@@ -1,0 +1,65 @@
+---
+slug: "the-cost-of-we-will-fix-it-later-a-postmortem"
+title: "The Cost of \"We Will Fix It Later\": A Postmortem"
+excerpt: "Every team says it. Almost no team does it. Here is the real cost of deferred engineering decisions and what to do instead."
+date: "2026-05-24"
+category: "Software Costs and Budgeting"
+tags: ["budget", "cost", "tech-debt", "postmortem", "engineering"]
+readingMinutes: 7
+ogImage: "/api/og/blog/the-cost-of-we-will-fix-it-later-a-postmortem"
+status: "published"
+faq: [
+  {"q":"Is \"we will fix it later\" ever the right decision?","a":"Yes: for code that is in a stable, rarely-touched part of the system where the shortcut has no ongoing cost. The wrong case is \"we will fix it later\" for code that is on the critical path or in active development."},
+  {"q":"How do I get product managers to support tech debt remediation time?","a":"Frame it in terms of feature velocity impact. \"This deferred fix is adding multiple days to every feature we build in this subsystem\" is a concrete, actionable statement. Product managers respond to velocity impacts because they affect the roadmap."},
+  {"q":"What percentage of a sprint should be reserved for deferred fixes?","a":"In my experience, 15 to 20 percent is sustainable for a codebase that is actively adding features. Below 15 percent, debt accumulates faster than it is paid down. Above 30 percent, the team is spending more time maintaining than building."},
+  {"q":"Should I disclose tech debt to investors or acquirers?","a":"In an acquisition due diligence process, significant tech debt will be discovered by technical reviewers. Disclosing it proactively with a remediation plan is better than having it discovered and raising questions about what else is hidden."},
+  {"q":"How do I prevent the pattern in a new project?","a":"Set the standard in the first sprint: every shortcut must be logged in the backlog at the time it is taken. The logging requirement creates awareness and accountability from the first line of code."}
+]
+---
+
+# The Cost of "We Will Fix It Later": A Postmortem
+
+**"We will fix it later" is the most expensive sentence in software development. It is said with good intentions under deadline pressure, and it is almost never fulfilled in the timeframe implied. The later that was supposed to be next week becomes next sprint, then next quarter, then never, until the deferred fix becomes the source of a production incident or a complete rewrite. This post is a postmortem on the pattern itself: where it comes from, what it costs, and how to break it.**
+
+## What you need to know
+
+- "We will fix it later" is a decision, not a placeholder; it commits the team to a future cost that is always higher than the present cost of the fix
+- The probability of a deferred fix being completed drops significantly with each passing week
+- Deferred fixes compound: one unfixed problem creates the context in which the next shortcut is taken
+- The most dangerous deferred fixes are in security, data integrity, and core business logic
+- The only reliable way to pay down deferred debt is to schedule it explicitly, not to leave it to the goodwill of future sprints
+
+## The core argument
+
+The mechanism behind "we will fix it later" is rational at the moment it is said. There is a deadline. There is a working implementation, imperfect but functional. The cost of fixing it now is a delay to the deadline. The cost of fixing it later is a future sprint commitment. Future sprints feel less real than the current deadline, so the deferred option is always chosen. This is not irrational. It is a reasonable response to the incentive structure of software development under deadline pressure. The problem is that the incentive structure does not change. Future sprints have future deadlines. The fix that was deferred from sprint three gets deferred again from sprint five, and again from sprint eight.
+
+The compounding effect is what makes this pattern expensive at scale. A single deferred fix is a manageable debt item. Ten deferred fixes in the same subsystem create a system that is difficult to reason about, slow to modify, and prone to unexpected interactions between the shortcuts. The team that built the system knows where the bodies are buried. A new developer inheriting the codebase does not, and their first weeks of contribution are spent discovering the shortcuts rather than building features. I have inherited codebases with significant deferred debt and it consistently costs substantial time in mapping before any meaningful new development can begin.
+
+The "we will fix it later" pattern also has a team dynamics cost that is separate from the technical cost. Engineers who ship knowing that they are shipping something they are not proud of accumulate what is sometimes called engineering shame: the discomfort of working on a system that reflects their worst rather than their best work. This is not a morale problem that resolves with surface-level fixes. It is a signal that the team's standards and the team's capacity to meet those standards are out of alignment. Addressing it requires either improving the capacity (more time, fewer features per sprint) or acknowledging honestly that the standard is not achievable given the current constraints.
+
+## Common mistakes
+
+1. **Not writing down deferred fixes at the time of deferral.** A "we will fix it later" that is not recorded in the backlog does not exist as a future commitment. It exists only in the memory of the developer who wrote the shortcut, and only until they move on. Log every deferral in the backlog immediately.
+2. **Estimating the future fix cost as the same as the current fix cost.** The fix will be harder later because more code will have been built on top of the shortcut. Estimate the future fix cost at roughly double the current fix cost to account for the additional context and dependencies that will have accumulated.
+3. **Treating all deferred fixes as equal priority.** A deferred fix in the authentication system is not the same priority as a deferred fix in the email formatting logic. Classify each deferred item by its proximity to security, data integrity, and core business logic. High-proximity items need a near-term remediation date.
+4. **Scheduling fix sprints that never happen.** "We will have a tech debt sprint next quarter" is the organizational equivalent of "we will fix it later." Tech debt sprints that are planned more than six weeks in advance almost never happen as planned because the product roadmap will have changed. Reserve capacity in every sprint rather than accumulating it into future dedicated sprints.
+5. **Fixing symptoms rather than causes.** A team that keeps shipping with the same shortcuts is not having a quality problem. It is having a process or capacity problem. If "we will fix it later" is the default response to every quality issue, the conversation that needs to happen is not about the individual fix but about the conditions that make the fix impossible in the present sprint.
+
+## Where to start
+
+**Step 1: Run a "we will fix it later" audit.** Go through your backlog and codebase TODOs and collect every deferred commitment. Estimate the current remediation cost and classify each one as security-related, data integrity-related, or convenience-related. This gives you a full picture of the debt load.
+
+**Step 2: Schedule the top three security and data integrity items in the next sprint.** These are the deferred fixes that have a real downside if they remain deferred. Do not wait for a dedicated tech debt sprint. Allocate specific story points to these items in the next sprint and treat them as delivery commitments.
+
+**Step 3: Change the deferral language in your process.** Replace "we will fix it later" with "we are deferring this with a remediation estimate of X weeks and a cost estimate of Y hours." The specific language creates accountability. A deferral that has a named cost and a named timeline is more likely to be paid down than one that was kicked into a vague future.
+
+## Related reading
+
+- [The Cost of Tech Debt: A Founder's Worst Bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill)
+- [The Cost of Trying to Be Cheap: Founder Confessions](/blog/the-cost-of-trying-to-be-cheap-founder-confessions)
+- [The Cost of Rebuilding Trust After a Bad Launch](/blog/the-cost-of-rebuilding-trust-after-a-bad-launch)
+- [The Cost of Over-Caching: Stale Data Stories](/blog/the-cost-of-over-caching-stale-data-stories)
+
+## The Contractor Who Ships Clean
+
+There is a version of this work built by someone who says "we will fix it later" and means it. I am not that person. Yashveer Singh Rajpoot, Yashveer Labs, New Delhi. Five production systems, all maintained. The arc of the work points toward machine learning, AI engineering, and systems that hold up under real conditions. The contact page and Instagram are both open.

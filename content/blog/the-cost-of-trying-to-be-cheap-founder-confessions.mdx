@@ -1,0 +1,65 @@
+---
+slug: "the-cost-of-trying-to-be-cheap-founder-confessions"
+title: "The Cost of Trying to Be Cheap: Founder Confessions"
+excerpt: "Cutting costs in software development is not the same as being frugal. Here is what founders get wrong when they optimize for the lowest price."
+date: "2026-05-24"
+category: "Software Costs and Budgeting"
+tags: ["budget", "cost", "founders", "hiring", "frugality"]
+readingMinutes: 7
+ogImage: "/api/og/blog/the-cost-of-trying-to-be-cheap-founder-confessions"
+status: "published"
+faq: [
+  {"q":"Is it ever right to choose the cheapest developer?","a":"Yes: for low-stakes internal tools, proof-of-concept work, or simple integrations where the codebase will not be maintained long-term. The threshold is: if this code goes wrong, what does it cost to fix it?"},
+  {"q":"What is the actual cost difference between good and cheap infrastructure?","a":"For a typical early-stage SaaS, the difference between a properly configured production environment and a cheap shared hosting setup is often $30 to $100 per month. The reliability difference is not proportional to the cost difference. Proper infrastructure is worth the premium."},
+  {"q":"How do I know if I am being frugal versus cheap?","a":"The test is: are you making a trade-off that saves money by accepting a well-understood and acceptable risk, or are you making a decision that saves money by hoping nothing goes wrong? Frugality involves clear tradeoffs. Cheapness involves wishful thinking."},
+  {"q":"What should never be cut from a software budget?","a":"Security basics, proper developer contracts with IP assignment, basic monitoring and alerting, and reliable hosting for any user-facing application. These are the floors of a defensible budget, not premium add-ons."},
+  {"q":"How do I push back on investor pressure to cut development costs?","a":"Frame it in expected value terms. A $10,000 development project with a significant chance of requiring a costly rewrite has a higher true expected cost than a more expensive option from a more experienced developer. The cheaper option is often not cheaper in expectation."}
+]
+---
+
+# The Cost of Trying to Be Cheap: Founder Confessions
+
+**Frugality is a virtue in early-stage startups. Cheapness is a different thing. Frugality is being deliberate about where you spend and maximizing value per dollar. Cheapness is optimizing for the lowest number on every line item without accounting for the downstream cost of that optimization. This post is a collection of the most expensive ways founders try to be cheap on software development, written for founders who are in the middle of making these decisions right now.**
+
+## What you need to know
+
+- The cheapest quote is almost never the cheapest outcome
+- Saving money on development usually means spending more money on fixes, rewrites, and timeline extensions
+- The total cost of a software project includes the initial development cost plus the operational cost plus the maintenance cost plus the opportunity cost of delays
+- The areas where cheapness is most costly are: developer quality, infrastructure reliability, and security
+- Frugality in software development means choosing simpler architecture over complex architecture, not choosing cheaper developers over experienced ones
+
+## The core argument
+
+The most common expression of cheapness in software development is the developer hiring decision. A founder who receives three quotes for a project and chooses the lowest one without investigating the tradeoffs is not being frugal. They are buying a lottery ticket. The lowest quote is the lowest quote for one of three reasons: the developer is less experienced and does not know how long the work actually takes, the developer is cutting corners in the estimate to win the project and will scope-creep later, or the developer is genuinely efficient and well-priced. The third option exists, but the base rate is lower than founders expect. Most of the time, the lowest quote reflects a different level of capability or a different understanding of the project scope.
+
+The second most common expression of cheapness is infrastructure decisions. A founder who chooses the cheapest hosting tier for a production application is not saving money. They are accepting a performance and reliability risk that materializes at the worst possible moment: when real users are trying to use the product. I have seen production applications running on shared hosting plans that were chosen because they were a few dollars cheaper per month than the next tier. The application became unusable under load, the founder spent two weeks migrating to a proper infrastructure, and the migration cost in developer time far exceeded the hosting savings over the project lifetime. The math does not work.
+
+The third is security. Founders who decide that security is a cost they will defer until they have revenue are making a decision that can end the company. A data breach on a pre-revenue startup is not a recoverable event. It erases user trust at the moment you most need it, creates legal liability before you have the resources to handle it, and is almost always more expensive to remediate than the security investment would have been. Basic security practices, proper authentication, encrypted data at rest, rate limiting, and input validation are not premium features. They are table stakes for any application that handles user data.
+
+## Common mistakes
+
+1. **Hiring the cheapest developer available rather than the most appropriate developer for the scope.** For a complex production system, the cheapest developer is rarely the right choice. For a simple internal tool, an experienced senior developer may be overkill. Match the developer's experience level to the project's complexity, not to the lowest available hourly rate.
+2. **Skipping code reviews to save time.** Code reviews are not overhead. They are quality control that prevents bugs from reaching production. A single production bug that could have been caught in a code review typically costs more in developer time to debug and fix than the review would have taken.
+3. **Using free tiers in production for critical services.** Free tiers are appropriate for development and testing. Production applications that depend on rate-limited, support-free, and uptime-unguaranteed free tiers are accepting a reliability risk that will eventually materialize as a user-facing incident.
+4. **Deferring monitoring and observability.** Not knowing what is happening in your production application is expensive because you discover problems through user reports rather than through your own monitoring. The cost of a monitoring setup is much lower than the cost of the incidents you will miss without it.
+5. **Not paying for proper legal and contract templates.** A founder who saves money by using a generic contract template for developer engagements and then has an IP dispute has not saved money. They have deferred a legal cost and added interest in the form of an active dispute. Get proper IP assignment clauses, NDAs, and scope-of-work templates before you need them.
+
+## Where to start
+
+**Step 1: Audit your current cost optimization decisions and categorize them as frugal or cheap.** Frugal is: choosing a simpler architecture that accomplishes the goal with less complexity. Cheap is: choosing a lower-quality implementation that accomplishes the goal less reliably. For each decision, assess whether the downstream cost of the cheaper choice is lower than the savings.
+
+**Step 2: Identify your three highest-risk cheapness decisions and assess the downside.** The question is not "how much are we saving?" but "what happens if this goes wrong, and how likely is that?" For infrastructure and security decisions, the downside is typically severe enough that the cheapness is not worth the risk.
+
+**Step 3: Reframe the development budget conversation as total cost of ownership.** When evaluating a developer quote or an infrastructure option, estimate the total cost over 12 months: initial cost plus operational cost plus expected maintenance and incident response. The cheapest option often does not win this comparison.
+
+## Related reading
+
+- [The Cost of Tech Debt: A Founder's Worst Bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill)
+- [The Cost of Switching Developers Mid-Project](/blog/the-cost-of-switching-developers-mid-project)
+- [The Cost of "We Will Fix It Later": A Postmortem](/blog/the-cost-of-we-will-fix-it-later-a-postmortem)
+- [The Cost of Rebuilding Trust After a Bad Launch](/blog/the-cost-of-rebuilding-trust-after-a-bad-launch)
+
+## Why I Write About This
+
+I built my first production system at fifteen and have not stopped since. Yashveer Singh Rajpoot, founder of Yashveer Labs. Commerce track in school, full stack engineering in practice. The projects in production include Nexli, Nyxera, Dwarka Bricks, and Prominence Football Academy. If you need a developer who ships without the cheap shortcuts, the portfolio is at yashveerlabs.vercel.app and the Instagram is in the header.

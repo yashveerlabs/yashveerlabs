@@ -1,0 +1,96 @@
+---
+slug: "the-engineering-operations-team-when-you-need-one"
+title: "The Engineering Operations Team: When You Need One"
+excerpt: "The signals that tell you it is time to invest in a dedicated engineering operations function and what that investment actually looks like at startup scale."
+date: "2026-01-28"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","devops","operations","infrastructure"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-operations-team-when-you-need-one"
+status: "published"
+definition: "An engineering operations team -- whether called DevOps, Platform Engineering, Site Reliability Engineering, or Infrastructure -- is the team responsible for the systems that other engineering teams build on. The question of when to create a dedicated operations function is distinct from the question of whether operations work needs to be done. Operations work is required from the first day of production traffic. The question is when it requires dedicated ownership rather than being distributed across the product engineering teams."
+faq: [
+  {"q":"What is the difference between DevOps, Platform Engineering, and SRE?","a":"DevOps is a philosophy of shared ownership between development and operations. Platform Engineering is a team that builds internal infrastructure that other engineering teams use. SRE (Site Reliability Engineering) is a Google-originated model where engineers apply software engineering methods to operations problems. In practice, startups use these terms interchangeably for the same team. The distinction matters less than what the team actually does."},
+  {"q":"When should a startup hire its first dedicated infrastructure engineer?","a":"When the time that product engineers spend on infrastructure setup, deployment, and incident response is consistently more than 20 percent of their capacity. At this point, a dedicated infrastructure engineer whose full-time job is this work is more efficient than distributing the work across engineers who are also responsible for product."},
+  {"q":"What does an engineering operations team do at a 20-person engineering org?","a":"CI/CD pipeline maintenance and optimization, developer tooling, cloud cost management, security baseline, on-call rotation management, infrastructure as code, and incident response coordination. At this scale, the team is probably one to three people and focuses on enabling the product engineering teams to ship faster and more reliably."},
+  {"q":"Should the operations team be separate from the product engineering teams?","a":"In most startup contexts, yes. Operations work requires different priorities than product work: an engineer who is responsible for both will deprioritize infrastructure work when product deadlines approach. A dedicated team has infrastructure reliability as its primary objective, not a secondary obligation."},
+  {"q":"How do I avoid the operations team becoming a bottleneck?","a":"By defining the operations team's role as enabling rather than gatekeeping. The operations team should be building tools and automation that let product engineers self-serve for common operations needs. An operations team that is a required approval for every deployment or infrastructure change becomes a bottleneck. One that builds the platform that lets teams deploy themselves does not."}
+]
+---
+
+## What you actually need to know
+
+- Operations work is required from day one. Dedicated operations ownership is required when the work is too large and consistent for part-time attention from product engineers.
+- The trigger for a dedicated operations hire is usually: incident response is taking product engineers out of their primary work regularly, or CI/CD and infrastructure setup is creating consistent friction that slows shipping.
+- The operations team's role is to enable, not to gatekeep. An operations team that controls deployment is a bottleneck. One that automates deployment for product teams is an accelerator.
+- At under 10 engineers, operations is usually a shared responsibility with one engineer taking primary ownership. At 20 to 30 engineers, a dedicated operations function typically becomes worth the headcount.
+- Platform Engineering and SRE are the same function at different scales. Do not import Google's SRE model at 20 engineers.
+
+| Engineering Org Size | Operations Model | What to Build |
+|---|---|---|
+| 1-5 engineers | Founder or senior engineer does it all | Basic CI/CD, cloud account setup |
+| 5-15 engineers | One engineer as informal owner | Automated deployments, monitoring, on-call |
+| 15-30 engineers | First dedicated operations hire | Platform tooling, incident process, cost management |
+| 30-60 engineers | Small operations team (2-3) | Internal developer platform, SLOs, reliability program |
+| 60+ engineers | Platform Engineering or SRE team | Multi-team infrastructure, dedicated reliability engineering |
+
+## The core argument
+
+The startup that ignores infrastructure until it breaks and the startup that builds a dedicated Platform Engineering team at ten engineers are both making the wrong call. The first gets surprised by production incidents that take the team days to resolve. The second spends engineering headcount on infrastructure that could have been a shared responsibility for another year.
+
+The right time to formalize operations ownership is when the informal arrangement is visibly failing. The signals: product engineers are spending more than one day per week on infrastructure problems, production incidents are recurring with the same root causes because there is no dedicated person tracking them, developer setup is taking new engineers multiple days and the documentation is perpetually stale, or cloud costs are growing faster than product usage and no one owns the budget.
+
+At this point, a dedicated operations hire pays for itself in the time it returns to product engineers. The product engineer who spends eight hours per week on infrastructure problems is eight hours per week not building product. A dedicated infrastructure engineer whose full-time job is infrastructure removes this drag from ten product engineers. The headcount math is straightforward.
+
+What the operations function should not become: a team that controls access to production and reviews every change. This model, inherited from traditional IT operations, is inappropriate for a startup context. The goal is to increase the team's ability to ship reliably, not to slow deployment for the sake of process. The operations team that enables self-service for product engineers is valuable. The operations team that creates a new approval layer is an obstacle.
+
+## What operations work looks like at startup scale
+
+At a 15 to 30 engineer startup, the operations function is typically one to two people. Their responsibilities span several categories.
+
+CI/CD and deployment: maintaining the pipeline that runs tests and deploys code, reducing the runtime so that feedback is fast, building the tooling that lets engineers deploy without manual steps. This is the highest-value investment for engineering velocity.
+
+Observability: ensuring that the production system produces the signals needed to understand its behavior. Error tracking, distributed tracing, metrics and dashboards, alerting. The product engineer who is trying to debug a production issue needs these tools to be working and configured correctly before the incident, not during it.
+
+Infrastructure as code: ensuring that the infrastructure configuration is in version control, reproducible, and auditable. An environment that exists only as console clicks is not reproducible, which means incident recovery is harder and new environment provisioning is manual.
+
+Security baseline: implementing the practices that keep the system from being a security liability without requiring security expertise from every engineer. MFA on all accounts, least-privilege access policies, secret management, dependency vulnerability scanning.
+
+Cost management: tracking cloud spend and identifying the largest contributors to cost growth. Cloud costs that are not actively managed grow without limit. An operations engineer whose job includes cost management pays for themselves in the savings they surface.
+
+## Building the case for the first operations hire
+
+The engineering leader who needs to hire an operations engineer needs to make the case to the founder or the board. The case is not abstract: it is the measured cost of the current arrangement.
+
+Quantify the time product engineers spend on infrastructure work each week. Multiply by the fully loaded cost of those engineers. A team of eight engineers each spending five hours per week on infrastructure is 40 hours per week of product engineering time on infrastructure. At a loaded cost of $150 per engineer-hour, this is $6,000 per week. A dedicated infrastructure engineer whose full-time job is this work costs far less than $6,000 per week and frees the $6,000 of product engineering capacity.
+
+The case is even stronger when the cost of incidents is included. A production incident that requires four engineers to resolve over eight hours costs 32 engineer-hours. If incidents occur monthly, this is 32 engineer-hours per month in addition to the regular infrastructure work.
+
+This math, presented with actual numbers from the team's recent quarter, makes the operations hire decision a straightforward financial case rather than an intuitive judgment call.
+
+## Common mistakes engineering leaders make with operations
+
+1. Creating an operations team before operations work is formalized. The first operations hire should have a clear scope of work. Hiring someone and figuring out their job afterward wastes the early months of their time.
+2. Hiring from the traditional IT operations background for a software-forward operations role. The infrastructure engineer who is valuable at a startup writes code, builds automation, and treats the infrastructure as software. The background that predicts this is software engineering with operations experience, not traditional IT administration.
+3. Making the operations team a deployment approval gate. Approval gates slow deployment without improving reliability. Deploy more reliably by automating the deployment pipeline, not by adding human review.
+4. Not including operations in the engineering planning process. The operations team knows what is creating reliability risk. If they are not in planning, the risk does not get prioritized until it becomes an incident.
+5. Measuring operations success by uptime alone. Uptime is a lagging indicator. The leading indicators are deployment frequency, mean time to recovery, and developer satisfaction with tooling. These tell you whether the operations investment is improving the team's performance.
+
+## Where to start: a 3-step operations foundation
+
+**Step 1: Measure the current infrastructure time cost.** Ask engineers to track infrastructure-related work for two weeks. What are they spending time on? How long is each category taking? This produces the baseline for the case to formalize operations ownership.
+
+**Step 2: Identify the highest-friction infrastructure pain for product engineers.** The answer is usually in one of three categories: slow CI/CD pipeline, manual deployment steps, or incident response without clear ownership. Fix the highest-friction item first, before hiring.
+
+**Step 3: Define the scope for the first operations hire based on the measurement.** What are the highest-value infrastructure investments that a dedicated engineer would make? Write the role description from this list. The scope definition prevents the "figure it out when they get here" problem.
+
+## Infrastructure as Engineering Investment
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The infrastructure work behind projects like Nexli and Velmora was not an afterthought -- it was the foundation that made the product reliable enough to keep users. At startup scale, that work is doable without a dedicated operations team, but only with intention. The decision to formalize it is a decision about where you want to spend engineering capacity and how much reliability risk you are willing to carry.
+
+## Related reading
+
+- [The Engineering Dashboard Every Founder Should Have](/blog/the-engineering-dashboard-every-founder-should-have)
+- [The Deployment Pipeline That Survives Real-World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- The On-Call Rotation That Does Not Break Engineers
+- [The Disaster Recovery Plan That Fits on One Page](/blog/the-disaster-recovery-plan-that-fits-on-one-page)

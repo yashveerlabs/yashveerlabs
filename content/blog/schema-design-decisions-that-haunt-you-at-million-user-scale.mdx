@@ -1,0 +1,62 @@
+---
+slug: "schema-design-decisions-that-haunt-you-at-million-user-scale"
+title: "Schema Design Decisions That Haunt You at Million User Scale"
+excerpt: "The schema decisions that feel fine at 10,000 users become migration nightmares at a million. Here are the specific choices that cause the most pain, and how to make the right call earlier than most teams do."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/schema-design-decisions-that-haunt-you-at-million-user-scale"
+status: "published"
+definition: "Schema design decisions at scale refers to the database structure choices made early in a product's development that become expensive to change once data volumes are large and production traffic is continuous. These decisions include primary key type selection, timestamp precision, soft delete implementation, JSON column usage, and index strategy. Changes to these structures on large tables require careful migration strategies to avoid downtime, and some choices are practically irreversible once millions of rows exist."
+faq: [
+  {"q":"Why does primary key type matter at scale?","a":"Sequential integer primary keys create index hot spots on high-write tables because every new row inserts at the same end of the B-tree index. At scale, this creates write contention on the index page as multiple concurrent inserts compete for the same leaf. UUID primary keys distribute inserts across the index tree, eliminating the hot spot. The trade-off: UUID primary keys increase index size and reduce cache efficiency for range scans compared to sequential integers. The practical recommendation: use UUIDs for tables with high concurrent write rates, sequential IDs for tables where insert contention is not a concern and range scan efficiency matters."},
+  {"q":"What is the soft delete problem at scale?","a":"Soft deletes mark rows as deleted (typically with a deleted_at timestamp or is_deleted boolean) rather than removing them from the table. At scale, the soft delete pattern causes three problems: the deleted rows accumulate in the table, increasing table size and slowing full scans; every query against the table must include WHERE deleted_at IS NULL to exclude deleted rows, and a missing WHERE clause exposes deleted data; and indexes become bloated with entries for deleted rows that are never queried. Solutions: periodically archive deleted rows to a separate archive table, use row-level security to automatically exclude deleted rows from all queries, or use table partitioning to separate active and deleted data."},
+  {"q":"What is the EAV (entity-attribute-value) anti-pattern and when does it appear?","a":"The EAV pattern stores flexible attributes as rows in a key-value table rather than as columns in a typed table: instead of a users table with a phone_number column, EAV stores (user_id, 'phone_number', '555-1234') as a row in an attributes table. EAV is tempting when attributes vary across records or when schema changes are feared. At scale, it is a performance and correctness disaster: querying multiple attributes requires multiple joins or sub-selects, type safety is lost (all values are strings), and index strategies are extremely limited. Use JSON columns for genuinely flexible attributes rather than EAV."},
+  {"q":"How should timestamps be stored and why does precision matter?","a":"Timestamps should be stored as timestamptz (timestamp with time zone) in PostgreSQL, not as Unix timestamps or timestamp without time zone. timestamptz stores in UTC and converts to local time on retrieval, making timezone handling consistent. timestamp without time zone stores the literal value with no timezone context, which causes bugs when application servers are in different timezones than the database. At scale, timezone bugs are extremely hard to diagnose because they produce subtle data inconsistencies rather than hard errors. Start with timestamptz consistently."},
+  {"q":"When should you use JSON columns in PostgreSQL versus normalized tables?","a":"JSON columns are appropriate for: genuinely flexible data where the attribute set varies per record and cannot be known at schema design time (user-configured form fields, plugin settings, external API response caching). JSON columns are not appropriate for: data that is frequently queried or filtered (JSON queries cannot use standard B-tree indexes efficiently), data that must maintain relational integrity with other tables, or data where consistent structure is important for data quality. At scale, JSON columns that have grown to contain frequently-queried attributes should be migrated to proper typed columns with standard indexes."}
+]
+---
+
+## What you need to know
+
+- UUID vs sequential integer primary keys is a consequential choice for high-write tables. Sequential IDs create index hot spots at scale; UUIDs distribute them.
+- Soft delete without row archival causes tables to grow without bound and slows every query that needs to filter deleted rows.
+- EAV (entity-attribute-value) patterns feel flexible in early design and become performance bottlenecks at any meaningful scale. Use JSON columns instead.
+- Timestamp columns must be timestamptz, not timestamp. Timezone bugs at scale are subtle and expensive to diagnose.
+- JSON columns are appropriate for genuinely flexible data and inappropriate for data that is queried or filtered frequently.
+
+## The core argument
+
+Schema decisions are uniquely painful to change at scale because the migration tooling for large tables is limited. Renaming a column on a 50-row table is a one-second operation. Renaming a column on a 200-million-row table requires a new column, a backfill job running over days, dual-write from application code, and a cutover coordination window. The migration cost at scale means that schema decisions made early in a product's life are effectively permanent unless the team has significant operational bandwidth to manage the migration.
+
+The schema mistakes that cause the most long-term pain are not the obvious ones. Nobody ships a production product with a column named x1. The mistakes are the ones that look reasonable at design time: storing timestamps as Unix integers because it seemed simpler, using a JSON blob for a configuration object that later needs to be queried, soft-deleting rows without any archival plan. Each of these decisions is defensible at 1,000 users and painful at 1,000,000.
+
+The decision that I see cause the most recurring pain in products I have worked with is the soft delete pattern implemented without row archival. The deleted rows accumulate forever. A users table with 10 percent annual churn accumulates a significant fraction of deleted rows within a few years. Every query hits the dead weight, every index includes dead entries, and vacuuming the table takes longer as the dead row count grows. The fix, migrating deleted rows to an archive table, is straightforward but requires coordination across the application to ensure deleted row lookups (for audit trail, support, or compliance purposes) query the archive rather than the main table.
+
+## Common mistakes
+
+1. **Using integer primary keys on multi-tenant tables with parallel write patterns.** Multi-tenant tables where multiple tenants are inserting rows concurrently generate sequential ID contention at the B-tree leaf level. This is measurable as lock wait time on the primary key index under load. Switching to UUID primary keys on multi-tenant tables eliminates this contention class before it becomes an incident.
+
+2. **Not creating composite indexes that match the most common WHERE patterns.** A WHERE clause filtering on (tenant_id, status, created_at) requires a composite index on those three columns in that order to be used efficiently. An index on tenant_id alone forces the query planner to filter on status and created_at after the tenant_id scan, which may be acceptable at 100,000 rows and unacceptable at 100,000,000 rows. Analyze the most common WHERE patterns and build composite indexes to match them.
+
+3. **Storing derived or computed values as columns without a consistency mechanism.** A column that caches the result of an aggregation (total_order_count on the users table) must be kept in sync with the source data. Without a disciplined consistency mechanism (database triggers, event-driven updates), it drifts from the actual value. At scale, inconsistent cached values produce user-visible data quality problems and require periodic reconciliation jobs.
+
+4. **Not planning for large table migrations before the table is large.** Adding a NOT NULL column with a default value to a table requires a table rewrite in older PostgreSQL versions. Dropping a column does not reclaim space without a VACUUM FULL. Changing a column type may require a full table scan and temporary double-storage. Understanding the cost of schema changes before the table is large allows the engineering team to plan ahead rather than discover constraints mid-incident.
+
+5. **Using TEXT for columns with a bounded set of values instead of an enum or check constraint.** A status column that accepts any text value will eventually contain inconsistent values (active, Active, ACTIVE, enabled, Enabled) that break filtering and reporting. Use an enum or a check constraint to enforce the allowed values at the database level. Correcting inconsistent text data in a large table is more expensive than adding the constraint from the start.
+
+## Where to start
+
+1. **Audit the five highest-row-count tables in the production database.** For each, check: primary key type (int vs UUID), whether soft delete is implemented without archival, whether there are JSON columns being queried as filter conditions, and whether all common WHERE patterns have corresponding indexes. This audit takes two hours and reveals the most important schema debt items before they become incidents.
+
+2. **Implement row archival for soft-deleted records.** Create an archive table with the same schema as the main table. Build a scheduled job that moves rows where deleted_at is older than a threshold (30 days, 90 days depending on business requirements) from the main table to the archive. Ensure the application code can query the archive table for lookup use cases (support, audit trail). This prevents the indefinite accumulation of dead rows in high-churn tables.
+
+3. **Add timestamptz to all new timestamp columns and plan migration of existing timestamp columns.** Review all timestamp columns for timestamptz vs timestamp usage. Schedule migration of timestamp columns to timestamptz during a low-traffic window using a rename-and-add approach to avoid table locks. The migration is straightforward and the correctness benefit for timezone handling is permanent.
+
+## Related reading
+
+- [Query Optimization in PostgreSQL: Real Examples From Real Projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects)
+- [Scaling from One Thousand to One Hundred Thousand Users: The Invisible Database Bottlenecks](/blog/scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks)
+- [Schema Evolution: Adding Columns Without Downtime](/blog/schema-evolution-adding-columns-without-downtime)
+- [SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)

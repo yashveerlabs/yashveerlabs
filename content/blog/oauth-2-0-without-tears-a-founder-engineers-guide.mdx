@@ -1,0 +1,62 @@
+---
+slug: "oauth-2-0-without-tears-a-founder-engineers-guide"
+title: "OAuth 2.0 Without Tears: A Founder Engineer's Guide"
+excerpt: "OAuth 2.0 is the authentication delegation standard that every modern app needs to understand. Here is how it works, which flow to use, and the implementation mistakes that lead to security incidents."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","founders"]
+readingMinutes: 6
+ogImage: "/api/og/blog/oauth-2-0-without-tears-a-founder-engineers-guide"
+status: "published"
+definition: "OAuth 2.0 is an authorization framework that allows applications to access resources on behalf of a user without handling or storing the user's credentials. The user authorizes the application through an authorization server (Google, GitHub, Okta) and the application receives an access token it can use to call APIs. OAuth 2.0 defines several flows (authorization code, implicit, client credentials, device code) for different use cases. Implementing the wrong flow or mishandling tokens introduces security vulnerabilities."
+faq: [
+  {"q":"What is the difference between OAuth 2.0 and OpenID Connect?","a":"OAuth 2.0 is an authorization framework: it answers whether an application can access a specific resource on behalf of a user. OpenID Connect (OIDC) is an identity layer built on top of OAuth 2.0: it answers who the user is, returning an ID token with user identity information in addition to the access token. For applications that need to authenticate users (sign in with Google, sign in with GitHub), OIDC is the relevant standard. For applications that only need API access (access a user's Google Drive), OAuth 2.0 without OIDC is sufficient."},
+  {"q":"Which OAuth 2.0 flow should a web application use?","a":"The authorization code flow with PKCE (Proof Key for Code Exchange). This is the current best practice for all client-side applications including single-page apps and mobile apps. The implicit flow, which was common for SPAs, has been deprecated because it returns access tokens in the URL fragment where they are exposed to browser history and referrer headers. Authorization code with PKCE avoids this by exchanging a code for a token in a server-to-server call."},
+  {"q":"What is a refresh token and when should it be used?","a":"A refresh token is a long-lived credential that allows an application to obtain new access tokens after the current access token expires, without requiring the user to re-authenticate. Refresh tokens are appropriate for applications where users should remain logged in for extended periods. They must be stored securely: in a server-side session for web apps, in secure storage for mobile apps. A leaked refresh token allows an attacker to obtain access tokens indefinitely until the refresh token is explicitly revoked."},
+  {"q":"What is the client credentials flow and when is it used?","a":"The client credentials flow is used for machine-to-machine communication where there is no user involved. A backend service authenticating with another backend service (a data processing worker calling an internal API, a cron job accessing cloud storage) uses client credentials. The application authenticates with its own identity (client ID and secret) rather than delegating a user's access. This flow should never be used in client-side code because the client secret cannot be stored safely in a browser or mobile app."},
+  {"q":"What are the most common OAuth 2.0 implementation mistakes?","a":"The most common mistakes are: using the implicit flow for SPAs instead of authorization code with PKCE; not validating the state parameter (which prevents CSRF attacks); storing access tokens in localStorage instead of memory or httpOnly cookies; not validating the ID token signature and claims in OIDC implementations; and not implementing token rotation for refresh tokens. Most of these mistakes are avoided by using a maintained OAuth library rather than implementing the flows manually."}
+]
+---
+
+## What you need to know
+
+- OAuth 2.0 is an authorization framework, not an authentication protocol. OpenID Connect (OIDC) adds the identity layer that makes "sign in with Google" possible.
+- The authorization code flow with PKCE is the correct flow for web applications and mobile apps. The implicit flow is deprecated. Do not use it in new implementations.
+- Access tokens are short-lived credentials for API calls. Refresh tokens are long-lived credentials for obtaining new access tokens. Both must be stored securely and both have different security risk profiles.
+- The state parameter in OAuth flows is a CSRF protection mechanism. Not validating it allows attackers to inject authorization codes from a different session.
+- Using a maintained OAuth library prevents the most common implementation mistakes. Manual OAuth implementation introduces subtle vulnerabilities that library authors have already solved.
+
+## The core argument
+
+OAuth 2.0 has a reputation for being complex, and implementations done without careful attention to the security requirements produce vulnerabilities that are not obvious until they are exploited. The complexity is real but manageable when understood correctly. The protocol has a small number of core concepts (client, resource server, authorization server, access token, refresh token) and a small number of flows (authorization code, client credentials, device code). The security properties of each flow follow logically from those concepts.
+
+The authorization code flow works as follows: the user is redirected to the authorization server (Google, GitHub) with a request that includes the client's identity, the requested permissions, and a state value. The user authenticates and approves the request at the authorization server. The authorization server redirects back to the application with a code and the state value. The application validates the state, exchanges the code for an access token in a server-side call, and uses the access token for API calls. The PKCE extension adds a code verifier and challenge to this flow, which prevents an intercepted authorization code from being exchanged for a token by a different party.
+
+The security mistakes I see most often in OAuth implementations are token storage mistakes. Access tokens stored in localStorage are accessible to any JavaScript on the page, including third-party scripts. An XSS vulnerability that injects JavaScript can exfiltrate all localStorage tokens. The correct storage for web applications is httpOnly cookies (not accessible to JavaScript) for refresh tokens, and in-memory storage (a JavaScript variable) for access tokens, with the understanding that the access token is lost on page refresh and must be obtained from the refresh token each time. This is not how most tutorial implementations work, which is why tutorial-based OAuth implementations often have storage vulnerabilities.
+
+## Common mistakes
+
+1. **Using the implicit flow for a single-page application.** The implicit flow returns access tokens as URL fragments. These appear in browser history, are sent in Referer headers, and are logged by server access logs. The authorization code flow with PKCE provides equivalent functionality without the token exposure. All new SPA implementations should use authorization code with PKCE.
+
+2. **Not validating the state parameter on the callback.** The state parameter is a random value generated before the authorization redirect that the authorization server echoes back on the callback. Validating that the returned state matches the generated value prevents CSRF attacks. Skipping this validation is a security vulnerability in the implementation.
+
+3. **Implementing OAuth manually instead of using a maintained library.** Libraries like Auth.js, Passport.js, and the official Okta and Auth0 SDKs implement the flows correctly and handle the edge cases. Manual implementations often miss token validation, PKCE implementation details, or token rotation logic.
+
+4. **Storing refresh tokens insecurely in client-side applications.** Refresh tokens in localStorage are accessible to any JavaScript on the page. Mobile applications should use the platform's secure storage (Keychain on iOS, Keystore on Android). Web applications should store refresh tokens in httpOnly, Secure, SameSite=Strict cookies.
+
+5. **Not implementing token revocation.** When a user logs out, the access token and refresh token should be revoked at the authorization server. Applications that only delete the local token without revoking it at the server allow the token to be used until it expires, which for refresh tokens may be weeks or months.
+
+## Where to start
+
+1. **For a new implementation: choose a maintained OAuth library before writing any auth code.** For Next.js, Auth.js (formerly NextAuth) handles OIDC and OAuth 2.0. For Node.js backends, Passport.js has strategies for most providers. For React Native, the Expo Auth Session library handles authorization code with PKCE correctly.
+
+2. **Review the token storage strategy in any existing implementation.** Find where access tokens and refresh tokens are currently stored. If they are in localStorage, that is a security gap that should be addressed. Document the storage location and the risk before the next review cycle.
+
+3. **Verify that the state parameter is being validated.** Find the OAuth callback handler in the codebase and confirm that the state parameter returned from the authorization server is compared against the state value stored before the redirect. If it is not, add that validation.
+
+## Related reading
+
+- [JWT Best Practices in 2026: What Has Changed](/blog/jwt-best-practices-in-2026-what-has-changed)
+- [Multi-Factor Authentication: WebAuthn, TOTP, and Beyond](/blog/multi-factor-authentication-webauthn-totp-and-beyond)
+- [OWASP Top Ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026)
+- [Insecure Direct Object References: The Bug Founders Underestimate](/blog/insecure-direct-object-references-the-bug-founders-underestimate)

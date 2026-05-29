@@ -1,0 +1,61 @@
+---
+slug: "test-coverage-a-metric-with-a-story"
+title: "Test Coverage: A Metric With a Story"
+excerpt: "Test coverage tells you what percentage of your code runs during tests. It does not tell you whether those tests are meaningful. Here is how to use it correctly."
+date: "2026-05-24"
+category: "Tech Debt and Refactoring"
+tags: ["testing", "tech-debt", "engineering", "quality", "saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/test-coverage-a-metric-with-a-story"
+status: "published"
+faq: [
+  {"q":"What is a reasonable test coverage target?","a":"For critical business logic, aim for 85 to 95 percent branch coverage. For the overall codebase, 70 to 80 percent line coverage is a reasonable floor that indicates meaningful test investment without requiring coverage theater for low-risk code. The right number depends more on what is covered than on the percentage itself."},
+  {"q":"Does coverage matter more for some types of code than others?","a":"Yes. Code that processes money, modifies user data, or controls access should have near-complete branch coverage. Configuration code, logging utilities, and formatting helpers can have lower coverage without meaningful risk. Allocate test investment proportionally to risk."},
+  {"q":"How do I improve coverage on legacy code without introducing bugs?","a":"Add tests around the existing behavior first (characterization tests), then refactor. This establishes a safety net before you change anything. The existing behavior, bugs and all, becomes the baseline the tests verify. Once covered, bugs can be identified and fixed with confidence."},
+  {"q":"Is 100 percent test coverage ever worth pursuing?","a":"For critical safety systems, financial logic, or compliance-related code, yes. For typical SaaS applications, the marginal cost of the last 10 to 15 percent of coverage usually exceeds the risk reduction it provides. The time is better spent on integration tests and end-to-end test coverage of user-facing flows."},
+  {"q":"What tools should I use for coverage reporting in a TypeScript or Node.js project?","a":"Vitest and Jest both have built-in coverage support using c8 or Istanbul as the underlying engine. The coverage report can be generated as an HTML report for local review or as LCOV for CI integration. Istanbul with HTML reports is the most useful for identifying specific uncovered branches."}
+]
+---
+
+# Test Coverage: A Metric With a Story
+
+**Test coverage is the percentage of your codebase that is executed during your test suite. A 90 percent coverage number sounds like confidence. It often is not. Coverage tells you which lines ran, not whether the assertions around them were meaningful. A test that calls a function without asserting anything about its output counts as coverage. The metric is useful as a floor, not as a ceiling, and treating it as the latter is what produces test suites with high numbers and low confidence.**
+
+## What you need to know
+
+- Coverage below 60 percent is a real warning sign; coverage above 80 percent is not necessarily good
+- Branch coverage (testing both sides of every conditional) is more meaningful than line coverage and harder to achieve
+- The most valuable tests are the ones covering paths where bugs cause production incidents, not the ones boosting coverage numbers
+- Test coverage requirements in CI create perverse incentives when the threshold drives behavior instead of quality
+- The question to ask is not "what is our coverage?" but "what are the behaviors we are confident in?"
+
+## The core argument
+
+The coverage theater problem is real. Teams adopt a coverage threshold requirement (say 80 percent) and engineers write tests to meet the threshold rather than to verify behavior. The result is tests that call functions, check that the function returns something, and move on. These tests run, they count as coverage, they add to the number. They do not catch bugs because they are not asserting the right things. I have reviewed codebases with 85 percent coverage that had significant gaps in their critical business logic and extensive coverage of getter functions and utility code that almost never changes.
+
+The more useful framing is coverage as a discovery tool. Run your coverage report not to check the number but to find the gaps. Areas with zero coverage are areas where bugs will not be caught before production. That is information worth having. The question is not whether the gap exists but whether the code in that gap is important enough to justify the cost of testing it. A 0 percent covered utility function that formats dates is a different risk than a 0 percent covered payment processing pathway.
+
+The highest-value test investment is almost never at the edges of coverage. It is at the center: the core business logic, the state transitions, the data transformations that define what the product does. For Nexli, the critical paths are the enrollment workflow, the attendance tracking logic, and the fee calculation engine. These paths have comprehensive tests not because of a coverage target but because a bug in any of them directly harms real users and real institution operations. A bug in the date formatting utility is an inconvenience. A bug in the fee calculation is a financial error with real consequences.
+
+## Common mistakes
+
+1. **Setting a coverage threshold and treating it as quality assurance.** A number in CI that says 80 percent does not mean 80 percent of your important behaviors are verified. It means 80 percent of your lines execute during the test run. These are different things and conflating them produces false confidence.
+2. **Prioritizing coverage in low-risk code over critical paths.** Teams often write tests for pure utility functions (easy to test, small, well-defined) and avoid testing complex business logic (hard to test, stateful, dependency-heavy). The coverage number improves but the value is inverted.
+3. **Not distinguishing between line, branch, and path coverage.** Line coverage tells you which lines ran. Branch coverage tells you which conditional branches were evaluated. Path coverage tells you which combinations of branches were evaluated. Most production bugs live in conditionals that only execute under specific conditions; branch coverage finds these gaps, line coverage does not.
+4. **Treating 100 percent coverage as a goal.** Perfect coverage is a coverage theater maximum. The cost of testing every line including error paths, configuration defaults, and defensive null checks often exceeds the value. Choose the paths that matter and test them thoroughly.
+5. **Not reviewing what the tests actually assert.** A coverage report tells you what ran. A test review tells you what was verified. These are separate checks. Periodically read your tests and ask whether each assertion is meaningful and whether a bug in the tested code would actually fail the test.
+
+## Where to start
+
+**Step 1: Run your coverage report and identify the top five uncovered critical paths.** Not the uncovered utility code. The uncovered business logic: payment handling, auth flows, data transformations that directly affect users. Write tests for these first.
+
+**Step 2: Add branch coverage to your coverage reporting.** Most coverage tools support branch coverage as a separate metric. Enabling it shows you where your tests call a function but only test one branch of its conditional logic. Branch coverage gaps in business logic are where most production bugs hide.
+
+**Step 3: Make test quality reviews part of your code review process.** When reviewing a PR that adds tests, check whether the assertions are meaningful, not just whether coverage increased. "This test calls the function and checks it returns without throwing" is not sufficient for a function that processes financial data.
+
+## Related reading
+
+- [The Test Pyramid for SaaS: Unit, Integration, End to End](/blog/the-test-pyramid-for-saas-unit-integration-end-to-end)
+- [The Frontend Testing Strategy That Works](/blog/the-frontend-testing-strategy-that-works)
+- [Refactoring Without a Test Suite: A Survival Guide](/blog/refactoring-without-a-test-suite-a-survival-guide)
+- [Adding Tests to a Legacy Codebase Without Going Mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad)

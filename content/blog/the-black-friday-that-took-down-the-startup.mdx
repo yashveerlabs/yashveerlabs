@@ -1,0 +1,74 @@
+---
+slug: "the-black-friday-that-took-down-the-startup"
+title: "The Black Friday That Took Down the Startup"
+excerpt: "A postmortem on a traffic spike that took down a startup on its biggest day. What failed, why load testing failed to catch it, and what to build differently."
+date: "2026-02-24"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","performance","scaling","incidents"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-black-friday-that-took-down-the-startup"
+status: "published"
+definition: "Black Friday, a product launch, a press mention, or a social media moment: any predictable traffic spike can expose architectural weaknesses that steady-state load never triggered. The startups that go down under a spike usually had the same failure mode. The database connection pool saturated. The queue backed up. The cache was not there. The autopsy always shows the same three lines in the logs."
+faq: [
+  {"q":"How do I prepare for a traffic spike if I have never had one?","a":"Load test against two to three times your current peak traffic. Run the load test long enough to see the steady-state behavior under load, not just the initial response. Check the database connection pool utilization, the queue depth, and the cache hit rate during the test. The point where things break is the point to fix before the real spike arrives."},
+  {"q":"What is the most common single cause of startup outages during traffic spikes?","a":"Database connection pool exhaustion. When every connection in the pool is in use, new requests queue up waiting for a connection. The queue grows faster than requests complete. Response times spike. The user-facing experience goes from slow to broken. PgBouncer or similar connection poolers, configured correctly, prevent this."},
+  {"q":"Should I scale horizontally or vertically to handle a spike?","a":"Both, in the right order. Vertical scaling (bigger instances) is faster to execute and requires no code changes. Horizontal scaling (more instances) requires stateless application servers and a load balancer. For a planned spike, scale vertically a week before, scale horizontally on the day. For an unplanned spike, vertical first."},
+  {"q":"How do I detect that a traffic spike is happening before the system goes down?","a":"Latency percentiles. When the 95th percentile response time starts climbing, the system is under stress. Do not wait for errors to detect a problem. Set an alert on p95 latency at 2x your baseline. That alert gives you minutes to respond before the system degrades to outage."},
+  {"q":"What is the most important thing to do after a traffic spike outage?","a":"Write the postmortem within 24 hours while the memory is fresh. Answer three questions: what failed, why was it not caught before, and what specifically is being changed to prevent it. Publish the postmortem internally. Act on the action items within two weeks."}
+]
+---
+
+## What you actually need to know
+
+- Database connection pool exhaustion is the most common cause of spike-driven outages. Fix it before the spike.
+- Steady-state load tests do not reveal spike behavior. Run tests at 3x your peak with a ramp-up period.
+- Latency percentiles are your early warning system. An alert on p95 at 2x baseline gives you response time before the outage.
+- Scaling vertically first is faster than scaling horizontally. Have a vertical scaling runbook ready.
+- The postmortem must be written within 24 hours and acted on within two weeks or it will not be acted on.
+
+| Failure Mode | Detection | Mitigation | Prevention |
+|---|---|---|---|
+| DB connection pool exhaustion | High p95 latency | Scale vertically, add PgBouncer | Connection pooler in production |
+| Cache miss storm | CPU spike on DB | Warm cache before spike | Cache warming runbook |
+| Queue backup | Job lag metric | Scale workers | Auto-scaling queue workers |
+| Server OOM | Instance crash | Restart, scale up | Memory profiling, load testing |
+
+## The core argument
+
+The spike that takes down a startup almost always comes on the day that matters most. A press feature. The product launch. Black Friday. The spike is predictable. The failure is not, because the team never ran the system under spike conditions in a controlled environment to see what would break first.
+
+The autopsy is consistent across the outages I have seen. The database connection pool hit its limit. Requests started queuing for database connections. Response times climbed from 200ms to 2 seconds to 30 seconds. Users refreshed. The load increased. The queue grew faster than it drained. The system stopped responding. The founder was on the phone with AWS support while their biggest opportunity of the year was going down.
+
+The failure is almost never in the code. The logic is correct. The feature works in staging. The failure is in the configuration and the capacity assumptions. A connection pool sized for 100 concurrent users fails under 1000. A server sized for steady-state load runs out of memory under a ramp. A database that handles 200 queries per second at p50 hits 8 seconds at p99 when the query mix changes under load.
+
+These failures are findable before they happen. A proper load test with a realistic traffic ramp reveals the connection pool limit, the memory ceiling, and the cache miss behavior. The load test is the most underinvested hour in every startup's engineering calendar.
+
+## What the load test should cover
+
+A load test that is useful for spike preparation runs in three phases. The ramp-up phase, where traffic increases linearly from zero to 3x peak over 15 minutes. The steady-state phase, where traffic holds at 3x peak for 30 minutes. The ramp-down phase, where traffic decreases back to zero.
+
+During the test, watch four metrics. Database connection pool utilization: if it hits 80 percent during steady state, the pool is too small. p95 response time: should stay under 2x baseline during steady state. Memory utilization on the application servers: should not exceed 85 percent. Queue depth for background jobs: should not grow continuously during steady state.
+
+When any of these metrics breach their threshold during the load test, that is the finding. The load test result is not pass/fail. It is a list of the things that will break first, in order, so you can fix them before the spike arrives.
+
+## Common mistakes startups make before a traffic spike
+
+1. Not running a load test at all. Hoping is not a capacity plan.
+2. Running a load test at 1.5x instead of 3x. Spikes are not gentle. The test should be more stressful than the expected spike.
+3. Running the load test once in staging but not in production-equivalent infrastructure. Staging and production often have different database configurations, different connection pool settings, and different memory allocations.
+4. Not having a scaling runbook. When the spike arrives, there is no time to figure out how to scale. The runbook should be written and practiced before the day.
+5. Not alerting on latency percentiles. By the time errors appear, the outage is already in progress. The p95 alert catches it earlier.
+
+## Where to start: a 3-step spike preparation plan
+
+**Step 1: Run a load test this week.** Use k6, Locust, or Artillery. Write a scenario that represents your most common user flows. Ramp from zero to 3x your current peak traffic over 15 minutes. Hold for 30 minutes. Watch the four metrics. Write down what broke first.
+
+**Step 2: Fix the first failure mode.** Whatever hit its limit first in the load test is the thing most likely to cause an outage under a real spike. If it was the database connection pool, add PgBouncer or increase the pool size. If it was server memory, right-size the instances or look for the memory leak. Fix the first failure mode before the next load test.
+
+**Step 3: Write the scaling runbook.** Define the steps to scale vertically (bigger instances), to scale horizontally (more instances), and to enable circuit breakers or graceful degradation if the load is unmanageable. The runbook should be runnable by any engineer on the team without the original author present.
+## Related reading
+
+- [The Outage That Cost the Year](/blog/the-outage-that-cost-the-year)
+- [Why Your App Got Slower After You Added Users](/blog/why-your-app-got-slower-after-you-added-users)
+- [Connection Pooling: The Quiet Killer of SaaS Performance](/blog/connection-pooling-the-quiet-killer-of-saas-performance)
+- [The Performance Regression That Hides in CI](/blog/the-performance-regression-that-hides-in-ci)

@@ -1,0 +1,118 @@
+---
+slug: "cdn-strategy-for-a-global-saas-in-2026"
+title: "CDN Strategy for a Global SaaS in 2026"
+excerpt: "A CDN is not just for static assets in 2026. The right strategy caches API responses, runs edge functions, and protects the origin from traffic spikes. Here is the modern approach."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["cdn","performance","edge","global"]
+readingMinutes: 12
+ogImage: "/api/og/blog/cdn-strategy-for-a-global-saas-in-2026"
+status: "published"
+definition: "A CDN strategy in 2026 covers static assets, public API responses, dynamic page caching, edge functions, image optimization, DDoS protection, and global routing. The right CDN reduces origin load, improves user perceived performance, and gives you a defensive layer in front of the application. The wrong CDN is just a passthrough that adds latency and cost."
+faq: [
+  {"q":"What CDN should I use in 2026?","a":"Cloudflare is the default for most B2B SaaS. Free tier covers most early stage needs. The features are deep. Vercel and Netlify both bundle CDN with their hosting. AWS CloudFront integrates cleanly with AWS infrastructure. Fastly is the choice for teams that want the deepest customization."},
+  {"q":"What should a CDN cache?","a":"Static assets always. Public API responses when the response is cacheable per public key. Pages that do not depend on auth state. Images, fonts, and stylesheets. Skip caching anything that varies per user without strict cache key handling."},
+  {"q":"What are edge functions?","a":"Code that runs on the CDN's edge nodes close to the user, before the request reaches your origin. Useful for redirects, A or B testing, auth checks, request rewriting, and lightweight personalization. Saves latency for the work that can happen at the edge."},
+  {"q":"How does CDN protect the origin?","a":"Caching reduces requests to the origin. DDoS protection absorbs attack traffic at the edge. Rate limiting throttles bad actors before they reach the origin. Bot management blocks scrapers. The CDN is a defensive layer that lets the origin handle real traffic."},
+  {"q":"What about image optimization?","a":"Modern CDNs offer image optimization at the edge. Resize, reformat to AVIF or WebP, compress, deliver. The optimization happens once per source image and is cached at the edge. Saves origin work and bandwidth."},
+  {"q":"How much does a global CDN cost?","a":"For most SaaS, 50 to 500 USD per month at moderate scale. Free tiers cover early stage products. The cost scales with bandwidth and request volume. Significantly cheaper than serving the same traffic from the origin."},
+  {"q":"How do I measure CDN effectiveness?","a":"Cache hit rate, origin egress, latency by region, error rates. The cache hit rate is the primary indicator. A healthy CDN runs at 80 to 95 percent hit rate. Below 60 percent suggests configuration issues."}
+]
+---
+
+## What you actually need to know
+
+- A CDN in 2026 is more than static assets. Cache API responses, run edge functions, optimize images.
+- Cloudflare is the default. Vercel and Netlify bundle it. CloudFront for AWS deep teams.
+- A healthy cache hit rate is 80 to 95 percent.
+- The CDN protects the origin from spikes, attacks, and scrapers.
+- Image optimization at the edge saves origin work and bandwidth.
+
+| CDN | Best fit | Free tier |
+|---|---|---|
+| Cloudflare | Most B2B SaaS | Generous |
+| Vercel | Next.js applications | Hosting tier dependent |
+| Netlify | Static and Jamstack | Hosting tier dependent |
+| CloudFront | AWS deep teams | Generous |
+| Fastly | Deep customization needs | Limited |
+
+## The core argument
+
+The CDN role has expanded dramatically over the last five years. The original job was to cache static assets close to the user. The current job is to be a programmable layer between the user and the origin that handles caching, transformation, security, and routing. The teams that use the modern CDN well save real money and ship faster experiences. The teams that treat the CDN as a passthrough miss the leverage entirely.
+
+The mental model that helps is to think of the CDN as the first server in your stack, not as a separate cache. The CDN can answer many requests without ever talking to the origin. Static assets, cacheable API responses, public pages. For the requests that do need the origin, the CDN can do work at the edge before forwarding. Redirects, A or B test bucketing, authentication checks, request rewriting.
+
+The defensive value is real. DDoS protection at the edge absorbs attack traffic before it reaches your application. Bot management blocks the scrapers and crawlers you do not want. Rate limiting throttles bad actors. The application behind the CDN is significantly more resilient than the same application directly exposed.
+
+The cost economics are favorable. CDN bandwidth and request charges are dramatically cheaper than serving the same traffic from the origin. The CDN is also faster for the user because the response comes from a node geographically close to them. The combination of cheaper and faster is unusual in infrastructure decisions.
+
+## The modern CDN feature matrix
+
+| Capability | What it does | Worth using? |
+|---|---|---|
+| Static asset caching | Caches files like JS, CSS, images | Always |
+| Dynamic page caching | Caches HTML responses with right headers | When cacheable |
+| API response caching | Caches public API responses | When cacheable |
+| Image optimization | Resize, reformat, compress at edge | Almost always |
+| Edge functions | Run code at the edge node | Selective |
+| DDoS protection | Absorb attack traffic | Always |
+| Rate limiting | Throttle abusive clients | Always |
+| Bot management | Block unwanted bots | Recommended |
+| WAF | Web application firewall | Recommended |
+| Global load balancing | Route to nearest healthy origin | When global |
+
+## How much does this cost
+
+| Scale | Cloudflare monthly | CloudFront monthly | Vercel or Netlify bundled |
+|---|---|---|---|
+| Early stage | Free | Free tier covers most | Hosting tier |
+| Moderate | 20 to 200 USD | 50 to 300 USD | Hosting tier |
+| Higher | 500 to 3000 USD | 1000 to 5000 USD | Higher hosting tier |
+| Enterprise | Custom | Custom | Custom |
+
+## Features the CDN strategy must have
+
+- A documented caching policy per content type.
+- Image optimization enabled.
+- WAF and bot management enabled.
+- Rate limiting on sensitive endpoints.
+- Cache key strategy that respects auth boundaries.
+- Cache purge process documented.
+- Monitoring for hit rate and error rate.
+- A plan for cache busting on deploy.
+
+## Expert opinion
+
+> The teams that take CDN strategy seriously in 2026 treat the CDN as their first server, not as a separate cache. They cache aggressively. They run edge functions. They use the security features. They monitor the hit rate. The CDN does most of the work for most requests. The origin is reserved for the requests that genuinely need application logic. The architecture is faster, cheaper, and more secure than the alternative.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was serving most traffic directly from their origin. The CDN was Cloudflare on the free tier with default settings. The cache hit rate was around twenty percent. The origin handled most requests. The latency outside their primary region was poor.
+
+We rewrote the cache headers across the application. Static assets got long lived immutable caching. Public marketing pages got stale-while-revalidate. The public API endpoints got short s-maxage with revalidation. We enabled image optimization at the edge. We turned on bot management and WAF.
+
+The cache hit rate jumped to eighty seven percent. The origin load dropped by an order of magnitude. The latency in distant regions improved from over a second to under three hundred milliseconds. The Cloudflare bill grew modestly. The origin bill dropped much more. Net cost dropped and performance improved.
+
+For more on the related work, see [Vercel vs Netlify vs Cloudflare Pages](/blog/vercel-vs-netlify-vs-cloudflare-pages) and [CDN cache headers a practical primer](/blog/cdn-cache-headers-a-practical-primer).
+
+## Common mistakes teams make
+
+1. Treating the CDN as a passthrough.
+2. Default cache headers that prevent caching.
+3. Image optimization disabled.
+4. No WAF or bot management. Attacks reach the origin.
+5. Cache key that does not respect auth. Private data leaks.
+6. No purge process. Stale content persists.
+7. No monitoring on hit rate. Cannot improve.
+8. Mixing CDN with origin features in confusing ways.
+
+## A 30 day plan to upgrade the CDN strategy
+
+1. **Week one.** Audit current CDN configuration and cache headers.
+2. **Week two.** Rewrite headers per content type. Enable image optimization.
+3. **Week three.** Turn on WAF, bot management, rate limiting.
+4. **Week four.** Monitor hit rate. Tune for ninety percent or better.
+
+For more on the related work, read [Vercel vs Netlify vs Cloudflare Pages](/blog/vercel-vs-netlify-vs-cloudflare-pages) and [CDN cache headers a practical primer](/blog/cdn-cache-headers-a-practical-primer). On the broader edge side, [the edge when to move logic off your origin](/blog/the-edge-when-to-move-logic-off-your-origin) is the natural next read.

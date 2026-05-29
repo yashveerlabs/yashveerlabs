@@ -1,0 +1,115 @@
+---
+slug: "geospatial-data-done-right-postgis-and-beyond"
+title: "Geospatial Data Done Right: PostGIS and Beyond"
+excerpt: "PostGIS turns Postgres into a real geospatial database. The setup is small. The performance is excellent. Most teams that need location queries should start with PostGIS rather than reaching for specialized stores."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["postgis","geospatial","postgres","backend"]
+readingMinutes: 11
+ogImage: "/api/og/blog/geospatial-data-done-right-postgis-and-beyond"
+status: "published"
+definition: "PostGIS is the Postgres extension that adds geometric and geographic types, spatial indexes, and spatial functions. The extension turns Postgres into a real geospatial database. The setup is one command. The performance is excellent on the queries most products need. Distance, contains, nearest, and routing all work. Most products that need location queries should use PostGIS rather than a specialized store."
+faq: [
+  {"q":"What does PostGIS actually add to Postgres?","a":"Geometric and geographic types. Spatial indexes via GiST. Hundreds of spatial functions. The combination makes spatial queries fast and expressive. The setup is one CREATE EXTENSION command. The capability is comparable to dedicated spatial databases for most workloads."},
+  {"q":"What is the difference between geometry and geography types?","a":"Geometry treats coordinates as planar. Calculations are fast and approximate. Good for small areas. Geography treats coordinates as on a sphere. Calculations are slower and accurate over large distances. Use geography for anything that crosses meaningful distances."},
+  {"q":"How do I find nearby items?","a":"The KNN operator with a GiST index. ORDER BY geom <-> point LIMIT N. The query finds the N nearest items by distance. The performance is excellent because the index supports nearest neighbor directly."},
+  {"q":"How do I find items within a radius?","a":"ST_DWithin in geography mode. The query filters to items within a specified distance from a point. The function uses the spatial index. The performance is fast even on large data sets."},
+  {"q":"What about routing?","a":"pgRouting is the extension that adds routing on top of PostGIS. Shortest path, traveling salesman, and other graph algorithms work on PostGIS data. For most product use cases this is overkill. Google Directions or Mapbox is usually cheaper to call than to build."},
+  {"q":"How do I handle map tiles?","a":"PostGIS can serve vector tiles via ST_AsMVT. The pattern is to query the relevant geometries for the bounding box and zoom level and return them in the Mapbox Vector Tile format. The tile server is the application. The capability is real."},
+  {"q":"When does PostGIS stop being enough?","a":"At very high query volume on specific spatial operations. At very large data sets where the index size becomes a problem. For most product use cases including delivery apps, marketplaces, mapping products, and asset tracking, PostGIS scales comfortably."}
+]
+---
+
+## What you actually need to know
+
+- PostGIS turns Postgres into a real geospatial database.
+- Geography for spherical accuracy. Geometry for planar speed.
+- KNN operator with GiST index for nearest neighbor.
+- ST_DWithin for radius queries.
+- pgRouting for graph algorithms when needed.
+
+| Capability | Function |
+|---|---|
+| Nearest items | KNN with <-> operator |
+| Within radius | ST_DWithin |
+| Contains | ST_Contains |
+| Distance | ST_Distance |
+| Intersects | ST_Intersects |
+| Vector tiles | ST_AsMVT |
+| Routing | pgRouting extension |
+| Area calculation | ST_Area |
+
+## The core argument
+
+PostGIS is the kind of extension that founders do not know about until they need spatial queries. The default response when a product needs location features is to reach for a specialized service or store. The right response in most cases is to add PostGIS to the Postgres that is already there.
+
+The setup is one command. CREATE EXTENSION postgis. The database now has geometric types, spatial indexes, and hundreds of spatial functions. The capability is comparable to dedicated spatial databases for most product workloads.
+
+The discipline is in picking the right type and the right index. Geography for long distances where accuracy matters. Geometry for planar approximations where speed matters. The GiST index supports both spatial filtering and nearest neighbor queries. The right index makes the difference between sub millisecond and seconds long queries.
+
+The patterns that fit most products are simple. Nearest items via the KNN operator. Within radius via ST_DWithin. Intersection and containment for region based queries. Each is a few lines of SQL. The performance is good into millions of rows for most workloads.
+
+The temptation to reach for specialized services is real. Mapbox, Google Maps, and similar have excellent capabilities. For the operations that PostGIS handles natively, the local query is often faster and cheaper than the API call. The specialized services are right for tile serving and routing at scale. PostGIS is right for most application level spatial logic.
+
+## The patterns that work
+
+| Use case | Query pattern |
+|---|---|
+| Find five nearest stores | ORDER BY location <-> point LIMIT 5 with KNN |
+| Stores within 5 km | ST_DWithin(location, point, 5000) with geography |
+| Drivers within delivery zone | ST_Contains(zone, driver_location) |
+| Total area covered | SUM(ST_Area(coverage_polygon)) |
+| Distance between two points | ST_Distance with geography for accuracy |
+| Generate vector tiles | ST_AsMVT for Mapbox compatible tiles |
+| Cluster nearby points | ST_ClusterDBSCAN for density clustering |
+
+## How much does this cost
+
+The cost of PostGIS is zero. The extension is included with most managed Postgres providers. The cost is engineering time to learn the patterns. A senior engineer can be productive with PostGIS in a few days. The investment is small. The savings versus a specialized service is meaningful at scale.
+
+## Features the spatial setup must have
+
+- PostGIS extension enabled.
+- GiST indexes on spatial columns.
+- Correct type (geometry or geography) for the use case.
+- Stored as the right SRID. 4326 is standard for lat lon.
+- Validation that input coordinates are correct.
+- A query plan check to confirm the index is used.
+- Backup includes spatial data.
+- A path to specialized services if you outgrow PostGIS.
+
+## Expert opinion
+
+> PostGIS is the kind of capability that most teams underestimate. The setup is one command. The patterns are mechanical. The performance is excellent. The teams that adopt PostGIS handle their spatial needs without adding new services. The teams that reach for Mapbox APIs for every operation pay for capability the local query would have delivered for free.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client building a marketplace app needed to find nearby providers for a customer search. The team's first instinct was to use the Google Places API. The cost projection at scale was meaningful.
+
+We added PostGIS instead. Storing the provider locations as geography. Indexing with GiST. The query for nearest providers was a single SQL statement with the KNN operator. The performance was sub ten milliseconds at the scale the team was projecting.
+
+The team kept Google for map display and routing. The application level spatial queries ran in Postgres. The cost difference was meaningful. The capability was equivalent for the operations that mattered.
+
+For more on the related work, see [PostgreSQL performance at scale the tweaks that move the needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle) and [database indexes a practical primer for SaaS engineers](/blog/database-indexes-a-practical-primer-for-saas-engineers).
+
+## Common mistakes teams make
+
+1. Using lat lon as separate columns instead of a spatial type.
+2. No GiST index on spatial columns.
+3. Wrong type (geometry vs geography).
+4. Wrong SRID.
+5. Calling external APIs for operations PostGIS handles natively.
+6. No query plan check.
+7. Treating PostGIS as exotic when it is mature.
+8. No backup verification for spatial data.
+
+## A one week adoption plan
+
+1. **Day one.** Enable PostGIS. Convert the spatial columns.
+2. **Day two.** Create GiST indexes. Verify with EXPLAIN.
+3. **Days three to five.** Migrate the application code to use PostGIS functions.
+4. **Days six and seven.** Measure performance. Document the patterns.
+
+For more on the related work, read [PostgreSQL performance at scale the tweaks that move the needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle) and [database indexes a practical primer for SaaS engineers](/blog/database-indexes-a-practical-primer-for-saas-engineers). On the broader Postgres side, [full text search in PostgreSQL practical patterns](/blog/full-text-search-in-postgresql-practical-patterns) is the natural next read.

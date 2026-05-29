@@ -1,0 +1,101 @@
+---
+slug: "the-engineering-okr-that-works"
+title: "The Engineering OKR That Works"
+excerpt: "How to write engineering OKRs that create alignment without bureaucracy and measure what actually matters for the team's health and output."
+date: "2026-01-19"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","okrs","planning","management"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-okr-that-works"
+status: "published"
+definition: "An engineering OKR that works connects the team's technical work to business outcomes in language that both engineers and non-engineers can evaluate. The OKRs that fail are either too technical to be legible to the business or too business-focused to be actionable for the engineering team. The engineering leader's job is to write OKRs that translate between these two levels: specific enough to guide technical decisions, meaningful enough to reflect business impact."
+faq: [
+  {"q":"What is the difference between an output OKR and an outcome OKR?","a":"An output OKR measures what the team produces: 'Ship the new payment integration by Q2.' An outcome OKR measures the result the output creates: 'Reduce payment processing errors to under 0.1 percent, enabling the sales team to close enterprise customers who require PCI compliance evidence.' Outcome OKRs are more valuable because they connect engineering work to business results."},
+  {"q":"How many OKRs should the engineering team have per quarter?","a":"Three to five objectives, each with two to three key results, is the right range. Fewer than three objectives may miss important dimensions. More than five creates priority confusion. The engineering leader should be able to explain the full set of OKRs in five minutes. If they cannot, there are too many."},
+  {"q":"Should engineering OKRs include reliability and technical debt work?","a":"Yes. If reliability and technical debt work is not in the OKRs, it will be deprioritized in favor of feature work. A key result like 'Reduce p99 API response time from 800ms to 300ms' or 'Reduce test suite runtime from 25 minutes to 8 minutes' makes infrastructure work legible as business investment."},
+  {"q":"How do I write key results that are actually measurable?","a":"The key result must have a baseline, a target, and a measurement method. 'Improve system performance' is not measurable. 'Reduce API p99 latency from 400ms to 150ms as measured by Datadog' is measurable. The measurement method must exist before the quarter starts, not be created to report on the result after the fact."},
+  {"q":"What should I do when the engineering OKRs are off track?","a":"Raise it visibly in the quarter, not in the end-of-quarter review. An OKR that is 20 percent complete after six weeks of an 12-week quarter needs a conversation about whether the target is achievable, whether priorities shifted, or whether the team needs help. The end-of-quarter review should not be the first time the organization hears about a miss."}
+]
+---
+
+## What you actually need to know
+
+- Engineering OKRs are the mechanism for connecting the team's work to the business's goals. If the connection is not legible, the OKRs are failing their primary purpose.
+- Key results that are not measurable are not key results. Every KR needs a baseline, a target, and an established measurement method.
+- Reliability, performance, and technical debt work should appear in OKRs or it will be deprioritized. Make it visible.
+- The mid-quarter check is where OKRs earn their value. End-of-quarter reviews without mid-quarter conversation are performance theater.
+- OKRs that are graded at 100 percent every quarter are wrong. A target that is always hit was set too low.
+
+| OKR Component | What Makes It Work | Common Failure |
+|---|---|---|
+| Objective | Qualitative, directional, motivating | "Complete the technical roadmap" |
+| Key Result | Measurable, time-bound, has a baseline | "Improve performance" |
+| Grade | Honest self-assessment against the KR | Adjusting definitions post-hoc |
+| Cadence | Weekly check-in, mid-quarter review | Only reviewed at quarter end |
+
+## The core argument
+
+OKRs fail at engineering teams for one of two reasons. The first is that the OKRs are too abstract. "Improve engineering excellence" or "accelerate product delivery" are objectives that feel directional but produce no useful guidance when the engineering team is deciding whether to refactor a critical service or build a new feature. You cannot evaluate your progress against these objectives or know whether you are on track.
+
+The second failure mode is that the OKRs are too tactical. A list of engineering deliverables -- "ship the authentication service, migrate the database, upgrade the CI pipeline" -- is a project plan, not a set of OKRs. It tells the team what to do but not why, and it makes it impossible to adjust course when circumstances change because there is no stated outcome against which to evaluate alternatives.
+
+The engineering OKRs that work sit between these. They state a meaningful objective in language that connects to the business -- "make the product reliable enough that enterprise customers do not raise reliability as a reason to delay purchase" -- and support it with key results that are specific, measurable, and owned by the engineering team -- "reduce 5xx error rate from 0.8 percent to under 0.05 percent across all production endpoints" and "achieve 99.9 percent uptime for the customer-facing API over the quarter, measured by our monitoring dashboard."
+
+The engineering leader who can write this way is translating between the technical and the business. This is a skill that improves with practice. The first quarter of OKRs will be worse than the fourth. The discipline of writing them and reviewing them honestly is what makes the subsequent quarters better.
+
+## Writing objectives that motivate
+
+The objective is the qualitative statement of what the team is trying to achieve this quarter. It should be aspirational enough to require real effort, specific enough to provide direction, and meaningful enough that the team understands why it matters.
+
+Bad objective: "Improve engineering practices." This says nothing about which practices, why they need improvement, or what improvement looks like.
+
+Better objective: "Build the reliability foundation that lets us sell to enterprise customers." This is still qualitative, but it explains why: enterprise customers have reliability requirements that currently prevent them from signing. The engineering team now has a reason why reliability work matters beyond the abstract goal of reliability.
+
+Good objective examples for engineering teams: "Reduce deployment friction so that the team can ship product changes daily rather than weekly." "Build the observability layer that lets us detect and resolve production issues before customers report them." "Establish the data infrastructure that makes it possible to answer product questions within one hour instead of one week."
+
+Each of these is aspirational, directional, and meaningfully connected to a business outcome. Each one would produce engineering work that is clearly relevant to the objective.
+
+## Writing key results that are actually measurable
+
+The key result is the quantitative definition of success for the objective. It answers: how will we know we achieved the objective?
+
+The test for a good key result: can you measure it today, before the work starts? If the measurement requires creating new infrastructure, the KR cannot be tracked and should be replaced with one that starts from an existing baseline. The baseline is the current state. The target is the desired state. The measurement method is already established.
+
+For the objective "Build the reliability foundation that lets us sell to enterprise customers," the key results might be: "Reduce monthly 5xx error rate from 0.8 percent to under 0.1 percent, measured by Datadog error tracking." "Achieve zero incidents with recovery time over 30 minutes during the quarter, measured by PagerDuty incident log." "Complete SOC 2 Type I audit and receive letter from auditor, enabling sales team to share with prospects."
+
+Each of these starts with a baseline (0.8 percent error rate, current MTTR, no audit letter), has a specific target, and has an established measurement source.
+
+## The mid-quarter conversation
+
+The OKR has no value if it is only reviewed at the end of the quarter. The mid-quarter check is where the OKR does its actual work: surfacing whether the team is on track, identifying what is blocking progress, and making decisions about whether to adjust scope or add resources.
+
+In the mid-quarter review, the engineering leader should be able to say: "We are at 60 percent of our reliability KR six weeks into a 12-week quarter, which means we are on track. We are at 15 percent of the audit KR, which means we are not -- here is why and here is the plan to catch up."
+
+This conversation requires honesty about the current state. The OKR culture at companies where every team reports green at every check and then misses the target at the end of the quarter is not a culture that is benefiting from OKRs. The value of OKRs is in the ability to see problems early and respond. This only works if the mid-quarter reporting is accurate.
+
+## Common mistakes engineering leaders make with OKRs
+
+1. Writing OKRs after the quarter has started. OKRs should be written in the two weeks before the quarter and finalized on the first day. Writing them mid-quarter means the team spent the first weeks without direction.
+2. Setting key results where 100 percent achievement is the expected outcome. If the team consistently hits 100 percent of all KRs, the targets were set too low. The expected outcome for well-set OKRs is 70-80 percent achievement with stretch.
+3. Making the engineering OKRs independent of the company OKRs. Every engineering objective should be traceable to a company objective. If it is not, the engineering team is working on things the company has not prioritized.
+4. Not including any infrastructure or reliability KRs. Feature delivery OKRs without reliability OKRs produce teams that ship fast and break often.
+5. Not reviewing OKRs with the team. OKRs that are written by the engineering leader and shared but not discussed do not create alignment. The team needs to understand and buy into the KRs to be motivated by them.
+
+## Where to start: a 3-step OKR process
+
+**Step 1: Start with the company's quarterly priorities.** What are the one to three things the company most needs to achieve this quarter? Map the engineering team's potential objectives against these. Each engineering objective should be justifiable in terms of its contribution to one or more company priorities.
+
+**Step 2: For each objective, write two to three key results using this template.** [Current state] to [target state] by [end of quarter] as measured by [existing measurement source]. Fill in each blank. If the measurement source does not exist, create it before writing the KR.
+
+**Step 3: Review the draft OKRs with the engineering team and revise based on their input.** Ask the team: are these achievable with a genuine stretch? Are these meaningful to the business? Are there dimensions of our work that are missing? The team's input improves the OKRs and creates ownership.
+
+## Alignment That Scales
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The OKR process I use for my own work -- scoping quarterly objectives for Yashveer Labs projects -- follows the principles above. The objectives connect to the business outcomes I am trying to drive. The key results are specific enough that I know at any point in the quarter whether I am on track. This clarity is the point.
+
+## Related reading
+
+- [The Engineering All Hands That Engineers Look Forward To](/blog/the-engineering-all-hands-that-engineers-look-forward-to)
+- [The Annual Engineering Review That Engineers Actually Find Useful](/blog/the-annual-engineering-review-that-engineers-actually-find-useful)
+- [The Engineering Career Ladder That Engineers Trust](/blog/the-engineering-career-ladder-that-engineers-trust)
+- [The Engineering Velocity Question: How Fast Should You Be Shipping?](/blog/the-engineering-velocity-question-how-fast-should-you-be-shipping)

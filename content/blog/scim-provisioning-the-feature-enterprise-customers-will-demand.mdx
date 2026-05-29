@@ -1,0 +1,62 @@
+---
+slug: "scim-provisioning-the-feature-enterprise-customers-will-demand"
+title: "SCIM Provisioning: The Feature Enterprise Customers Will Demand"
+excerpt: "Enterprise customers expect user accounts to sync automatically with their identity provider. SCIM makes this possible. Here is what SCIM is, what implementing it actually involves, and when to build it versus buy it."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance"]
+readingMinutes: 6
+ogImage: "/api/og/blog/scim-provisioning-the-feature-enterprise-customers-will-demand"
+status: "published"
+definition: "SCIM (System for Cross-domain Identity Management) is a standardized protocol that allows enterprise identity providers (Okta, Azure AD, Google Workspace) to automatically create, update, and deactivate user accounts in SaaS applications. When a new employee joins a company, their IT team provisions them in the identity provider, which automatically creates their account in all connected SaaS tools via SCIM. When an employee is offboarded, their accounts across all SCIM-connected tools are deactivated automatically. SCIM is a standard enterprise buying requirement for SaaS products targeting companies with more than 50 employees."
+faq: [
+  {"q":"What does SCIM provision and deprovision mean in practice?","a":"Provisioning means creating a user account in a SaaS application when a new user is added to the customer's identity provider. Deprovisioning means deactivating or deleting that account when the user is removed from the identity provider (typically when an employee is offboarded). Without SCIM, enterprise customers manually create and remove accounts, which creates security gaps (ex-employees retaining access after offboarding) and administrative overhead. With SCIM, account lifecycle is automated: the identity provider is the authoritative source and the SaaS product stays in sync automatically."},
+  {"q":"What are the SCIM API endpoints that must be implemented?","a":"The core SCIM 2.0 endpoints: GET /Users (list users, supports filtering and pagination), POST /Users (create a user), GET /Users/{id} (get a specific user), PUT /Users/{id} (replace a user), PATCH /Users/{id} (partial update a user), DELETE /Users/{id} (deprovision a user). The same endpoints exist for Groups if the product supports group-based permissions. The server must respond with the standard SCIM JSON schema that the identity provider expects. Most identity providers send SCIM 2.0 requests and test against a conformance checker before enabling the integration."},
+  {"q":"Which identity providers send SCIM requests and how do they differ?","a":"The main identity providers that use SCIM for provisioning: Okta (largest enterprise deployment, SCIM 2.0, uses bearer tokens for authentication), Azure Active Directory (Microsoft enterprise, SCIM 2.0, uses OAuth 2.0), Google Workspace (SCIM via third-party provisioning connectors), OneLogin, and Ping Identity. Okta and Azure AD cover the majority of enterprise customers. They each have slightly different behavior around attribute mapping, group provisioning, and how they handle SCIM errors. Building against Okta's SCIM specification first and then testing against Azure AD catches most compatibility issues."},
+  {"q":"Should you build SCIM yourself or use a provider like WorkOS or Scalekit?","a":"Building SCIM yourself is a two to four week engineering effort for a basic implementation supporting user provisioning from one identity provider. Providers like WorkOS and Scalekit offer SCIM as a managed service with connectors pre-built for all major identity providers, tested against their conformance requirements, and maintained as those providers update their SCIM implementations. For a product doing its first enterprise deals, using a managed provider reduces time-to-close and avoids the maintenance overhead. For a product with multiple enterprise customers and internal DevOps capacity, building directly reduces per-customer cost."},
+  {"q":"What product and architectural changes does SCIM require?","a":"SCIM requires: a user lifecycle model that distinguishes between active and deprovisioned users (rather than deleting them, since SCIM reactivation must be possible), an external_id field on users to store the identity provider's user identifier, an API layer with authentication designed for machine-to-machine access (bearer tokens, not user sessions), and a provisioning log for auditing which operations the identity provider has executed. The architectural implication: users in a SCIM-enabled product are not solely created by self-service signup. The provisioning model must accommodate both identity-provider-created users and self-service signups in the same system."}
+]
+---
+
+## What you need to know
+
+- SCIM automates user provisioning and deprovisioning from enterprise identity providers. It is a standard requirement for SaaS products selling to companies with more than 50 employees.
+- The core SCIM endpoints are CRUD operations on Users and Groups. Okta and Azure AD cover the majority of enterprise use cases.
+- Building SCIM takes two to four weeks. Managed providers like WorkOS shorten time-to-enterprise at the cost of ongoing service fees.
+- SCIM requires a user lifecycle model that supports deprovisioning without deletion. Deprovisioned users must be reactivatable.
+- The provisioning log is not optional for enterprise customers. Security teams expect to audit every provisioning action.
+
+## The core argument
+
+Enterprise procurement moves on checklists, and SCIM is near the top of every security team's checklist. Without SCIM, the IT administrator at a company with 200 employees must manually add every new hire to the SaaS product, and manually remove them when they leave. The manual removal is the security problem: employees who leave companies are often not removed from SaaS tools promptly, which means ex-employees may retain access to company data for days or weeks after offboarding. SCIM solves this by making the identity provider the authoritative source of truth for user access.
+
+The decision to build SCIM is effectively the decision to sell to enterprise. SaaS products targeting companies with fewer than 20 employees rarely need it. Products targeting companies with 50 or more employees will encounter it in nearly every deal of any size. The deal will either close without it (and the customer will accept the manual provisioning workaround) or it will stall while the security team flags the missing SCIM support as a requirement. In my experience with enterprise-adjacent SaaS work, the stall is more common than the workaround acceptance.
+
+Timing the build is a practical question. Building SCIM before the first enterprise deal is premature optimization. Building it after the first three enterprise deals have closed and the fourth deal is stalling on it is the right time. The signal is a pattern of enterprise prospects raising the same requirement, not a single request. Once SCIM is on the product roadmap and the team understands the implementation scope, the build is straightforward enough that it should not be the reason a deal closes late.
+
+## Common mistakes
+
+1. **Deleting users on SCIM deprovision instead of deactivating them.** SCIM deprovision should deactivate a user account, not delete it. Identity providers may reactivate users (a contractor returning, a rehire), which requires the account to exist in a recoverable state. Deleting the user destroys data history, project memberships, and audit trails. Model deprovisioned users as active: false, not as deleted rows.
+
+2. **Not implementing the external_id mapping between your user IDs and the identity provider's IDs.** The identity provider knows users by its own identifier, not by your database's user IDs. Every user provisioned via SCIM needs both your internal ID and the identity provider's ID stored in the users table. Lookups from the identity provider will use the external ID. Without this mapping, PATCH and DELETE requests from the identity provider cannot find the correct user record.
+
+3. **Implementing SCIM authentication with user session tokens.** SCIM uses machine-to-machine authentication, typically long-lived bearer tokens or OAuth 2.0 client credentials. Using session-based authentication designed for human users creates maintenance problems when sessions expire and breaks provisioning silently. Generate SCIM-specific bearer tokens that the customer configures in their identity provider, with rotation controls in the product settings.
+
+4. **Not testing against the identity provider's conformance checker before announcing the integration.** Both Okta and Azure AD provide developer tools for testing SCIM endpoint conformance. An integration that does not pass conformance testing produces cryptic errors in production when the identity provider sends edge case requests. Run the conformance tests before putting the integration in front of a customer.
+
+5. **Not logging SCIM operations for audit purposes.** Enterprise security teams expect an audit log of every provisioning action: which user was created, updated, or deprovisioned, and when. This log is often required for SOC 2 compliance and is requested during security reviews. Build the provisioning audit log from the start, not as a retrofit.
+
+## Where to start
+
+1. **Evaluate build vs buy for the first enterprise deal.** If the deal is the first enterprise deal and the team has limited DevOps bandwidth, use WorkOS or Scalekit for SCIM. The managed service cost is justified by the reduced engineering time and the faster deal close. If the team has the bandwidth and multiple enterprise deals in the pipeline, building directly produces lower ongoing cost.
+
+2. **Add external_id, active, and deprovisioned_at columns to the users table before writing any SCIM code.** These three fields are the foundation for the SCIM user lifecycle. external_id stores the identity provider's user ID. active: false is the deprovisioned state. deprovisioned_at records when the account was deprovisioned for audit purposes. Migrating the schema before the SCIM code is written avoids mid-implementation schema changes.
+
+3. **Implement the minimal Okta-compatible SCIM endpoints first.** GET /Users (with filter by userName), POST /Users, PATCH /Users/{id} (for status updates), and DELETE /Users/{id} (which sets active: false). These four endpoints cover the provisioning and deprovisioning flow. Group support can be added in a subsequent iteration. Test against Okta's SCIM test suite before shipping.
+
+## Related reading
+
+- [Single Sign-On for Enterprise SaaS: SAML and OIDC Compared](/blog/single-sign-on-for-enterprise-saas-saml-and-oidc-compared)
+- [Right to Be Forgotten: How to Implement It Without Pain](/blog/right-to-be-forgotten-how-to-implement-it-without-pain)
+- [SOC 2 Type I vs Type II: A Founder's Guide to Both](/blog/soc-2-type-i-vs-type-ii-a-founders-guide-to-both)
+- [SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)

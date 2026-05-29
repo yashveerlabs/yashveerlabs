@@ -1,0 +1,123 @@
+---
+slug: "why-most-ai-roadmaps-fail-in-the-first-quarter"
+title: "Why Most AI Roadmaps Fail in the First Quarter"
+excerpt: "AI roadmaps fail for predictable reasons. The team underestimates the gap between a working demo and a working product, picks vanity features over real ones, and runs out of patience before the second iteration. The pattern is recognizable, and avoidable."
+date: "2025-01-17"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-most-ai-roadmaps-fail-in-the-first-quarter"
+status: "published"
+definition: "Most AI roadmaps fail in the first quarter because the team scopes features that demo well but solve no real problem, underestimates the engineering work between demo and production, and lacks the evals and observability to know when something is broken. The fix is to scope smaller, build the production scaffolding first, and treat AI features like every other product surface."
+faq: [
+  {"q":"Why do AI roadmaps fail differently from regular roadmaps?","a":"Because the gap between a working demo and a production feature is dramatically larger than most teams expect. A regular feature that works in dev usually works in production with minor adjustment. An AI feature that works in dev often fails in production for reasons the team did not anticipate: edge cases in prompts, cost spikes, latency, hallucinations, vendor changes. The buffer between demo and ship is the trap."},
+  {"q":"What is the most common scoping mistake?","a":"Picking features that demo well to investors rather than features that solve real user problems. \"AI assistant\" sounds great in a deck and is hard to ship as something users actually want. Specific features tied to existing workflows ship and get used. Generic chat interfaces struggle to find a home."},
+  {"q":"What infrastructure is needed before shipping an AI feature?","a":"Evals, observability, cost monitoring, and the ability to swap models. Evals tell you whether the feature is getting better or worse. Observability tells you what users are actually doing. Cost monitoring keeps the bill from surprising you. Model swapping protects you from vendor changes. Skip any of these and you ship a feature you cannot maintain."},
+  {"q":"How long should an AI roadmap quarter take to plan?","a":"Less than you think for individual features, more than you think for infrastructure. Each feature scoped should be small enough to ship in 2-4 weeks of focused work. The infrastructure underneath should be planned for the year, not the sprint. Most failed roadmaps invert this: big feature plans, no infrastructure."},
+  {"q":"What does a successful first quarter look like?","a":"One or two real AI features shipped, integrated into existing workflows, with measurable adoption. Evals and observability in place. A clear answer to whether the features are getting better. A team that understands the operational shape of AI features and is no longer guessing. The win is process, not feature count."},
+  {"q":"What about open source models?","a":"Worth considering for non-critical workloads where cost matters. The operational lift is real: hosting, scaling, monitoring, fine-tuning. For most teams in the first quarter, sticking with a frontier API is the right tradeoff. Open source becomes attractive once you understand your workload and the API costs cross a threshold."},
+  {"q":"What kills morale fastest on an AI team?","a":"Shipping features that nobody uses. AI features that get traction tend to be small, specific, and embedded in existing flows. Features that try to be transformational get demoed once and quietly die. The morale hit from shipping a feature nobody uses is worse than shipping nothing at all."}
+]
+---
+
+## What you actually need to know
+
+- The gap between AI demo and AI product is the trap. Most teams underestimate it by months.
+- Vanity features fail. Specific, embedded features succeed.
+- Evals, observability, and cost monitoring are infrastructure, not features. They come first.
+- The right cadence is small features, fast iterations, real metrics.
+- One quarter is enough to ship something real if scoped honestly.
+
+| Failure pattern | Why it kills the roadmap | What to do instead |
+|---|---|---|
+| Generic "AI assistant" | Demos well, no user need | Embed AI into a specific workflow |
+| Skip the evals | Cannot tell if you are improving | Build evals before features |
+| Underestimate prod gap | Quarter spent on demo polish | Plan production scaffolding first |
+| No cost monitoring | Bill surprises everyone | Set per-feature cost budgets |
+| Build everything custom | Time runs out | Use APIs first, build custom when justified |
+| Plan in features, not problems | Pretty roadmap, no impact | Plan in user problems |
+
+## The core argument
+
+Most AI roadmaps I have reviewed in the last year had the same shape. A big list of "AI-powered" features. Optimistic timelines. No mention of evals, observability, or cost. By the end of the quarter the team has shipped one feature that nobody uses, the other features are stuck in a "polish" phase that never ends, and the leadership is asking why AI is not transformative yet.
+
+The root issue is not AI. It is that the team treated AI features like normal features. Normal features go from working in dev to working in production with relatively predictable engineering work. AI features have a wider gap, because the demo runs against ideal inputs in low traffic with a model whose costs and behavior are stable, and production runs against messy inputs at full traffic with a model that drifts and a bill that grows.
+
+The fix is to invert the order. Build the production scaffolding before the features. Evals first, observability first, cost monitoring first. Then ship a small, specific feature that solves a real user problem. Measure. Iterate. Repeat. Most failed roadmaps did the opposite: features first, infrastructure later, by which point the team had already lost trust.
+
+The other consistent failure is scoping. Teams pick features that demo well rather than features that solve real problems. An AI assistant. A chat interface for your product. A magic "draft for me" button. These sound great in a board meeting and struggle in production because the users do not have a clear job they are trying to do with them. The features that succeed tend to be small, specific, and embedded in existing workflows.
+
+## The patterns that kill the roadmap
+
+### Vanity scoping
+
+The temptation to pick features that look transformative is real. Investors ask for AI. Boards ask for AI. The team responds with the biggest, most ambitious feature they can imagine. That feature does not ship in a quarter, and what does ship does not get used.
+
+The pattern that works is small, specific, embedded. AI that drafts an email reply in the context where the user is already replying to email. AI that suggests a category for a transaction the user is already categorizing. The user does not have to learn a new tool. The AI shows up where they already are.
+
+### Skipping evals
+
+Without evals, you cannot tell if your feature is getting better. You cannot tell if a model change broke something. You cannot tell which prompt update was the regression. You ship into the dark.
+
+Evals are not optional infrastructure. They are the test suite for AI features. Build them before you ship the feature, not after. The discipline is documented in [AI evals: how to test your AI features like software](/blog/ai-evals-how-to-test-your-ai-features-like-software).
+
+### Ignoring cost
+
+AI feature costs scale with usage in ways that surprise teams used to flat-rate infrastructure. A feature that costs cents per user at launch can cost dollars per user as adoption grows. Without per-feature cost monitoring, you find out at the next billing cycle.
+
+Build cost dashboards before you ship. Set per-feature budgets. Know the unit economics. The pattern is in [token economics: why your AI bill surprised you](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it).
+
+### Building custom too early
+
+The temptation to fine-tune your own model is strong. It is also usually wrong in the first quarter. The frontier APIs are good enough for most use cases, the iteration speed is fast, and the operational lift is zero. Custom models become attractive after you understand your workload, not before.
+
+## How long does it actually take
+
+| Stage | Realistic time | What teams plan |
+|---|---|---|
+| Build evals and observability | 3-6 weeks | "Build alongside features" |
+| First production AI feature | 4-8 weeks | "Two weeks" |
+| Cost monitoring infrastructure | 2-3 weeks | "We'll add it later" |
+| Iteration on shipped feature | Ongoing | "We'll move to the next thing" |
+| Model swap capability | 1-2 weeks | "Not until we need it" |
+
+The pattern is that infrastructure work gets underestimated and feature work gets overestimated. Reversing the proportions is the fix.
+
+## What a healthy first quarter looks like
+
+- Two weeks on evals and observability. Real metrics, real dashboards.
+- Two weeks on cost monitoring and per-feature budgets.
+- Two weeks identifying the one or two real user problems AI could help with.
+- Four to six weeks shipping the first feature, including iteration after launch.
+- A few weeks of measurement and improvement before scoping the next thing.
+
+## Expert opinion
+
+> The teams I have rescued from a failed AI roadmap all made the same mistakes. They picked too many features, scoped each one too big, built no infrastructure to know if they were succeeding, and ran out of runway before iteration. The fix is not exciting: do less, build the boring infrastructure first, ship one thing that actually solves a problem. A quarter that ships one real feature and the scaffolding to maintain it is a successful quarter. A quarter that demos five features and ships none is the pattern that gets the team rebuilt.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS team I worked with had committed to "AI by end of quarter" without specifying what that meant. The first six weeks went into a chat interface that nobody used. The next four weeks went into a "draft suggestions" feature that did not have evals so the team could not tell if it was good. They shipped at the end of the quarter with low usage, no metrics, and no plan for iteration.
+
+We restarted with a different shape. Two weeks on evals and a cost dashboard. Three weeks on one specific feature: AI categorization for transactions the user was already categorizing. That feature shipped with measurable improvement to the user's task time. Adoption hit 60 percent within a month. The team's confidence recovered because they had something working with clear signal. The next quarter built on that foundation. The pattern matches [from AI demo to AI product: the bridge most teams fail to build](/blog/from-ai-demo-to-ai-product-the-bridge-most-teams-fail-to-build) and the earlier observation in [building production grade AI features without an ML team](/blog/building-production-grade-ai-features-without-an-ml-team).
+
+## Common mistakes
+
+1. Scoping a generic "AI assistant" instead of a specific feature.
+2. Shipping without evals so you cannot tell if it is working.
+3. Skipping cost monitoring and getting surprised by the bill.
+4. Building custom models in the first quarter when frontier APIs would have shipped faster.
+5. Planning by feature count instead of by user problems solved.
+6. Treating AI features like normal features and underestimating the production gap.
+7. Letting investor pressure dictate scope when the team is not ready to deliver it.
+
+## A 90 day plan for an AI roadmap that ships
+
+1. **Weeks one and two.** Build evals, observability, and cost dashboards. Get the boring infrastructure in place.
+2. **Week three.** Identify one specific user problem AI could solve. Verify with real users that they actually have the problem.
+3. **Weeks four to seven.** Ship the first feature. Use a frontier API. Embed it in the existing workflow.
+4. **Weeks eight and nine.** Measure. Adjust prompts and evals based on real usage. Iterate on the feature.
+5. **Weeks ten to twelve.** Either ship a second feature using the same pattern or deepen the first. Do not start three new things.
+6. **End of quarter.** Review what shipped, what got used, and what to do next. The discipline of [why most AI roadmaps fail](/blog/why-most-ai-roadmaps-fail-in-the-first-quarter) is to keep doing what worked and stop doing what did not.

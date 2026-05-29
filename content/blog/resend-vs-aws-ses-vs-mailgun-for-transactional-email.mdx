@@ -1,0 +1,62 @@
+---
+slug: "resend-vs-aws-ses-vs-mailgun-for-transactional-email"
+title: "Resend vs AWS SES vs Mailgun for Transactional Email"
+excerpt: "Transactional email services differ significantly in deliverability, developer experience, and pricing at scale. Here is how Resend, AWS SES, and Mailgun compare for SaaS products in 2026."
+date: "2026-05-23"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026","ai"]
+readingMinutes: 6
+ogImage: "/api/og/blog/resend-vs-aws-ses-vs-mailgun-for-transactional-email"
+status: "published"
+definition: "Transactional email services provide infrastructure for sending programmatically triggered emails: account confirmation, password reset, purchase receipts, notification emails, and onboarding sequences. They handle SMTP relay, IP reputation management, delivery tracking, bounce and complaint handling, and compliance features (unsubscribe management, GDPR compliance). The distinction between transactional email (triggered by user actions) and marketing email (sent in bulk to subscriber lists) matters for deliverability: mixing them on the same IP reputation degrades deliverability for the transactional emails users need to receive."
+faq: [
+  {"q":"What is Resend and why has it gained adoption quickly?","a":"Resend is a developer-first transactional email service launched in 2023 that provides a clean REST API and a React Email integration for building HTML emails using React components. The React Email library allows building email templates with the same tooling used for the rest of the frontend, with live preview and responsive design support. Resend's API is modern and well-documented, the pricing is transparent, and the developer experience is significantly better than older services. It has gained adoption among Next.js and React teams specifically because of the React Email integration."},
+  {"q":"When is AWS SES the right choice for transactional email?","a":"AWS SES is the right choice when the application is already on AWS and email volume is high enough that per-email pricing matters. SES charges $0.10 per 1,000 emails, which is significantly cheaper than Resend, Mailgun, or Postmark at high volumes. SES requires more setup: domain verification, DKIM configuration, and handling bounce and complaint notifications via SNS. The developer experience is lower than newer services, but the pricing advantage at scale (100,000 emails per month and above) is significant. SES is also the underlying infrastructure for several other transactional email services."},
+  {"q":"What is Mailgun and when does it make sense in 2026?","a":"Mailgun is a transactional and marketing email service from Sinch, with strong deliverability, detailed analytics, and a mature API. Mailgun has been around since 2010 and has a stable, proven infrastructure. In 2026, Mailgun is a reliable choice for teams that need both transactional and marketing email from a single vendor, or for teams that need the detailed deliverability analytics Mailgun provides. The developer experience is older than Resend, but the documentation is comprehensive. Mailgun's pricing is mid-tier: more than SES at scale but less than Postmark."},
+  {"q":"What is email deliverability and how do these services compare?","a":"Email deliverability is the percentage of sent emails that reach the recipient's inbox rather than spam folder or being bounced. Deliverability depends on: sender reputation (IP and domain reputation with major ISPs), email authentication (SPF, DKIM, DMARC configuration), content quality (spam trigger words, link-to-text ratio, HTML structure), and bounce and complaint rates (high bounce rates damage reputation). All three services have good deliverability when properly configured. Dedicated IPs (available on paid plans) improve deliverability for high-volume senders by isolating their reputation from shared pool users. New senders on shared IPs inherit the pool's reputation."},
+  {"q":"What email authentication records need to be configured for any transactional email service?","a":"Three DNS records are required for proper email authentication. SPF (Sender Policy Framework): a TXT record that lists the mail servers authorized to send from the domain. DKIM (DomainKeys Identified Mail): a TXT record containing the public key that verifies the email's cryptographic signature. DMARC (Domain-based Message Authentication, Reporting, and Conformance): a TXT record that tells receiving mail servers what to do with emails that fail SPF or DKIM checks (reject, quarantine, or report). Without all three records configured, emails are more likely to land in spam. All three services provide the DNS records to add during onboarding."}
+]
+---
+
+## What you need to know
+
+- Resend is the best developer experience in 2026 and the right choice for new projects using React or Next.js. The React Email integration is a meaningful productivity improvement.
+- AWS SES is the cheapest option at scale and the right choice for high-volume senders already on AWS. The setup complexity is a one-time cost.
+- Mailgun is the reliable middle ground for teams that need good deliverability without the AWS SES setup overhead.
+- Configure SPF, DKIM, and DMARC before going to production with any service. Missing authentication records significantly reduce deliverability.
+- Separate transactional and marketing email onto different sending domains or services to protect transactional deliverability.
+
+## The core argument
+
+The transactional email service decision is usually not made deliberately. Teams pick the service with the most visible documentation when they need to implement password reset, and that service becomes the default for all email for years. The cost of that decision is typically only noticed when email volume grows and the pricing model that works at 1,000 emails per month is expensive at 100,000.
+
+For new projects starting today, Resend is the most productive choice. The API is clean, the React Email library produces maintainable HTML email templates that do not involve fighting with table-based layouts, and the documentation for common patterns (Next.js integration, authentication flows) is excellent. Resend's pricing is competitive for the volumes typical of early-stage SaaS. The only scenario where Resend is not the right choice is very high volume where SES's per-email pricing produces a significant cost advantage.
+
+The scenario for AWS SES is explicit: you are already on AWS, you are sending 100,000 or more emails per month, and you have the engineering time to set up and maintain the SES integration. At 100,000 emails per month, SES costs $10 per month. Resend at similar volume costs roughly $150 per month on the pro plan. The $140 per month savings may or may not justify the SES setup complexity depending on the team size and the value of engineering time.
+
+## Common mistakes
+
+1. **Not configuring DMARC.** SPF and DKIM are commonly configured because the email service onboarding requires them. DMARC is often skipped because it is optional for sending but important for long-term deliverability and domain protection. Start with DMARC in monitoring mode (p=none) to identify authentication failures before switching to enforcement mode (p=reject). A DMARC policy that rejects unauthenticated email prevents domain spoofing.
+
+2. **Sending transactional and marketing email from the same IP pool.** Marketing email generates more spam complaints and unsubscribes than transactional email. If both types share an IP, marketing email complaints degrade the deliverability of transactional emails (password resets, purchase receipts) that users need to receive. Separate transactional email onto a dedicated IP (usually available at higher plan tiers) or use separate services.
+
+3. **Not handling bounce and complaint webhooks.** All three services send webhooks when emails bounce or generate spam complaints. Not processing these webhooks means continuing to send email to invalid addresses (which harms deliverability) and to addresses that have marked emails as spam (which violates CAN-SPAM and harms deliverability further). Process bounce webhooks to update email validity in the database and suppress future sends to bounced addresses.
+
+4. **Using the same domain for email and web without DMARC enforcement.** A domain without DMARC enforcement can be spoofed: malicious actors can send emails that appear to be from your domain. Enable DMARC monitoring mode to understand the sending patterns before enabling enforcement, then move to enforcement to prevent domain spoofing.
+
+5. **Not testing email rendering across clients.** Email clients render HTML differently. An email that looks correct in Gmail may look broken in Outlook 2019. Services like Litmus and Email on Acid provide cross-client rendering previews. At minimum, test in Gmail, Apple Mail, and Outlook before deploying new email templates.
+
+## Where to start
+
+1. **Choose the service and configure DNS records before writing any email code.** SPF, DKIM, and DMARC records require 24 to 48 hours to propagate. Configure them at the start of the project so authentication is in place before the first email is sent.
+
+2. **Implement a bounce and complaint webhook handler on day one.** Before sending to real users, implement the webhook endpoint that receives bounce and complaint notifications and updates a suppression list in the database. This prevents future sends to invalid or complaining addresses from the start.
+
+3. **Build the first email template in React Email (for Resend) or use a template library.** Writing HTML emails from scratch in 2026 involves fighting against email client quirks. React Email (Resend), MJML (Mailgun), or a similar abstraction handles the email client compatibility issues and produces responsive, well-rendered emails from readable component code.
+
+## Related reading
+
+- [Resend vs Postmark vs SendGrid vs Mailgun](/blog/resend-vs-postmark-vs-sendgrid-vs-mailgun)
+- [Pylon vs Plain vs Front for Modern Customer Support](/blog/pylon-vs-plain-vs-front-for-modern-customer-support)
+- [Push Notifications: The Architecture Most Apps Get Wrong](/blog/push-notifications-the-architecture-most-apps-get-wrong)
+- [Lead Pipeline Automation: From Form to CRM Without Touching It](/blog/lead-pipeline-automation-from-form-to-crm-without-touching-it)

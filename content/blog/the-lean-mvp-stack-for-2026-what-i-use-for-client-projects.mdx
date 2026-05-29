@@ -1,0 +1,143 @@
+---
+slug: "the-lean-mvp-stack-for-2026-what-i-use-for-client-projects"
+title: "The Lean MVP Stack for 2026: What I Use for Client Projects"
+excerpt: "The exact stack I use to ship client MVPs fast: Next.js, Supabase, Stripe, Resend, and Vercel -- and why each choice reduces friction."
+date: "2024-06-14"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders","nextjs","supabase","stripe"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-lean-mvp-stack-for-2026-what-i-use-for-client-projects"
+status: "published"
+definition: "The lean MVP stack is a set of opinionated technology choices designed to minimize the time from idea to working product in the hands of real users. The criteria for inclusion: the tool must eliminate a category of infrastructure work (auth, payments, email, deployment), must have a generous free tier that covers the MVP phase, must be well-documented enough that a solo developer can ship without support tickets, and must not create significant lock-in that makes the post-MVP phase expensive. In 2026, the stack I use for most client projects is Next.js, Supabase, Stripe, Resend, and Vercel."
+faq: [
+  {"q":"Why Next.js over a separate frontend and backend?","a":"A single Next.js codebase handles frontend rendering, API routes, and server-side logic without requiring separate deployment pipelines or CORS configuration. For an MVP with one developer, the reduced surface area is the primary advantage. The tradeoff is a mixed concern codebase that gets harder to split as the team scales -- but for an MVP, that problem is years away and the present simplicity is worth it. The alternative (separate React SPA + Express API) doubles the deployment configuration and adds a CORS layer that is a source of friction in early development."},
+  {"q":"Why Supabase over a hosted PostgreSQL database?","a":"Supabase provides PostgreSQL with a built-in auth system (including OAuth providers, magic links, and JWT handling), row-level security for per-user data access, a realtime subscription layer for live data, and a JavaScript SDK that handles most common database operations without writing raw SQL. For an MVP, this eliminates the auth infrastructure work entirely. The alternative (bare PostgreSQL + custom auth) requires building or integrating session management, password hashing, OAuth flows, and row-level authorization separately -- work that Supabase covers in the first hour of setup."},
+  {"q":"What does the Stripe integration look like in this stack?","a":"Stripe Checkout for payment collection (no custom payment UI to build), Stripe Customer Portal for subscription management (cancellation, plan changes, billing history without any UI to build), and Stripe webhooks for payment event handling (subscription activated, cancelled, payment failed). The combination covers most SaaS billing requirements without writing payment UI. The critical implementation: verify Stripe webhook signatures before processing any event, and handle subscription status transitions correctly (past_due is not active, cancelled subscriptions should lose access immediately)."},
+  {"q":"Why Resend over SendGrid or AWS SES for transactional email?","a":"Resend has the best developer experience of any transactional email service I have used: a simple REST API, React email templates (same JSX components as the frontend, rendered server-side to HTML), and a dashboard that shows email delivery and open rates without requiring custom integration. SendGrid has more features but more complexity; AWS SES is cheaper at scale but requires significant configuration for deliverability. For an MVP sending fewer than 3,000 emails per month, Resend's free tier covers the full email stack at zero cost."},
+  {"q":"When should this stack be replaced or extended?","a":"Three signals that the MVP stack needs extension: user base grows past 50,000 monthly active users (Supabase's free tier and Vercel's hobby tier become insufficient, requiring paid plans or migration to managed infrastructure), the team grows past 5 engineers (the single Next.js codebase becomes a coordination bottleneck), or the product requires features the stack does not support well (background job processing at scale, real-time features beyond Supabase's realtime tier, or a mobile app that cannot be served by a responsive web app)."}
+]
+---
+
+## What you actually need to know
+
+- The goal of an MVP stack is to eliminate infrastructure work so development time goes to the product. Every tool in the stack below replaces a week or more of infrastructure work that is not the product.
+- Next.js handles frontend and API in one deployment. No CORS, no separate deployment pipelines, no coordination overhead for a solo developer.
+- Supabase eliminates auth infrastructure entirely. OAuth, magic links, row-level security, and JWT handling are set up in under two hours.
+- Stripe Checkout and Customer Portal eliminate payment UI. The checkout page, plan selection, and billing management interfaces are hosted by Stripe and require no custom frontend work.
+- Vercel deploys automatically on every git push with zero configuration for Next.js projects.
+
+| Layer | Tool | Why | Free Tier |
+|---|---|---|---|
+| Frontend + API | Next.js 15 | Full-stack in one codebase | Open source |
+| Database + Auth | Supabase | PostgreSQL + auth included | 500MB DB, 50K MAU |
+| Payments | Stripe | Checkout + Portal, no UI required | No monthly fee |
+| Transactional email | Resend | React templates, simple API | 3,000 emails/month |
+| Deployment | Vercel | Zero-config Next.js, auto-preview | Hobby tier generous |
+| File storage | Supabase Storage | Same dashboard as DB | 1GB storage |
+| Background jobs | Vercel Cron | Simple scheduled tasks | Free on hobby |
+
+## The core argument
+
+The MVP stack is an opinionated set of choices designed to solve one problem: a founder or solo developer needs a working product in the hands of real users within 4-8 weeks, and every infrastructure decision that is not the core product is a week that could have been spent building the thing that matters.
+
+I have seen this play out consistently across client projects. The team that spends two weeks setting up a custom auth system, one week configuring a database ORM, and one week building a payment flow has four weeks of infrastructure work before they have written a line of product code. The team that chooses Supabase (auth included), Next.js (full-stack in one codebase), and Stripe Checkout (payment UI included) starts writing product code in the first week.
+
+The tradeoff is lock-in. Supabase's row-level security is not a portable abstraction -- migrating away requires rewriting authorization. Stripe's Customer Portal is a hosted page you do not control. Vercel's edge middleware is Next.js-specific. I make this tradeoff deliberately: the cost of the potential future migration is much lower than the cost of the foregone speed, and most MVPs do not reach the scale where migration becomes necessary.
+
+## The Next.js foundation
+
+Next.js 15 with the App Router is the foundation for every client project I build in 2026. The App Router model -- server components for data fetching, client components for interactivity, API routes for external webhook handling -- produces a codebase structure that maps cleanly to the way SaaS products are built.
+
+The specific patterns I use consistently:
+
+**Server components for authenticated data fetching.** In the App Router, a `page.tsx` that is a server component can call Supabase directly to fetch the current user's data and render it without a loading state. No `useEffect`, no API route for simple data display, no client-side data fetching for content that does not need to be interactive.
+
+**API routes for Stripe webhooks.** Stripe webhook events must be processed server-side with signature verification. Next.js API routes handle this cleanly: the raw request body is accessible (required for Stripe's signature check), the route runs server-side, and it shares the same codebase as the rest of the application.
+
+**Middleware for auth.** Supabase's Next.js SDK includes middleware that refreshes the user session on every request and makes the session available to all server components without per-page auth checks. A single middleware file covers the entire application.
+
+## The Supabase auth and database layer
+
+Supabase's auth system is the single biggest time-saver in the stack. Setting up email/password auth, Google OAuth, and magic link auth takes under two hours including testing. The alternative -- building the same auth system from scratch with bcrypt, JWT, session management, and OAuth -- takes two to three days minimum.
+
+Row-level security (RLS) is the feature that makes Supabase auth genuinely useful for a multi-tenant SaaS product. RLS policies are SQL-level rules that restrict what data each authenticated user can access:
+
+```sql
+-- Users can only read their own documents
+create policy "Users can read own documents"
+on documents for select
+using (auth.uid() = user_id);
+```
+
+This policy means that a query like `supabase.from('documents').select('*')` automatically filters to only the current user's documents, regardless of how the query is constructed. Authorization is enforced at the database level, not in application code -- which means it cannot be accidentally bypassed by a missing check in an API route.
+
+The practical implication: the horizontal privilege escalation vulnerability that I find in most AI-generated codebases (user A accessing user B's data) cannot occur in a Supabase project with RLS enabled, because the database rejects the query before it returns unauthorized data.
+
+## The Stripe billing implementation
+
+The Stripe integration for a typical SaaS MVP requires three components:
+
+**Checkout flow.** A button click redirects the user to Stripe Checkout with a `price_id` for the selected plan. Stripe handles the payment form, validation, and confirmation. The redirect URL brings the user back to the app after successful payment. Total frontend code: one redirect function.
+
+**Webhook handler.** A Stripe webhook receives events when subscription status changes. The handler verifies the signature, processes the `checkout.session.completed` event (mark user as subscribed), the `customer.subscription.deleted` event (mark user as cancelled), and the `invoice.payment_failed` event (mark subscription as past due). Total backend code: 50-100 lines.
+
+**Access control.** Every page or API route that requires a paid subscription checks the user's subscription status from the database. The status is written by the webhook handler, not by client-side code. This prevents bypassing the paywall by manipulating client-side state.
+
+The Stripe Customer Portal handles all subscription management UI: plan upgrades, cancellations, billing history, and payment method updates. The portal is a hosted Stripe page configured with a single API call.
+
+## The Resend email layer
+
+Resend's React Email integration is the cleanest transactional email developer experience I have found. Email templates are `.tsx` files that use React components:
+
+```tsx
+// emails/welcome.tsx
+export function WelcomeEmail({ name }: { name: string }) {
+  return (
+    <Html>
+      <Body>
+        <Text>Welcome, {name}. Your account is ready.</Text>
+      </Body>
+    </Html>
+  );
+}
+```
+
+Sending the email from a Next.js API route:
+
+```ts
+await resend.emails.send({
+  from: 'Yashveer Labs <hello@yashveerlabs.com>',
+  to: user.email,
+  subject: 'Welcome',
+  react: WelcomeEmail({ name: user.name }),
+});
+```
+
+The email templates are versioned alongside the application code, previewed in the browser during development, and tested with real sends in development using Resend's test mode. No separate email design tool, no HTML-in-strings, no deliverability configuration until the project goes to production.
+
+## Common mistakes founders make with MVP stack choices
+
+1. Over-engineering the stack before validating the product. A custom backend with microservices, separate databases, and a dedicated auth service is infrastructure that a product with zero users does not need.
+2. Choosing tools based on long-term scalability before short-term shipping speed. The stack that scales to 10 million users is not the stack that ships to 100 users in 4 weeks. Optimize for shipping first.
+3. Building auth from scratch "for control." Supabase's auth is open source, self-hostable, and exits cleanly if you outgrow it. The control argument for custom auth rarely holds up when the alternative is a two-day build vs. a two-hour configuration.
+4. Building a custom payment UI instead of using Stripe Checkout. Payment forms require PCI compliance, browser compatibility, and error handling that Stripe has already solved. Custom payment UI is weeks of work to solve a problem that Checkout handles for free.
+5. Not using Vercel's preview deployments. Every pull request on Vercel gets a preview URL with the full application running. Sharing preview links with clients for feedback before merging is one of the highest-leverage workflow improvements available for free.
+
+## Where to start: a 3-step MVP stack setup
+
+**Step 1: Initialize the Next.js project with the Supabase template.** `npx create-next-app` with the Supabase starter template creates a working app with auth configured, database types generated, and server-side session management in place. Day one configuration, not day three.
+
+**Step 2: Set up Stripe in test mode and implement the Checkout redirect and webhook handler.** The webhook handler with signature verification, the checkout session creation, and the subscription status update can be implemented in 3-4 hours following Stripe's Next.js examples. Test with Stripe's test card numbers before touching real payment credentials.
+
+**Step 3: Deploy to Vercel and connect the domain.** The first deployment takes under 10 minutes for a Next.js project. Connect the domain, set the environment variables (Supabase URL, Stripe keys, Resend API key), and the production environment is live. The preview deployments for every subsequent pull request are automatic.
+
+## The Stack That Ships
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I used this stack to build the first version of Expert Tutorials -- authentication, subscription billing, email delivery, and content delivery in four weeks with one developer. The Supabase auth eliminated a week of session management work. Stripe Checkout eliminated two weeks of payment UI work. Resend eliminated a day of email deliverability configuration. Those four weeks of saved infrastructure time went into the product. That is the only argument for a stack like this: it moves time from infrastructure to product, and for an MVP, the product is the only thing that matters.
+
+## Related reading
+
+- [The Honest MVP Checklist: 25 Items Before You Launch](/blog/the-honest-mvp-checklist-25-items-before-you-launch)
+- [The Five Hour Founder Audit: Are You Ready to Build?](/blog/the-five-hour-founder-audit-are-you-ready-to-build)
+- [The Last 20 Percent: Why Your AI Generated SaaS Fails at Stripe and Security](/blog/the-last-20-percent-why-your-ai-generated-saas-fails-at-stripe-and-security)
+- [The Hidden Costs of Custom Software Development](/blog/the-hidden-costs-of-custom-software-development)

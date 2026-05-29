@@ -1,0 +1,62 @@
+---
+slug: "multi-factor-authentication-webauthn-totp-and-beyond"
+title: "Multi Factor Authentication: WebAuthn, TOTP, and Beyond"
+excerpt: "MFA is no longer optional for B2B SaaS. Here is how TOTP, WebAuthn, passkeys, and hardware keys compare, what to implement first, and how to enforce MFA without alienating your user base."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance"]
+readingMinutes: 6
+ogImage: "/api/og/blog/multi-factor-authentication-webauthn-totp-and-beyond"
+status: "published"
+definition: "Multi-factor authentication (MFA) requires users to provide two or more types of evidence before accessing an account: something they know (password), something they have (a device generating a code), and something they are (biometrics). TOTP (Time-based One-Time Passwords) is the most widely deployed second factor. WebAuthn is the modern standard that replaces TOTP with phishing-resistant hardware-backed authentication. Passkeys implement WebAuthn for consumer-friendly use. Each has different phishing resistance, implementation complexity, and user friction tradeoffs."
+faq: [
+  {"q":"What is the difference between TOTP and WebAuthn?","a":"TOTP generates a six-digit code that changes every thirty seconds, which the user types in addition to their password. The code is vulnerable to real-time phishing: an attacker can intercept the code and use it immediately. WebAuthn uses public-key cryptography with a hardware-bound private key. Authentication is a cryptographic signature that is specific to the origin of the request, making it phishing-resistant by design. WebAuthn cannot be intercepted and used on a different domain."},
+  {"q":"What are passkeys and how do they relate to WebAuthn?","a":"Passkeys are the consumer-friendly implementation of WebAuthn where the private key is stored in the device's secure enclave (managed by Apple, Google, or a password manager) and authenticated with biometrics. They replace both the password and the second factor with a single phishing-resistant credential. Passkeys are a WebAuthn credential type, not a separate standard. The FIDO Alliance and major platform vendors (Apple, Google, Microsoft) have standardized the user experience."},
+  {"q":"What is the implementation complexity of adding TOTP to an existing app?","a":"TOTP implementation requires: generating a TOTP secret for each user and storing it securely, generating a QR code for authenticator app setup, validating the provided code against the current and immediately adjacent time windows (to handle clock drift), and providing backup codes for recovery. Libraries like otplib (Node.js) handle the cryptographic operations. The auth provider route (Clerk, Auth0) handles all of this without custom implementation."},
+  {"q":"How do I enforce MFA without creating excessive friction?","a":"Enforce MFA at the role or permission level rather than universally at first. Require MFA for all admin actions, for all users with access to sensitive data, and for enterprise customers whose contracts require it. For standard users, make MFA strongly recommended (prompt after login, show security completion percentage) before requiring it. Phase the enforcement over thirty to sixty days with clear communication about why it is required."},
+  {"q":"Do I need hardware security keys (YubiKey) or are passkeys sufficient?","a":"Passkeys provide equivalent phishing resistance to hardware security keys for most use cases. Hardware keys provide an additional assurance level for high-security environments where device compromise is a concern. For standard B2B SaaS, passkeys are sufficient. For financial services, government, and high-compliance environments where government-grade security is required, hardware keys remain the appropriate recommendation."}
+]
+---
+
+## What you need to know
+
+- TOTP is widely deployed and provides meaningful protection against credential stuffing and password breaches. It is not phishing-resistant, but it blocks the majority of automated attacks.
+- WebAuthn and passkeys are phishing-resistant by design. They are the correct direction for new MFA implementations in 2026.
+- SMS-based OTP is the weakest MFA option and should not be the only second factor offered. SIM swapping attacks bypass it. TOTP or WebAuthn is the correct alternative.
+- Enterprise customers increasingly require MFA enforcement as a condition of security questionnaire completion. Build MFA enforcement before the first enterprise deal closes.
+- Auth providers (Clerk, Auth0, Supabase, WorkOS) handle TOTP and WebAuthn implementation. Building MFA from scratch is rarely justified.
+
+## The core argument
+
+The MFA decision for B2B SaaS in 2026 is not whether to implement it but which method to prioritize and how to enforce it. The threat model has changed: password breaches from third-party services are so common that passwords alone are not a reasonable security baseline for any account that controls customer data or billing. Enterprise security questionnaires reflect this: they ask specifically about MFA support, enforcement policies, and whether admin accounts require MFA.
+
+TOTP is the most broadly supported second factor because it works with every authenticator app (Google Authenticator, Authy, 1Password) and requires no hardware or browser support. The implementation via an auth library is straightforward, and user adoption is high for technical users who understand the value. The limitation is that TOTP codes can be phished in real time: an attacker who creates a convincing login phishing page can capture both the password and the TOTP code and use them immediately. This attack is less common against SaaS products with small attack surfaces but is a genuine concern for high-value accounts.
+
+WebAuthn passkeys are the right direction for new MFA implementations. They require no code typing, authenticate with a biometric gesture, and are bound to the specific domain, making phishing impossible. The user experience is comparable to Face ID or Touch ID on a device: one tap or glance to authenticate. The implementation via a modern auth provider is handled automatically. The challenge is that not all users have passkey-compatible devices or understand the technology. The practical approach is to offer both TOTP and passkeys, allow users to register either or both, and recommend passkeys for new users while maintaining TOTP as a supported option for users on older devices or platforms.
+
+## Common mistakes
+
+1. **Offering SMS OTP as the only MFA option.** SMS OTP is better than no MFA but is the weakest option available. SIM swapping attacks bypass it. If SMS is offered, it should be presented as the fallback behind TOTP or WebAuthn, not the primary option.
+
+2. **Not providing backup codes at MFA enrollment.** A user who loses their authenticator device needs a recovery path. Backup codes generated at enrollment and stored securely by the user are the standard recovery mechanism. Without them, account lockout requires customer support involvement.
+
+3. **Requiring MFA without adequate user notification.** Turning on required MFA without a thirty-day notice period, in-app prompts, and email communication results in locked-out users and support tickets. Phase MFA enforcement with clear communication.
+
+4. **Not enforcing MFA for admin roles while leaving it optional for standard users.** The highest-risk accounts are admin accounts. If MFA enforcement is not universal, it must at least be required for accounts with admin or billing access.
+
+5. **Building TOTP from scratch when an auth provider handles it.** TOTP implementation involves secure secret storage, time-window validation, and backup code management. Auth providers like Clerk and Auth0 implement this correctly and maintain it. Custom implementation is unnecessary and introduces implementation risk.
+
+## Where to start
+
+1. **Add TOTP support to the authentication flow using your current auth provider.** Clerk, Auth0, and Supabase all have native MFA support. Enable TOTP for all accounts as an optional feature before making it required.
+
+2. **Require MFA for all admin and billing roles immediately.** These accounts have the highest value to attackers. Enforce MFA for privileged roles before enforcing it universally.
+
+3. **Set a roadmap for WebAuthn passkey support.** If your auth provider does not yet support passkeys, request it on their roadmap or evaluate providers that do. Plan to offer passkeys as an option alongside TOTP within the next two quarters.
+
+## Related reading
+
+- [JWT Best Practices in 2026: What Has Changed](/blog/jwt-best-practices-in-2026-what-has-changed)
+- [Mobile Authentication: Biometrics, Magic Links, and the Death of Passwords](/blog/mobile-authentication-biometrics-magic-links-and-the-death-of-passwords)
+- [How to Sell to Enterprise Without a Full Compliance Stack](/blog/how-to-sell-to-enterprise-without-a-full-compliance-stack)
+- OWASP Top 10 for SaaS Founders: What Actually Matters

@@ -1,0 +1,101 @@
+---
+slug: "auth0-vs-clerk-vs-supabase-auth-vs-build-your-own"
+title: "Auth0 vs Clerk vs Supabase Auth vs Build Your Own"
+excerpt: "Four credible paths for auth in 2026. Auth0 if you have enterprise needs and a budget. Clerk if you want to move fast. Supabase Auth if you live in that ecosystem. Build your own only if you have a real reason."
+date: "2026-05-19"
+category: "Comparisons and Vendor Decisions"
+tags: ["auth","comparisons","vendor-evaluation","clerk","auth0"]
+readingMinutes: 13
+ogImage: "/api/og/blog/auth0-vs-clerk-vs-supabase-auth-vs-build-your-own"
+status: "published"
+definition: "Auth0 is the enterprise default, expensive but battle tested. Clerk is the modern developer experience leader for B2B SaaS in 2026, with batteries for organizations, MFA, and passkeys included. Supabase Auth is the right call when you are already on Supabase and want auth tied to your Postgres. Building your own is a real option only when you have a security team, a multi region constraint, or an unusual integration."
+faq: [
+  {"q":"What is the fastest way to add auth to a Next.js SaaS in 2026?","a":"Clerk. The Next.js SDK handles sign in, sessions, organizations, and middleware in roughly a day of integration. Auth0 takes longer because the configuration surface is larger. Supabase Auth is fastest if you are already in that ecosystem."},
+  {"q":"When should I pick Auth0 over Clerk?","a":"When you have enterprise customers asking for SAML, custom token lifetimes, complex role mappings, and certified compliance documentation. Auth0 has the deepest enterprise feature set. Clerk is closing the gap. For most B2B SaaS under 50k MAU, Clerk wins on developer experience and price."},
+  {"q":"Is Supabase Auth production ready?","a":"Yes for products that live on Supabase. The integration with the rest of the stack is the value. Row level security tied to the auth user is what most teams pick it for. The standalone auth surface is less developed than Clerk or Auth0."},
+  {"q":"Should I ever build auth myself?","a":"Rarely. Build your own when you have multi region data residency that no vendor supports, a regulator requires self hosted secrets, or you are an auth product itself. Otherwise the math does not work. The break even on engineering cost is usually three to five years."},
+  {"q":"What is the real cost of Auth0 at scale?","a":"For B2B SaaS with organizations and MFA, expect 0.04 to 0.10 USD per monthly active user once you cross the free tier. A product at 50k MAU often pays 3000 to 5000 USD per month. The enterprise tier adds platform fees and minimums."},
+  {"q":"How hard is it to migrate from one auth provider to another?","a":"Hard. The password hashes can sometimes be exported and reused. The session migration always requires a forced reset or a long shadow period. Plan two to four engineering weeks plus customer communication. Pick the provider you will live with for three years."},
+  {"q":"What about passkeys and the death of passwords?","a":"All three vendors support passkeys in 2026. Clerk has the cleanest implementation by default. Auth0 has the most granular policy controls. Supabase Auth supports passkeys but has fewer enterprise policy levers. Build your own and you are implementing WebAuthn yourself."}
+]
+---
+
+## What you actually need to know
+
+- Clerk wins developer experience and time to ship for new B2B SaaS in 2026.
+- Auth0 wins enterprise readiness and certification breadth.
+- Supabase Auth wins integration depth when the rest of the stack is Supabase.
+- Build your own loses on math for almost every team.
+- The migration cost is high. Pick once. Live with it for three years.
+
+| Vendor | Best fit | Cost at 10k MAU | Cost at 100k MAU | Enterprise readiness |
+|---|---|---|---|---|
+| Auth0 | Enterprise SaaS, regulated industries | 800 to 1500 USD per month | 8000 to 15000 USD per month | Highest |
+| Clerk | Developer first B2B SaaS, fast moving teams | 500 to 900 USD per month | 4000 to 7000 USD per month | High, growing |
+| Supabase Auth | Products already on Supabase | Free to 250 USD per month | 250 to 500 USD per month | Medium |
+| Build your own | Auth products, special compliance, multi region | 0 ongoing license, 6 to 12 months of engineering | Maintenance dominates | Depends on team |
+
+## The core argument
+
+Auth is one of three or four decisions that compound across the lifetime of a SaaS product. The wrong call costs years of migration pain. The right call removes a class of incidents and unlocks enterprise revenue. The available paths in 2026 have consolidated. Auth0 and Clerk lead the managed market. Supabase Auth is the right call inside its ecosystem. Building your own is the right call almost never.
+
+The choice between Auth0 and Clerk is the one most teams agonize over. Auth0 has the deeper enterprise feature set, more certifications, and the longest track record. Clerk has the better developer experience, the friendlier pricing curve under 100k MAU, and a faster pace of shipping new features like passkeys and organizations. The honest framing is that Clerk wins if your first ten customers are not enterprise and Auth0 wins if they are.
+
+Supabase Auth is a different decision. You pick it because the rest of your stack is Supabase and the row level security integration is what you want. The standalone capability is good but not as deep as Clerk or Auth0. The win is the seamless tie to your Postgres tenant model.
+
+Building your own is the choice teams make when the math does not work. I have rescued two projects where founders built their own auth to save money and then spent more than a vendor would have charged trying to keep it secure. The exceptions are real. Multi region data residency, self hosted secrets requirements, or an auth product itself. Outside those, the cost is hidden until it is not.
+
+## The cost math
+
+Take a B2B SaaS at 20k monthly active users with organizations, MFA, and SAML for the top tier. The all in cost of Auth0 at that scale is roughly 1800 to 2800 USD per month. Clerk for the same shape is roughly 900 to 1500 USD per month. Supabase Auth is roughly 200 to 400 USD per month. Building your own is roughly 15000 to 25000 USD per quarter in engineering time once the system is mature, plus the cost of incidents.
+
+The pricing differences compress at higher scale. At 200k MAU, Auth0 and Clerk are within twenty percent of each other. The decision moves toward features, support, and migration risk.
+
+## Features to demand from any choice
+
+- Passkeys and WebAuthn.
+- Organizations or tenants as a first class concept.
+- SAML and OIDC for enterprise customers.
+- Custom claims in tokens for your application's authorization needs.
+- Audit logs with retention.
+- SCIM provisioning for the enterprise tier.
+- Self serve admin dashboards for support staff.
+- Clear migration paths if you ever leave.
+
+## Expert opinion
+
+> Most founders pick the auth provider they have heard of and live with the consequences for three years. The teams that pick deliberately, after a one week evaluation against their next four quarters of customers, end up with the right call. The cost of the evaluation is one engineering week. The cost of the wrong call is multiples of that.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client building a workflow platform asked me to scope their auth decision in their first month. They were leaning Auth0 because a senior advisor recommended it. The customers they were courting were mid market and not yet enterprise. The team was two engineers.
+
+We ran a four day evaluation. Built a working sign in flow in each of Auth0, Clerk, and Supabase Auth. Mapped each against the next four quarters of customer requirements. Modeled the cost at 5k, 25k, and 100k MAU. Talked to the support teams.
+
+The team picked Clerk. The integration shipped in two days. The first enterprise customer arrived eight months later and asked for SAML, which Clerk supported on the higher tier without architecture changes. The total cost over the first year was roughly 7000 USD against an estimated 18000 USD on Auth0. The win was the developer experience as much as the price.
+
+For more on the enterprise readiness side of auth, see [single sign on for enterprise SaaS](/blog/single-sign-on-for-enterprise-saas-saml-and-oidc-compared) and [SCIM provisioning the feature enterprise customers will demand](/blog/scim-provisioning-the-feature-enterprise-customers-will-demand).
+
+## Common mistakes teams make
+
+1. Building auth themselves to save money. The math almost never works.
+2. Picking the vendor with the loudest sales pitch instead of the one that fits the customer base.
+3. Skipping the evaluation. The decision is too expensive to delegate to a single team member's preference.
+4. Ignoring the migration path. Every vendor lock matters at the moment you want to leave.
+5. Treating session management as solved. Token lifetimes, refresh patterns, and revocation are not.
+6. Storing passwords yourself when the vendor would have done it for you.
+7. Underbuilding the customer admin experience. Enterprise will ask to manage users themselves.
+8. Forgetting passkeys. The expectation in 2026 is that the product supports them.
+
+## A two week evaluation plan
+
+1. **Days one to two.** Map the next four quarters of customer requirements. Enterprise readiness, organizations, MFA, SCIM, SAML, audit.
+2. **Days three to four.** Build a working sign in flow in each candidate vendor. Time the integration honestly.
+3. **Day five.** Model the cost at three growth scenarios. Conservative, planned, aggressive.
+4. **Day six.** Talk to the support teams. Ask about migration paths and outage history.
+5. **Day seven.** Make the decision. Write the memo. Get sign off.
+6. **Week two.** Ship the integration. Plan the rollout. Train the support team.
+
+For more on the broader vendor landscape, read [the vendor audit every funded startup should run once a year](/blog/the-vendor-audit-every-funded-startup-should-run-once-a-year) and [SaaS pricing for founders a cost to build to sell framework](/blog/saas-pricing-for-founders-a-cost-to-build-to-sell-framework). On the security side, [passkeys for SaaS the migration plan](/blog/passkeys-for-saas-the-migration-plan) is the natural next read.

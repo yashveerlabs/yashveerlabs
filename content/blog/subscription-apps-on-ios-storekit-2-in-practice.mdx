@@ -1,0 +1,61 @@
+---
+slug: "subscription-apps-on-ios-storekit-2-in-practice"
+title: "Subscription Apps on iOS: StoreKit 2 in Practice"
+excerpt: "StoreKit 2 is Apple's modern subscription API and it changes how iOS apps handle purchases, renewals, and entitlements. Here is what actually matters."
+date: "2026-05-24"
+category: "Cross Platform and Mobile Development"
+tags: ["ios", "mobile", "storekit", "subscriptions", "apple", "swift"]
+readingMinutes: 7
+ogImage: "/api/og/blog/subscription-apps-on-ios-storekit-2-in-practice"
+status: "published"
+faq: [
+  {"q":"Do I need to support the old StoreKit API alongside StoreKit 2?","a":"Only if you need to support iOS 14. StoreKit 2 requires iOS 15 or later. If your app analytics show less than 5 percent of users on iOS 14, dropping support for iOS 14 and using StoreKit 2 exclusively is almost always the right call in 2026."},
+  {"q":"How do I handle subscription entitlements for a cross-platform app?","a":"Use App Store Server Notifications v2 to keep your backend subscription state current, then use your backend as the source of truth for entitlement checks. StoreKit 2's local verification is useful for the iOS app's UI, but the backend is the authority for cross-platform access control."},
+  {"q":"What is the App Store's commission on subscriptions?","a":"Apple takes 30 percent in the first year of a subscription and 15 percent from the second year onward. For apps in the App Store Small Business Program (under $1M annual revenue), the first-year rate is 15 percent. This commission applies to all purchases made through StoreKit."},
+  {"q":"How do I test subscription renewals locally?","a":"Configure a StoreKit test configuration file in Xcode. In the local sandbox, subscription periods are compressed: weekly subscriptions renew every 3 minutes, monthly subscriptions every 5 minutes. This lets you test multiple renewal cycles without waiting."},
+  {"q":"Can I offer a free trial with StoreKit 2?","a":"Yes. Free trials are configured in App Store Connect at the subscription product level. StoreKit 2 exposes the introductory offer information in the `Product` type, and you can check whether a user is eligible for an introductory offer before showing the trial CTA."}
+]
+---
+
+# Subscription Apps on iOS: StoreKit 2 in Practice
+
+**StoreKit 2 is Apple's async/await-native subscription API, released with iOS 15 and now the standard for in-app purchase implementation. It replaces the older SKPaymentQueue-based model with a cleaner transaction verification system, server-side receipts eliminated in favor of signed JWS transactions, and a subscription status API that makes entitlement checking dramatically more reliable. If you are building a subscription iOS app in 2026, StoreKit 2 is the only path worth taking.**
+
+## What you need to know
+
+- StoreKit 2 requires iOS 15 or later; if you need to support iOS 14, you must handle both APIs or drop iOS 14 support
+- Transaction verification is now done via cryptographically signed JWS tokens, eliminating the unreliable receipt validation model
+- The subscription status API gives you a real-time view of a subscriber's current state including cancellations and billing grace periods
+- App Store Server Notifications v2 are the companion to StoreKit 2 on the backend and deliver reliable event updates for subscription lifecycle events
+- Testing in Xcode's StoreKit sandbox has improved significantly; you can now simulate renewals, cancellations, and billing retry scenarios locally
+
+## The core argument
+
+The original StoreKit API was built for a different era of iOS development. Receipt validation required your app to send a receipt blob to Apple's servers, parse an opaque JSON response, and hope the validation did not fail intermittently. Handling subscription renewals, cancellations, billing retries, and family sharing required extensive offline receipt parsing and a lot of defensive programming. Most apps got it wrong in subtle ways. Entitlement bugs were a leading source of subscription support tickets across the industry.
+
+StoreKit 2 fixes the fundamental model. Every transaction is now a signed JWS token that you can verify locally without a server round-trip, using Apple's public keys. The transaction includes all the information you need: product ID, original purchase date, current subscription state, whether the subscription is in a billing grace period, whether it was purchased through Family Sharing. You get this information in a single call with a clear data model instead of parsing receipt payloads. The async/await API makes the code significantly cleaner than the old delegate-based model where transaction updates arrived through a shared queue.
+
+The backend story improved too. App Store Server Notifications v2 delivers real-time events for every subscription lifecycle moment: subscription renewed, subscription cancelled, billing retry, grace period started, refund issued. With the original system, you had to poll receipt validation to detect these events. Now Apple pushes them to your server endpoint within seconds of the event. For Nexli, where subscription state needs to be reflected accurately in the user's access permissions, this push-based model is far more reliable than polling and makes the access control logic simpler to reason about.
+
+## Common mistakes
+
+1. **Not verifying transactions on your server for anything security-sensitive.** StoreKit 2 enables local verification, but for subscription access decisions in a multi-device or web product, verify the JWS transaction on your backend. Local verification is convenient for UI purposes; server verification is required for access control.
+2. **Ignoring the billing grace period.** Apple gives subscribers a grace period during billing failures before cancelling their subscription. If you revoke access the moment a billing failure occurs, you are cancelling users who Apple will successfully charge within 16 days. Respect the grace period and use it to reduce involuntary churn.
+3. **Not handling family sharing subscriptions.** If your subscription supports Family Sharing, members of a family share group can access your app. The entitlement check must account for family sharing, or family members who are legitimately entitled will get an incorrect access denial.
+4. **Not testing subscription scenarios in the Xcode StoreKit sandbox.** The sandbox lets you simulate renewals every 5 minutes, test billing failures, test cancellations, and test refunds without real money. If you have not run through every subscription lifecycle scenario in the sandbox before shipping, you have bugs you have not found yet.
+5. **Using StoreKit for subscriptions when the app is primarily a web product.** If your primary product is web-based and the iOS app is a companion, Apple's 30 percent cut on subscription revenue applies to anything purchased through the App Store. Many products route subscription purchases through the web and use the app for delivery only, which is permitted under Apple's current guidelines.
+
+## Where to start
+
+**Step 1: Configure your products in App Store Connect before writing code.** You need the product IDs and subscription group configuration in App Store Connect before StoreKit 2 can load them. This takes longer than expected; allow a day for initial review and approval of your subscription products.
+
+**Step 2: Build the entitlement check before the purchase flow.** Start with `StoreKit.Transaction.currentEntitlements` and get the access control working correctly for already-subscribed users. Subscription status check is the most important piece to get right, more important than the purchase flow itself.
+
+**Step 3: Set up App Store Server Notifications v2 on your backend in the same sprint as the iOS implementation.** Do not ship a subscription app without server-side notifications. You will miss cancellation events, billing failures, and refunds. These events are what keep your database synchronized with Apple's subscription state.
+
+## Related reading
+
+- [Native iOS Development in 2026: SwiftUI, Combine, and the New Stack](/blog/native-ios-development-in-2026-swiftui-combine-and-the-new-stack)
+- [App Store Review Hell: How to Survive It as a Solo Founder](/blog/app-store-review-hell-how-to-survive-it-as-a-solo-founder)
+- [Apple App Store Account Setup: Avoiding the Common Traps](/blog/apple-app-store-account-setup-avoiding-the-common-traps)
+- [App Store Pricing Psychology for Founders](/blog/app-store-pricing-psychology-for-founders)

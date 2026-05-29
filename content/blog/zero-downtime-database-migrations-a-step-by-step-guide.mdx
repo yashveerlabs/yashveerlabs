@@ -1,0 +1,127 @@
+---
+slug: "zero-downtime-database-migrations-a-step-by-step-guide"
+title: "Zero Downtime Database Migrations: A Step By Step Guide"
+excerpt: "Most outages I have seen during a schema change were avoidable. Zero downtime migrations are not magic. They are a discipline. This is the sequence I use on real production systems, with the traps that catch teams who skip a step."
+date: "2025-04-19"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 13
+ogImage: "/api/og/blog/zero-downtime-database-migrations-a-step-by-step-guide"
+status: "published"
+definition: "A zero downtime database migration is a sequence of small, backward-compatible changes that lets the application run normally throughout. The trick is never doing the schema change and the code change in the same deploy. You expand, you backfill, you migrate reads, you stop writing the old way, then you contract. Each step is reversible. None of them is dramatic."
+faq: [
+  {"q":"What is the expand and contract pattern?","a":"It is the safest sequence for evolving a schema without downtime. Expand: add the new column or table without removing anything. Backfill the data. Migrate the application to read from the new shape. Stop writing the old shape. Contract: drop the old column once nothing reads or writes it. Each step is a separate deploy. Each is reversible until you contract."},
+  {"q":"Can I rename a column without downtime?","a":"Not in one step. You add the new column, write to both, backfill, switch reads to the new column, stop writing to the old one, then drop the old column. Five deploys for one rename. It feels excessive until the first time you avoid an outage by doing it this way."},
+  {"q":"How do I backfill a large table without locking it?","a":"In batches, with throttling. Update a few thousand rows at a time, commit, pause briefly, repeat. Run it as a background job with progress tracking and the ability to resume. Avoid one giant UPDATE statement on a billion-row table. That is how you take down production at 3am on a Saturday."},
+  {"q":"What is the safest way to add an index in production?","a":"Use CREATE INDEX CONCURRENTLY in PostgreSQL or the online algorithm in MySQL. The non-concurrent version locks the table against writes. On a busy table that means an outage. Concurrent index creation takes longer but does not block writes. Plan for it and check that the index built successfully before relying on it."},
+  {"q":"How do I deploy application code that depends on a schema change?","a":"Deploy the schema change first, in a backward-compatible form. Confirm the migration ran in every environment. Then deploy the code that uses the new schema. Never ship the code and the schema change in the same deploy. If the migration fails or runs late, the code crashes."},
+  {"q":"What about ORM migrations like Rails or Django?","a":"They are convenient for small changes and dangerous for large ones. They tend to bundle schema and code in one commit, run synchronously on deploy, and use unsafe defaults. For anything that touches a large or hot table, write the migration as separate, sequenced steps and run the backfill outside the deploy hook."},
+  {"q":"How do I roll back if something goes wrong mid-migration?","a":"Each step in expand and contract is independently reversible until you drop the old column. If reads break, route them back to the old column. If writes break, stop dual-writing. Only the final contract step is irreversible, and by then everything has been running on the new shape long enough that you trust it. That is the point of the sequence."}
+]
+---
+
+## What you actually need to know
+
+- Zero downtime migrations are a sequence, not a tool. The pattern is expand, backfill, migrate reads, stop old writes, contract.
+- Never ship the schema change and the dependent code change in the same deploy. They must be separated.
+- The dangerous operations are renaming columns, dropping columns, changing types, and adding indexes on hot tables. Each has a safe way to do it.
+- Big backfills run as throttled background jobs, not as one UPDATE statement.
+- The reversible steps come before the irreversible one. By the time you contract, you have evidence that the new shape is safe.
+
+| Operation | Naive approach | Zero downtime approach | Risk if you skip the safe path |
+|---|---|---|---|
+| Add column | Add and ship code together | Add nullable, deploy, then use | Deploy ordering bug, 500s |
+| Rename column | Single migration | Expand, dual-write, migrate reads, contract | Outage on deploy |
+| Drop column | Drop and ship | Stop using, deploy, then drop | Application crashes |
+| Add index | CREATE INDEX | CREATE INDEX CONCURRENTLY | Table lock, write outage |
+| Change column type | ALTER TYPE | Add new column, dual-write, migrate, contract | Long lock, rewrite of table |
+
+## The core argument
+
+Most database outages I have walked into were caused by a migration the team thought was safe. The migration ran. It locked the table. The application started timing out because writes were queuing. The on-call engineer got paged, the team rolled back, and the postmortem said "we should be more careful next time." Next time looked the same.
+
+The pattern of being more careful is not the answer. The answer is a discipline that does not depend on anyone being careful, because under pressure people skip the careful steps. Zero downtime is the property of a sequence, not a person.
+
+The shape of the sequence is always the same. Expand the schema in a way that does not break the current application. Backfill data. Move the application to use the new shape. Stop writing the old shape. Then, only then, drop the old shape. Each step is small. Each is reversible. None of them is dramatic.
+
+When I run a migration this way, the deploys are boring. That is the goal. Boring deploys mean the team can ship every day, and shipping every day means the product moves.
+
+## The expand and contract sequence in detail
+
+### Expand
+
+Add the new column, table, or index in a form that the current application can ignore. A new nullable column. A new table that nothing reads or writes. An index that is created concurrently so it does not lock.
+
+This step ships on its own. The application continues to work because nothing has changed for it. If the migration is slow, only the migration is slow. The product is unaffected.
+
+### Backfill
+
+Populate the new column or table with the data it needs. This is the longest step, usually run as a background job that updates a few thousand rows at a time and tracks progress.
+
+A common mistake is running the backfill in the same deploy as the schema change. On a large table, the deploy hangs, the CI times out, and the team gets nervous and cancels. Run the backfill separately. Treat it as production work, not as part of a release. The pattern is documented well in [database migrations at scale](/blog/database-migrations-at-scale-how-to-move-fast-without-breaking-things).
+
+### Migrate reads
+
+Change the application to read from the new shape. The application still writes to both the old and the new shape during this period. Reads come from the new shape. If something is wrong with the new data, you find out here, and you can switch reads back to the old shape with a config change.
+
+### Stop old writes
+
+Once reads from the new shape have been stable for long enough to trust them (often a few days for a customer-facing column, longer for billing), stop writing to the old column. The application now writes only to the new shape.
+
+### Contract
+
+Drop the old column or table. This is the only irreversible step. Run it last. Once dropped, you cannot easily go back. By the time you reach this step, the new shape has been running in production for weeks and there is no reason to go back.
+
+## How long does it take
+
+| Operation | Calendar time | Engineering time | Notes |
+|---|---|---|---|
+| Simple add column | Same day | An hour | Just expand and use |
+| Add index on busy table | A day | An hour | CONCURRENTLY can take hours to build |
+| Rename a column | Two to three weeks | A day total | Five sequenced deploys |
+| Change a column type | Two to four weeks | Two days total | Same sequence as rename |
+| Split a table | A month or more | A week total | Hardest because of foreign keys |
+
+The pattern is that engineering time is small. Calendar time is the cost. The waiting is what buys you the safety, because the waiting is what gives you evidence.
+
+## Features your migration tooling must have
+
+- The ability to run migrations independently of application deploys.
+- Backfill jobs that are throttled, resumable, and observable.
+- A way to feature flag the read switch so you can flip it back instantly.
+- Schema diff in code review so reviewers can see what will run.
+- A history of what migrations have run in production, with their durations.
+- A way to mark a migration as irreversible so it gets extra review.
+
+## Expert opinion
+
+> The teams that take downtime for granted are the ones that have never built the muscle of doing schema changes the boring way. Once you have done expand and contract twice, it becomes the default. You stop reaching for the dramatic one-shot migration because you remember the outage it caused last time. The discipline pays for itself in the first incident you do not have.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client wanted to rename a column on a fifty million row users table. The legacy field was confusing the team and the new engineer kept asking what it meant. The product manager asked for the rename "this sprint."
+
+The naive migration would have locked the table for around fifteen minutes during the rewrite. The product was used by paying customers during business hours, so fifteen minutes was an outage. We did the expand and contract version. Add the new column, ship. Backfill over four nights as a throttled job. Switch reads, ship. Stop old writes after a week of reading the new column without complaints. Drop the old column three weeks later on a quiet morning.
+
+Total downtime: zero. Total engineering time: about a day across three weeks. The rename was so undramatic that nobody outside the team noticed it happened, which is exactly the goal. For more on the philosophy of safe schema evolution, read [schema evolution without downtime](/blog/schema-evolution-adding-columns-without-downtime).
+
+## Common mistakes
+
+1. Shipping the schema change and the dependent code change in one deploy.
+2. Running a backfill inside the deploy hook on a large table. The deploy hangs, the team panics, and someone cancels mid-run.
+3. Using a non-concurrent CREATE INDEX on a hot table.
+4. Skipping the dual-write period and switching all writes at once. There is no rollback if something is wrong with the new shape.
+5. Dropping the old column too early because the migration "feels done."
+6. Treating an ORM migration as automatically safe. The framework will happily lock your table.
+7. Not measuring the migration in staging on a representative dataset. The hundred row staging database is not the production billion row table.
+
+## A four week plan for a serious migration
+
+1. **Week one.** Write the sequence on paper. Identify every step. Mark which are reversible. Decide the rollout window for each.
+2. **Week two.** Ship the expand step. Confirm the new column or table is present in every environment.
+3. **Weeks two and three.** Run the backfill as a throttled background job. Track progress. Verify the new data matches expectations on a sample.
+4. **Week three.** Ship the read migration behind a flag. Flip the flag for an internal account first. Roll out over a few days.
+5. **Week four.** Stop dual writing. Watch for errors. Wait at least one full business cycle.
+6. **Week four or later.** Ship the contract. Drop the old column or table. Document the migration in the [architecture decision record](/blog/the-architecture-decision-record-a-lightweight-discipline) so the next team understands why the schema looks the way it does.

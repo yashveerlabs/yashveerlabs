@@ -1,0 +1,124 @@
+---
+slug: "the-tech-debt-audit-a-two-day-process"
+title: "The Tech Debt Audit: A Two Day Process"
+excerpt: "A structured two-day process for auditing technical debt across an existing codebase. What to look at, how to score it, and what to do with the findings before they get buried."
+date: "2025-08-28"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-tech-debt-audit-a-two-day-process"
+status: "published"
+definition: "A tech debt audit is two days of structured investigation that produces a ranked list of the highest-cost problems in a codebase. I run this on every new engagement before recommending any refactor or rewrite. The goal is not a comprehensive catalogue. The goal is a short list of the things that are actively slowing the team down or creating risk right now."
+faq: [
+  {"q":"How long does a tech debt audit actually take for a small team?","a":"Two focused days is enough to surface the things that matter. Day one is conversation and codebase reading. Day two is synthesis and prioritisation. The audit does not need to be exhaustive to be useful. A one-page list of the five highest-impact problems is worth more than a forty-page report nobody reads."},
+  {"q":"Should developers self-audit their own codebase for tech debt?","a":"Yes, with caveats. Developers who wrote the code often under-score familiar problems and over-score cosmetic ones. Pair a self-audit with at least one outside perspective, a senior engineer who did not write the code, or a short contractor engagement. The blind spots are usually in the areas the team stopped noticing."},
+  {"q":"What is the difference between tech debt and a bug?","a":"A bug produces wrong output today. Tech debt produces wrong output in the future, or slows the team down before it does. The line blurs when a known design flaw causes intermittent bugs. In practice, classify anything that a developer has to work around daily as tech debt, even if it does not crash the application."},
+  {"q":"How do you prioritise tech debt items when everything feels urgent?","a":"Score each item on two axes: how much it slows current development, and how much risk it carries if left alone. Anything that scores high on both gets addressed first. Items that are annoying but not risky get deferred. The goal is to reduce the debt that compounds, not the debt that merely sits."},
+  {"q":"How often should a team run a tech debt audit?","a":"Quarterly for fast-moving teams, twice a year for steady-state ones. The audit is most valuable after a period of fast growth or a product pivot, when the codebase has absorbed decisions that nobody would make today. Running it regularly prevents the list from becoming a wall."},
+  {"q":"What should the output of a tech debt audit look like?","a":"A single document with five to ten items, each with a one-line description of the problem, an estimate of the weekly cost in engineering time, and a rough remediation effort in days. No more than two pages. The document goes to the engineering lead and whoever owns the roadmap. Long reports get ignored."},
+  {"q":"When is the right time to start a tech debt audit on a legacy codebase?","a":"Before you agree to a rewrite, before you onboard a new team, and before any significant new feature that touches old modules. The audit tells you whether the old code is a foundation or a trap. Starting a rewrite without one is how teams end up six months into a migration they cannot finish."}
+]
+---
+
+## What you actually need to know
+
+- A tech debt audit is not a code review. It is a cost and risk mapping exercise.
+- Two days is enough if you are focused. More time produces longer lists, not better decisions.
+- The output is a ranked list of five to ten problems, not a comprehensive catalogue.
+- Score everything on two axes: cost to the team right now, and risk of compounding if ignored.
+- The audit is only useful if the findings reach the person who controls the roadmap.
+
+| Audit format | Time | Usefulness | Risk of being ignored |
+|---|---|---|---|
+| Full codebase coverage report | 2-4 weeks | Low (too broad) | High |
+| Two-day focused audit | 2 days | High | Low if output is short |
+| Developer self-assessment survey | 1 day | Medium | Medium |
+| External engineering review | 1-2 weeks | High | Medium |
+
+## The core argument
+
+Most tech debt audits fail because they try to document everything. The team spends three weeks cataloguing every TODO comment, every missing test, every inconsistent naming convention. The result is a forty-page document that gets read by nobody and changes nothing. The codebase continues exactly as it was, plus the team now has a forty-page document to feel guilty about.
+
+The two-day audit works because it refuses to be comprehensive. The goal is not a complete picture of every problem. The goal is a short list of the things that are actively costing the team time or carrying real risk right now. That list is what gets addressed. Everything else is noise.
+
+Day one is about listening and reading. Conversations with the engineers who work in the codebase daily, looking at the modules that come up in every post-mortem, reviewing the deployment history for patterns, reading the areas of the code that nobody wants to touch. Day two is about scoring and ranking. Taking the findings from day one and forcing a ranking that is honest about impact. The discipline of day two is saying no to the things that are annoying but harmless.
+
+The output is one page. Five to ten items. Each item has a one-line description of the problem, a rough estimate of the weekly cost in engineering hours, and a remediation estimate in days. That document goes to the engineering lead and whoever owns the roadmap. Short enough to read. Specific enough to act on.
+
+## The two-day process
+
+### Day one: investigation
+
+Start with the team. Ask each engineer three questions. What is the most painful part of the codebase to work in? What would you fix first if nobody was watching? What are you most afraid to change? The answers point directly at the high-cost areas. Engineers know where the problems are. They rarely get asked.
+
+After the conversations, spend three to four hours reading the codebase. Focus on the modules the conversations pointed at. Look at the deployment history and find the modules that appear in every incident or rollback. Check the PR history for the files that get touched on every change. Files that get touched constantly either matter a lot or have bad abstractions. Usually both.
+
+Look at the test coverage, but not as a number. Look at which modules have no tests and which ones have tests that are not actually run. An untested payment module is a different category of problem from an untested email formatter.
+
+### Day two: scoring and ranking
+
+Take everything from day one and write it out as individual problems. Each problem gets one sentence. Then score each one on a simple two-axis grid: weekly cost in engineering hours, and risk if left unaddressed for six months. The scoring does not need to be precise. It needs to be honest.
+
+Anything in the high-cost, high-risk quadrant is on the immediate list. Anything in the low-cost, low-risk quadrant goes on a backlog nobody will look at. The middle cases are the interesting ones. A low-cost, high-risk item, a known security hole that the team routes around, belongs on the immediate list. A high-cost, low-risk item, a slow build system, belongs in the medium term.
+
+Write the ranked list. Share it the same day. The longer the findings sit unshared, the more likely they are to get archived.
+
+## How long does it take
+
+| Phase | Time | What you produce |
+|---|---|---|
+| Engineer interviews | 3-4 hours | List of pain points, named modules |
+| Codebase reading | 3-4 hours | Annotated list of problem areas |
+| Deployment and PR history review | 1-2 hours | Modules with high churn, incident patterns |
+| Scoring and ranking | 2-3 hours | Two-axis grid, ranked list |
+| Writing the output document | 1 hour | One-page audit result |
+
+The total is twelve to fourteen hours across two days for one experienced engineer. The work is not parallelisable much. The synthesis has to happen in one head.
+
+## What to look for
+
+- Modules with no tests that touch money, identity, or data export.
+- Files that appear in more than fifty percent of recent post-mortems or rollbacks.
+- Areas the team consistently routes around instead of fixing.
+- Dependencies that are significantly out of date and carry known security issues.
+- Code that is understood by fewer than two engineers on the team.
+- Build or deploy processes that take more than ten minutes.
+- Any manual step in the deployment process that requires a specific person.
+- Authentication or permission logic that is duplicated in more than one place.
+
+## Expert opinion
+
+> The two-day audit is the most valuable two days you can spend before starting a refactor. Not because it tells you everything, but because it prevents you from fixing the wrong things first. Most teams skip it and spend six months refactoring the parts of the codebase that feel messy rather than the parts that are actually costing them time.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A startup came to me wanting to do a full rewrite. The product was two years old, the team had turned over twice, and the codebase felt painful to work in. My first move was the two-day audit before agreeing to anything else.
+
+Day one surfaced the actual picture. The payment module, the module they were most afraid of, had no tests and had been touched in every incident for fourteen months. The authentication module was duplicated across three services with slightly different logic in each copy. The rest of the codebase was not good, but it was not what was costing them.
+
+The rewrite conversation stopped after the audit. We spent three weeks adding tests to the payment module and consolidating the auth logic. The team's deploy confidence went from zero to reasonable in a month. The rewrite they had planned would have taken a year and almost certainly would have recreated the same two problems in a new codebase.
+
+For the next step after the audit, [the pareto refactor](/blog/the-pareto-refactor-twenty-percent-effort-for-eighty-percent-improvement) covers how to prioritise the work the audit surfaces. For teams facing the bigger question of whether to refactor or rewrite entirely, [when to refactor and when to rewrite](/blog/when-to-refactor-and-when-to-rewrite) is the right read.
+
+## Common mistakes teams make
+
+1. Trying to catalogue every problem instead of the highest-cost ones. The long list feels thorough but produces no action.
+2. Running the audit without talking to the engineers. The codebase reading alone misses the daily friction that only shows up in conversation.
+3. Scoring items by aesthetics instead of cost. Inconsistent naming conventions feel bad but rarely slow anyone down.
+4. Not sharing the findings immediately. Audit outputs that sit in a draft folder get archived.
+5. Using the audit to justify a rewrite decision that was already made. The audit has to be honest or it is useless.
+6. Running the audit once and treating it as permanent. A six-month-old audit on a fast-moving codebase is stale.
+7. Leaving the findings document too long. If the output is more than two pages, nobody reads it.
+8. Forgetting to include a remediation estimate. A list of problems without effort estimates is not actionable.
+
+## A two-week plan after the audit
+
+1. **Day one.** Share the audit output with the engineering lead and the product owner. Walk through it in a thirty-minute meeting. Do not email and hope.
+2. **Day two to three.** Pick the single highest-ranked item and agree on a plan to address it. Not a plan to plan. An actual remediation plan with an owner and a deadline.
+3. **Day four to seven.** Begin the remediation on item one. Do not start item two until item one is done or in a stable state.
+4. **Day eight to ten.** Review what the remediation actually took versus the estimate. Update the remaining items if the estimate was wrong.
+5. **Day eleven to fourteen.** Address item two, or schedule it into the next sprint. Set a date for the next audit. Put it in the calendar before the current one is forgotten.
+
+The companion work for teams ready to move faster is [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad), which maps directly onto the findings that almost every audit produces. For teams running a full refactor sprint after the audit, [the refactor sprint](/blog/the-refactor-sprint-when-a-quarter-of-the-roadmap-becomes-cleanup) covers how to structure the bigger cleanup.

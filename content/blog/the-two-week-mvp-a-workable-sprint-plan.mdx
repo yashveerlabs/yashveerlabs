@@ -1,0 +1,129 @@
+---
+slug: "the-two-week-mvp-a-workable-sprint-plan"
+title: "The Two Week MVP: A Workable Sprint Plan"
+excerpt: "A two-week sprint plan for shipping a real MVP slice, written from the side of the build, not the pitch deck. What to do on each day, what to skip, and why the discipline is harder than the code."
+date: "2024-06-27"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-two-week-mvp-a-workable-sprint-plan"
+status: "published"
+definition: "A two-week MVP sprint is not a full product in two weeks. It is one core flow, built to a standard a real user can interact with, deployed to a real URL, and demonstrated at the end of day fourteen. I run this format with clients when we need to prove something quickly without pretending the whole product fits inside a fortnight."
+faq: [
+  {"q":"Can you actually build a real MVP in two weeks?","a":"One core flow, yes. A product with four or five features, no. The two-week format works when the scope is already cut to a single job-to-be-done and the team is not waiting on external APIs, lengthy approvals, or design rounds that have not started yet. The discipline is the scope, not the calendar."},
+  {"q":"What should be in scope for a two-week MVP sprint?","a":"One user-facing flow, one data model, one deployment target. The acceptance criterion is simple: a real person who is not the developer can open the URL, complete the flow, and have something useful happen. Everything outside that definition is week three or later."},
+  {"q":"How do you handle design in a two-week MVP sprint?","a":"You use defaults. A component library, a plain layout, system fonts. Design debt incurred in week one is repaid in week five with actual user feedback to guide it. Spending day three on brand colors is the most expensive mistake in a sprint this short."},
+  {"q":"What is the biggest risk in a two-week MVP sprint?","a":"Scope creep on day four. The feature list feels small on day one. By day four the founder has seen the skeleton and wants to add three things. Each addition is a half-day. Five additions is a second sprint inside the first. The sprint ends on day fourteen either way, but with less finished."},
+  {"q":"Should the MVP be production-ready after two weeks?","a":"Production-grade on the core flow, yes. Scalable to a thousand users, not necessarily. The goal is a real URL with real data handling and real error states, not a proof of concept that only works when you demo it yourself. That distinction matters when you show it to the first ten users."},
+  {"q":"How do you structure daily work during a two-week sprint?","a":"Morning standup of ten minutes, heads-down build for four to six hours, written update at end of day. No meetings in the middle of the build window. The founder reviews the update and sends feedback before the next morning. Questions that require a call go into the next morning standup, not a mid-afternoon interruption."},
+  {"q":"What does a two-week MVP sprint cost?","a":"Roughly two to four thousand dollars for a senior solo engineer on a scoped flow, more if the integration surface is complex. The cost is primarily engineering time. Design, hosting, and tooling in the first two weeks are usually under five hundred dollars combined. The expensive versions are unscoped. If the estimate is under a thousand, the scope is a template, not a product."}
+]
+---
+
+## What you actually need to know
+
+- Two weeks is a forcing function, not a promise. It only works if the scope is already cut before day one starts.
+- The output of a two-week sprint is a working URL, not a finished product. The distinction matters when you set expectations with early users.
+- The most common failure mode is scope growth on day four, after the skeleton becomes visible and the founder starts seeing what else could fit.
+- A senior engineer running a focused two-week sprint will outship a junior team running four weeks of scattered effort.
+- The sprint ends on day fourteen regardless. The question is whether the right thing finished or the wrong things started.
+
+| Sprint format | Typical output | Risk | Best fit |
+|---|---|---|---|
+| Two-week focused sprint | One working flow, live URL | Scope creep mid-sprint | Validating a single core job-to-be-done |
+| Four-week milestone build | Two to three features | Integration drift in week three | Founders with cleaner briefs and more runway |
+| Rolling weekly sprints | One feature per week, compounding | No stable integration window | Teams with an existing codebase to build on |
+
+## The core argument
+
+The two-week sprint format gets misread constantly. Founders hear "two weeks" and imagine a complete product. That is not what it is. A two-week sprint is a container for one thing done properly, not ten things done roughly.
+
+I use this format with clients when the goal is proof, not product. A founder needs to know whether the core mechanic works before they spend sixty thousand dollars on a full build. A two-week sprint answers that question with working software instead of a demo script. That is its entire purpose.
+
+The format only holds if the scope conversation happens before the sprint starts. I spend as much time on the pre-sprint scoping call as I do on the first two days of the build. If that call ends without a single agreed-upon flow written down, the sprint will drift. The written brief is the contract. Everything outside it waits.
+
+What usually happens without that discipline: the founder sees the wireframe on day three and realizes the flow needs a settings page, and the settings page needs an email notification, and the email notification needs a preferences model. By day eight, none of the original flow is complete. The sprint ends with three unfinished threads instead of one finished one.
+
+## How I structure the fourteen days
+
+### Days one and two: foundation
+
+The first two days are infrastructure, not features. The repository is created, the deployment pipeline is wired, the database is stood up, and the development environment matches what will go to production. This sounds boring. Skipping it is how you spend day twelve realizing the local build does not behave like the live one.
+
+The acceptance criterion for day two is: a blank page deploys successfully to a real URL. That is all. Nothing else.
+
+### Days three through eight: the core flow
+
+This is the build window. The single agreed flow gets built from end to end. Real data, real validation, real error states. I do not ship placeholder content or mock data at this stage. The flow either works with real inputs or the sprint has failed its purpose.
+
+The founder reviews a live URL at the end of day five. One round of feedback. The feedback is scoped to the flow, not to features outside it. New requests go into a separate list that starts with "week three."
+
+### Days nine and ten: integration and edge cases
+
+The happy path is done. Days nine and ten are for the unhappy paths. What happens when the user submits invalid data. What happens when the third party API returns an error. What happens when the session expires mid-flow. These are not nice-to-haves. A demo that breaks on the second test input is worse than no demo.
+
+### Days eleven and twelve: observability
+
+PostHog or Plausible goes in. Sentry goes in. A basic health check endpoint is wired. These take half a day combined. The founder who skips this step will spend the first week after launch guessing what users are doing instead of knowing.
+
+### Days thirteen and fourteen: review and handoff
+
+Day thirteen is the internal demo. The developer walks through every path, including the error states. Day fourteen is the founder-facing demo and a written handoff document: what was built, how to access it, what comes next, and what was deliberately left out.
+
+## How long does it take
+
+| Phase | Time | What is happening |
+|---|---|---|
+| Pre-sprint scoping | Two to four hours | Brief written, scope agreed, acceptance criteria set |
+| Foundation | Days one to two | Infrastructure, deployment pipeline, blank page live |
+| Core flow build | Days three to eight | End-to-end feature, real data, real error states |
+| Edge cases and integration | Days nine to ten | Unhappy paths, third party error handling |
+| Observability | Days eleven to twelve | Analytics, error tracking, health check |
+| Review and handoff | Days thirteen to fourteen | Internal demo, founder demo, written handoff |
+
+## What to look for in a sprint this short
+
+- The developer should have a live URL to show by end of day two. Not a feature, a URL. If that does not exist, the infrastructure phase was skipped.
+- Feedback rounds should be scheduled, not reactive. One review at day five, one at day fourteen. Everything else is email or async.
+- The brief should be one page. If it is longer, the scope was not cut.
+- The handoff document should list what was cut as clearly as what was built. The cut list is as valuable as the delivery list.
+- Any estimate under one thousand dollars for a two-week sprint is either a template or a developer who has not read the brief.
+
+## Expert opinion
+
+> The two-week sprint only works when both sides have agreed in writing on what the sprint is not building. I have run this format many times. The sessions that go wrong always drift from a scope agreement that existed in one person's head but never made it onto a page. Write the brief. Cut the scope. Then the two weeks is plenty.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I ran this format for a client building a service marketplace. The original brief had nine features. We cut it to one: a booking flow that let a customer select a slot and receive a confirmation email. That is it. Nothing else. The founder pushed back. I held the line.
+
+Fourteen days later the flow was live, real users were booking, and the confirmation emails were landing in inboxes. The founder had ten completed bookings within forty-eight hours of sending the URL to a small test group. The nine-feature version would have taken three months and launched to silence. The one-feature version launched to real usage and paid for the next three features with its own signal.
+
+For a deeper look at what goes into the scope decision before the sprint starts, [the honest MVP checklist](/blog/the-honest-mvp-checklist-25-items-before-you-launch) covers the twenty-five items worth verifying before day one. For what happens after the sprint when the founder is asking whether to build more or stop, [the MVP postmortem questions](/blog/the-mvp-postmortem-questions-to-ask-yourself-six-months-in) gives a structured framework.
+
+## Common mistakes
+
+1. Starting the sprint without a written one-page brief. The brief is the scope contract. Without it, the sprint is an estimate, not a plan.
+2. Adding a feature after day three. Every addition is a debt taken against the core flow's completion.
+3. Using placeholder data in the demo. Real inputs surface real bugs. A demo that only works on curated data is a liability, not proof.
+4. Skipping observability. The sprint ends. Users arrive. Without analytics you are guessing for the next month.
+5. Setting up a staging environment but not a production environment. The demo should run on the URL you will send to users, not a staging subdomain.
+6. Scheduling feedback calls in the middle of the build window. Mid-day interruptions break flow. Async updates in the evening, calls in the morning.
+7. Treating day fourteen as launch day. The sprint produces a validated first slice. Launch is a separate event with a separate plan behind it.
+8. Conflating the sprint with the MVP. The two-week sprint is the first proof. The MVP is the thing users actually rely on. They are related but not the same thing.
+
+## A fourteen day plan
+
+1. **Day one.** Pre-sprint brief finalized in writing. Single flow agreed. Repository created. Deployment pipeline wired to a real URL.
+2. **Day two.** Blank page deploys successfully. Database provisioned. Authentication stubbed if required.
+3. **Days three to five.** Core flow built end to end. Real data, real validation. No placeholder content.
+4. **End of day five.** Founder reviews live URL. One round of written feedback. New requests go on the week-three list, not into this sprint.
+5. **Days six to eight.** Feedback integrated. Core flow polished. Happy path complete.
+6. **Days nine to ten.** Edge cases and error states. Unhappy paths handled. Third-party error surfaces covered.
+7. **Days eleven to twelve.** Analytics installed, error tracking live, health check wired. Handoff document started.
+8. **Day thirteen.** Internal demo. Developer walks every path including errors.
+9. **Day fourteen.** Founder demo. Handoff document delivered. Week-three scope list reviewed together.
+
+For the broader context on what makes an MVP actually ready to show users, [the stages of an MVP build](/blog/the-stages-of-an-mvp-build-a-founders-mental-model) lays out the mental model. For the sprint cadence inside a longer build, [agile for early stage startups](/blog/agile-for-early-stage-startups-what-actually-matters) covers what actually matters week to week.

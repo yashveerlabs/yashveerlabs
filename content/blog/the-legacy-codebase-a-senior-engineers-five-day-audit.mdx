@@ -1,0 +1,116 @@
+---
+slug: "the-legacy-codebase-a-senior-engineers-five-day-audit"
+title: "The Legacy Codebase: A Senior Engineer's Five Day Audit"
+excerpt: "How to assess a codebase you inherited in five days -- what to read, what to run, and what to report to the team before writing a single line."
+date: "2025-09-17"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","engineering-leadership"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-legacy-codebase-a-senior-engineers-five-day-audit"
+status: "published"
+definition: "The legacy codebase audit is the structured process a senior engineer uses to understand an inherited codebase before proposing changes. The goal is not to rewrite immediately or to document everything that is wrong -- it is to identify the highest-risk areas (the code that breaks most often, the dependencies that are most outdated, the patterns that are most inconsistent), understand why specific decisions were made, and build a map of what can be changed safely versus what requires careful, staged migration."
+faq: [
+  {"q":"What is the most important thing to read first in a new codebase?","a":"The deployment pipeline and the change log (git log or equivalent), not the application code. The deployment pipeline tells you how changes reach production, what the test suite covers, and where human intervention is required. The git log tells you which files change most frequently (high-churn areas are the most important to understand), who has been making changes (who has context that is not in the code), and what recent changes looked like (the current team's patterns and practices). Application code without this context is harder to interpret correctly."},
+  {"q":"How do I identify the highest-risk areas in a legacy codebase?","a":"Four indicators of high-risk code: files with the highest change frequency in the last six months (they are changing for a reason), files with no test coverage (they are the hardest to modify safely), files that are imported by many other files (changes propagate through the codebase), and areas that the team describes as 'scary' when you ask them informally. The intersection of high-churn and no-test-coverage is the highest-risk area -- this is where bugs are introduced and where changes are most likely to have unintended consequences."},
+  {"q":"What should the five-day audit produce?","a":"A written document with four sections: the architecture overview (how the system is structured, what the key components are, how data flows between them), the risk map (the three to five highest-risk areas with specific reasoning), the dependency health assessment (which dependencies are significantly outdated, which have known vulnerabilities), and the recommended priorities (the three to five highest-leverage improvements with estimated effort and expected benefit). This document is the starting point for any refactoring or improvement work."},
+  {"q":"How do I understand why specific decisions were made in legacy code?","a":"In order of reliability: git blame and git log on the specific file (often shows the commit message explaining the decision), the PR that introduced the code (if the team uses pull requests, the description often has context), the person who wrote the code (if they are still at the company, a 30-minute conversation is worth days of reading), and the code comments (less reliable but sometimes present). The worst approach is inferring intent from the code alone -- code that looks like a bad decision often has a constraint behind it that is not visible from the code."},
+  {"q":"What is the right scope for refactoring proposals after the audit?","a":"The audit should produce proposals that are scoped to one of three levels: cleanup (no behavior change, can be done in parallel with product work, low risk), targeted improvement (changes behavior in a specific area, requires specific test coverage before and after, medium risk), or architectural migration (changes fundamental patterns or dependencies, requires a detailed migration plan and staged rollout, high risk). Jumping to architectural migration proposals without the cleanup and targeted improvement phases first is the pattern that leads to the never-finished rewrite."}
+]
+---
+
+## What you actually need to know
+
+- Read the deployment pipeline and the git log before reading the application code. They tell you more about the codebase's current state than the application code alone.
+- High-churn files with no test coverage are the highest-risk areas. These are where you focus the audit, not on the cleanest or most interesting code.
+- "Why was this written this way?" is the most important question. The answer is almost always a constraint that was real at the time -- and understanding that constraint prevents you from proposing changes that re-create the original problem.
+- The audit produces a document, not a refactoring plan. The document informs the refactoring plan, which is a separate conversation with the team.
+- Never propose a full rewrite in the audit document. The rewrite that sounds like the obvious solution after five days of reading a codebase is the decision that takes three years and often fails to ship.
+
+| Audit Day | Focus | Tools / Methods | Output |
+|---|---|---|---|
+| Day 1 | Git history, deployment pipeline | `git log`, CI config, README | Deployment process map, team context |
+| Day 2 | Architecture and data model | ERD, key models, entry points | Architecture overview |
+| Day 3 | Risk identification | Coverage reports, dependency audit | Risk map |
+| Day 4 | Dependency and security health | `npm audit`, CVE databases | Dependency health report |
+| Day 5 | Synthesis and recommendations | All prior outputs | Written audit document |
+
+## The core argument
+
+Every engineer who inherits a legacy codebase faces the same temptation: the urge to rewrite before understanding. The codebase looks wrong -- inconsistent patterns, outdated dependencies, undocumented decisions -- and the fastest path to making it right seems to be starting over. This instinct is almost always wrong, and it is most wrong in the cases where the codebase is most complicated.
+
+The complications in a legacy codebase are evidence of real constraints. The seemingly arbitrary data model has the shape it has because of a business requirement from three years ago that is still true today. The inconsistent authentication pattern reflects a migration that was 80 percent complete when business priorities shifted. The undocumented workaround in the payment processing code is fixing a specific Stripe edge case that only appears with a particular combination of subscription plan and billing cycle.
+
+The five-day audit is the process that separates the real constraints from the accidental complexity. It is not about documenting everything wrong with the codebase -- it is about understanding the system well enough to propose changes that improve it without re-creating the problems that the existing code was written to solve.
+
+## Day 1: Git history and deployment pipeline
+
+I start every legacy codebase audit with two things: the git log and the CI/CD configuration. Neither of these is application code, and both of them tell me more about the system's current state than any amount of reading application code would.
+
+The git log shows me which files are changing, how frequently, and in what patterns. Running `git log --since="6 months ago" --name-only --pretty=format:` and counting file occurrences produces a ranked list of the highest-churn files in the codebase. These files are the most important ones to understand -- they are either actively developed (important features) or frequently broken (high-risk code). The distinction matters and is visible in the commit messages.
+
+The CI/CD configuration tells me what the test suite covers, how long it takes, and what the deployment process requires. A test suite that takes 45 minutes to run is a test suite that most engineers are not running locally -- which means changes are being deployed without confidence that they do not break existing behavior. A deployment process that requires manual steps is a deployment process that is one mistake away from a production incident.
+
+I also spend time on Day 1 in conversation with whoever can answer the question "what are the three things you most worry about in this codebase?" The answer to this question, repeated across two or three conversations, identifies the areas that the current team considers highest-risk -- which is exactly the information the git log does not provide.
+
+## Day 2: Architecture and data model
+
+Day 2 is spent understanding the system's structure. Not in exhaustive detail -- the goal is the map, not the territory. I want to understand: what are the major components, how does data flow between them, where is the application state stored, and what does the production deployment look like.
+
+For web applications, this means tracing the request path from the entry point (router, load balancer, CDN) through the middleware, controllers, service layer, and database. I draw this as a diagram -- not because the diagram is the output, but because drawing forces understanding. The places where I cannot draw the diagram cleanly are the places I do not yet understand.
+
+The data model is the most important artifact of Day 2. The entities the system stores, their relationships, and the constraints the database enforces reveal the business domain in a way that application code does not. A data model that has many nullable columns in what should be required fields is evidence of migrations that were done in a hurry without data cleanup. A data model that has tables with many columns and no clear relationship to each other suggests a period of rapid feature addition without architectural oversight. Both are patterns that affect what can be changed safely.
+
+## Day 3: Risk identification
+
+Day 3 is the risk audit. I am looking for the areas that are most likely to cause problems when changed, most likely to be changed in the near term, and least likely to be caught by the existing test suite.
+
+The process: run the test coverage report and identify the files with the lowest coverage (or no coverage). Cross-reference these with the high-churn files from the git log. The files that appear in both lists -- high change frequency, low test coverage -- are the highest-risk areas in the codebase.
+
+For each high-risk area, I try to understand why the coverage is low. Sometimes it is a gap that was never filled. Sometimes the code is genuinely difficult to test because of its structure (deeply nested callbacks, tight coupling to infrastructure, global state). The reason matters: a gap that was never filled can often be addressed with targeted tests; code that is structurally difficult to test usually requires structural changes before meaningful test coverage is achievable.
+
+I also audit the areas the team described as "scary" on Day 1. Scary code is often code that has broken before, code that the original author is no longer around to explain, or code that is known to have edge cases that are not fully understood. All of these are legitimate reasons to be scared, and all of them inform the risk map.
+
+## Day 4: Dependency and security health
+
+Outdated dependencies are a category of risk that is separate from the application code and often easier to address incrementally. Day 4 is the dependency audit.
+
+For a Node.js project: `npm audit` produces a list of known vulnerabilities in current dependencies, with severity levels and fix recommendations. I separate the results into critical (active exploits with known vectors in the version in use), high (significant vulnerabilities that should be addressed within the quarter), and moderate/low (worth tracking but not urgent). The critical vulnerabilities are the first items in the recommendations section of the audit document.
+
+Beyond the security audit, I check for significantly outdated major versions. A codebase running Node.js 16 in 2025 is running an EOL version without security patches. A codebase with React 16 has missed four major versions and several performance improvements. Major version upgrades carry breaking change risk -- they belong in the audit document as medium-term priorities, not immediate actions.
+
+I also check for dependencies that are no longer maintained. An unmaintained dependency is not immediately dangerous but becomes a risk as vulnerabilities are discovered and no patches are released. The npm package `npx is-online` and similar dependency health checkers can surface unmaintained packages quickly.
+
+## Day 5: Synthesis and the audit document
+
+Day 5 is synthesis. I have four days of notes, diagrams, and observations. The output is a document that the team can read in 30 minutes and that frames the conversation about what to work on next.
+
+The document has four sections: architecture overview (what the system does, how it is structured, how data flows), risk map (the three to five highest-risk areas with specific evidence from the git log, coverage reports, and team conversations), dependency health (what needs to be updated, in priority order), and recommendations (the three to five highest-leverage improvements with estimated effort).
+
+The recommendations section is the most important and the most dangerous part of the document. I am careful to scope recommendations appropriately: small, targeted improvements that can be done without architectural change come first. Larger structural changes, if they are warranted, come with a clear rationale and an honest effort estimate. The "rewrite the whole thing" recommendation does not appear in this document, not because it is never the right answer, but because five days is not enough time to know whether it is, and because proposals at that scope almost always fail without careful staged planning.
+
+## Common mistakes engineers make during a legacy codebase audit
+
+1. Starting with application code instead of git history and deployment pipeline. The application code without context is harder to interpret correctly, and the git history often explains the decisions that look wrong from the code alone.
+2. Proposing rewrites in the audit document. The audit produces a risk map and recommendations; the rewrite decision requires a separate, detailed business case that the audit informs but does not constitute.
+3. Not having Day 1 conversations with the current team. The informal knowledge about what breaks, what is scary, and why specific decisions were made is not in the code and not in the git history. It is in the heads of the people who have been working in the codebase.
+4. Treating the audit as comprehensive instead of risk-focused. A five-day audit cannot cover everything. It should cover the highest-risk areas in depth and sketch the rest at a higher level.
+5. Not including effort estimates in recommendations. "We should improve test coverage in the payment module" is less useful than "We should improve test coverage in the payment module -- estimated 3-5 days, reduces incident risk in the highest-churn area of the codebase."
+
+## Where to start: a 3-step legacy codebase orientation
+
+**Step 1: Run `git log --since="6 months ago" --name-only` and identify the ten highest-churn files.** These files are where you spend most of your reading time. They are the most important to understand because they are the most likely to change and the most likely to cause problems when they do.
+
+**Step 2: Ask two to three team members: "What three things do you most worry about in this codebase?"** Their answers identify the areas that are not captured in the git history -- the known risks, the historical problems, the code that is understood to be fragile.
+
+**Step 3: Run the test coverage report and cross-reference with the high-churn files.** The intersection of high churn and low coverage is the highest-risk area and the first thing to address in the recommendations document.
+
+## The Audit That Earns the Right to Change Things
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I ran a version of this audit on a fintech client's codebase before proposing any changes. The audit surfaced a payment reconciliation module with zero test coverage that changed more than any other file in the codebase -- 47 commits in six months. The team had been patching it reactively, every patch introducing new edge cases, because nobody had time to understand it fully before fixing the immediate bug. The audit framed the conversation: this module is the highest-risk area, it needs test coverage before it can be safely changed, and adding that coverage is the first three days of work, not the refactoring the team wanted to start with. Starting there, instead of the architectural changes that looked more interesting, was the decision that made the rest of the improvements possible.
+
+## Related reading
+
+- The Tech Debt Conversation: How to Explain It to Non-Technical Stakeholders
+- The Incremental Refactor: How to Modernize Without Stopping
+- [The Hot Path: Finding and Optimizing It](/blog/the-hot-path-finding-and-optimizing-it)
+- [The Five Architectural Failures That Killed Startups I Worked With](/blog/the-five-architectural-failures-that-killed-startups-i-worked-with)

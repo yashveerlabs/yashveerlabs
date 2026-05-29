@@ -1,0 +1,131 @@
+---
+slug: "the-mobile-app-backend-rest-vs-graphql-vs-trpc-vs-custom"
+title: "The Mobile App Backend: REST vs GraphQL vs tRPC vs Custom"
+excerpt: "Which API pattern works best for a mobile backend -- and why the answer depends more on your team than your data model."
+date: "2025-03-13"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","api-design","graphql","rest","trpc"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-app-backend-rest-vs-graphql-vs-trpc-vs-custom"
+status: "published"
+definition: "The mobile app backend API pattern choice -- REST, GraphQL, tRPC, or a custom protocol -- affects developer productivity, network performance, type safety, and long-term maintainability. Each pattern has a different tradeoff profile. REST is the most familiar and most interoperable but requires explicit versioning and produces over-fetching. GraphQL solves over-fetching and enables flexible queries but adds significant tooling complexity. tRPC provides end-to-end type safety with minimal overhead but requires a TypeScript-first codebase. Custom protocols are justified only for specific performance requirements."
+faq: [
+  {"q":"What is the best API pattern for a React Native app?","a":"REST for most teams. It is the most familiar pattern, has the best mobile client library support (fetch, Axios, TanStack Query), and the tooling complexity is lowest. GraphQL is worth considering when the mobile app has highly variable data requirements across screens -- the ability to request exactly the fields needed for each screen reduces over-fetching. tRPC is the best choice when both the backend and mobile client are TypeScript and sharing types is a priority. Custom protocols are almost never justified for mobile apps at startup scale."},
+  {"q":"What is over-fetching and why does it matter for mobile?","a":"Over-fetching is returning more data from an API endpoint than the client needs. A REST endpoint that returns a full user object (50 fields) when the client only needs 3 fields sends 47 unnecessary fields. On mobile, this wastes bandwidth (relevant for users on cellular connections), increases JSON parsing time (relevant for low-end devices), and increases memory usage. GraphQL's primary value proposition is eliminating over-fetching -- the client specifies exactly which fields it needs and the server returns only those. For mobile apps where bandwidth efficiency matters, this is a meaningful advantage over REST."},
+  {"q":"What are the real-world downsides of GraphQL for mobile?","a":"Three practical downsides: the tooling complexity is significantly higher than REST (schema definition, resolver implementation, code generation for the client), caching is harder because GraphQL responses are not cached by URL (they all go to the same endpoint), and the learning curve for developers who have not worked with it is non-trivial. For a small team building an early-stage mobile product, the tooling overhead often outweighs the over-fetching reduction. GraphQL's advantages compound at scale and with multiple client types (web, mobile, partner APIs) requesting different data shapes."},
+  {"q":"When is tRPC the right choice for a mobile backend?","a":"When the backend and mobile client are both TypeScript, and sharing types between them is a priority. tRPC generates a typed client from the server's procedure definitions -- calling an API endpoint from the mobile client is a TypeScript function call with type-checked parameters and return type. The catch: tRPC requires a Node.js backend and a TypeScript frontend. React Native with TypeScript qualifies. Flutter with Dart does not. For teams with a Node.js backend and a React Native app, tRPC significantly reduces the type safety overhead compared to REST with manually maintained type definitions."},
+  {"q":"How does the backend API choice affect mobile performance?","a":"Three performance dimensions: payload size (GraphQL wins on over-fetching reduction), latency (REST wins on caching -- HTTP response caching works out of the box), and request batching (GraphQL wins for screens that need data from multiple entities). For most mobile apps, the performance differences are small compared to the network latency itself. The decision that most improves mobile performance is reducing the number of round trips -- which can be addressed by designing REST endpoints that return all the data a screen needs in one request, achieving most of the benefit of GraphQL's field selection without the tooling complexity."}
+]
+---
+
+## What you actually need to know
+
+- REST is the right default for most mobile backends. The familiarity, mobile client library support, and lower tooling complexity outweigh the over-fetching tradeoff for early-stage products.
+- GraphQL is worth the tooling investment when the mobile app has highly variable data requirements and multiple client types requesting different shapes.
+- tRPC provides the best developer experience for TypeScript-first teams (Node.js backend + React Native client), but does not work with Flutter or non-TypeScript backends.
+- Over-fetching is a real mobile performance concern but is addressable with REST by designing screen-specific endpoints rather than generic resource endpoints.
+- Custom protocols are almost never justified for a startup-scale mobile product.
+
+| API Pattern | Best For | Mobile Library Support | Type Safety | Tooling Complexity |
+|---|---|---|---|---|
+| REST | Most teams, multiple client types | Excellent | Manual | Low |
+| GraphQL | Multiple clients, variable data needs | Good | Generated | High |
+| tRPC | TypeScript full-stack teams | Good (RN) | Automatic | Medium |
+| Custom (WebSocket/binary) | Real-time or performance-critical | Custom | Custom | Very High |
+
+## The core argument
+
+The mobile backend API debate is frequently framed as a technical question -- REST vs. GraphQL vs. tRPC based on their theoretical properties. In practice, the most important factor is team familiarity and tooling overhead. A team that has never used GraphQL faces a 2-4 week learning curve before they are productive with it in a mobile context, and the tooling complexity (schema definition, resolvers, code generation, client configuration) is ongoing overhead for the team's lifetime.
+
+The theoretical benefits of GraphQL -- no over-fetching, exact field selection, a single flexible endpoint -- are real. They are also most valuable at a scale that most startups never reach: multiple client types (web, mobile, partner integrations) requesting meaningfully different data shapes from the same backend. For a product with one mobile app and one web app, the REST approach of designing screen-specific endpoints (returning exactly the data each screen needs in one request) achieves most of the same result with far less tooling overhead.
+
+The question I ask before recommending an API pattern is: what does the team know well? An experienced GraphQL team should use GraphQL. A TypeScript-first team building a React Native app should evaluate tRPC seriously. A team with mixed backgrounds and a Flutter frontend should use REST. The best API pattern is the one the team can implement correctly, maintain over time, and debug when something goes wrong -- and that answer is almost always REST for a team that has not made a specific investment in an alternative.
+
+## REST for mobile: the practical patterns
+
+REST on mobile has one significant downside compared to GraphQL: over-fetching. The `/api/v1/user/profile` endpoint returns all 40 user fields when the profile screen needs 8 of them. The `/api/v1/feed` endpoint returns 20 items when the screen displays 10.
+
+The practical solution is not GraphQL -- it is screen-specific endpoints. Instead of generic resource endpoints, design endpoints for the data requirements of specific screens:
+
+```
+GET /api/v1/home-screen         -- returns feed items, user badge count, featured content
+GET /api/v1/profile-screen      -- returns user profile fields the screen uses
+GET /api/v1/notifications       -- returns notification items with their action data
+```
+
+These endpoints are designed around screen requirements, not data models. They return exactly what each screen needs in one request, eliminating the round-trip overhead of assembling data from multiple endpoints and reducing over-fetching to near zero.
+
+This pattern is sometimes called BFF (Backend for Frontend) when it is implemented as a separate service layer, but it does not require a separate service -- the screen-specific endpoints can be implemented directly in the main backend.
+
+The trade-off: these endpoints are less reusable than generic resource endpoints. A generic `/user` endpoint serves every client that needs user data; a screen-specific `home-screen` endpoint serves only the home screen. As the mobile app's data requirements evolve, the screen-specific endpoints evolve with them. This is acceptable overhead for the elimination of over-fetching and multiple round trips.
+
+## GraphQL: when it earns its complexity
+
+GraphQL becomes worth the tooling investment when two conditions are true: the mobile app has meaningfully variable data requirements across screens, and there are multiple client types requesting different data shapes from the same backend.
+
+The first condition: variable data requirements. If every screen in the app needs approximately the same fields, GraphQL's field selection does not help much. If the home screen needs 5 fields, the profile screen needs 20, and the settings screen needs 3, and these are fields from the same underlying data model, GraphQL's field selection eliminates multiple endpoint designs.
+
+The second condition: multiple client types. A backend that serves a web app, a React Native app, and a partner API -- each requesting different field subsets -- benefits from GraphQL's flexibility. The web app can request the full user object; the mobile app can request only the fields it renders; the partner API can request only the fields the integration uses. Without GraphQL, each client either over-fetches from a generic endpoint or requires a custom endpoint designed for its specific needs.
+
+For teams that meet both conditions, GraphQL with code generation (graphql-codegen for TypeScript, graphql_flutter for Dart/Flutter) produces a typed client that matches the server's schema. The generated types are kept in sync with the schema by running code generation as part of the build process -- a form of end-to-end type safety that REST does not provide without manual effort.
+
+## tRPC: the TypeScript full-stack option
+
+tRPC takes a different approach from both REST and GraphQL. Instead of a schema or URL structure, tRPC defines the API as TypeScript functions on the server:
+
+```typescript
+// backend: src/routers/user.ts
+export const userRouter = router({
+  profile: publicProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(async ({ input }) => {
+      return await db.users.findById(input.userId);
+    }),
+  
+  updateProfile: protectedProcedure
+    .input(z.object({ name: z.string(), bio: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      return await db.users.update(ctx.user.id, input);
+    }),
+});
+```
+
+The mobile client (React Native with TypeScript) calls these procedures as typed function calls:
+
+```typescript
+// mobile client
+const { data: profile } = trpc.user.profile.useQuery({ userId: currentUserId });
+```
+
+The return type of `profile` is automatically inferred from the server's procedure definition. If the server changes the return type, the client's TypeScript compiler flags the mismatch immediately.
+
+This is the strongest type safety guarantee of any of the patterns -- stronger than REST with manually maintained types, stronger than GraphQL with code generation. The types are never out of sync because they are derived from the same source.
+
+The constraint: tRPC requires a Node.js backend (or a compatible runtime) and a TypeScript client. It works with React Native. It does not work with Flutter. If the mobile team uses Dart, REST or GraphQL is the only option.
+
+## Common mistakes teams make with mobile backend API design
+
+1. Choosing GraphQL because it is modern rather than because the team's specific requirements justify the complexity. GraphQL's tooling overhead is real and ongoing; the benefits are conditional on specific use cases.
+2. Building generic REST endpoints for a mobile app and accepting the over-fetching. The screen-specific endpoint pattern costs a day of design work and eliminates over-fetching and multiple round trips. It is worth doing.
+3. Not generating types from the API schema. REST without types requires manually maintaining type definitions that diverge from the actual API. GraphQL without code generation has the same problem. Whatever API pattern is used, generate types automatically.
+4. Not versioning the REST API before releasing the first mobile client version. Adding versioning after the first version is released is harder than starting with it. Version from the beginning.
+5. Using HTTP/1.1 for APIs that could benefit from HTTP/2. HTTP/2's multiplexing is particularly valuable for mobile apps that make multiple simultaneous API requests -- it reduces the connection overhead that HTTP/1.1 pays per request. Most modern hosting platforms support HTTP/2 out of the box; verify it is configured.
+
+## Where to start: a 3-step mobile backend API decision
+
+**Step 1: Assess the team's existing expertise.** Has the team shipped GraphQL in production? Is the backend TypeScript? Is the mobile client React Native or Flutter? The answer determines which patterns are realistic for the team's current skill level.
+
+**Step 2: Map the five most complex screens in the app to their data requirements.** For each screen, list the data fields it needs and their source entities. If each screen needs a different subset of a large shared data model and the app has multiple client types, GraphQL is worth evaluating. If each screen's data requirements are relatively similar or bounded, REST with screen-specific endpoints is sufficient.
+
+**Step 3: Start with REST and add versioning from day one.** Even if the team later migrates to GraphQL or tRPC, starting with REST ensures that the mobile client ships quickly and the API has a versioning strategy before users install the app. Migrations are cheaper than fighting over-fetching without tooling.
+
+## The API That Ships and Scales
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app uses REST with screen-specific endpoints. The team evaluated GraphQL and decided against it because the app has one client type (React Native), the data requirements per screen are bounded and consistent, and nobody on the team had shipped GraphQL in production before. Three months in, the REST API is performing well: no over-fetching issues (screen-specific endpoints solved it), API versioning has allowed one client update cycle to complete without a forced upgrade, and the team has not needed the flexibility that GraphQL would have provided. The API choice that ships is better than the API pattern that is optimal in theory but adds three weeks of tooling setup to the development timeline.
+
+## Related reading
+
+- [The Mobile API: How to Design One That Survives App Versions](/blog/the-mobile-api-how-to-design-one-that-survives-app-versions)
+- [The Hybrid Mobile Architecture: WebView Heavy Apps in 2026](/blog/the-hybrid-mobile-architecture-webview-heavy-apps-in-2026)
+- The Cross-Platform Decision: React Native vs Flutter in 2025
+- The API Design Patterns That Scale

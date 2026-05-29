@@ -1,0 +1,65 @@
+---
+slug: "the-critical-path-test-suite-a-founders-definition"
+title: "The Critical Path Test Suite: A Founder's Definition"
+excerpt: "Not every feature needs tests. The critical path does. Here is what the critical path test suite is and how to build one that actually protects your product."
+date: "2026-05-24"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt", "testing", "quality", "founders", "engineering"]
+readingMinutes: 7
+ogImage: "/api/og/blog/the-critical-path-test-suite-a-founders-definition"
+status: "published"
+faq: [
+  {"q":"How many tests should be in a critical path test suite?","a":"In my experience, a well-defined critical path suite for a SaaS application has between 10 and 30 tests. Fewer than 10 often means the critical path is incompletely covered. More than 30 often means the definition of critical has been stretched to include non-critical scenarios."},
+  {"q":"Should I write critical path tests before or after building the feature?","a":"Ideally before, which is the test-driven development approach. In practice, for most startup teams, writing them immediately after the feature is built but before the next feature starts is a realistic and effective approach."},
+  {"q":"What testing framework should I use for critical path tests?","a":"For web applications, Playwright provides a strong combination of reliability, API quality, and maintenance characteristics. For API-only applications, supertest or similar HTTP testing libraries are sufficient."},
+  {"q":"How do I handle external services like payment processors in critical path tests?","a":"Use the test mode or sandbox environment provided by the service rather than mocking the client. A Stripe test mode integration test is more reliable than a mock because it tests the actual integration, not the test double."},
+  {"q":"What is the difference between critical path tests and smoke tests?","a":"Smoke tests verify that the application starts and basic functionality works. Critical path tests verify that the core user journey works end-to-end. Smoke tests are a subset of critical path tests."}
+]
+---
+
+# The Critical Path Test Suite: A Founder's Definition
+
+**The critical path test suite is the minimum set of automated tests that protect the features a user must be able to complete for your product to have value. It is not the full test suite. It is not 100 percent coverage. It is the tests that, if they fail, mean the product is broken in a way that prevents users from accomplishing the core task they came to your product to do. Every production application needs this suite before anything else.**
+
+## What you need to know
+
+- The critical path is the sequence of actions a user must take to get value from your product: sign up, set up, and use the core feature
+- Tests that cover the critical path protect against the most expensive category of bug: the bug that prevents revenue
+- Writing these tests first, before other tests, is the highest-return testing investment available
+- The critical path test suite should run on every deployment and block the deployment if it fails
+- Most development teams significantly underinvest in critical path tests and overinvest in unit tests for low-stakes utility functions
+
+## The core argument
+
+The instinct in software development is to test what you just wrote. You write a new utility function, you write a unit test for it. You write a new component, you write a unit test for it. The result is a test suite with high coverage of the code you wrote most recently and uneven coverage of the code that matters most to users. A 90 percent coverage score on a codebase does not mean that the 10 percent that is untested is unimportant. Often, the most critical user-facing logic is in the lowest-coverage parts of the codebase because it is harder to test and was written earlier, before the testing culture was established.
+
+The critical path definition exercise forces a different starting point. Instead of "what did I write that needs tests," the question is "what must work for the product to have value." For a SaaS application, the answer is almost always: account creation, authentication, the core feature workflow, and payment processing. These four areas are the minimum scope of the critical path test suite. If any of these breaks in production, you have an incident. If your test suite catches them before production, you have a process. The difference between those two outcomes is the entire value of the critical path test suite.
+
+The practical challenge is that critical path tests are harder to write than unit tests. They are end-to-end tests that involve multiple system components, real or mocked external services, and complex state setup. The setup cost is high enough that teams skip them in favor of faster-to-write unit tests. This is the wrong tradeoff. A unit test that passes when the database is down is not protecting you from the thing that will actually break your product. In building Nexli, I write critical path tests for the enrollment flow and attendance recording before anything else, because those are the actions that define the product's value. Everything else is tested based on the complexity and change frequency of the code.
+
+## Common mistakes
+
+1. **Defining the critical path too broadly.** The critical path test suite should cover the minimum viable user journey, not every feature. If you include too many scenarios, the suite becomes slow, flaky, and expensive to maintain. A test suite that takes 30 minutes to run will not be run on every deployment.
+2. **Using unit tests where integration tests are needed.** Critical path logic typically spans multiple components and system boundaries. A unit test that mocks the database, the authentication layer, and the payment processor is not testing whether those things work together. Use integration or end-to-end tests for critical path coverage.
+3. **Not including the unhappy path.** The critical path test suite should test both successful and failed scenarios. What happens when payment fails? When authentication credentials are wrong? When a required field is missing? These failure paths often have bugs that are as business-critical as bugs in the success path.
+4. **Letting the critical path tests become flaky.** A test that sometimes passes and sometimes fails is worse than no test because it trains the team to ignore test failures. Invest in making the critical path tests reliable before adding new ones.
+5. **Not updating the tests when the critical path changes.** As the product evolves, the critical path changes. A test suite that reflects the product of six months ago is not protecting the product of today. Review and update the critical path definition whenever a major feature or user flow changes.
+
+## Where to start
+
+**Step 1: Write down the critical path in plain language.** List the exact steps a new user takes from first landing on your product to completing the core action that makes your product valuable to them. This is the scope of your critical path test suite.
+
+**Step 2: Write one end-to-end test for each step in the critical path.** Use a testing framework that can run against your actual application stack. For a Next.js application, Playwright is the current best choice for end-to-end tests that simulate real browser interactions.
+
+**Step 3: Block deployments on critical path test failures.** In your CI/CD pipeline, run the critical path test suite on every push and block the deployment if any test fails. This is the mechanism that makes the tests valuable: not the fact that they exist, but the fact that they must pass before code reaches users.
+
+## Related reading
+
+- [The Cost of Rebuilding Trust After a Bad Launch](/blog/the-cost-of-rebuilding-trust-after-a-bad-launch)
+- [The Cost of Tech Debt: A Founder's Worst Bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill)
+- [The Cost of "We Will Fix It Later": A Postmortem](/blog/the-cost-of-we-will-fix-it-later-a-postmortem)
+- [The Cost of Switching Developers Mid-Project](/blog/the-cost-of-switching-developers-mid-project)
+
+## The Engineering Perspective Behind This Post
+
+The work in this post is what I apply to every system I build. Yashveer Singh Rajpoot, founder of Yashveer Labs. The systems in production include Nexli, Nyxera, and Velmora. If your critical path is untested and you are about to ship, this is the conversation I have with every client before we touch the deployment pipeline. Instagram and the contact page are both open.

@@ -1,0 +1,116 @@
+---
+slug: "cloudflare-r2-vs-s3-vs-backblaze-b2"
+title: "Cloudflare R2 vs S3 vs Backblaze B2"
+excerpt: "S3 is the safe default with the deepest ecosystem. R2 wins when egress is the cost driver. B2 wins on pure storage price. Three credible object stores. Three different fits."
+date: "2026-05-20"
+category: "Comparisons and Vendor Decisions"
+tags: ["object-storage","r2","s3","backblaze"]
+readingMinutes: 12
+ogImage: "/api/og/blog/cloudflare-r2-vs-s3-vs-backblaze-b2"
+status: "published"
+definition: "S3 is the original object storage with the broadest ecosystem and the deepest integration with the AWS stack. Cloudflare R2 is S3 compatible storage with zero egress fees. Backblaze B2 is the lowest cost option with reasonable performance. The right choice depends on the egress pattern, the surrounding stack, and the team's risk appetite for newer vendors."
+faq: [
+  {"q":"What is the cheapest option for pure storage?","a":"Backblaze B2 is the cheapest per GB at 6 USD per TB per month. R2 is 15 USD per TB. S3 standard is 23 USD per TB. The differences add up at meaningful scale. The cheapest storage is not always the cheapest total because egress and request fees vary."},
+  {"q":"What about egress?","a":"R2 has zero egress fees, which is its defining feature. B2 has 10 USD per TB egress with significant free allowances when paired with Cloudflare bandwidth alliance. S3 has 90 USD per TB egress beyond the first 100 GB monthly free tier. For workloads with heavy egress, R2 dominates the math."},
+  {"q":"Is R2 production ready?","a":"Yes for most production workloads in 2026. The reliability has been strong over multiple years. The ecosystem is smaller than S3 but the S3 API compatibility means most tools work. The risk is the smaller integration surface compared to S3, not the storage itself."},
+  {"q":"When does S3 win?","a":"When you live deep in AWS. The integration with Lambda, CloudFront, Glacier, Snowball, and the IAM system is what S3 sells. The egress cost is real but offset by reduced engineering time on integrations and the broadest ecosystem of compatible tools."},
+  {"q":"What about Backblaze B2?","a":"B2 wins on pure storage price for cold or warm data. The performance is adequate for most use cases. The Cloudflare bandwidth alliance gives free egress to Cloudflare which is meaningful if you front your assets with Cloudflare anyway."},
+  {"q":"What is the migration cost between them?","a":"Low if you have used the S3 API throughout. All three offer S3 compatible APIs. The data migration is bandwidth and time. The application changes are typically endpoint and credential updates. Plan a sprint for a meaningful migration including verification."},
+  {"q":"What about durability and availability?","a":"All three offer 11 nines durability or equivalent. The availability SLAs are similar at 99.9 to 99.99 percent monthly. The differences are not material for most use cases. Pick by cost and ecosystem fit, not by durability claims."}
+]
+---
+
+## What you actually need to know
+
+- S3 is the default. Deepest ecosystem. Most expensive at scale because of egress.
+- R2 wins when egress is the cost driver. Zero egress is the headline.
+- B2 wins on pure storage cost. Bandwidth alliance with Cloudflare is meaningful.
+- All three offer S3 compatible APIs. Migration is straightforward.
+- Pick by cost pattern and ecosystem fit, not by reliability.
+
+| Property | S3 | R2 | B2 |
+|---|---|---|---|
+| Storage per TB per month | 23 USD | 15 USD | 6 USD |
+| Egress per TB | 90 USD | 0 USD | 10 USD with alliance free |
+| Read request per million | 0.40 USD | 0.36 USD | 4 USD |
+| Write request per million | 5 USD | 4.50 USD | 4 USD |
+| Free egress to internet | 100 GB monthly | All | Variable |
+| S3 API compatible | Native | Yes | Yes |
+| Ecosystem | Largest | Growing | Smaller |
+
+## The core argument
+
+Object storage looks like a commodity. The three main providers offer similar durability, similar APIs, and similar developer experience for most use cases. The pricing differences are what make the decision interesting.
+
+S3 is the safe default because of the ecosystem. Every cloud tool integrates with S3. The pricing is the most expensive, especially on egress, but the integration savings are real for teams already on AWS. The team does not have to think about it.
+
+R2 is the egress free option. The storage cost is moderate. The egress is zero. The math is favorable for workloads with heavy egress relative to storage. Static asset hosting, public file downloads, image and video delivery. The savings versus S3 can be tens of thousands of dollars per month at scale.
+
+B2 is the cheapest. The storage cost is roughly a quarter of S3. The egress through the Cloudflare bandwidth alliance is free or very cheap. The ecosystem is smaller and the performance is adequate rather than excellent. B2 is the right call for cold storage, backups, and archive use cases where cost dominates.
+
+The teams that pick well evaluate the pattern. Heavy egress chooses R2. Heavy cold storage chooses B2. Deep AWS integration chooses S3. The wrong call costs real money at scale.
+
+## The cost math at three scales
+
+At 1 TB of storage with 5 TB of egress per month.
+
+S3 costs 23 USD for storage, 442 USD for egress (after free tier), 7.50 USD for requests. Total roughly 472 USD per month.
+
+R2 costs 15 USD for storage, 0 USD for egress, 5 USD for requests. Total roughly 20 USD per month.
+
+B2 costs 6 USD for storage, depending on alliance configuration this can be 0 to 50 USD for egress, 5 USD for requests. Total roughly 11 to 61 USD per month.
+
+The R2 savings at this scale are roughly 450 USD per month or 5400 USD per year. The B2 savings are higher in pure cost but require the bandwidth alliance to fully realize.
+
+## How much does this cost
+
+The numbers above scale linearly with usage. A 10 TB storage with 50 TB egress per month produces an S3 bill of roughly 4700 USD versus an R2 bill of roughly 175 USD. The savings are significant.
+
+The migration cost is one sprint of engineering work for most teams plus the data transfer cost. The payback is fast at scale.
+
+## Features the object store must have
+
+- Server side encryption.
+- Versioning for objects.
+- Lifecycle policies for tiering and expiration.
+- Presigned URLs for direct uploads and downloads.
+- Cross region replication if availability matters.
+- CDN integration for public content.
+- Detailed access logs.
+- A clear path for migration if you ever need to leave.
+
+## Expert opinion
+
+> Object storage pricing is one of the few places where the savings are dramatic and the engineering work to realize them is small. The teams that pay full S3 egress at scale are paying for ecosystem they may not be using. R2 has matured to the point where most production workloads can move to it cleanly. The decision is worth making deliberately every couple of years as the pricing landscape shifts.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was serving customer assets from S3 to users worldwide. The egress bill was approaching 8000 USD per month and growing fast. The storage bill was modest by comparison.
+
+We migrated to R2 over two weeks. The data transfer was the longest part. The application change was a credential and endpoint swap. The verification was running both stores in parallel for a week and comparing checksums on a sample.
+
+The monthly bill dropped from roughly 8500 USD to roughly 600 USD. The savings paid for the migration cost in the first week. The team has been on R2 for two years since without significant issues.
+
+For more on the related work, see [cloud hosting costs at scale what founders underestimate](/blog/cloud-hosting-costs-at-scale-what-founders-underestimate) and [CDN strategy for a global SaaS in 2026](/blog/cdn-strategy-for-a-global-saas-in-2026).
+
+## Common mistakes teams make
+
+1. Picking S3 by default without checking the egress math.
+2. Picking R2 for storage heavy cold data where B2 would have been cheaper.
+3. Picking B2 for AWS deep workloads where the integration cost dominates the savings.
+4. Ignoring request costs. They add up on high request workloads.
+5. No lifecycle policies. Storage accumulates.
+6. No versioning. Lost data is unrecoverable.
+7. Public buckets that leak data.
+8. No migration plan. Vendor lock is real for huge stores.
+
+## A 30 day plan to evaluate object storage
+
+1. **Week one.** Measure current storage, egress, and requests. Calculate the bill at each provider.
+2. **Week two.** Pick the right provider. Set up a test bucket.
+3. **Week three.** Migrate a non production workload. Verify performance.
+4. **Week four.** Plan the production migration if savings warrant it.
+
+For more on the related work, read [cloud hosting costs at scale what founders underestimate](/blog/cloud-hosting-costs-at-scale-what-founders-underestimate) and [reserved instances and cost math when they pay off](/blog/reserved-instances-and-cost-math-when-they-pay-off). On the broader vendor side, [the vendor audit every funded startup should run once a year](/blog/the-vendor-audit-every-funded-startup-should-run-once-a-year) is the natural next read.

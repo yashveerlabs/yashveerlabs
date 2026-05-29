@@ -1,0 +1,124 @@
+---
+slug: "when-to-refactor-and-when-to-rewrite"
+title: "When to Refactor and When to Rewrite"
+excerpt: "Working notes on when to refactor and when to rewrite. Written for founders, engineers, and operators who want a clear read on tech debt and refactoring from someone who has shipped the work."
+date: "2025-08-29"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/when-to-refactor-and-when-to-rewrite"
+status: "published"
+definition: "Refactoring improves the internal structure of code without changing its observable behavior. Rewriting replaces the code entirely with a new implementation. The decision between them is not about code quality. It is about cost, risk, and what the existing code knows that you do not. I lean heavily toward refactoring, and I push for rewrites only when I can show the math that justifies them."
+faq: [
+  {"q":"What are the warning signs that code genuinely needs a rewrite rather than a refactor?","a":"The key signs are that every change cascades unpredictably, the original technology no longer supports the required scale, the team cannot reason about the code even after reading it carefully, or the cost of maintaining the existing system exceeds the cost of replacement within two years. All four conditions together make a strong case. One condition alone rarely does."},
+  {"q":"How do I estimate whether a refactor or a rewrite will be faster?","a":"Add up the current maintenance cost per quarter, multiply by how many quarters until the new system would be complete, and compare that number to the estimated build cost. The rewrite only wins if the break-even point is within eighteen to twenty-four months. Beyond that, the uncertainty in the rewrite estimate swallows any projected savings."},
+  {"q":"What is the strangler fig pattern and when should I use it instead of a rewrite?","a":"The strangler fig grows a new system around the old one, intercepts traffic for migrated surfaces, and retires the old one incrementally. Use it instead of a big bang rewrite whenever the system handles live traffic, has integrations that cannot all be cut over at once, or when the team needs to keep shipping product work during the transition."},
+  {"q":"Can you refactor a codebase that has no tests?","a":"You can, but you are flying without instruments. The discipline is to add tests around the code before changing it, not after. Even crude end to end tests that freeze the current behavior are better than refactoring in the dark. A refactor without tests is indistinguishable from an introduction of new bugs."},
+  {"q":"How long should a refactor sprint last before the team returns to feature work?","a":"One to two weeks for a targeted module refactor. Longer than two weeks without shipping product value is hard to sustain and hard to justify. If the refactor needs more than two weeks, break it into phases and ship product work between phases."},
+  {"q":"What does a good refactor look like from the outside?","a":"No visible changes in behavior. Faster deploys. Engineers report that the module is easier to change. Test coverage increases as a byproduct of the work. Fewer incidents in that module in the ninety days after the refactor. None of those signals are visible on day one. They accumulate over the following quarter."},
+  {"q":"What is the most common reason refactors fail to finish?","a":"Scope creep. A refactor that starts with one module touches a dependency, which touches another dependency, and six weeks later the team has rewritten half the application without shipping a feature. The discipline is to define the scope tightly, hold the boundary, and schedule the adjacent work for a separate sprint."}
+]
+---
+
+## What you actually need to know
+
+- Refactoring changes the structure without changing the behavior. Rewriting changes both.
+- Most code that engineers want to rewrite can be refactored. The instinct to rewrite is often about comfort, not cost.
+- The rewrite is justified when the cost of maintaining the existing code exceeds the cost of replacement within eighteen to twenty-four months.
+- Tests before refactoring, not after. You need the safety net before you move the furniture.
+- Scope creep kills refactors. Define the module boundary before you start and hold it.
+- The strangler fig pattern is the right path for any system that handles live traffic.
+
+| Path | Risk | Time to benefit | When to choose |
+|---|---|---|---|
+| Small targeted refactor | Low | Weeks | One module is slow to change or unreliable |
+| Module rewrite with interface parity | Medium | Months | Module is beyond salvage but the rest is fine |
+| Strangler fig migration | Low-medium | Quarters | Live system with multiple integrations |
+| Big bang rewrite | High | Never on schedule | Almost never justified |
+| Greenfield parallel build | High | Very long | Only for isolated subsystems with no user traffic |
+
+## The core argument
+
+The question of refactor versus rewrite comes up in almost every engineering team that has been building for more than two years. The codebase has accumulated decisions that made sense at the time and do not make sense now. Someone on the team says "we should just rewrite this." The conversation that follows is usually emotional rather than analytical.
+
+The emotional pull toward rewriting is understandable. The existing code has scars. Every engineer who has worked on it carries the memory of the bugs it caused and the workarounds it required. The idea of starting clean, without those scars, feels like relief. The problem is that rewrites are almost never the relief they promise. The new code will have its own scars. The team will carry knowledge about the problem domain that only existed in the old code. The schedule will slip. The business will wait.
+
+The analytical question is simpler. How much is the existing code costing per quarter in engineer time, incidents, and slow delivery? How much would it cost to replace? At what point does the replacement pay back its cost? If the break-even is within eighteen to twenty-four months, the rewrite deserves a real evaluation. If the break-even is three years out, the refactor is almost always the better call, because the rewrite estimate will be wrong by the time it is done.
+
+Refactoring is not settling. It is precise surgery on the parts that are creating the most drag, while leaving the parts that work alone.
+
+## How to make the decision
+
+### The cost test
+
+Before any rewrite conversation, put a number on the current maintenance cost. Hours per sprint spent on workarounds, bugs traced to this module in the last six months, features slowed because the module resists change. Translate to dollars. Then estimate the rewrite cost in engineer-weeks and translate that too.
+
+If the monthly maintenance cost times eighteen months is greater than the rewrite cost, the rewrite is defensible. If not, the refactor is the right call.
+
+### The knowledge test
+
+Every line of code that has been in production for more than a year contains implicit knowledge. Edge cases the team discovered through bugs. Business rules that were added quietly during an incident. Behaviors that customers depend on without knowing they do.
+
+Before approving a rewrite, ask how much of that knowledge is documented anywhere other than the code. If the answer is "very little," the rewrite will rediscover those edge cases the hard way, in production, after the old code is gone.
+
+### The scope test
+
+If the code that needs replacing is a module with a defined interface, a rewrite is more tractable. If the code is a cross-cutting concern that touches everything, a rewrite will expand until it consumes the entire codebase. The strangler fig is the right answer for cross-cutting concerns. The targeted rewrite is right for bounded modules.
+
+## What it costs
+
+| Decision | Engineering cost | Time to value | Risk of delay |
+|---|---|---|---|
+| Targeted refactor, one module | Low, days to two weeks | Weeks | Low |
+| Module rewrite with tests | Medium, weeks | Months | Medium |
+| Strangler fig on a subsystem | High, quarters | Quarters | Low-medium |
+| Full application rewrite | Very high | Often never on schedule | Very high |
+
+The full application rewrite rarely delivers on its original timeline. The average is two to three times the estimate. Plan accordingly or do not plan it.
+
+## What to look for before approving a refactor or rewrite
+
+- A defined scope boundary with named modules in and out.
+- Tests around the existing code before any structural change.
+- An interface contract for the module that will stay stable during the change.
+- A rollback path if the refactor introduces regressions.
+- A team member who owns the work from start to finish without splitting focus.
+- A defined done condition, not "when it feels clean."
+- A communication plan for the rest of the team about what will and will not change.
+
+## Expert opinion
+
+> The refactor versus rewrite decision is almost always made emotionally and justified analytically afterward. Engineers who want to rewrite will find the numbers to support it. Engineers who want to refactor will find the numbers to support that. The discipline I hold to is: show me the maintenance cost first, then show me the replacement cost, and we will do the math together. The math almost always points to refactor.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client came to me with a payment processing module that the team wanted to rewrite. The stated reason was that the code was "impossible to understand." The module had been in production for three years and processed several million dollars per year without a major incident.
+
+We ran [the two-day tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) on the module. The actual cost of maintaining it was four hours per sprint, mostly because there were no tests and every change required manual verification. The rewrite estimate was six weeks. At the team's rate, that was about forty thousand dollars.
+
+The math said: four hours per sprint at their blended rate was around two thousand dollars per month. The rewrite would pay back in twenty months. That was inside our eighteen-to-twenty-four month threshold, but only barely. We recommended a refactor instead: add tests first, then extract the pure logic, then improve the integration layer. Three weeks of work, not six. The module became maintainable without the risk of a full replacement.
+
+The team initially pushed back. Two months after the refactor was done, they admitted it was the right call. The module still runs without incident. The code is now comprehensible. The rewrite would have been a distraction.
+
+For the companion decision on how to structure the actual cleanup work, [the refactor sprint post](/blog/the-refactor-sprint-when-a-quarter-of-the-roadmap-becomes-cleanup) covers how to scope and run a focused sprint without derailing the delivery cadence.
+
+## Common mistakes
+
+1. Starting the rewrite without testing the existing code first. The new code will miss behaviors that only existed in undocumented edge cases.
+2. Letting scope creep expand the refactor into an accidental rewrite. Hold the module boundary.
+3. Choosing to rewrite because the code is ugly, not because it is costly. Ugly code that works is not a business problem.
+4. Running the refactor without a defined done condition. "Cleaner" is not a done condition. "Tests pass, module deploys independently, no cascading changes required" is.
+5. Assigning the refactor to the most junior engineer because senior engineers are on feature work. Structural changes require structural judgment.
+6. Not communicating the change to the rest of the team. Surprises in shared modules break other people's work.
+7. Treating the refactor as invisible infrastructure work with no visibility in the sprint. It belongs on the board, with a ticket, and a done definition, the same as any feature.
+
+## A three-week refactor plan
+
+1. **Days one to three.** Define the module boundary. Write down the interface contract. Add tests that freeze the current behavior, even if they are ugly.
+2. **Days four to eight.** Refactor the internal structure. Do not change the interface. Run the tests after every meaningful change.
+3. **Days nine to twelve.** Clean up the integration points. Update the tests to reflect the improved structure.
+4. **Days thirteen to fifteen.** Deploy to staging, run the full test suite, deploy to production. Monitor for forty-eight hours.
+
+For further reading on the related migration question, [big bang vs gradual migration](/blog/big-bang-vs-gradual-migration-a-decision-map) gives the structured decision map for when an architectural change is large enough to require a migration strategy rather than a sprint.

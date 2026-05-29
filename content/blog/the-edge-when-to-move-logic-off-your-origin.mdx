@@ -1,0 +1,96 @@
+---
+slug: "the-edge-when-to-move-logic-off-your-origin"
+title: "The Edge: When to Move Logic Off Your Origin"
+excerpt: "What belongs at the CDN edge, what must stay at origin, and how to make the decision correctly for your specific workload."
+date: "2025-04-07"
+category: "Backend, APIs, and System Design"
+tags: ["backend","edge","cdn","architecture","system-design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-edge-when-to-move-logic-off-your-origin"
+status: "published"
+definition: "The edge is the network of CDN nodes distributed globally where request processing can happen before traffic reaches the origin server. Moving logic to the edge reduces latency for global users, offloads work from the origin, and can enforce security rules closer to the requester. Not all logic belongs at the edge: operations that require database access, full Node.js APIs, or shared state must stay at or near the origin."
+faq: [
+  {"q":"What logic is suitable for the edge?","a":"Request validation, JWT verification, rate limiting, A/B test assignment, geolocation-based redirects, authentication middleware, bot detection, and header manipulation. All of these can run without database access and complete in milliseconds at a node close to the user."},
+  {"q":"What logic must stay at origin?","a":"Database queries, full session validation backed by a database, operations requiring native Node.js modules, complex business logic with many dependencies, and any operation requiring shared mutable state that cannot be expressed as distributed atomic operations."},
+  {"q":"What is the difference between CDN caching and edge computing?","a":"CDN caching stores static responses and serves them without executing any code. Edge computing executes code at the CDN node for each request, allowing dynamic responses based on request properties. Caching is simpler and faster. Edge computing is needed when the response varies by request in a way that cannot be cached."},
+  {"q":"What does Cloudflare Workers vs Vercel Edge Functions provide?","a":"Cloudflare Workers runs JavaScript at 300+ Cloudflare edge nodes globally, with access to the KV store for shared state and Durable Objects for coordination. Vercel Edge Functions runs at Vercel's edge network, integrated with Next.js middleware. Both have the same fundamental constraint: a limited Node.js-like runtime without native module support."},
+  {"q":"How do edge functions affect cost?","a":"Edge functions are billed per request execution, unlike origin servers that are billed by compute time. At low volume, edge functions are cheap. At high request volume with simple logic, they are efficient. For complex operations that take significant CPU time, the per-request cost can exceed the cost of equivalent origin server compute."}
+]
+---
+
+## What you actually need to know
+
+- JWT verification, rate limiting, and geolocation redirects are excellent edge candidates. They add no origin load and reduce latency.
+- Database connections at the edge are not practical with traditional connection pooling. Use edge-compatible data access patterns (HTTP APIs, connection poolers like PlanetScale, or edge-aware ORMs).
+- The edge runtime is sandboxed and Node.js-restricted. Audit dependencies before moving code there.
+- Edge functions add a layer to debug and deploy. The operational overhead is real.
+- Measure first. Many applications do not have globally distributed users and gain little from edge logic.
+
+| Logic Type | Edge? | Reason |
+|---|---|---|
+| JWT verification | Yes | No external calls required |
+| Rate limiting | Yes | With KV store for counters |
+| A/B test assignment | Yes | Deterministic, no DB needed |
+| Geolocation redirect | Yes | Request headers only |
+| Database query | No | DB connections not practical at edge |
+| Session store lookup | No | Requires shared state |
+| Complex business logic | No | Dependencies not available |
+
+## The core argument
+
+The architecture decision of what to run at the edge versus what to run at origin is a resource allocation question with latency and operational complexity as the tradeoffs. Code running at the edge is geographically close to the user, which reduces round-trip time. Code running at the origin has access to full infrastructure, all dependencies, and shared state.
+
+The pattern that works: move logic to the edge when the logic is stateless or when the required state is available at the edge (via edge KV stores or headers), and when the response depends primarily on the request rather than on data from the database. Keep logic at origin when it requires database access, complex dependency chains, or shared mutable state.
+
+The mistake teams make is moving logic to the edge because it seems like the right modern approach rather than because the specific workload benefits from the move. Authentication middleware is a good edge candidate because JWT verification is stateless and fast. A pricing calculation that requires loading the current discount table from a database is not a good edge candidate because the database call eliminates the latency benefit.
+
+## The practical edge use cases
+
+**Authentication middleware.** Verifying a JWT token, checking that the token is not expired, extracting user claims, and either allowing the request or redirecting to login. All of this can run entirely from the token itself. No database call. The edge processes the request before it reaches the Next.js or Express application layer. Every authenticated route in the application benefits from this without changing the route handlers.
+
+**Rate limiting.** Counting requests per IP or per user token and rejecting requests that exceed the threshold. This requires a counter store, but edge-compatible KV stores (Cloudflare KV, Upstash Redis via HTTP) handle this well. Rate limiting at the edge prevents abusive requests from ever reaching the origin, which protects the origin from DoS attempts and reduces compute waste.
+
+**A/B test assignment.** Assigning users to test variants based on a cookie or a deterministic hash of the user identifier. This is purely computational and requires no database access. Running A/B assignment at the edge ensures consistent variant assignment without adding latency to the first request.
+
+**Geolocation and locale routing.** Redirecting users to the correct version of the site based on their location (EU to the GDPR-compliant version, France to the French-language version). The request's geolocation headers provide the required data without any external calls.
+
+**Security headers and bot detection.** Adding security headers, blocking known malicious user agents, and detecting basic bot patterns can all run at the edge before the request consumes any origin resources.
+
+## Connecting to data at the edge
+
+The most common challenge with edge computing is data access. Traditional database connections do not work at the edge because the edge runtime does not support the TCP connections that most database clients use.
+
+There are several patterns for accessing data at the edge:
+
+**HTTP-based database APIs.** Some managed databases provide HTTP APIs that work in edge environments. PlanetScale's Serverless Driver, Turso's HTTP API, and Neon's serverless driver all support edge-compatible access. For read-heavy use cases, this pattern is practical.
+
+**Edge KV stores.** Cloudflare KV, Upstash Redis, and similar edge-compatible key-value stores can cache frequently accessed data for edge consumption. A rate limit counter, a feature flag configuration, or an IP blocklist can all live in a KV store accessible from the edge.
+
+**Token claims for user data.** When the authenticated user's data can fit in the JWT claims (user ID, role, tier), the edge can make personalization decisions from the token without a database call.
+
+## Common mistakes teams make with edge architecture
+
+1. Moving database-dependent logic to the edge without an edge-compatible data access strategy. The code deploys but fails at runtime because the database driver does not work in the edge environment.
+2. Not auditing npm packages for edge compatibility before migration. Many packages use Node.js built-ins that are not available at the edge. The audit must happen before the migration, not after.
+3. Adding edge middleware that adds latency instead of reducing it. An edge middleware that makes an HTTP call to an origin service adds a round trip. The net effect can be higher latency than running everything at origin.
+4. Not logging edge function execution for debugging. Edge functions are harder to debug than origin code. Structured logging from the beginning makes debugging significantly easier.
+5. Using the edge for logic that changes frequently. Deploying edge functions involves CDN propagation delays. Logic that needs to change quickly is better kept at origin where deployment is immediate.
+
+## Where to start: a 3-step edge logic audit
+
+**Step 1: Identify the current middleware running at origin.** Authentication, rate limiting, CORS handling, header manipulation. For each one, determine whether it can run without database access. These are the candidates for edge migration.
+
+**Step 2: Audit edge runtime compatibility for the code being moved.** List every npm package the middleware uses. Check whether each one is compatible with the edge runtime. Most modern packages that avoid Node.js-specific APIs are compatible. A quick test deploy to a staging edge environment reveals compatibility issues faster than manual auditing.
+
+**Step 3: Deploy authentication middleware to the edge first.** This is the highest-value, lowest-risk edge migration. JWT verification is stateless, well-understood, and the performance benefit for users far from the origin is real. Use it as the proof-of-concept before moving anything more complex.
+
+## The Architecture Decisions Behind the Code
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. Edge architecture decisions come up in every project I build that serves a global user base. I have implemented JWT authentication middleware at the edge, rate limiting with Upstash Redis, and geolocation routing in production Next.js applications. The decision framework in this post is the one I apply. If you are evaluating edge architecture for a specific workload and want a technical opinion, the contact page is the place.
+
+## Related reading
+
+- [The Edge Rendering Bet: When It Pays Off](/blog/the-edge-rendering-bet-when-it-pays-off)
+- [The Boring API: Why Predictability Beats Cleverness](/blog/the-boring-api-why-predictability-beats-cleverness)
+- The SaaS Architecture Stack That Scales to One Million Users
+- The Caching Strategy Every SaaS Needs

@@ -1,0 +1,117 @@
+---
+slug: "trunk-based-development-for-small-teams"
+title: "Trunk Based Development for Small Teams"
+excerpt: "Long-lived branches accumulate merge debt. Trunk-based development removes the debt by keeping everyone on one branch. Here is how small teams adopt it without chaos."
+date: "2025-07-30"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 11
+ogImage: "/api/og/blog/trunk-based-development-for-small-teams"
+status: "published"
+definition: "Trunk-based development is a source control practice where all engineers commit directly to a single main branch, or to short-lived feature branches that merge within one to two days. The goal is to eliminate the integration problems that come from long-lived branches. It requires feature flags for work in progress and a CI pipeline that runs fast enough to give feedback before the next commit."
+faq: [
+  {"q":"What is trunk-based development and how does it differ from feature branch workflows?","a":"Trunk-based development means all engineers commit to one shared branch, either directly or via branches that live for one to two days at most. Feature branch workflows allow branches to live for days or weeks. The difference is integration debt. Long-lived branches accumulate divergence from main that must be resolved in a merge. Trunk-based development eliminates that debt by keeping the divergence small."},
+  {"q":"Can a team of two or three engineers use trunk-based development?","a":"Yes, and small teams are actually the easiest context for it. With two or three engineers, the coordination overhead of feature branches is higher proportionally. Everyone needs to track who is working on what branch. Trunk-based development on a small team often works as direct commits with pull requests that are reviewed and merged the same day."},
+  {"q":"How do you ship incomplete features with trunk-based development?","a":"Feature flags. Work in progress goes behind a flag that is off in production. The code ships to main continuously but customers do not see it until the flag is turned on. This is the core dependency of trunk-based development. Without feature flags, teams that use it end up with partially built features visible in production."},
+  {"q":"How fast does the CI pipeline need to be for trunk-based development to work?","a":"Fast enough that engineers do not batch their commits to avoid waiting. Under ten minutes for the full suite is workable. Under five minutes is better. If CI takes thirty minutes, engineers will start accumulating local changes and committing in large batches, which reintroduces the integration problems trunk-based development is meant to solve."},
+  {"q":"What are the risks of trunk-based development for a small team without a senior engineer?","a":"The main risk is that broken code reaches main and blocks other engineers. The mitigation is a CI pipeline that catches common breakage before the merge, and a team norm around small, reviewed commits. The risk is real but manageable. The alternative of long-lived branches has its own risk of large, difficult merges that are also hard to review."},
+  {"q":"Does trunk-based development require continuous deployment?","a":"No. Trunk-based development is a source control practice. Continuous deployment is a release practice. They work well together but are independent. You can practice trunk-based development and deploy from main once a day, once a week, or on a release schedule. The source control practice and the release practice are separate decisions."},
+  {"q":"How do you handle hotfixes and emergency patches with trunk-based development?","a":"Fix forward on main when possible. The fix ships in the next deployment from main. For truly urgent fixes on an older release, create a release branch from the last tag, cherry-pick the fix, deploy from that branch, then merge the fix to main. This is the exception, not the standard flow."}
+]
+---
+
+## What you actually need to know
+
+- Long-lived branches are technical debt that accumulates silently and pays down painfully.
+- Trunk-based development keeps the integration surface small by keeping branches short.
+- Feature flags are the prerequisite. Without them, trunk-based development ships half-built features to production.
+- CI pipeline speed is a constraint. Slow CI makes the practice unworkable in practice even if you commit to it in principle.
+- Small teams often have the smoothest adoption. The coordination overhead of feature branches scales with team size.
+
+| Branching model | Branch lifetime | Integration pain | CI requirements | Feature flag need |
+|---|---|---|---|---|
+| Long-lived feature branches | Days to weeks | High at merge | Moderate | Low |
+| Short-lived feature branches | Hours to 1-2 days | Low | High | Medium |
+| Trunk-based (direct commit) | No branch | Minimal | High | High |
+| Gitflow | Weeks to months | Very high at release | Moderate | Low |
+
+## The core argument
+
+Long-lived branches feel safe. The feature is isolated. Other work does not interfere. The engineer can develop at their own pace and merge when the work is done. This feeling is accurate for the first two days. After that, the main branch keeps moving and the feature branch keeps diverging. By day five, the merge is a project. By day ten, the merge is a negotiation.
+
+I have worked with teams that were proud of their branch naming conventions and their pull request templates and their code review process, and simultaneously spending eight to twelve hours per week on merge conflicts and integration failures. The branching model was producing the work it was meant to prevent.
+
+Trunk-based development inverts the risk. The integration cost is paid continuously in small increments rather than once in a large batch. The engineer commits small, the CI runs fast, the feedback comes immediately. The merge conflict, if there is one, is small enough to resolve in five minutes.
+
+The trade off is discipline. Trunk-based development requires that every commit is safe to be on main. That means the CI pipeline must catch breakage quickly, incomplete work must be hidden behind feature flags, and the team must develop the habit of small, reviewable commits. These are not hard requirements. They are habits, and habits take time to build.
+
+For most small teams, the adoption curve is two to four weeks. The first week is awkward. By the fourth week, the merge queue anxiety has gone and the question is why they waited.
+
+## Making the practice work in practice
+
+### Feature flags as a prerequisite
+
+Every team adopting trunk-based development should implement feature flags before they change the branching model. The sequence matters. If you switch to trunk-based development first and add feature flags later, you will ship at least one half-built feature to production in the interim.
+
+The feature flag system does not need to be elaborate. A simple database table or a configuration file is enough to start. The pattern is: new code goes behind a flag that defaults to off. The flag goes on in production only when the feature is complete. The flag comes out of the codebase once the feature has been stable for a reasonable period.
+
+### CI pipeline speed
+
+Target under ten minutes for the full suite. If you cannot achieve that with all tests, run the fast tests on every commit and the slow tests on a scheduled basis or before deployment. The feedback loop needs to be short enough that the engineer does not move on to the next task before getting the result.
+
+### Commit conventions
+
+Agree on a commit message format and enforce it in CI. This matters more in trunk-based development than in a feature branch model because the commit history on main is the canonical history. Conventional commits, a simple format like feat/fix/chore with a short description, makes the log readable and enables automated changelog generation.
+
+## How much does it cost
+
+| Activity | Engineering time | Ongoing overhead |
+|---|---|---|
+| Feature flag system setup | 1 to 2 days | Low |
+| CI pipeline optimization | 1 to 3 days | Low |
+| Team workflow change (habit formation) | 2 to 4 weeks | None after adoption |
+| Branch protection rules and merge policies | Half a day | None |
+
+The switch itself is nearly free. The investment is in the prerequisites.
+
+## What a working trunk-based workflow requires
+
+- A CI pipeline that runs in under ten minutes and blocks merges on failure.
+- Feature flags for any work that will not be complete within two days of the first commit.
+- Branch protection on main that requires CI to pass and at least one reviewer.
+- A commit convention that the team agrees to and CI enforces.
+- A deployment pipeline that can deploy from main at any time and that the team trusts enough to deploy frequently.
+- An agreement on what constitutes a mergeable pull request so reviews stay fast.
+- A habit of reviewing pull requests the same day they are opened, not the next morning.
+
+## Expert opinion
+
+> The branching model debate is often framed as trunk-based versus feature branches. The real question is how long you are comfortable with divergence accumulating before you pay the integration cost. Trunk-based development says pay it now, in small amounts, continuously. Feature branch workflows say pay it later, in large amounts, occasionally. The teams that do the math on how long their merges actually take usually switch.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A five-engineer team was running Gitflow. Releases happened every two weeks. The week before each release was increasingly consumed by merge conflicts across branches that had diverged significantly. The week of the release was the highest-stress week of the cycle. The team estimated they spent roughly fifteen percent of their engineering time on branching and merging overhead, not code review, just conflict resolution and integration testing.
+
+We switched the team to trunk-based development over three weeks. Week one: we built a basic feature flag system and agreed on commit conventions. Week two: we optimized the CI pipeline from twenty-two minutes to eight minutes. Week three: we ran the new model for the first time on a real feature cycle. The merge overhead dropped immediately. The first deployment from the new model happened on day fifteen and took four minutes.
+
+Six months later, the team was deploying to production an average of three times per week, up from once every two weeks. The deployment anxiety had not transferred to trunk-based development. It had dissipated. For the deployment strategy that pairs with frequent trunk commits, [blue green deployments vs canary vs rolling a decision tree](/blog/blue-green-deployments-vs-canary-vs-rolling-a-decision-tree) covers how to keep each of those deployments safe. For the twelve factor practices that make trunk-based deployments reliable, [the twelve factor app in 2026 still relevant slightly updated](/blog/the-twelve-factor-app-in-2026-still-relevant-slightly-updated) is the natural companion.
+
+## Common mistakes teams make
+
+1. Switching to trunk-based development before adding feature flags. The result is half-built features in production on the first week.
+2. Keeping CI pipeline times the same after switching. A twenty-minute pipeline in a trunk-based workflow is an active deterrent to small commits.
+3. Not enforcing branch protection. Without it, someone pushes directly to main and bypasses the CI, then the team loses trust in the history.
+4. Reviewing pull requests the next day instead of the same day. A pull request open for twenty hours is accumulating divergence. The same-day norm is part of the practice.
+5. Treating trunk-based development as an excuse to skip code review. Small, frequent commits still benefit from a second set of eyes.
+6. No commit conventions. The main branch history becomes unreadable when every engineer uses a different commit message format.
+7. Conflating trunk-based development with continuous deployment. You can practice one without the other. Confusing them leads to resistance from teams that are not ready for continuous deployment.
+
+## A 3 week adoption plan
+
+1. **Week one.** Set up your feature flag system. Agree on the commit convention. Update the CI pipeline to enforce both. Run branch protection on main.
+2. **Week two.** Start running all new work behind feature flags. Move to short-lived branches (one to two days maximum). Measure CI pipeline time and optimize until it is under ten minutes.
+3. **Week three.** Make the first full cycle under the new model. Review the experience on Friday. Adjust the norms that are not working.
+
+For the CI/CD infrastructure underneath this, [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) covers the database migration problem that often surfaces once deployment frequency increases. For the observability foundation that makes frequent deployments safe to monitor, [why your service should have two health checks not one](/blog/why-your-service-should-have-two-health-checks-not-one) is worth reading before you start deploying three times a week.

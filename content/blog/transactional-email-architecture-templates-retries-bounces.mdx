@@ -1,0 +1,120 @@
+---
+slug: "transactional-email-architecture-templates-retries-bounces"
+title: "Transactional Email Architecture: Templates, Retries, Bounces"
+excerpt: "Transactional email is the part of the product that talks to the user when the user is not looking at the screen. Most teams treat it as a library call. The teams that treat it as infrastructure ship email that is reliable, readable, and maintainable."
+date: "2024-11-29"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling","ai"]
+readingMinutes: 11
+ogImage: "/api/og/blog/transactional-email-architecture-templates-retries-bounces"
+status: "published"
+definition: "Transactional email architecture is the system that sends, retries, tracks, and manages the lifecycle of emails triggered by user actions: signup confirmations, password resets, invoices, alerts, and notifications. I've seen teams lose customers to silent delivery failures and deliverability blacklists from simple omissions in bounce handling. The correct design separates template management, delivery, retry logic, and suppression into distinct concerns."
+faq: [
+  {"q":"What is the difference between transactional email and marketing email and why does it matter?","a":"Transactional email is triggered by a user action: password reset, receipt, notification. Marketing email is bulk outreach. They must be sent from different IP pools and ideally different subdomains. A bounce or spam complaint from a marketing campaign can hurt the deliverability of your transactional email if they share infrastructure."},
+  {"q":"Should I send transactional email from my own server or use a managed service?","a":"Use a managed service. Resend, Postmark, AWS SES, and SendGrid handle deliverability, IP reputation, bounce processing, and DKIM/SPF signing. Managing your own mail server for transactional email is a full-time job. The managed services cost a fraction of that and handle the hard parts."},
+  {"q":"How should I handle email bounces in a SaaS application?","a":"Process bounce webhooks from your email provider and suppress bounced addresses in your own database immediately. Never retry a hard bounce. Soft bounces can retry with backoff. A suppression list that you own means you are not dependent on the provider's suppression list surviving account changes."},
+  {"q":"What is the right retry strategy for transactional email?","a":"Retry on provider API errors with exponential backoff up to three to five attempts. Do not retry on hard bounces or spam complaints. Route terminal failures to a dead letter destination that alerts the engineering team. An email that never arrived for a password reset is a support ticket waiting to happen."},
+  {"q":"How do I keep email templates maintainable as the product grows?","a":"Store templates in version-controlled source code, not in the email provider's UI editor. Use a component-based template system like React Email or MJML that renders to HTML. Review templates in code review the same way you review any other product surface. Templates stored only in a provider's editor are a single point of failure."},
+  {"q":"What DNS records do I need for good email deliverability?","a":"SPF, DKIM, and DMARC at minimum. SPF lists the servers allowed to send from your domain. DKIM signs each message. DMARC tells receivers what to do with messages that fail SPF or DKIM checks. Missing any of these will hurt inbox placement. Most managed services provide the records and verify them for you."},
+  {"q":"How do I test transactional email in development without sending to real users?","a":"Use a mail trap service like Mailtrap or Mailpit for local development. Use a dedicated test email domain for staging. Never rely on production email addresses in non-production environments. Add an environment check that prevents sending to external addresses outside production."}
+]
+---
+
+## What you actually need to know
+
+- Transactional and marketing email must share no infrastructure. Different IP pools, different subdomains.
+- Store templates in version control, not in the provider's UI editor.
+- Process bounce webhooks and maintain your own suppression list. Do not rely solely on the provider's list.
+- Route all email through a background queue. A failed API call should not fail the user's request.
+- In my experience, the SaaS teams that treat email as a library call discover their deliverability problems from angry customer support tickets, not from dashboards.
+
+| Provider | Best fit | Pricing model | Bounce handling | Template support |
+|---|---|---|---|---|
+| Resend | Developer-first SaaS | Per email | Webhook based | React Email native |
+| Postmark | Reliability-focused teams | Per email | Message streams | Templating API |
+| AWS SES | High volume, AWS shops | Per email, very low | SNS bounce notifications | External |
+| SendGrid | Full lifecycle marketing + transactional | Per email tier | Event webhooks | Built-in editor |
+| Mailgun | Flexible routing needs | Per email | Webhook based | Template API |
+
+## The core argument
+
+Every SaaS sends email. Welcome messages, password resets, invoices, notifications, digest emails, alerts. Most of the time, the email works fine. The edge cases are where the architecture matters. The provider API is temporarily unavailable. The user's address has bounced before. The user's inbox is full. The email takes thirty seconds to deliver and the user clicks "resend" twice. The invoice email fires twice because the webhook retried. The password reset email goes to the spam folder because the DKIM record is wrong.
+
+None of these are exotic scenarios. They happen weekly at any meaningful scale. The teams that have wired up their email as a proper system handle them quietly. The teams that called the provider SDK directly in the request handler deal with them as user complaints.
+
+The correct architecture has four distinct layers. The trigger layer decides that an email should be sent and enqueues a job. The job layer calls the provider SDK, handles API errors, and retries. The template layer renders the email from version-controlled source. The lifecycle layer processes bounces, complaints, and unsubscribes and updates the suppression list.
+
+None of these layers are expensive to build. The templates take the most time if you care about visual quality. The rest is a few hundred lines of infrastructure that runs quietly forever.
+
+## The template problem
+
+Templates stored in a provider's UI editor are not in your codebase. They cannot be reviewed. They cannot be tested in a CI pipeline. They disappear if you change providers. They drift from the product's visual identity because they are maintained separately.
+
+The right approach is React Email or MJML. Both produce HTML that renders correctly across email clients including Outlook, which is notoriously difficult. Both integrate with a build step. Both allow component composition so the header, footer, and button components are shared across all templates.
+
+The template renders at send time with data injected from the job context. The rendered HTML goes to the provider's send API. The template source lives in the repository alongside the rest of the product code.
+
+A secondary benefit: the email template is now in code review. Product managers can review the copy. Designers can review the visual structure. A typo in a password reset email gets caught before it ships.
+
+## How much does it cost
+
+| Volume | Provider cost | Engineering setup | Ongoing maintenance |
+|---|---|---|---|
+| Under 10k emails per month | Under 20 USD | Two to five days | Near zero |
+| 10k to 100k emails per month | 20 to 200 USD | Same | Near zero |
+| 100k to 1M emails per month | 200 to 2000 USD | Add dedicated IP | Quarterly review |
+| Over 1M emails per month | Negotiated | Add warm-up plan | Monthly review |
+| AWS SES at any volume | Roughly 0.10 per thousand | Higher integration cost | Near zero |
+
+The engineering setup cost covers template infrastructure, background queue integration, bounce webhook processing, and the suppression list. Done once, it runs without maintenance. The ongoing cost is provider fees and occasional template updates.
+
+## Features to demand from the implementation
+
+- All sends routed through a background job queue, never inline in the request handler.
+- Exponential backoff retry on provider API failures, with a maximum attempt count.
+- Bounce and complaint webhook processing with immediate suppression list updates.
+- Hard bounce addresses never retried, ever.
+- Templates in version-controlled source code rendered at send time.
+- Separate subdomains and IP pools for transactional and marketing email.
+- SPF, DKIM, and DMARC configured and verified before the first production send.
+- A development mail trap that prevents external delivery outside production.
+- Idempotency keys on sends to prevent duplicates from queue retries.
+
+## Expert opinion
+
+> Transactional email has the highest user expectation of any notification channel. The user requested the email. They are waiting for it. When it does not arrive, or arrives twice, or goes to spam, the trust damage is immediate and personal. The engineering investment to get it right is modest. A background queue, bounce processing, version-controlled templates, and correct DNS records is a week of work. The teams that skip that week spend months on support tickets and deliverability investigations.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client was sending transactional email directly in their API request handlers using a provider SDK. The password reset endpoint took four to eight seconds because it waited for the email API call to complete. When the provider had a partial outage, password resets failed with a 500 error, which meant users who had forgotten their password were also locked out during the outage. The support queue filled in under an hour.
+
+We moved all email sends to a background job queue in three days. The API endpoint now enqueues the job and returns immediately. The job retries on provider errors with exponential backoff. Password resets work during provider partial outages because the queue absorbs the delay. We also discovered the team had no bounce processing at all. Hard bounced addresses were being retried on every send, which was hurting deliverability scores. Adding the bounce webhook handler and suppression list took one additional day.
+
+The second project involved a SaaS that had been sending transactional and marketing email from the same subdomain. A marketing campaign with a higher than normal spam complaint rate briefly affected the inbox placement of their password reset emails. Separating the infrastructure fixed the deliverability. For more on the async infrastructure that supports this, see [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip) and [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code).
+
+## Common mistakes teams make
+
+1. Sending email synchronously in the request handler. The email provider's latency becomes the user's latency.
+2. No retry logic. A transient provider error causes silent delivery failure.
+3. No bounce processing. Hard bounced addresses accumulate and hurt sender reputation.
+4. Templates stored only in the provider's UI editor. Unreviewed, untested, and lost if you switch providers.
+5. Shared infrastructure for transactional and marketing email. A marketing campaign complaint rate affects password reset deliverability.
+6. No idempotency keys. Queue retries send the invoice twice.
+7. Missing or misconfigured DKIM. The email signs incorrectly and lands in spam.
+8. No development mail trap. A configuration mistake in staging sends real emails to real users.
+
+## A two week plan for clean email infrastructure
+
+1. **Day one.** Audit every email send in the codebase. List each trigger, volume estimate, and current implementation.
+2. **Days two and three.** Choose the provider. Configure SPF, DKIM, DMARC, and separate subdomains for transactional and marketing.
+3. **Days four and five.** Build the background job integration. Route all sends through the queue with retry and dead letter handling.
+4. **Days six and seven.** Migrate templates to React Email or MJML. Add them to the repository and CI pipeline.
+5. **Day eight.** Implement the bounce and complaint webhook handler. Build the suppression list table and logic.
+6. **Day nine.** Add idempotency keys to all sends. Test with forced retries.
+7. **Days ten and eleven.** Set up the development mail trap. Add the environment guard.
+8. **Day twelve.** Review deliverability configuration with the provider's tools. Confirm all DNS records are passing.
+9. **Days thirteen and fourteen.** Load test the queue under realistic send volume. Confirm retry and dead letter behavior.
+
+For related infrastructure reading, [async job failure recovery patterns that actually work](/blog/async-job-failure-recovery-patterns-that-actually-work) covers the retry patterns in detail, and [resend vs AWS SES vs Mailgun for transactional email](/blog/resend-vs-aws-ses-vs-mailgun-for-transactional-email) covers the provider selection decision.

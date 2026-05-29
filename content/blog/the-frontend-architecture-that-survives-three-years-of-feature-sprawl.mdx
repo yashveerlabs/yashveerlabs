@@ -1,0 +1,131 @@
+---
+slug: "the-frontend-architecture-that-survives-three-years-of-feature-sprawl"
+title: "The Frontend Architecture That Survives Three Years of Feature Sprawl"
+excerpt: "The structural decisions that keep a React frontend maintainable after three years and dozens of features -- and the patterns that cause it to collapse."
+date: "2025-11-09"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","architecture","typescript"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl"
+status: "published"
+definition: "A frontend architecture that survives three years of feature additions is one built around clear module boundaries, a consistent data fetching layer, a design system that constrains UI variation, and a state management approach that does not require global state for local problems. The specific patterns that fail at scale: co-locating business logic with UI components, using global state for everything, and building without a design system so every feature adds its own UI primitives."
+faq: [
+  {"q":"What is the single most important architectural decision for a long-lived React frontend?","a":"Clear module boundaries. A frontend where features are organized into self-contained modules -- each with its own components, hooks, API calls, and types -- is significantly easier to maintain than one where all components are in a single flat directory and business logic is distributed randomly across the codebase. Module boundaries make it possible to understand, modify, and delete a feature without understanding the entire application."},
+  {"q":"How should state management be approached in a large React application?","a":"Start local and go global only when necessary. useState for component-local state, useContext for state that needs to be shared within a feature, Zustand or Jotai for cross-feature state that is too complex for context, and React Query (TanStack Query) for server state. The mistake is using a global store for everything from the beginning -- it makes the state dependencies hard to understand and creates unnecessary coupling between unrelated features."},
+  {"q":"What is a design system and why does it matter for long-term maintainability?","a":"A design system is a set of reusable UI components (buttons, inputs, modals, cards) built to consistent visual and behavioral standards. Without a design system, each developer adds their own button component, their own modal, their own input styling. After three years, the codebase has fifteen button variants with slightly different styles and behaviors. A design system prevents this by making the shared components the default and making custom components the exception that requires justification."},
+  {"q":"How should data fetching be organized in a React application?","a":"All data fetching should go through a consistent layer: TanStack Query for server state (it handles caching, loading, error, and stale-while-revalidate automatically), and custom hooks that encapsulate the specific queries and mutations for each domain. Components should not call APIs directly -- they should call custom hooks that call APIs. This keeps the data fetching logic testable and keeps components focused on rendering."},
+  {"q":"What is feature-based folder structure and why does it scale better?","a":"Feature-based folder structure groups files by feature (auth, dashboard, settings, billing) rather than by type (components, hooks, utils). A feature folder contains everything the feature needs: its components, hooks, API calls, types, and tests. When you need to modify the billing feature, you look in the billing folder -- not across five top-level directories. When a feature is removed, you delete one folder. Type-based structure makes features hard to find and impossible to delete cleanly."}
+]
+---
+
+## What you actually need to know
+
+- Feature-based folder structure scales; type-based folder structure does not. After 30 features, a flat components directory is unusable.
+- Business logic belongs in hooks, not in components. Components that contain business logic cannot be tested or reused independently.
+- TanStack Query is the correct default for server state. It removes the need for 80 percent of the global state that teams add unnecessarily.
+- A design system is not a luxury. It is the architectural constraint that prevents UI inconsistency from accumulating into unmaintainability.
+- TypeScript strict mode is the difference between a refactoring-friendly codebase and a refactoring-hostile one. Enable it from the start.
+
+| Architecture Pattern | Survives 3 Years | Fails at 3 Years |
+|---|---|---|
+| Folder structure | Feature-based modules | Type-based flat dirs |
+| State management | Local first, global only when needed | Global store for everything |
+| Data fetching | TanStack Query + custom hooks | API calls in components |
+| UI components | Shared design system | Per-feature component soup |
+| Business logic | Custom hooks | In components directly |
+| Type safety | Strict TypeScript from day 1 | Added TypeScript later |
+
+## The core argument
+
+A React frontend built without architectural constraints will accumulate technical debt in predictable patterns. After six months: a flat component directory with 200 components, no clear distinction between business logic and presentation, global state used for everything including component-local concerns, and a growing number of "helper" utilities that no one fully understands. After three years of this pattern, the codebase is effectively unmaintainable -- changes anywhere can break things anywhere else, and the cognitive load of understanding the codebase exceeds what any individual engineer can hold.
+
+The architectural patterns that prevent this outcome are not complex. They are a set of initial decisions that create constraints -- constraints that slow down the first implementation slightly and prevent the exponential accumulation of complexity that kills long-lived frontends.
+
+I have built and maintained several production Next.js and React applications over three-plus year timeframes. The applications that are still maintainable at year three are the ones that had these constraints from the beginning. The ones that became maintenance burdens had them absent. The patterns I describe are not theory -- they are the observed difference between the two outcomes.
+
+## Feature-based module structure
+
+The foundational architectural decision is folder structure. The structure that fails at scale: a top-level `components` directory, a top-level `hooks` directory, a top-level `utils` directory. All components live in `components`, all hooks in `hooks`, all utilities in `utils`. This structure is intuitive at small scale and breaks at large scale because it provides no information about where to find a specific feature's code.
+
+The structure that scales: top-level `features` directory with one folder per feature. Each feature folder contains everything the feature needs:
+
+```
+features/
+  auth/
+    components/  (LoginForm, SignupForm, ResetPassword)
+    hooks/       (useAuth, useSession)
+    api/         (authApi.ts)
+    types/       (auth.types.ts)
+  billing/
+    components/  (PricingTable, PaymentForm, InvoiceList)
+    hooks/       (useBilling, useSubscription)
+    api/         (billingApi.ts)
+    types/       (billing.types.ts)
+```
+
+This structure makes features independently navigable and independently deletable. When the billing feature changes, you look in `features/billing`. When the billing feature is removed, you delete `features/billing`. No grep for billing-related files scattered across the codebase.
+
+Shared code -- components used by multiple features, utility functions, types used across the application -- lives in a `shared` or `common` directory. The rule: code starts in a feature directory and moves to shared only when a second feature needs it. Shared code that is not actually shared is the most common source of accidental coupling.
+
+## Business logic in hooks
+
+Components that contain business logic become untestable and unreusable. The business logic is interleaved with the rendering logic, and there is no clean way to test one without the other. A component that calls an API, transforms the response, manages loading and error state, and renders the result is doing four things, none of which can be verified in isolation.
+
+The pattern that survives: components render, hooks fetch and transform. Every unit of business logic that is more than a line of code lives in a custom hook. The component calls the hook and renders the result:
+
+```tsx
+// In the component:
+const { data, isLoading, error } = useInvoiceList();
+
+// In the hook:
+export function useInvoiceList() {
+  const { data, isLoading, error } = useQuery({ queryKey: ['invoices'], queryFn: fetchInvoices });
+  const sorted = useMemo(() => data?.sort((a, b) => b.date - a.date), [data]);
+  return { data: sorted, isLoading, error };
+}
+```
+
+The hook is testable without rendering anything. The component is testable with a mocked hook. Both can be modified independently. The transformation logic -- the sort, the filter, the derivation -- is in a location where it can be found, tested, and reused.
+
+## TanStack Query for server state
+
+The majority of global state in most React applications is server state -- data fetched from an API that the component needs to display. Managing server state with a global store (Redux, Zustand) requires writing reducers or actions to handle loading, error, and data states manually. This is significant boilerplate for a problem that TanStack Query solves automatically.
+
+TanStack Query treats server data as a cache. The first component that asks for a specific query key fetches the data; subsequent components that ask for the same key get the cached result. The cache is invalidated automatically on mutation. Loading and error states are handled per-query without global state management overhead.
+
+After adding TanStack Query to a project I was rescuing, I removed approximately 40 percent of the Zustand store code -- it had been used primarily for server state that TanStack Query now handled more correctly. The remaining Zustand code was genuine UI state (modal open/closed, selected filter, sidebar expanded) that was appropriate for a lightweight store. The clarity between server state (TanStack Query) and UI state (Zustand) made the state management understandable.
+
+## The design system constraint
+
+A shared design system is not primarily about visual consistency -- it is about the architectural constraint it imposes. When all buttons come from the same `Button` component, there is one button to maintain. When each developer adds their own button, there are fifteen buttons, each with subtle differences in spacing, color, active state, and focus behavior. The maintenance burden is multiplicative.
+
+The design system investment does not require building Radix UI from scratch. Adopting a component library (shadcn/ui, Radix, Chakra) and wrapping it in a local design system that adds the project's specific tokens (colors, spacing, typography) is the appropriate scale for most applications. The local wrapper allows the design tokens to be changed in one place and propagated to all components that use them.
+
+The rule: new UI primitives are added to the design system, not created ad hoc. A developer who needs a new card layout adds it to the card component in the design system (or opens a design system PR) rather than creating a new one-off div with inline styles. This rule, enforced in code review, prevents the accumulation of UI component variants that eventually makes the frontend unmaintainable.
+
+## Common mistakes engineers make in frontend architecture
+
+1. Not establishing folder structure conventions on day one. The cost of reorganizing a codebase from type-based to feature-based at month six is significantly higher than establishing feature-based structure from the beginning.
+2. Using a global store for server state. TanStack Query handles server state better than a Redux slice in every dimension: less code, built-in cache invalidation, built-in loading and error states.
+3. Putting business logic in components. Business logic in a component is invisible to the rest of the team -- it cannot be found by searching for hooks, cannot be tested without rendering, and cannot be reused.
+4. Not using TypeScript strict mode. Non-strict TypeScript allows the `any` type and implicit type coercions that strict mode disallows. Adding strict mode to a mature TypeScript codebase is expensive. Starting with strict mode is cheap.
+5. Building shared components before they are needed. Premature abstraction is as damaging as no abstraction. A component shared by two callers is not a design system component -- it is a component with two callers. Design system components are components that are used by many features and need to be consistent.
+
+## Where to start: a 3-step frontend architecture setup
+
+**Step 1: Set up the feature-based folder structure before writing the first feature.** Create the `features`, `shared`, and `app` (or `pages`) top-level directories. Establish the rule: every new feature gets its own folder with its own components, hooks, api, and types.
+
+**Step 2: Install TanStack Query and establish the custom hook pattern.** The first custom hook -- one that fetches a specific resource and returns the data, loading, and error state -- establishes the pattern for every subsequent data fetching hook. Write it well, document it briefly, and use it as the reference for code review.
+
+**Step 3: Adopt a component library and define the design tokens.** Pick shadcn/ui or Radix UI, configure the design tokens (colors, spacing) in the Tailwind configuration or CSS custom properties, and add a rule in the project's contributing guide: UI primitives come from the shared component library, not from custom inline implementations.
+
+## The Architecture That Pays Dividends
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Expert Tutorials platform frontend -- built on Next.js with feature-based modules, TanStack Query, and a shared component library -- has been maintained and extended for over two years without the kind of architectural debt accumulation I have seen in projects that did not start with these constraints. A developer new to the project can find any feature in under a minute and understand it in under an hour. That navigability is not accidental -- it is the result of the architecture constraints that were established before the first feature was written.
+
+## Related reading
+
+- [The Frontend Build System: Why It Matters More Than Founders Think](/blog/the-frontend-build-system-why-it-matters-more-than-founders-think)
+- [The Frontend Testing Strategy That Works](/blog/the-frontend-testing-strategy-that-works)
+- [The Forms Problem: React Hook Form vs Formik vs TanStack Form](/blog/the-forms-problem-react-hook-form-vs-formik-vs-tanstack-form)
+- The State Management Decision in 2025

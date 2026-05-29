@@ -1,0 +1,123 @@
+---
+slug: "why-you-should-never-hire-a-solo-developer-for-a-critical-project"
+title: "Why You Should Never Hire a Solo Developer for a Critical Project"
+excerpt: "A single developer can build a great product. They cannot maintain availability, share knowledge, or absorb the risk that one person carries. For anything critical, the cost of solo is paid in the worst possible quarter."
+date: "2024-09-27"
+category: "Hiring Developers, Freelancers, and Agencies"
+tags: ["hiring","engineering-teams","freelance"]
+readingMinutes: 11
+ogImage: "/api/og/blog/why-you-should-never-hire-a-solo-developer-for-a-critical-project"
+status: "published"
+definition: "A solo developer concentrates risk in one person. If they get sick, take a vacation, or leave, the project stops. There is nobody to review their code, catch their blind spots, or maintain availability when they cannot. For a critical project, the savings from hiring solo are paid back many times over in the first emergency. The minimum viable team is two."
+faq: [
+  {"q":"Can a solo developer ship a great product?","a":"Yes. Many great products were shipped by one person. The issue is not capability. The issue is what happens after launch. A solo developer cannot sustain a critical system because they cannot be available all the time, cannot catch their own blind spots, and cannot survive personally without becoming a single point of failure."},
+  {"q":"Why is one developer a risk for a critical project?","a":"Three reasons. Availability: they will get sick, take vacation, and have personal emergencies. Knowledge: only they understand the system, so when they are unavailable, no one can fix anything. Review: their code is never reviewed by a peer, so bugs and blind spots ship. Each is a real risk; together they are a guarantee of trouble."},
+  {"q":"What is the minimum viable team size?","a":"Two. Two engineers can review each other's work, cover each other's vacations, and avoid the single point of failure. The pair structure is not perfect but it removes most of the worst risks. Three is better; one is dangerous for anything critical."},
+  {"q":"What about an agency? Are they better than a solo?","a":"Sometimes. A good agency staffs multiple people on the project, reviews code internally, and covers availability. A bad agency assigns a single person and bills you for the team. Ask explicitly: who is reviewing the code, who covers if the primary is unavailable, who else knows the system."},
+  {"q":"What if I cannot afford two developers?","a":"Then either the project is not critical, the budget is wrong, or you need to scope smaller. Trying to do a critical build with a solo developer because of budget constraints is a false economy. The first emergency costs more than the savings."},
+  {"q":"What about a part-time co-pilot?","a":"Better than nothing. A second engineer who reviews code weekly and could cover an emergency is meaningful insurance. They will not catch everything but they remove the worst single-point-of-failure risk. Pair this with documentation discipline and you have something workable."},
+  {"q":"How do I structure a two-person team for a critical project?","a":"Both work on the same codebase. Review each other's pull requests. Share on-call responsibilities. Document significant decisions. Each one builds enough context to cover for the other for a week. The structure prevents most of the failures that solo work guarantees."}
+]
+---
+
+## What you actually need to know
+
+- A solo developer concentrates risk that compounds in the worst possible moment.
+- The minimum viable team for a critical project is two. Three is safer.
+- Capability is not the issue. Availability, review, and knowledge sharing are.
+- Agencies are sometimes better, often the same risk hidden behind a bigger invoice.
+- If you cannot afford two, the project is not as critical as you thought, or you need to rescope.
+
+| Risk | Solo developer | Two-person team |
+|---|---|---|
+| Vacation, illness | Project stops | Coverage exists |
+| Departure | Knowledge lost entirely | Knowledge partially shared |
+| Code review | None | Built in |
+| On-call availability | One person, 24/7 | Rotated |
+| Blind spots in design | Ship to production | Caught in review |
+| Burnout | High; single point of stress | Lower; shared load |
+
+## The core argument
+
+I have walked into more than one company where a solo developer had built something critical, then left or was unavailable when something went wrong. The pattern is recognizable. The original developer is talented. The code is reasonable. Nobody else understands it. When something needs urgent attention, the team is paralyzed.
+
+The risk is not whether the developer can build. Many people can build. The risk is what happens after the build, when the system has to be maintained, debugged, and evolved by someone other than the original author. A solo developer leaves a system that nobody else can confidently touch, and that becomes a problem in proportion to how critical the system is.
+
+The argument for solo is usually cost. One developer is cheaper than two. The savings are real on the spreadsheet. The cost shows up later in three ways. Availability, when the developer is sick or on vacation. Knowledge, when the developer leaves or just stops responding. Review, when bugs ship that a second pair of eyes would have caught.
+
+For a critical project, none of these is acceptable. The right minimum team size is two. Both work on the same codebase. Both review each other's work. Both build enough context to cover for the other. The structure is more expensive and dramatically less risky.
+
+The other argument for solo is speed. One developer can move faster than two because there is no coordination overhead. This is true in the very short term and false over any meaningful time horizon. Two engineers reviewing each other's work catch problems earlier, ship more reliably, and avoid the rewrites that solo work tends to require.
+
+## What goes wrong with solo
+
+### Availability
+
+The solo developer takes a vacation. The system breaks during that vacation. The customer calls and the company cannot respond. The developer's vacation either gets canceled or the company eats the incident. Both outcomes are bad. The vacation gets canceled enough times that the developer burns out and leaves.
+
+### Knowledge
+
+Nobody else has read the code. Nobody else knows why a particular design choice was made. When the developer is unavailable, every change is guessing. The cost of any change scales with the lack of context.
+
+### Review
+
+The developer's code goes to production unreviewed. Bugs that a colleague would have caught at the pull request stage instead get caught by customers. The error rate is measurably higher than for code that went through review. The cost of those errors is paid in customer trust.
+
+### Departure
+
+The developer leaves. They take with them the only understanding of the system. The replacement engineer spends months building back the context. During those months, every change is risky. Some of the changes break production. The cost is real and lasts longer than the hiring process.
+
+### Burnout
+
+The solo developer carries the full weight of the system alone. They are on call 24/7 in practice. They cannot fully relax even on vacation because they know something might break. Burnout is statistically likely. The departure mentioned above is often the result of the burnout this section describes.
+
+## How much does the right structure cost
+
+| Structure | Cost | Risk |
+|---|---|---|
+| Solo developer | 1x | High; single point of failure |
+| Two-person team | 2x | Low; coverage exists |
+| Three-person team | 3x | Lower; redundancy is real |
+| Solo + part-time reviewer | 1.5x | Moderate; better than solo |
+| Agency with 2+ named people | 2-3x | Low if structured well |
+| Agency with 1 named person | 1-2x | High; same as solo |
+
+The right answer for a critical project is two people minimum. The cost premium is meaningful, and it is much smaller than the cost of one bad incident or one bad departure on a critical system.
+
+## What to set up for a two-person team
+
+- Both working on the same codebase from day one.
+- Code review on every pull request.
+- Shared documentation of significant decisions.
+- Rotation of on-call responsibilities.
+- Pair sessions on the hardest problems.
+- An explicit understanding that either could cover for the other for a week.
+
+## Expert opinion
+
+> The companies I have helped after a solo developer crisis paid more for the rescue than they would have paid for the second developer in the first place. The savings from hiring solo are a loan against the first emergency. The interest rate is high. The principal is paid in trust. The two-person team feels expensive on the spreadsheet and looks cheap when you compare it to the alternative.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder I helped had hired a solo developer to build their core SaaS product. The developer was talented and the product shipped on time. Eighteen months later, the developer announced they were leaving in two weeks. The codebase had no documentation, no tests, and no second person who understood it.
+
+The transition cost the founder three months of nearly-stopped feature work, a worse onboarding experience for the next engineer, and an incident during the handover that cost them their second-largest customer. The savings from hiring solo had been about 80k. The cost of the crisis was several times that. We rebuilt with a two-person team going forward. The pattern matches [10 questions every non-technical founder must ask before hiring a developer](/blog/10-questions-every-non-technical-founder-must-ask-before-hiring-a-developer) and the broader [hiring offshore: the real tradeoffs beyond cost](/blog/hiring-offshore-the-real-tradeoffs-beyond-cost).
+
+## Common mistakes
+
+1. Hiring solo to save money on a project that cannot tolerate a single point of failure.
+2. Believing the developer when they say they will document everything later.
+3. Treating an agency with one named person as different from a solo developer.
+4. Not planning for the developer's eventual departure from day one.
+5. Letting on-call burden fall entirely on one person.
+6. Skipping code review because there is no one to review.
+7. Assuming the project is not critical when in fact it powers the business.
+
+## A 30 day plan to fix it if you are already solo
+
+1. **Week one.** Document the system's current state. Architecture, key decisions, deploy process, gotchas.
+2. **Week two.** Hire a second engineer or contract someone strong to start reviewing PRs and learning the system.
+3. **Weeks three and four.** Both engineers ship together. Code review on everything. Pair on the hardest problems.
+4. **Ongoing.** Rotate on-call. Build redundancy of knowledge. The transition takes months but starts paying back in weeks. The discipline aligns with [the two-person team: a founder's hiring sweet spot](/blog/the-two-person-team-a-founders-hiring-sweet-spot) and [the vetting framework: how to verify a developer's real experience](/blog/the-vetting-framework-how-to-verify-a-developers-real-experience).

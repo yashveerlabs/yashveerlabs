@@ -1,0 +1,62 @@
+---
+slug: "migrating-from-rest-to-graphql-a-strategic-read"
+title: "Migrating From REST to GraphQL: A Strategic Read"
+excerpt: "GraphQL solves real problems but introduces its own. The migration from REST to GraphQL is not a performance upgrade; it is an architectural shift. Here is when it is worth it and how to do it without breaking existing clients."
+date: "2026-05-23"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration"]
+readingMinutes: 6
+ogImage: "/api/og/blog/migrating-from-rest-to-graphql-a-strategic-read"
+status: "published"
+definition: "Migrating from REST to GraphQL is the process of replacing HTTP endpoints that return fixed response shapes with a single GraphQL endpoint where clients specify exactly the data they need. The migration is appropriate when over-fetching and under-fetching are causing performance or development velocity problems, when the API serves multiple clients with different data requirements, or when the API surface has grown complex enough that REST versioning is creating maintenance overhead. It is not appropriate as a general modernization upgrade."
+faq: [
+  {"q":"What problem does GraphQL solve that REST does not?","a":"GraphQL solves the over-fetching and under-fetching problems that emerge when a REST API serves clients with different data needs. A mobile client that only needs three fields from a REST endpoint that returns twenty fields is over-fetching. A client that needs to make three REST requests to get related data is under-fetching. GraphQL lets each client specify exactly what it needs in a single request."},
+  {"q":"When should I not migrate from REST to GraphQL?","a":"When your API has a small number of clients with similar data needs, when performance is not a concern, when your team is not familiar with GraphQL, or when your API is primarily used by third parties who have built around your REST contracts. GraphQL introduces schema design complexity, n+1 query problems, and a different security model that requires investment to do correctly."},
+  {"q":"How do I migrate incrementally without breaking existing REST clients?","a":"Run GraphQL and REST simultaneously on the same server during migration. New features are built in GraphQL; existing REST endpoints are maintained. Clients migrate to GraphQL on their own timeline. Once all clients have migrated off a REST endpoint, deprecate and remove it. This additive approach avoids breaking changes and gives clients control over their migration timing."},
+  {"q":"What is the n+1 query problem in GraphQL and how do I solve it?","a":"The n+1 problem occurs when resolving a list of items triggers a separate database query for each item in the list. Fetching 100 users and their respective companies triggers 1 query for users and 100 queries for companies. DataLoader, developed by Facebook, solves this by batching and deduplicating database calls for a given request. Any GraphQL implementation that resolves nested objects needs DataLoader or an equivalent batching mechanism."},
+  {"q":"How does GraphQL affect API security compared to REST?","a":"GraphQL requires a different security model. REST endpoints have known, fixed scopes. A GraphQL schema exposes all fields and relationships to any query. Without field-level authorization, clients can request data they should not have access to. Authorization must be implemented per-field or per-type in the resolver layer, not just at the endpoint level. Depth limiting and query complexity analysis prevent expensive denial-of-service queries."}
+]
+---
+
+## What you need to know
+
+- GraphQL is not a REST replacement by default. The migration is appropriate for specific problems: over-fetching, under-fetching, or serving multiple clients with different data needs. It is not a modernization upgrade for its own sake.
+- The n+1 query problem is the most common GraphQL performance failure. Any implementation without DataLoader or equivalent batching will produce more database queries than the equivalent REST API.
+- Incremental migration is the correct approach. REST and GraphQL can coexist on the same server. Migrate one resource at a time and deprecate REST endpoints as clients move over.
+- Authorization in GraphQL requires per-field or per-type guards, not just endpoint-level authentication. The REST authorization model does not map directly to GraphQL.
+- Query depth limiting and complexity analysis are required security controls for any GraphQL API that accepts public or client-originated queries.
+
+## The core argument
+
+The GraphQL migration decision is driven by a specific pain point, not by architectural preference. The pain point that justifies the migration cost is the combination of multiple REST requests to construct a single view, or a single REST endpoint that returns far more data than any single client uses. Both of these problems have performance consequences (extra latency and bandwidth for multiple requests, bandwidth waste for over-fetching) and development velocity consequences (frontend engineers must wait for new REST endpoints when they need data combinations that do not exist). GraphQL solves both by letting clients define their own query shapes against a unified schema.
+
+The migration approach that works is not a big-bang switch but an additive layer. Stand up a GraphQL endpoint alongside the existing REST API. Build new features in GraphQL. Front-end clients that need the new features migrate to GraphQL for those features while continuing to use REST for existing ones. As coverage expands and clients migrate, REST endpoints are deprecated and eventually removed. This approach means no existing REST client is broken by the migration, and the team learns GraphQL progressively rather than all at once.
+
+The two technical concerns that require upfront design are the n+1 problem and the authorization model. DataLoader is the standard solution for the n+1 problem and should be included in the GraphQL implementation from the first resolver that fetches related data. Implementing it after the fact requires auditing and refactoring every resolver that makes database calls, which is more expensive than designing for it initially. The authorization model requires an explicit decision about whether authorization happens in the resolver layer, a middleware layer, or using a directive-based approach. There is no default; each approach has tradeoffs, and the team needs to pick one before building out the schema.
+
+## Common mistakes
+
+1. **Migrating to GraphQL without a specific use case that justifies it.** If the REST API works and clients have similar data needs, GraphQL adds complexity without benefit. The migration should solve a specific, documented problem, not follow an architecture trend.
+
+2. **Not implementing DataLoader from the start.** A GraphQL API without batching is slower than the equivalent REST API for any endpoint that resolves nested relationships. DataLoader is not optional; it is the mechanism that prevents GraphQL from being slower than REST.
+
+3. **Exposing the entire database schema through GraphQL without field-level authorization.** A GraphQL schema that automatically reflects the database schema without authorization guards exposes data to clients that should not have access to it. Design the GraphQL schema as a deliberate API surface, not a database mirror.
+
+4. **Not setting query depth and complexity limits.** A deeply nested GraphQL query can cause exponential database load. Set maximum depth and complexity limits before exposing the API to external clients.
+
+5. **Trying to migrate all REST endpoints simultaneously.** Migrating every REST endpoint to GraphQL in a single sprint creates a large parallel development surface with many opportunities for behavioral regressions. Migrate one resource or domain at a time.
+
+## Where to start
+
+1. **Identify the REST endpoint that causes the most over-fetching or requires the most supplementary requests.** This is the highest-ROI migration candidate. Start here rather than with the most complex endpoint.
+
+2. **Set up a GraphQL server alongside the existing REST API.** Using Apollo Server, GraphQL Yoga, or Pothos, create a minimal GraphQL schema for the first resource. Verify that the resolver returns the same data as the REST endpoint before replacing client calls.
+
+3. **Implement DataLoader for the first resolver that fetches related data.** Even before over-fetching becomes visible in production, set the pattern that all relationship resolvers use DataLoader. This prevents n+1 problems from ever appearing in the GraphQL layer.
+
+## Related reading
+
+- [Building APIs That Survive Five Years of Customer Change Requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests)
+- [Migrating From Express to Fastify or NestJS or Beyond](/blog/migrating-from-express-to-fastify-or-nestjs-or-beyond)
+- API Versioning Strategies That Do Not Break Everything
+- Tech Debt: The Real Cost and When to Pay It Down

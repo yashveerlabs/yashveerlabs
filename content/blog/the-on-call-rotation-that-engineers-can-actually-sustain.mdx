@@ -1,0 +1,116 @@
+---
+slug: "the-on-call-rotation-that-engineers-can-actually-sustain"
+title: "The On Call Rotation That Engineers Can Actually Sustain"
+excerpt: "Most on call rotations are designed by people who are not on call. Here is the structure that keeps engineers alert, keeps the team healthy, and actually reduces incidents over time."
+date: "2025-08-06"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","ai"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-on-call-rotation-that-engineers-can-actually-sustain"
+status: "published"
+definition: "An on call rotation is the schedule that determines which engineer is responsible for responding to production incidents outside of business hours. A sustainable one means pages that are actionable, shifts that are short enough to not destroy sleep, and a feedback loop that reduces the page volume over time. Most rotations fail on all three of those. The ones that work are designed explicitly, not inherited."
+faq: [
+  {"q":"How many engineers do you need before setting up an on call rotation?","a":"Two is the practical minimum. One engineer on call with no one to escalate to is not a rotation, it is a permanent burden. With two engineers you can alternate weekly. Three is more comfortable and gives each person a longer rest window. Below two, the honest answer is that the founder is on call."},
+  {"q":"What is a reasonable on call shift length for a small engineering team?","a":"One week per person is the most common and workable structure for small teams. It gives enough rotation that no one is perpetually on call. Anything longer than one week starts degrading the engineer's quality of work during the day shift. Anything shorter than three to four days creates too much handoff overhead."},
+  {"q":"How do you reduce on call pages without compromising reliability?","a":"Fix the alerts that fire most often and do not require human action. Most teams find that twenty to thirty percent of their alerts are either flapping, misconfigured, or informational rather than actionable. Every alert that fires without resulting in a human action is a candidate for removal or automation."},
+  {"q":"Should junior engineers be on the on call rotation?","a":"Yes, but with a shadow period first. Put junior engineers on call alongside a senior for their first two rotations. They observe the response process and get context. Then they go on the rotation with clear escalation paths. Shielding junior engineers from on call entirely produces engineers who cannot operate production systems."},
+  {"q":"What should an on call runbook contain?","a":"For each alert: what the alert means, what the likely causes are, what the first three diagnostic steps are, and who to escalate to if those steps do not resolve it. A runbook that says investigate the issue is useless at 2 AM. Runbooks are worth writing during business hours so you are not writing them during an incident."},
+  {"q":"How do you compensate engineers for on call time?","a":"The most common approaches are time off in lieu for nights and weekends interrupted, a fixed monthly stipend for being in rotation, and per-page compensation for pages outside business hours. All three signal that the burden is recognized. The worst outcome is treating on call as a free obligation implied by employment."},
+  {"q":"What tools are essential for a small team on call rotation?","a":"An alerting platform like PagerDuty or OpsGenie for routing pages. A runbook system even if it is just a shared document. A post incident review template. An uptime monitor for external availability. A way to see logs quickly without needing to ask a colleague. The tooling does not need to be expensive but it does need to exist."}
+]
+---
+
+## What you actually need to know
+
+- On call only works if the alerts are actionable. A noisy rotation burns engineers faster than the actual incidents.
+- Shift length and rotation frequency determine whether on call is a burden or a manageable part of the job.
+- Every alert that fires without resulting in a human action is engineering debt that should be paid down.
+- The runbook is the most underinvested piece of on call infrastructure. Write it during business hours, not during the incident.
+- Compensation and recognition matter. On call that is treated as free labor produces attrition.
+
+| Rotation model | Minimum team size | Shift length | Best fit |
+|---|---|---|---|
+| Single person always on | 1 | Permanent | Solo founder, pre-team stage |
+| Two person weekly rotation | 2 | 1 week | Early stage startup |
+| Three person weekly rotation | 3 | 1 week | Small team with basic coverage |
+| Follow the sun | 4+ across timezones | Business hours per region | Distributed teams |
+| Tiered primary and secondary | 6+ | 1 week per tier | Teams with complex escalation needs |
+
+## The core argument
+
+On call rotations are usually designed by accident. The first production incident happens, someone gets paged, and from that point forward that person is de facto on call. The rotation gets formalized only after that person complains or leaves. By then the tooling is haphazard, the runbooks do not exist, and the team has a model of on call as an unpleasant tax rather than a designed system.
+
+The difference between a rotation that burns people out and one that does not comes down to three things. First, alert quality. If most pages require no human action, the rotation is broken at the source. Second, shift structure. Weekly rotations with clear handoffs keep the burden predictable. Perpetual or monthly rotations accumulate fatigue that shows up in daytime performance. Third, feedback loops. A rotation that does not get better over time will get worse. Every page that fires should either produce a fix or a deliberate decision to accept the noise.
+
+I have seen this from both sides. I have been the engineer on a noisy rotation where alerts fired three times a night on average, most of them non-actionable, and I have run a lean rotation where pages were rare and always meant something real. The systems that produced those two experiences were not dramatically different in complexity. The difference was whether someone had spent the time tuning the alerts and writing the runbooks.
+
+The sustainable rotation is not the one with the fewest pages. It is the one where every page is understandable, every runbook exists, every shift ends and the next person knows exactly what happened, and the feedback loop is real. That requires intentional design, not just assigning a pager.
+
+## Designing the rotation itself
+
+### Shift length and handoff
+
+One week is the right default for most small teams. It is long enough that context accumulates within the shift and short enough that it does not wear the engineer down before the hand off. The handoff should happen during business hours, not at midnight. The outgoing engineer writes a brief shift summary: what paged, what was done, what is still open.
+
+### Escalation paths
+
+Every alert should have a clear escalation path. The on call engineer should know who to call if they cannot resolve an issue in fifteen minutes. That person should be reachable and should expect escalations. An escalation that goes to a Slack channel and waits for volunteers is not an escalation path.
+
+### Shadow rotations for new engineers
+
+Two rotations as a shadow before going primary. The shadow observes, participates in the diagnosis, and can take action under the primary's guidance. This is also how institutional knowledge gets transferred. The first time you respond to a database failover alert should not be at 2 AM with no context.
+
+## How much does it cost
+
+| Tool | Cost per month | What it does |
+|---|---|---|
+| PagerDuty (Team plan) | 19 USD per user | Escalation routing, schedules, alert dedup |
+| OpsGenie (Standard) | 9 USD per user | Alerting, scheduling, on call tracking |
+| Better Uptime | 20 to 80 USD | External uptime monitoring plus alerting |
+| VictorOps / Splunk On-Call | 14 USD per user | Similar to PagerDuty, now part of Splunk |
+| Grafana OnCall (open source) | Free, self-hosted | Full feature alerting with operational cost |
+
+The tooling is not the expensive part of on call. The expensive part is the engineering time spent on incidents that good tooling and good runbooks would have resolved faster or prevented entirely.
+
+## What the rotation needs to function
+
+- A rotation schedule that every engineer can see, with names and dates at least four weeks ahead.
+- An alerting platform that routes pages to the right person and escalates if they do not acknowledge.
+- Runbooks for every alert that has fired in the last three months, living in a place the on call engineer can reach from a phone.
+- A shift summary process so context transfers at handoff.
+- A post incident template that captures duration, root cause, and what would prevent recurrence.
+- A monthly alert review to identify the top five noisy alerts and either fix or remove them.
+- Clear compensation or time-off policy for out-of-hours pages.
+
+## Expert opinion
+
+> The on call rotation reveals the quality of your production engineering more honestly than any deployment metric. A rotation with twenty pages per week is a system that has not been maintained. A rotation with two pages per week, both actionable, is a system that someone cares about. The pages are not the problem. The absence of feedback loops that reduce the pages is the problem.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client team of four engineers had an informal on call arrangement where one senior engineer was effectively always on call because he was the only person who understood the production system well enough to act. He was getting paged an average of eight times per week. A third of those pages were for alerts that had been misconfigured six months earlier and had never been cleaned up. He had been on this arrangement for eleven months.
+
+We spent three days auditing the alert configuration. Twelve alerts were firing regularly but had never produced a human action. We removed nine and converted three to informational. We spent another two days writing runbooks for the remaining alerts using a simple template: what it means, what causes it, what to do in the first fifteen minutes. We set up a weekly rotation across all four engineers with a one-hour handoff call on Monday mornings.
+
+The page volume dropped from eight per week to two. Both remaining pages were actionable. The senior engineer, who had been considering leaving, stayed. Within six months, the other three engineers had each responded to incidents and built the context to act without escalating. For the reliability side of this, [the error budget SRE for small teams](/blog/the-error-budget-sre-for-small-teams) gives the framework for measuring how fast you are burning reliability budget when the rotation gets noisy. For the deployment side, [blue green deployments vs canary vs rolling a decision tree](/blog/blue-green-deployments-vs-canary-vs-rolling-a-decision-tree) covers how your deploy strategy can reduce the incident rate that drives on call pages.
+
+## Common mistakes teams make
+
+1. Never auditing alert quality. The noisiest rotations are noisy because no one has ever removed an alert that stopped being useful.
+2. Putting one person on call indefinitely because they know the system. This is how you lose that person.
+3. No runbooks. The on call engineer wakes up to an alert with no context and spends thirty minutes figuring out what the alert even means.
+4. Shift lengths that are too long. A two week on call shift does not produce twice the coverage. It produces half the productivity during the daytime shift.
+5. Escalation paths that are not real. A Slack message asking for help is not an escalation path.
+6. No post incident review. Every incident that does not produce a written review is an incident that will happen again.
+7. Treating on call as a senior engineer responsibility only. Junior engineers who never see production incidents cannot develop operational judgment.
+
+## A 4 week plan to build a sustainable rotation
+
+1. **Week one.** Audit your current alerts. List every alert that fired in the past thirty days. Mark each one as actionable or non-actionable. Remove or convert the non-actionable ones.
+2. **Week two.** Write runbooks for the remaining alerts. Use a simple template. Assign one runbook per engineer. Review and merge at the end of the week.
+3. **Week three.** Set up or reconfigure your alerting platform with the new schedule. Define escalation paths for each alert tier. Walk the team through the new structure.
+4. **Week four.** Run the first formal rotation. Hold the Monday handoff call. Use a shift summary template. Review at the end of the week.
+
+For the monitoring foundation underneath the rotation, [why your service should have two health checks not one](/blog/why-your-service-should-have-two-health-checks-not-one) is the natural starting point. For a broader view of the operational discipline that keeps pages rare, [the post mortem culture that improves security](/blog/the-post-mortem-culture-that-improves-security) covers how to turn incidents into improvements rather than just cleanup work.

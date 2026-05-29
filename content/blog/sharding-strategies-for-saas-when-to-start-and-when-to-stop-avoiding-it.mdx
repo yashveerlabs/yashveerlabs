@@ -1,0 +1,65 @@
+---
+slug: "sharding-strategies-for-saas-when-to-start-and-when-to-stop-avoiding-it"
+title: "Sharding Strategies for SaaS: When to Start and When to Stop Avoiding It"
+excerpt: "Sharding is a last resort, not a first move. Here is the honest decision framework for SaaS teams."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling","database","sharding"]
+readingMinutes: 8
+ogImage: "/api/og/blog/sharding-strategies-for-saas-when-to-start-and-when-to-stop-avoiding-it"
+status: "published"
+faq: [
+  {"q":"How many users do you need before sharding makes sense?","a":"There is no fixed number. It depends on your write patterns, query complexity, and instance size. In my experience, teams rarely hit single-instance write limits before several hundred thousand active users with optimized queries."},
+  {"q":"What is the difference between horizontal and vertical scaling?","a":"Vertical scaling is adding more resources (CPU, RAM, storage) to a single machine. Horizontal scaling is adding more machines. Sharding is a form of horizontal scaling for databases. Vertical scaling is simpler and should be exhausted first."},
+  {"q":"Can you shard Postgres without a special extension?","a":"Yes, but you are building the routing and distribution logic yourself. Citus (now Postgres extension, owned by Microsoft) and tools like Vitess for MySQL provide this infrastructure. Application-level sharding using a simple hash-based routing function is also viable for SaaS with a clean tenant separation model."},
+  {"q":"What happens to global queries after sharding?","a":"Cross-shard aggregation requires either a separate analytics database (read replicas aggregated into a warehouse), a fan-out query that hits all shards and aggregates in the application layer, or an Elasticsearch/ClickHouse layer for reporting queries."},
+  {"q":"Is database-per-tenant the same as sharding?","a":"Not exactly. Database-per-tenant gives each tenant a separate database, which provides the strongest isolation but the highest operational overhead. Sharding typically means multiple tenants per shard, distributed by a routing key. Both are forms of horizontal partitioning."}
+]
+---
+
+# Sharding Strategies for SaaS: When to Start and When to Stop Avoiding It
+
+**Sharding is the practice of splitting a single database into multiple independent databases, each holding a subset of the data, to scale beyond the limits of a single machine. It solves a real problem at genuine scale. It also introduces distributed systems complexity that will break your application in new and creative ways. Most SaaS companies sharding their database before exhausting vertical scaling, read replicas, and connection pooling are solving the wrong problem.**
+
+## What you need to know
+
+- Vertical scaling (bigger instances) is cheap and fast; most SaaS products never exhaust it
+- Read replicas handle 80% of scaling problems for read-heavy workloads before sharding is even relevant
+- Application-level sharding requires changes throughout your codebase wherever queries touch the sharded table
+- The most common shard key in SaaS is tenant ID; getting the key wrong at the start creates uneven distribution that defeats the purpose
+- Managed databases like PlanetScale and Citus (Postgres) provide sharding infrastructure without building it yourself
+
+## The core argument
+
+The conversation about sharding usually happens too early. An engineer reads about Stripe or Airbnb's database architecture, proposes sharding for the startup's Postgres instance that is serving 5,000 users, and the architecture review gets derailed for a week. Sharding at that scale is engineering theater. The real question is what other options you have exhausted.
+
+The ladder looks like this. First, optimize the queries: indexes, EXPLAIN ANALYZE, query restructuring. Second, increase the database instance size. Third, add read replicas for read-heavy operations. Fourth, add a caching layer for the most-read data. Fifth, implement connection pooling via PgBouncer. If you have done all five and you are still hitting throughput ceilings on writes, you have earned the sharding conversation. In my experience building multi-tenant applications, reaching genuine write saturation before implementing the steps above is rare for anything under a few hundred thousand users.
+
+When sharding is the right call, tenant-based sharding is the most common approach for SaaS. Each tenant (or a group of tenants) lives on a separate database shard. The application layer routes queries to the correct shard based on tenant ID. This keeps data isolation clean, makes compliance work like GDPR deletion and data residency easier to implement, and means a noisy tenant does not affect others. The downside is that cross-tenant queries become impossible (or very expensive) and operational complexity multiplies with each shard.
+
+## Common mistakes
+
+1. **Sharding before saturating single-instance vertical scaling.** The largest Postgres instances handle genuinely massive workloads. If you have not tried a bigger instance, you have not earned the sharding conversation.
+
+2. **Choosing a bad shard key.** A shard key that does not distribute writes evenly creates hot shards that defeat the purpose of sharding. Tenant ID is good for SaaS. Sequential IDs often create hot shards because recent data concentrates on one shard.
+
+3. **Not handling cross-shard queries.** Once data is sharded, queries that touch multiple shards require aggregation at the application layer. Teams that shard without building that aggregation discover it during the first analytics query.
+
+4. **Sharding the entire database instead of one table.** If your write throughput problem is isolated to one table, shard that table. The rest of the application does not need to change.
+
+5. **No shard rebalancing plan.** As the user base grows, shards will become uneven. A sharding strategy without a plan for rebalancing is a strategy that works today and fails in six months.
+
+## Where to start
+
+1. **Run the exhaustion checklist first.** Indexes optimized? Read replicas deployed? PgBouncer configured? Connection pool sized correctly for your workload? Instance type maxed out? If the answer to any of these is no, start there.
+
+2. **If sharding is genuinely next, evaluate Citus or PlanetScale.** Both offer Postgres-compatible distributed database infrastructure that handles the routing and distribution complexity that would otherwise live in your application code.
+
+3. **Shard by tenant ID and build the routing layer before migrating data.** Get the abstraction right first. The application should route to a shard database handle transparently. Then migrate data to the sharded setup behind that abstraction.
+
+## Related reading
+
+- [SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- [The Multi Tenant Database: One Schema or Many?](/blog/the-multi-tenant-database-one-schema-or-many)
+- [Read Replicas: When They Save You and When They Lie to You](/blog/read-replicas-when-they-save-you-and-when-they-lie-to-you)

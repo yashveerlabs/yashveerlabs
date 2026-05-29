@@ -1,0 +1,116 @@
+---
+slug: "why-vercel-cannot-be-your-entire-backend"
+title: "Why Vercel Cannot Be Your Entire Backend"
+excerpt: "Vercel is excellent at what it is built for. It is not built to be the only home for a serious SaaS backend, and the projects I have rescued because someone tried prove the point. Here is where the boundary is."
+date: "2025-07-27"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-vercel-cannot-be-your-entire-backend"
+status: "published"
+definition: "Vercel is a great frontend host and a competent edge runtime. It is not designed to host long-running processes, background jobs, persistent connections, or workloads that need precise control over memory and concurrency. Trying to make it do all of those things produces a system that is fragile in ways that get worse as traffic grows."
+faq: [
+  {"q":"What is Vercel actually good at?","a":"Hosting frontends with server components and edge functions, with great developer experience, fast deploys, and excellent global distribution. For a Next.js app that is mostly UI with some API routes that do request/response work, Vercel is hard to beat. The trouble starts when the API routes have to do work that does not fit the request/response model."},
+  {"q":"Why are Vercel functions a bad fit for long-running work?","a":"Because they are designed to start, handle a request, and exit. They have execution time limits, they pay for cold starts, and they cannot maintain in-memory state across requests. A background job that takes two minutes does not fit. A WebSocket server that holds connections does not fit. Even a workload that needs warm cache between requests does not fit."},
+  {"q":"What is the actual cost ceiling on Vercel?","a":"Compute pricing on Vercel scales with request volume and function invocation time. For a SaaS doing serious traffic, the bill grows faster than equivalent compute on AWS, GCP, or Hetzner. The convenience is real, but at scale the spread can be three to five times. That is a renewal conversation waiting to happen."},
+  {"q":"Can I run a real database on Vercel?","a":"No. Vercel does not host databases in the traditional sense. They partner with vendors who do. You run your database on Neon, Supabase, Planetscale, or wherever else, and connect to it from Vercel. That is fine but it means Vercel is one of several services you are paying for, not your whole backend."},
+  {"q":"What about Edge Functions for everything?","a":"Edge functions are great for small, fast, stateless work like authentication, redirects, and personalization. They have stricter limits than serverless functions. Compute time is limited, memory is small, and many Node APIs are not available. Building a substantial application logic layer on edge functions is fighting the platform."},
+  {"q":"Should I leave Vercel as I grow?","a":"Not necessarily. Many teams stay on Vercel for the frontend and move the backend workloads that do not fit elsewhere. The mistake is assuming Vercel can host everything. The right design is Vercel for what it is good at, and other infrastructure for the rest."},
+  {"q":"What runs the backend if Vercel does not?","a":"Depends on the workload. Long-running services on Fly.io, Render, Railway, or a container platform on AWS or GCP. Background jobs on a queue with workers on the same platform. Persistent connections on a platform that supports WebSockets natively. None of this is exotic. It is just not what Vercel is optimized for."}
+]
+---
+
+## What you actually need to know
+
+- Vercel is a frontend platform that hosts some backend code. It is not a backend platform that also does frontends.
+- The boundary is workloads that do not fit the request-response model: long-running jobs, persistent connections, warm in-memory state.
+- The cost spread at scale can be 3x to 5x compared with equivalent compute elsewhere.
+- The right pattern is Vercel for what it is good at, plus something else for the rest.
+- The teams I have rescued tried to push past the boundary and paid for it in incidents, not invoices.
+
+| Workload | Fits on Vercel? | Better home |
+|---|---|---|
+| Next.js frontend + API routes | Yes | Vercel |
+| Edge personalization, auth | Yes | Vercel edge functions |
+| Long-running background jobs | No | Inngest, Trigger.dev, Sidekiq, or worker container |
+| WebSockets / persistent connections | No | Fly.io, Render, dedicated WebSocket service |
+| Heavy CPU work (image, ML) | Marginal | Dedicated compute or specialized service |
+| Cron jobs | Yes, with caveats | Vercel Cron or a dedicated scheduler |
+
+## The core argument
+
+Vercel built one of the best developer experiences for frontend deployment that exists today. They genuinely deserve the praise they get for what they are good at. The problem is the pitch has expanded to suggest the platform can be your entire backend, and when teams take that pitch literally, the cracks show up at the worst possible time.
+
+The cracks come from the design assumption underneath the platform. Vercel functions are short-lived, stateless, and elastic. That model is correct for many web request patterns. It is incorrect for any work that needs to live longer than a request, hold state in memory, or maintain a persistent connection.
+
+When you try to force long-running work into a serverless function, you end up with patterns that look clever on a whiteboard and fragile in production. Polling instead of pushing. Splitting one logical operation across many function invocations to fit time limits. Spending more on retries than the work would cost on a normal server. None of this is necessary. It is the cost of using the wrong tool.
+
+I have rescued SaaS products that hit a wall around the 10,000 user mark for exactly this reason. The team had built everything on Vercel because the early experience was so good. Then the backend started doing work that did not fit, the bill grew faster than revenue, and the failure modes became operational firefighting.
+
+The pragmatic position is to use Vercel for what it is good at and host the rest elsewhere. The platform you pick for the rest is less important than the recognition that Vercel cannot be all of it.
+
+## Where the boundary actually is
+
+### Long-running work
+
+A function that needs to run for more than a few minutes does not fit. The serverless function has a hard ceiling. The edge function has a shorter one. Splitting the work into pieces that fit is sometimes possible but the orchestration cost usually exceeds the savings.
+
+For background jobs you want a queue and a long-running worker process. Inngest and Trigger.dev are popular managed options. Self-hosted, a small container running a worker on Fly.io or Render costs less and gives you more control.
+
+### Persistent connections
+
+WebSockets and long-lived SSE connections need a server that stays up. Vercel functions terminate after the response. The platforms that genuinely support these workloads charge for the connection time, which is the right model. Trying to fake WebSockets with polling is how you end up with both a worse user experience and a higher bill.
+
+### Warm in-memory state
+
+A function that has to redo expensive setup on every invocation is fighting the platform. If your work benefits from a cache, a connection pool, or a loaded model, you want a process that runs continuously, not one that starts fresh constantly. The fix is to run that work somewhere with persistent processes.
+
+## How much does it cost at scale
+
+| Stage | Vercel total | Vercel + other backend | Notes |
+|---|---|---|---|
+| Prototype to 1k users | Free to low | Adds little | Vercel covers it |
+| 1k to 50k users | Few hundred a month | About the same | Either pattern works |
+| 50k to 500k users | Thousands a month | Often 30-50% less | Backend workloads dominate |
+| 500k+ users | Five figures a month | Often 3-5x less | The spread is decisive |
+
+Numbers vary wildly by workload. The pattern is consistent: Vercel for frontend stays competitive at any scale. Vercel for backend gets expensive once the backend is doing real work.
+
+## What a healthy architecture looks like
+
+- Vercel hosts the Next.js app, the API routes that are short-lived request/response work, and edge functions for auth and redirects.
+- A separate service runs persistent processes. Background workers, schedulers, WebSocket servers.
+- The database is on Neon, Supabase, Planetscale, or wherever else fits. Vercel is not in the data path beyond connection.
+- Long-running jobs use a queue. The queue is the contract between Vercel functions and worker processes.
+- Observability spans both. You see what is happening across Vercel and the rest as one system.
+
+## Expert opinion
+
+> The teams I have rescued from Vercel-as-everything were not bad teams. They were teams that took the convenience seriously and assumed the platform would scale to the use cases they had not built yet. By the time the issues showed up, they had a year of code that assumed serverless. Refactoring out of that takes longer than designing for the right boundary on day one. Use Vercel for what it is brilliant at, and put the long-running work somewhere it can actually live.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had built their entire backend on Vercel. They had background jobs implemented as functions that called themselves recursively to stay under the time limit, a polling-based notification system because WebSockets did not work, and a bill that was growing faster than revenue. They thought their problem was Vercel pricing. Their problem was the architecture.
+
+We moved background jobs to a worker container on Fly.io behind a queue. We replaced polling with a managed WebSocket service. Vercel stayed in place for the frontend and the API routes that genuinely fit. The bill dropped by 60 percent in the first month, the failure modes simplified, and engineering velocity recovered. The frontend developer experience did not change. Only the things Vercel was not good at moved off it. For the related platform comparison see [Fly.io, Railway, Render, Vercel: the 2026 platform comparison](/blog/fly-io-railway-render-vercel-the-2026-platform-comparison).
+
+## Common mistakes
+
+1. Treating Vercel as a full backend because the early experience is so good.
+2. Building long-running jobs as recursive function calls to fit time limits.
+3. Faking WebSockets with polling instead of using a platform that supports them.
+4. Putting heavy CPU work in serverless functions and paying for cold starts on every call.
+5. Building everything on edge functions because they are trendy. Edge has its place but it is not application logic.
+6. Assuming the bill scales linearly. It does not. Compute costs grow faster than feature growth.
+7. Refusing to leave Vercel for any workload, including the ones that genuinely do not fit.
+
+## A 30 day plan to right-size the architecture
+
+1. **Week one.** Audit the workloads currently running on Vercel. Categorize them by request-response fit.
+2. **Week two.** Pick a backend platform for the workloads that do not fit. Fly.io and Render are both reasonable starting points.
+3. **Weeks two and three.** Migrate the worst-fit workload first. Usually a background job system. Confirm cost and reliability improve.
+4. **Week three.** Move persistent connections off serverless if you have them.
+5. **Week four.** Re-evaluate the bill. Document the new architecture in an [ADR](/blog/the-architecture-decision-record-a-lightweight-discipline) so the next team understands the split.
+6. **Ongoing.** Default new workloads to the right platform from day one. Vercel for frontend and short-lived API routes. Something else for everything that does not fit.

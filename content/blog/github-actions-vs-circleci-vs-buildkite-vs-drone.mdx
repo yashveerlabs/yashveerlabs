@@ -1,0 +1,122 @@
+---
+slug: "github-actions-vs-circleci-vs-buildkite-vs-drone"
+title: "Github Actions vs CircleCI vs Buildkite vs Drone"
+excerpt: "Four CI platforms with different sweet spots. GitHub Actions for most teams. CircleCI for polish. Buildkite for hybrid. Drone for self hosted open source. Pick by fit."
+date: "2026-05-22"
+category: "Comparisons and Vendor Decisions"
+tags: ["ci","github-actions","circleci","buildkite","drone"]
+readingMinutes: 11
+ogImage: "/api/og/blog/github-actions-vs-circleci-vs-buildkite-vs-drone"
+status: "published"
+definition: "GitHub Actions is the dominant CI platform for teams on GitHub. CircleCI is the polished managed alternative. Buildkite is the hybrid platform with hosted control plane and your own runners. Drone is the open source self hosted option. Each fits a specific team and budget. The choice has more to do with the team's stack and operational appetite than with CI features."
+faq: [
+  {"q":"What does Drone add to the picture?","a":"Drone is the open source self hosted CI option. Teams that prefer to run their own infrastructure can use Drone for free. The control plane runs on your own servers. The runners run on your own servers. The cost is operational time. The benefit is no per minute or per user pricing at scale."},
+  {"q":"When should I pick Drone over the others?","a":"When you have the operational appetite for self hosted infrastructure. When the cost at scale justifies the operational cost of running CI yourself. When open source is a hard requirement. Each is a real reason. Outside these the managed options usually win on operational time saved."},
+  {"q":"How does Drone compare to GitHub Actions self hosted?","a":"GitHub Actions self hosted gives you self hosted runners with the managed control plane. Drone gives you both self hosted. The choice depends on whether the control plane matters to you. For most teams the GitHub Actions hybrid is the right balance."},
+  {"q":"What is the operational cost of self hosted CI?","a":"Real. The team has to operate the CI infrastructure. Updates. Failure recovery. Scaling. Most teams that try self hosted CI for cost reasons end up paying as much in engineering time as they would have paid the managed platform."},
+  {"q":"Is there a hybrid Drone setup?","a":"Drone is open source. The cloud version was discontinued. Self hosted is the path. Teams that want hybrid usually pick Buildkite instead."},
+  {"q":"What about Jenkins?","a":"Still in use at large enterprises. Not the right choice for new SaaS in 2026. The operational cost and the developer experience lag the alternatives. Migrate off Jenkins if you can. Skip Jenkins if you are starting fresh."},
+  {"q":"What is the worst CI mistake?","a":"Picking Drone or Jenkins to save money without the operational appetite. The savings vanish into engineering time spent maintaining the CI. The teams that picked managed CI for the operational savings are usually right."}
+]
+---
+
+## What you actually need to know
+
+- GitHub Actions for most teams.
+- CircleCI for polish and advanced workflows.
+- Buildkite for hybrid hosted plus self hosted.
+- Drone for fully self hosted open source.
+- Self hosted savings often vanish into operational time.
+
+| Platform | Hosting model | Best fit | Operational cost |
+|---|---|---|---|
+| GitHub Actions | Managed plus self hosted runners | Most teams | Low |
+| CircleCI | Managed | Polish, advanced workflows | Low |
+| Buildkite | Hybrid (hosted control, your runners) | Self hosted runner needs | Medium |
+| Drone | Self hosted | Open source, full control | High |
+| GitLab CI | Managed plus self hosted | GitLab users | Low to medium |
+| Jenkins | Self hosted | Legacy enterprise | High |
+
+## The core argument
+
+The CI platform decision in 2026 has four credible options. GitHub Actions, CircleCI, Buildkite, and Drone. Each fits a specific team. The decision has more to do with the team's existing stack and operational appetite than with the marginal feature differences.
+
+GitHub Actions wins for most teams because GitHub is where the code lives. The integration is the deepest. The marketplace covers most needs. The pricing scales reasonably. New teams should default to GitHub Actions unless a specific reason pushes elsewhere.
+
+CircleCI is the polished managed alternative. The advanced workflow features and the orbs system are sometimes cleaner than GitHub Actions. The platform is mature. The fit is best for teams that have used CircleCI before or that need specific features.
+
+Buildkite is the hybrid platform. The control plane is hosted. The runners are your own. The pattern fits teams with security or hardware requirements that managed runners cannot meet. The cost model scales differently from per minute. The operational cost of running runners is real.
+
+Drone is the open source self hosted option. The whole stack runs on your servers. The cost in dollars is zero. The cost in engineering time is real. Teams that pick Drone for cost reasons without the operational appetite usually pay the savings back in time spent maintaining the CI.
+
+The pattern is that managed platforms save operational time at the cost of dollar fees. Self hosted platforms save dollar fees at the cost of operational time. The trade off is consistent. The right choice depends on which resource the team has more of.
+
+## The honest decision
+
+| Question | GitHub Actions | CircleCI | Buildkite | Drone |
+|---|---|---|---|---|
+| Need GitHub integration? | Strongest | Good | Good | Good |
+| Need self hosted runners? | Possible | Less common | Yes | Yes |
+| Need open source? | No | No | No | Yes |
+| Operational appetite for self hosted? | Low | Low | Medium | High |
+| Care about dollar cost at scale? | Sometimes | Sometimes | Sometimes | Yes |
+| Need polished advanced workflows? | Decent | Yes | Decent | Less |
+
+## How much does this cost
+
+| Platform | Small team | Large team |
+|---|---|---|
+| GitHub Actions | Free to 50 USD | 500 to 5000 USD |
+| CircleCI | 90 to 180 USD | 1500 to 6000 USD |
+| Buildkite | 100 to 200 USD plus runner cost | 1000 to 5000 USD plus runner cost |
+| Drone | Free | Free in dollars, real in engineering time |
+| Jenkins | Free | Free in dollars, significant engineering time |
+
+## Features the CI must have
+
+- Source control integration.
+- Parallel job execution.
+- Caching.
+- Secrets management.
+- Status checks on PRs.
+- A path to self hosted if needed.
+- Observability into build duration.
+- A migration path if needed.
+
+## Expert opinion
+
+> The CI platform decision is one of those where the right answer is usually the boring one. GitHub Actions for most teams. The team that needs the polish of CircleCI knows it. The team that needs Buildkite's hybrid model knows it. The team that picks Drone usually overestimates their appetite for self hosted operations. The discipline is to pick by actual need rather than by aspiration.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client team was on Drone for cost reasons. The CI was self hosted. The team spent roughly fifteen percent of one engineer's time on CI maintenance. The dollar savings versus GitHub Actions was real but smaller than the engineering time lost.
+
+We migrated to GitHub Actions. The cost rose by roughly 400 USD per month. The engineering time recovered was worth significantly more. The team's velocity improved because CI stopped being a source of operational work.
+
+A different client was on Buildkite because their workloads required GPU runners. The self hosted runners were the right fit. The managed platforms could not have served them. Buildkite was the right call.
+
+The pattern was the same in both cases. The platform fit the operational appetite. The wrong platform produced friction.
+
+For more on the related work, see [GitHub Actions vs CircleCI vs Buildkite in 2026](/blog/github-actions-vs-circleci-vs-buildkite-in-2026) and [CI caching strategies that cut build times in half](/blog/ci-caching-strategies-that-cut-build-times-in-half).
+
+## Common mistakes teams make
+
+1. Picking Drone or Jenkins to save money without the operational appetite.
+2. Picking the platform without considering the team's source control.
+3. No caching strategy. Builds are slow.
+4. No self hosted runner consideration when it would have helped.
+5. Migrating platforms without a clear reason.
+6. No observability on build duration.
+7. Treating CI as solved once configured.
+8. Secrets in plain text.
+
+## A one week evaluation plan
+
+1. **Day one.** Inventory the requirements. Source control, hardware, scale.
+2. **Days two to four.** Set up trial accounts on the top candidates.
+3. **Day five.** Build the same pipeline on each.
+4. **Days six and seven.** Compare. Decide. Document.
+
+For more on the related work, read [GitHub Actions vs CircleCI vs Buildkite in 2026](/blog/github-actions-vs-circleci-vs-buildkite-in-2026) and [the deployment pipeline that survives real world pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure). On the broader CI side, [CI cd pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library) is the natural next read.

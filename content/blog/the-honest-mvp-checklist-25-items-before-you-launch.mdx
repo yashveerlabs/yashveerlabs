@@ -1,0 +1,108 @@
+---
+slug: "the-honest-mvp-checklist-25-items-before-you-launch"
+title: "The Honest MVP Checklist: 25 Items Before You Launch"
+excerpt: "25 items that separate a launchable MVP from a demo -- covering security, data integrity, error handling, and the operational basics that real users require."
+date: "2024-07-13"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders","launch","checklist"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-honest-mvp-checklist-25-items-before-you-launch"
+status: "published"
+definition: "The MVP checklist is the set of items that must be true before a product is ready for real users with real data. The minimal viable product is not the smallest product -- it is the smallest product that is honest about what it can and cannot do for users. An MVP that loses user data, has security vulnerabilities that are exploitable in production, or has no error recovery mechanism is not a minimum viable product -- it is a liability. The 25 items in this checklist are the minimum for a product that users can trust with their data and their workflows."
+faq: [
+  {"q":"What is the difference between an MVP and a demo?","a":"A demo shows what the product can do under controlled conditions. An MVP works correctly under real-world conditions with real users. The specific differences: an MVP handles error states gracefully (the demo shows only the happy path), an MVP secures user data against unauthorized access (the demo does not need to), an MVP has operational monitoring (the demo does not need it), and an MVP works on the range of devices and browsers real users have (the demo is tested on one device). The checklist is the gap between demo and MVP."},
+  {"q":"What is the most commonly missed MVP requirement?","a":"Error state handling. The MVP that shows users a blank screen, an unformatted stack trace, or a generic '500 error' when something fails is not ready for real users. Error states are not edge cases -- they are routine events that every user will encounter. A user who sees an unhelpful error state does not understand what happened or what to do next; they leave and do not come back."},
+  {"q":"Does an MVP need a privacy policy?","a":"Yes, if it collects any personal data (including email addresses). A privacy policy is required by GDPR for EU users, by CCPA for California users, and by most App Store and Play Store requirements. An MVP that launches without a privacy policy is in legal exposure, and this exposure is discovered at the worst possible time -- when the product is gaining traction and scrutiny increases."},
+  {"q":"What security items are non-negotiable for an MVP?","a":"HTTPS everywhere (no HTTP traffic), password hashing (bcrypt or Argon2, never MD5 or SHA-1), rate limiting on login endpoints (prevent brute force), input validation on the server side (do not trust client-side validation alone), and authorization checks on all endpoints that access user data (verify the user is allowed to access the specific resource, not just authenticated)."},
+  {"q":"How do I know when the MVP is actually ready to launch?","a":"When every item on the checklist is true, and you have tested the product on at least three different devices with three different users who are not on your team. The three external users will find issues that internal testing misses -- they will try things you did not expect, have different browser configurations, and encounter edge cases that a developer testing their own product will not. Launch after incorporating the most significant feedback from this testing."}
+]
+---
+
+## What you actually need to know
+
+- An MVP that is not secure with real user data is not an MVP -- it is a liability. Security items are not optional for any product that collects email addresses, stores user content, or processes any form of payment.
+- Error handling is the most commonly missed launch requirement. Real users will encounter errors. What they see when they do determines whether they trust the product.
+- Monitoring is not optional. A product with no error tracking does not know when it is broken. A product that is broken without knowing it is losing users before they can tell you why.
+- A privacy policy and terms of service are legal requirements, not optional polish. Launch without them at your legal risk.
+- External user testing on real devices reveals issues that internal testing does not. Do it before launch, not after.
+
+## The 25-item checklist
+
+### Security (items 1-7)
+
+**1. HTTPS on all routes.** No HTTP traffic. Every page, every API endpoint, every asset. The TLS certificate should be valid and should auto-renew.
+
+**2. Passwords hashed with bcrypt or Argon2.** MD5, SHA-1, and SHA-256 are not password hashing algorithms. bcrypt and Argon2 are designed for passwords. If the developer used the wrong algorithm, this is a critical fix before launch.
+
+**3. Rate limiting on authentication endpoints.** The login and password reset endpoints must be rate-limited. Without rate limiting, a brute force attack is trivial. Most web frameworks have middleware for this; it takes 30 minutes to add correctly.
+
+**4. Server-side input validation.** Every endpoint that accepts user input validates it on the server, not only in the browser. The browser can be bypassed by any attacker. Server-side validation is the real defense.
+
+**5. Authorization on every user-data endpoint.** Every API endpoint that fetches user-specific data verifies that the authenticated user is authorized to access that specific resource. "I am logged in" is not the same as "I am allowed to access this document."
+
+**6. Secrets not in the codebase.** API keys, database credentials, and private keys live in environment variables or a secrets manager, not in the code. The code can be public; the secrets cannot.
+
+**7. Dependencies scanned for known vulnerabilities.** `npm audit` (Node.js), `pip audit` (Python), or equivalent. Known vulnerabilities in dependencies are exploitable. This scan takes 5 minutes.
+
+### Data integrity (items 8-12)
+
+**8. Database backups configured.** Automated daily backups to a separate location. Test that the backup can be restored. A backup that has never been tested is not a backup.
+
+**9. Transactions for multi-step data operations.** Operations that write to multiple tables or perform multiple writes must use database transactions so that partial writes (one write succeeds, the next fails) cannot corrupt data.
+
+**10. Foreign key constraints.** The database schema enforces the relationships between tables. An order that references a non-existent user is a data corruption problem, not an application bug.
+
+**11. No raw SQL with string concatenation.** All database queries use parameterized queries or an ORM. String concatenation in SQL is an injection vulnerability.
+
+**12. User data deletable.** If a user requests data deletion, it can be done. GDPR requires this for EU users. Build the mechanism before launch, not in response to a request.
+
+### Error handling (items 13-17)
+
+**13. All unhandled promise rejections caught.** In Node.js, unhandled rejections crash the process or produce silent failures. The production application handles all promise rejections explicitly.
+
+**14. User-facing error messages are helpful.** The user who encounters an error sees a message that tells them what happened and what to do next, not a stack trace or "something went wrong."
+
+**15. API errors return structured JSON.** The API that returns HTML error pages for JSON clients produces confusing failures in the frontend. All API errors return structured JSON with a consistent error format.
+
+**16. The error page exists.** The 404 and 500 pages are designed and match the product's visual design. Showing a server's default error page in production is unprofessional and confusing.
+
+**17. Form validation errors are clear.** Every form field that can have a validation error shows the specific error message next to the relevant field. "Invalid input" is not a helpful error message.
+
+### Operations (items 18-22)
+
+**18. Error tracking is configured.** Sentry or equivalent. When a production error occurs, the team knows about it without waiting for a user to report it.
+
+**19. Application logging is structured.** Logs are written in a structured format (JSON) that can be queried. Log lines that include the user ID, the request ID, and the relevant context are the logs that are useful during incident diagnosis.
+
+**20. Health check endpoint exists.** A `/health` endpoint that returns 200 when the application and its dependencies are healthy. This is required for load balancers and monitoring.
+
+**21. Environment variables are documented.** A `.env.example` file lists every environment variable required to run the application, with descriptions. A developer who needs to set up a new environment can do so without asking.
+
+**22. The deployment process is documented.** How to deploy to production is written down. One person having this knowledge in their head is a bus risk.
+
+### Legal and accessibility (items 23-25)
+
+**23. Privacy policy is published.** It describes what data is collected, how it is used, and how users can request deletion. Link to it from the signup page and the footer.
+
+**24. Terms of service are published.** The terms govern the relationship between the product and the user. Required for payment-accepting products; strongly recommended for all products.
+
+**25. The product works without JavaScript exceptions on the three most common browsers.** Chrome, Firefox, and Safari (for iOS users). A JavaScript exception that only appears in Safari will be reported by your first iOS users.
+
+## Where to start: a 3-step launch readiness review
+
+**Step 1: Run through the security items (1-7) with the developer and verify each one.** These are non-negotiable. Do not launch with any of these unresolved.
+
+**Step 2: Test the product with three external users on different devices.** Sit with them or watch a recording. Every error state, every confusing UI, every unexpected behavior they encounter is a launch risk that internal testing missed.
+
+**Step 3: Verify that items 18-22 (operations) are in place before launch.** The product that launches without error tracking will have its first production issue diagnosed through user complaints rather than proactive monitoring.
+
+## The Minimum That Earns Trust
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The products I have launched for clients that had the smoothest launches were the ones where the team worked through a checklist like this one before the launch date was set. The security items caught two authorization vulnerabilities that would have been exploitable in production. The error tracking caught a production JavaScript error in the first hour that affected 40 percent of users and would not have been reported for days without the monitoring. The checklist is not overhead -- it is the minimum investment that prevents the launch-week fire drill.
+
+## Related reading
+
+- [The Five Hour Founder Audit: Are You Ready to Build?](/blog/the-five-hour-founder-audit-are-you-ready-to-build)
+- [The Founder Who Vibe Coded Their MVP: A Postmortem and Rescue Plan](/blog/the-founder-who-vibe-coded-their-mvp-a-postmortem-and-rescue-plan)
+- [The Hidden Costs of Custom Software Development](/blog/the-hidden-costs-of-custom-software-development)
+- [The Honest Cost of Building an App in 2026: Global Breakdown](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown)

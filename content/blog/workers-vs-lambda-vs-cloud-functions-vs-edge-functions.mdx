@@ -1,0 +1,121 @@
+---
+slug: "workers-vs-lambda-vs-cloud-functions-vs-edge-functions"
+title: "Workers vs Lambda vs Cloud Functions vs Edge Functions"
+excerpt: "Four serverless runtimes, four different bets about where compute should live and what it should cost. Pick the one whose tradeoffs match your workload, not the one your last team used."
+date: "2026-05-11"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026"]
+readingMinutes: 12
+ogImage: "/api/og/blog/workers-vs-lambda-vs-cloud-functions-vs-edge-functions"
+status: "published"
+definition: "Cloudflare Workers run V8 isolates on the edge, cheap and fast but constrained. AWS Lambda runs full Node or other runtimes regionally, flexible but with cold starts and higher cost. Google Cloud Functions sit in the middle. Edge functions from Vercel and others wrap a similar isolate model. The decision is about latency, runtime compatibility, and the cost trajectory."
+faq: [
+  {"q":"What is the difference between an isolate and a container?","a":"An isolate is a lightweight V8 instance that starts in single-digit milliseconds and shares a process with many others. A container is a full Linux process with its own filesystem, memory, and runtime. Isolates are cheaper to start and more constrained. Containers are heavier and can run anything. Cloudflare Workers and edge functions use isolates. Lambda and Cloud Functions use containers."},
+  {"q":"Which has the worst cold start?","a":"Lambda, typically, especially for languages with heavy runtimes like Java or .NET. Node Lambdas cold start in hundreds of milliseconds. Cloud Functions are similar. Workers cold start in single-digit milliseconds because isolates are tiny. Edge functions are similarly fast. If cold start matters, isolates win."},
+  {"q":"Which is cheapest?","a":"Workers, often by a lot. Cloudflare's pricing model is generous and the bandwidth is effectively free. Lambda gets expensive at high volume, especially with long-running invocations. Cloud Functions are similar to Lambda. The 10x cost spread for high-volume workloads is not unusual."},
+  {"q":"What can Lambda do that Workers cannot?","a":"Run arbitrary code with full Node, Python, Go, Java, and other runtimes. Access the file system. Make use of larger memory limits. Run for longer periods. Lambda is more flexible. Workers are more constrained but cheaper and faster. The flexibility costs money."},
+  {"q":"When should I use edge functions?","a":"For work that is small, fast, and benefits from running close to the user. Authentication checks, geo-personalization, redirects, A/B test assignment. Edge functions are bad for heavy compute, large dependencies, or anything needing a stable connection to a region-specific resource like a database."},
+  {"q":"Can I run a real backend on Workers?","a":"Yes, increasingly, but you have to fit your code into the isolate model. Some Node APIs are missing or different. The Cloudflare Workers ecosystem has matured significantly. For teams willing to design around the constraints, it is a serious option. For teams that want to drop in existing Node code, Lambda or a container platform is easier."},
+  {"q":"What about durability? Where does my data live?","a":"None of these is a database. All of them connect to external storage. Cloudflare offers KV, R2, D1, and Durable Objects as adjacent services. AWS offers DynamoDB, RDS, S3. The serverless function is compute. The data lives elsewhere. Choose the data layer separately from the compute layer."}
+]
+---
+
+## What you actually need to know
+
+- Workers: cheapest, fastest cold start, most constrained runtime.
+- Lambda: most flexible, full runtime support, highest cost at scale.
+- Cloud Functions: in the middle, similar profile to Lambda with GCP integration.
+- Edge functions: small, fast, run near the user, narrow use case.
+- The decision is about your workload's shape, not which provider is most popular.
+
+| Concern | Workers | Lambda | Cloud Functions | Edge Functions |
+|---|---|---|---|---|
+| Cold start | Single-digit ms | 100ms-several seconds | 100-500 ms | Single-digit ms |
+| Runtime | V8 isolate | Full Node/Python/Go/Java/etc | Full Node/Python/Go/etc | V8 isolate |
+| Cost at scale | Lowest | Highest | Middle | Low |
+| Geographic reach | Global edge | Regional | Regional | Global edge |
+| Best for | Edge logic, high volume | Flexible backend work | GCP-integrated backends | Personalization, auth |
+
+## The core argument
+
+The serverless landscape in 2026 is not a single market. It is four different design philosophies competing for different workloads. Treating them as interchangeable is how you end up with the wrong platform for what you are actually building.
+
+Cloudflare Workers are the bet that compute should live on the edge, close to users, in lightweight isolates that start instantly and cost almost nothing. The bet is that you can adapt your code to fit the constraints, and that the latency and cost benefits are worth the adaptation cost.
+
+AWS Lambda is the original bet: full runtimes, flexible code, run anything that runs on Linux. The bet pays off when you need flexibility and are willing to pay for it. The cold start is the cost. The pricing at high volume is the other cost. Both are accepted because the flexibility is genuinely useful.
+
+Google Cloud Functions are a similar bet to Lambda with GCP-specific integration. The choice between them is usually determined by which cloud your data already lives in, not by the function platform's individual merits.
+
+Edge functions from Vercel and others sit in a category close to Workers, with a similar isolate model and similar constraints. The pitch is that they integrate with your hosting platform smoothly, which is real but means you are locked into that platform's ecosystem.
+
+## Where each one actually fits
+
+### Workers
+
+For high-volume, latency-sensitive work that can fit in an isolate. Authentication. Personalization. API aggregation. Image proxying. Webhook receivers. Workers shine when you have a lot of requests, each one is small, and you want them to run close to users at low cost.
+
+The constraint is the runtime. Many Node packages do not work. The file system does not exist. CPU time per request is limited. Designing around these is straightforward once you accept them. Fighting them is where teams burn time.
+
+### Lambda
+
+For backend work that needs the full Node runtime, larger memory, longer execution, or arbitrary libraries. Image processing. PDF generation. Heavy data transformations. Anything where the convenience of a real Node environment outweighs the cost.
+
+Lambda's cold start is the perennial complaint. With provisioned concurrency you can eliminate it for hot paths, but you pay for it. The pricing at high invocation volume is the other concern. At low to medium volume, Lambda is cheap. At very high volume, it gets expensive fast.
+
+### Cloud Functions
+
+For teams already on GCP that want serverless compute that integrates with the rest of the platform. The performance profile is similar to Lambda. The integration with GCP services is the reason to pick it over Lambda. The cost is in the same range.
+
+### Edge functions
+
+For small, fast logic that runs near users and integrates with your frontend platform. Vercel's edge functions, Netlify's, and others sit in this category. They are great for specific tasks and bad for general backend work. Treat them like Workers for that narrower use case.
+
+## How much does it cost
+
+| Workload profile | Workers | Lambda | Cloud Functions | Edge Functions |
+|---|---|---|---|---|
+| 10M requests/month, light | Free or low tens | 50-200 USD | 50-200 USD | Free or low tens |
+| 100M requests/month | Low hundreds | 500-2000 USD | 500-2000 USD | Hundreds |
+| 1B+ requests/month | Hundreds to low thousands | Thousands to tens of thousands | Thousands | Hundreds to low thousands |
+| Heavy CPU per request | Worse fit | Native fit | Native fit | Worse fit |
+| Bandwidth-heavy responses | Best (free egress) | Expensive | Expensive | Best |
+
+The bandwidth difference is the biggest single line item people miss. Cloudflare's bandwidth model means heavy-response workloads on Workers are dramatically cheaper than the same workload on Lambda.
+
+## What to weigh before picking
+
+- The shape of your requests. Many small ones favor Workers. Fewer big ones favor Lambda.
+- Your data locality. Compute should live near data. Edge functions far from a single-region database often pay round-trip latency that cancels their edge advantage.
+- Your team's tolerance for runtime constraints. Workers require adaptation. Lambda runs your existing Node code.
+- Your existing cloud commitments. AWS heavy teams default to Lambda. GCP teams default to Cloud Functions.
+- Your cost trajectory. At high volume, Workers can be 5-10x cheaper than Lambda for comparable workloads.
+
+## Expert opinion
+
+> The teams I have seen pick wrong are the ones that picked by familiarity. They used Lambda on the last job, so they used it on this one. The workload they built was perfect for Workers and the bill quintupled when it grew. The choice is not about the platform's popularity. It is about the workload's shape. Spend an afternoon estimating cost and latency on your two best candidates. The right answer is usually obvious once the numbers are on a page.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS team was running a high-volume webhook receiver on Lambda. The receiver did small work, returned 200, and forwarded the payload to a queue. Their bill at peak was nearly 4000 USD a month, almost entirely Lambda invocations.
+
+We moved the receiver to Cloudflare Workers. The code adapted in about half a day. The new bill at the same traffic was under 100 USD a month. The latency to acknowledge improved because Workers were closer to the webhook senders. There was no downside. The previous team had picked Lambda by reflex because their other services were on AWS. For the related platform-level discussion see [Vercel vs Netlify vs Cloudflare Pages](/blog/vercel-vs-netlify-vs-cloudflare-pages) and the broader [Fly.io vs Railway vs Render vs Vercel comparison](/blog/fly-io-railway-render-vercel-the-2026-platform-comparison).
+
+## Common mistakes
+
+1. Picking the runtime by familiarity rather than fit.
+2. Running heavy CPU work on Workers and fighting the constraints.
+3. Running tiny, high-volume work on Lambda and paying 10x what it should cost.
+4. Putting edge functions in front of a single-region database and losing the latency benefit.
+5. Underestimating bandwidth costs on Lambda for response-heavy workloads.
+6. Treating provisioned concurrency as free. It is not.
+7. Building everything as functions when long-running compute would be cheaper and simpler.
+
+## A two week plan to evaluate and migrate
+
+1. **Days one and two.** Pick the workload to evaluate. Document its shape: request size, frequency, CPU profile, dependencies.
+2. **Days three to five.** Estimate cost on each of the four runtimes at projected scale.
+3. **Week two.** Build a prototype on the top two candidates. Measure latency, cold start, and integration cost.
+4. **End of week two.** Pick. Migrate one workload. Validate the numbers.
+5. **Ongoing.** Apply the same evaluation to new workloads. The right runtime for one is often wrong for another. The lesson is the same as in [the vendor audit every funded startup should run once a year](/blog/the-vendor-audit-every-funded-startup-should-run-once-a-year).

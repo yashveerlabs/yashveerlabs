@@ -1,0 +1,67 @@
+---
+slug: "sql-injection-in-2026-still-happening-still-preventable"
+title: "SQL Injection in 2026: Still Happening, Still Preventable"
+excerpt: "SQL injection has been on the OWASP Top 10 for two decades. It is still being exploited. Here is why and how to stop it."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","sql-injection","owasp","web-security"]
+readingMinutes: 7
+ogImage: "/api/og/blog/sql-injection-in-2026-still-happening-still-preventable"
+status: "published"
+faq: [
+  {"q":"Does using an ORM completely prevent SQL injection?","a":"For standard ORM operations, yes. ORMs use parameterized queries internally for create, read, update, and delete operations. The vulnerability arises when you use raw query escape hatches, dynamic field selection, or query builder features incorrectly."},
+  {"q":"What is second-order SQL injection?","a":"First-order injection involves malicious input executed immediately. Second-order injection involves malicious input stored in the database and then executed later when retrieved and used in another query. It is rarer but more dangerous because it bypasses input validation applied at the storage layer."},
+  {"q":"Can WAFs (Web Application Firewalls) protect against SQL injection?","a":"WAFs provide a layer of defense that can block known injection patterns, but they are not a complete solution. Sophisticated injection techniques can bypass WAF rules. Parameterized queries at the application layer are the reliable defense; WAFs are additional layers, not replacements."},
+  {"q":"What is the difference between SQL injection and NoSQL injection?","a":"SQL injection targets relational databases with SQL syntax. NoSQL injection targets databases like MongoDB with their own query injection vectors (like JSON injection in query operators). The same principle applies: never interpolate user input directly into query structures."},
+  {"q":"How do I test for SQL injection manually?","a":"The simplest manual test: enter a single quote (') into an input field and observe whether the application returns a database error, changes behavior, or returns unexpected data. A visible error containing SQL syntax is a confirmed injection point. More sophisticated testing requires understanding the underlying query structure."}
+]
+---
+
+# SQL Injection in 2026: Still Happening, Still Preventable
+
+**SQL injection is a vulnerability where user-controlled input is included in a SQL query without proper sanitization, allowing an attacker to modify the query's logic, extract unauthorized data, or destroy data. It is one of the oldest known web vulnerabilities and remains one of the most exploited. The reason it persists is not that developers do not know about it; it is that the unsafe pattern (string concatenation into a SQL query) is the intuitive pattern, and parameterized queries require a deliberate choice.**
+
+## What you need to know
+
+- Parameterized queries (also called prepared statements) are the primary defense; they separate the SQL structure from user data at the database driver level
+- ORMs like Prisma, Sequelize, and Active Record use parameterized queries by default; the risk is when developers bypass the ORM to write raw queries
+- The most dangerous injection surface is search functionality, advanced filtering, and any query that includes user-provided column names, table names, or sort directions
+- Stored procedures do not prevent SQL injection unless they themselves use parameterized input handling
+- SQL injection can be blind (no visible error output), time-based, or error-based; automated tools can exploit all three variants
+
+## The core argument
+
+The mental model that produces SQL injection is: "I need the user's input in the query, so I will put it in the query." The correct mental model is: "I need the user's input to affect the query's behavior, so I will pass it as a parameter." Those two mental models produce very different code and very different security outcomes.
+
+String concatenation: `"SELECT * FROM users WHERE email = '" + userEmail + "'"`. If userEmail is `'; DROP TABLE users; --`, the resulting query is `SELECT * FROM users WHERE email = ''; DROP TABLE users; --'`. The database executes all of it. The table is gone.
+
+Parameterized query: `SELECT * FROM users WHERE email = $1` with `[userEmail]` as the parameter. The database treats the parameter as a value, not executable SQL, regardless of what it contains. The injection attempt becomes a string literal search for the malicious SQL text. It finds nothing and returns zero rows.
+
+The pattern I audit for in every codebase I review is raw query construction: anywhere that string interpolation or concatenation is used to build a SQL query string. Modern TypeScript ORMs make this almost impossible to accidentally do; the risk is in legacy code, quick debug queries that made it to production, or raw query escape hatches used for complex operations. For Nexli, every query that could involve user input goes through the ORM parameterization layer. The one place I use raw SQL (complex reporting queries with dynamic column selection) uses allowlisted column names checked against a hardcoded array before being interpolated into the query.
+
+## Common mistakes
+
+1. **Using string interpolation in raw queries.** Even engineers who know about SQL injection write it accidentally when they are in a hurry. Code review should flag any query construction with string interpolation.
+
+2. **Assuming ORM usage makes you immune.** ORMs prevent injection for standard operations. Raw query escape hatches, dynamic column/table names, and query-building libraries with improper use can still produce injection vulnerabilities.
+
+3. **Not escaping user input that appears in LIKE clauses.** `WHERE name LIKE '%' + userInput + '%'` is vulnerable even in parameterized queries if the LIKE wildcards are in the query structure. The user input itself should also be escaped for LIKE special characters (%, _).
+
+4. **Relying on input validation alone.** Validating that user input "looks like" safe data is not a substitute for parameterized queries. A valid-looking email address can still contain SQL injection characters. Defense in depth means both validation and parameterization.
+
+5. **Not testing for SQL injection.** Run sqlmap or a manual test on every input field that interacts with a database query. Test before launch and after adding new query paths.
+
+## Where to start
+
+1. **Audit every raw query in the codebase.** Search for string interpolation in SQL strings. Every instance is either a confirmed vulnerability or a pattern that needs to be reviewed carefully. Convert unsafe patterns to parameterized queries.
+
+2. **Enforce parameterized queries in code review.** Add a code review check for raw query construction. Many teams add a linting rule (eslint-plugin-security or similar) that flags string interpolation in common query patterns.
+
+3. **Run sqlmap against your staging environment.** Sqlmap is an open source automated SQL injection tool. Running it against your staging environment before launch tells you what an attacker would find without the consequences of a real attack.
+
+## Related reading
+
+- [OWASP Top Ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026)
+- [CSRF, XSS, SSRF: A Modern Web Security Primer](/blog/csrf-xss-ssrf-a-modern-web-security-primer)
+- [The Threat Model: How to Build One in Two Hours](/blog/the-threat-model-how-to-build-one-in-two-hours)
+- [Insecure Direct Object References: The Bug Founders Underestimate](/blog/insecure-direct-object-references-the-bug-founders-underestimate)

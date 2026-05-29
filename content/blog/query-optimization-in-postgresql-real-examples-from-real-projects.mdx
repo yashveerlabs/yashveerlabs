@@ -1,0 +1,62 @@
+---
+slug: "query-optimization-in-postgresql-real-examples-from-real-projects"
+title: "Query Optimization in PostgreSQL: Real Examples From Real Projects"
+excerpt: "Slow queries in PostgreSQL are predictable problems with a repeatable diagnostic process. Here are real examples from production systems and the exact techniques that moved the needle."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/query-optimization-in-postgresql-real-examples-from-real-projects"
+status: "published"
+definition: "PostgreSQL query optimization is the process of analyzing slow queries using EXPLAIN ANALYZE output, identifying the root cause (missing index, sequential scan, poor join order, N+1 pattern), and applying targeted fixes that reduce execution time. Optimization in PostgreSQL is evidence-driven: the planner's cost estimates and actual row counts in EXPLAIN output reveal which part of the query is expensive and why."
+faq: [
+  {"q":"What is EXPLAIN ANALYZE and how do you read it?","a":"EXPLAIN ANALYZE executes the query and returns the execution plan with actual timing and row counts alongside the planner's estimates. The key numbers to read: 'actual time' for each node (the time spent in that operation), 'rows' vs 'actual rows' (large divergence means stale statistics), and 'Seq Scan' vs 'Index Scan' (sequential scans on large tables are almost always the optimization target). Reading from the innermost node outward gives the execution order and shows where time accumulates."},
+  {"q":"When should you add an index vs rewrite the query?","a":"Add an index when the query filters or sorts on a column without an existing index and the table has more than a few thousand rows. Rewrite the query when the structure itself is inefficient: N+1 patterns (replacing with a JOIN or subquery), subqueries that re-execute for every row (replacing with a lateral join or CTE), or SELECT * when only a few columns are needed. Sometimes both are needed: an index helps but the query structure also creates unnecessary work."},
+  {"q":"What is a partial index and when is it useful?","a":"A partial index is an index with a WHERE clause that only indexes rows matching the condition. A partial index on active users (WHERE deleted_at IS NULL) is smaller and faster than a full index on all users when most queries filter for active users only. Partial indexes are useful when queries consistently filter on a high-selectivity condition that eliminates most rows (status = 'active', type = 'premium', deleted_at IS NULL). The index size reduction means faster scans and lower write overhead."},
+  {"q":"What causes the N+1 query problem in PostgreSQL-backed applications?","a":"N+1 queries happen when application code loads a list of records and then queries for related data on each record individually, producing N additional queries for N records. An ORM that loads 100 orders and then executes a separate query for each order's customer produces 101 queries instead of 1. The fix is eager loading (JOIN the related table in the original query) or using IN queries to load all related records in a single query. N+1 patterns are typically visible in query logs as identical queries executing hundreds of times in rapid succession."},
+  {"q":"How do you deal with slow queries that cannot be indexed?","a":"Queries that cannot be efficiently indexed (full-text search, range queries across multiple columns, JSONB field queries) have several options: materialized views that pre-aggregate expensive computations and refresh on a schedule, denormalization that stores computed values alongside the source data, read replicas that route expensive analytical queries away from the primary, and caching layers that store query results for frequently-repeated identical queries. For full-text search specifically, PostgreSQL's tsvector/tsquery with GIN indexes handles most cases without an external search service."}
+]
+---
+
+## What you need to know
+
+- EXPLAIN ANALYZE is the diagnostic tool. Run it before and after every optimization to confirm the improvement is real and not coincidental.
+- Sequential scans on large tables are almost always the root cause of slow queries. The fix is an index on the filter or sort column.
+- N+1 query patterns are invisible in per-query profiling but catastrophic at the application layer. Look at query counts, not just query duration.
+- Statistics drift after large data inserts. Run ANALYZE on tables that have changed significantly before debugging query plan issues.
+- Index maintenance has a write cost. Do not add indexes speculatively. Each index slows INSERT, UPDATE, and DELETE operations on the table.
+
+## The core argument
+
+PostgreSQL query optimization has a repeatable diagnostic process. The frustrating part is that teams skip the diagnostic step and go straight to guessing. They add an index because a blog post said indexes help, or they rewrite the query because the code looks complex, without measuring whether either change actually reduced execution time. The result is a mix of effective and ineffective changes with no understanding of which did what.
+
+The right process is: run EXPLAIN ANALYZE on the slow query, read the output to find the expensive node, understand why that node is expensive (missing index, stale statistics, poor join order), apply the targeted fix, and run EXPLAIN ANALYZE again to confirm the improvement. This takes longer than guessing but produces reliable results. On a project I worked on for Nexli, a query that was taking 4 seconds on a 500K row table dropped to 12 milliseconds after reading the EXPLAIN output and adding a composite index on two filter columns. The guess before reading the output was to add a single-column index, which would have helped but not nearly as much.
+
+The fixes that appear most frequently in my experience across different projects are: missing indexes on foreign keys (an ORM creates the foreign key constraint but not the index, so JOIN operations do sequential scans on the child table), missing indexes on timestamp columns used in date range filters (very common in reporting queries), and N+1 patterns in ORMs that are configured without eager loading. These three account for the majority of slow queries I have diagnosed in production PostgreSQL systems.
+
+## Common mistakes
+
+1. **Adding indexes without checking if they are used.** An index added without confirming that queries use it through EXPLAIN ANALYZE may never be used by the planner, while still adding write overhead. After adding an index, run EXPLAIN ANALYZE on the query that should benefit and verify the plan shows an Index Scan on the new index.
+
+2. **Running EXPLAIN without ANALYZE.** EXPLAIN without ANALYZE shows the planner's estimated plan based on table statistics, not the actual execution. The estimated plan may differ significantly from what PostgreSQL actually does. Always use EXPLAIN (ANALYZE, BUFFERS) for accurate diagnosis.
+
+3. **Optimizing queries that are not actually slow.** A query that runs in 5ms is not worth optimizing. Find the actual slow queries through pg_stat_statements or slow query logs, not through reading code and guessing. Optimization effort on fast queries produces no user-visible improvement.
+
+4. **Ignoring connection overhead and pool sizing.** A query that executes in 1ms but spends 50ms waiting for a connection from an undersized connection pool looks like a slow query in application-level tracing. Check connection pool utilization before diagnosing query performance. The fix may be connection pool sizing, not query optimization.
+
+5. **Using SELECT * in high-frequency queries.** Fetching all columns when only a few are needed transfers more data from PostgreSQL to the application, increases memory allocation, and prevents the planner from using index-only scans. In high-frequency query paths, selecting only the needed columns reduces data transfer and enables covering indexes to serve the query entirely from the index without touching the table.
+
+## Where to start
+
+1. **Find the actual slow queries.** Enable pg_stat_statements if it is not already active. Query it for the slowest queries by total execution time (`ORDER BY total_exec_time DESC LIMIT 20`). This gives the real list of optimization targets, not guesses. Slow query logs (log_min_duration_statement = 100ms) provide the same information in the application logs.
+
+2. **Run EXPLAIN (ANALYZE, BUFFERS) on each slow query.** Look for Seq Scan nodes on large tables, large divergence between estimated and actual row counts (statistics issue), and nodes with high actual time. The node with the highest actual time is the optimization target. Hash joins with very large memory usage may indicate a work_mem configuration issue rather than a missing index.
+
+3. **Apply the targeted fix and measure the improvement.** For sequential scans: add an index on the filter column. For stale statistics: run ANALYZE on the table. For N+1 patterns: add eager loading or rewrite with a JOIN. After each fix, re-run EXPLAIN ANALYZE to confirm the plan changed and the execution time improved. Document the before/after timing so the impact is measurable.
+
+## Related reading
+
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- [PostgreSQL vs MySQL vs MongoDB for a New SaaS in 2026](/blog/postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026)
+- [Read Replicas: When They Save You and When They Lie to You](/blog/read-replicas-when-they-save-you-and-when-they-lie-to-you)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)

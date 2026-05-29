@@ -1,0 +1,112 @@
+---
+slug: "ai-feature-flags-rolling-out-generative-features-safely"
+title: "AI Feature Flags: Rolling Out Generative Features Safely"
+excerpt: "Feature flags are the cheapest insurance against an AI feature that breaks production. The discipline takes a day to set up and saves you the week you would lose on a panic rollback."
+date: "2026-05-18"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","feature-flags","reliability","saas"]
+readingMinutes: 10
+ogImage: "/api/og/blog/ai-feature-flags-rolling-out-generative-features-safely"
+status: "published"
+definition: "AI feature flags let you ship a generative feature behind a runtime switch that targets specific users, tenants, or percentages. The teams that wrap every AI launch in flags can ship with confidence and roll back in seconds. The teams that skip flags eventually ship the bad version to everyone at once and learn the value the hard way."
+faq: [
+  {"q":"Why are flags more important for AI than for normal features?","a":"Because AI output is non deterministic. The version that worked perfectly in staging can produce a bad response in production an hour after launch. Flags let you scope the blast radius and roll back without redeploying."},
+  {"q":"What flag tools do you recommend?","a":"LaunchDarkly and Statsig for managed solutions. PostHog for built in flagging on top of analytics. For small teams, a simple database table and a config file work. The tool matters less than the discipline of wrapping every AI feature in a flag."},
+  {"q":"Should every AI feature have a flag?","a":"Yes. The default is on. Removing the flag after a feature has been stable for a few months is fine. Shipping without one is not."},
+  {"q":"What is a sensible rollout schedule for an AI feature?","a":"Internal team for a week. Five percent of users for a week. Twenty five percent for a week. Fifty percent for a week. Hundred percent. Each gate gives the team a chance to catch issues before they hit everyone. The schedule can compress for low risk features and expand for high risk ones."},
+  {"q":"What metrics do I watch during rollout?","a":"Error rate, latency, hallucination rate from your eval suite, customer support volume, and direct feedback. Any meaningful regression on any of those is a reason to pause and investigate."},
+  {"q":"How do I roll back without losing user state?","a":"Flag the feature, not the data. Even if you turn the feature off, the data the AI generated should remain in the database. Users do not lose work, they just lose access to the AI generated parts until the flag turns back on."},
+  {"q":"What about tenant level flags for enterprise?","a":"Mandatory for any product targeting regulated industries. Some tenants will want AI on, others will want AI off. A tenant level toggle is now a standard enterprise requirement, not a nice to have."}
+]
+---
+
+## What you actually need to know
+
+- Wrap every AI feature in a flag. The cost is one day. The value shows up on the first bad rollout.
+- Stage the rollout from internal team to five percent to twenty five percent to fifty percent to all.
+- Watch error rate, latency, hallucination rate, and support volume during the rollout.
+- Build tenant level flags from day one if you sell to enterprise.
+- In my experience, AI features cause more last minute rollbacks than any other feature category.
+
+| Rollout stage | Audience | Watch for |
+|---|---|---|
+| Internal | Your team | Obvious bugs, prompt regressions |
+| Pilot | 5% of users or 5 hand picked accounts | Edge cases, real world inputs |
+| Wider | 25% to 50% | Performance, scale, support load |
+| Full | All users | Cost, drift, long tail issues |
+
+## The core argument
+
+The reason AI features fail in production more often than traditional features is structural. The output is variable, the upstream API can change without warning, and the prompt that worked yesterday can stop working tomorrow. The team has less ability to predict failure modes from a unit test. The only honest way to know if the feature is going to behave well in production is to put it in front of a small slice of real users and watch.
+
+Feature flags make that possible. The team writes the feature, deploys the code, and then chooses which users see it. If something breaks, the flag goes off in seconds. No redeploy, no panic rollback, no lost data. The blast radius is contained to the slice of users that had the flag on.
+
+The mistake I see most often is teams that build flags into the product as an afterthought. They retrofit them under pressure after the first bad launch. That works but it is more expensive than building them in from the start. The right move is to treat the flag as a deliverable of every AI feature, written into the engineering ticket as a requirement, never optional.
+
+The second mistake is teams that have flags but do not stage the rollout. They flip from off to on for everyone in one move. The flag becomes a deploy gate, not a rollout tool. The point of staged rollout is to find the problem before everyone sees it. Skipping stages is skipping the insurance.
+
+## A good rollout schedule
+
+**Stage one. Internal.** Turn the feature on for your team. Use it for a week. Look for obvious issues. The team is the most forgiving audience and the fastest feedback loop.
+
+**Stage two. Pilot.** Turn the feature on for five percent of users, or for five hand picked customers who agreed to be part of the pilot. Run for a week. Watch error rates, support tickets, and direct feedback. Most issues that survive internal use surface here.
+
+**Stage three. Wider.** Twenty five percent for a few days, then fifty percent. Watch for scale issues that did not appear at five percent. Cost, latency, and support volume often jump non linearly at this stage.
+
+**Stage four. Full.** Hundred percent. Continue watching the same metrics for a week. Then mark the feature as stable and consider retiring the flag, though keeping it is usually fine.
+
+Compress the schedule for low risk features. Expand it for features that touch money, identity, or customer trust. The judgment call about which is which belongs to the senior engineer and the product manager, not the calendar.
+
+## What it actually costs
+
+| Approach | Setup | Per feature lift |
+|---|---|---|
+| No flags, ship to all | Zero | Pay for the bad launch |
+| Hand rolled flag table | One day | One hour per feature |
+| Open source flag library | Half a day | Zero ongoing |
+| LaunchDarkly or Statsig | One to two days | Subscription plus engineer time |
+
+For a startup, hand rolled flags work for a long time. Once you have more than a handful of engineers shipping AI features, a managed flag tool pays for itself in coordination savings. The numbers above are based on what I see in client teams.
+
+## Features to demand from the flag system
+
+- Targeting by user, by tenant, by percentage, and by environment.
+- Audit logging on every flag change. Who flipped it, when, and why.
+- A kill switch that turns the feature off globally in one click.
+- A way to fall back to a deterministic non AI version when the flag is off.
+- Metrics integration so the team can see error rates broken down by flag state.
+- A clean API that the engineering team finds easy to use. Friction at the flag level kills the discipline.
+
+## Expert opinion
+
+> The teams that ship AI features without flags are the teams that learn the hard way. The teams that ship with flags can take more risks, because the rollback cost is near zero. The discipline pays for itself the first time a flag saves a feature from a bad day.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client project that rolled out an AI summary feature, we shipped behind a flag on a Monday. Internal team only. Tuesday afternoon, a team member noticed that summaries were truncating on long documents. We pushed a fix Wednesday morning. Without the flag, that bug would have shipped to every customer. With the flag, the customer impact was zero. The fix landed before stage two of the rollout.
+
+The opposite story is a project that did not use flags. The AI feature shipped to all users on a Thursday. By Friday morning, the support inbox had forty tickets. The team had to redeploy a hotfix, then redeploy again, then communicate with customers about the rough launch. The recovery took the team a full week of cycles. The first launch with flags would have taken one day.
+
+For related discipline, [AI evals](/blog/ai-evals-how-to-test-your-ai-features-like-software) covers the test layer that catches issues before the flag rollout begins, and [feature flags as a deployment strategy](/blog/feature-flags-as-a-deployment-strategy) covers the broader engineering pattern. [AI failover and fallback patterns](/blog/ai-failover-and-fallback-patterns-when-your-model-stops-working) covers the architectural side of safe AI deployment.
+
+## Common mistakes teams make
+
+1. Adding flags as an afterthought instead of as a deliverable.
+2. Flipping from off to on for all users without a staged rollout.
+3. Not building a kill switch that one engineer can trigger without coordination.
+4. Forgetting to log who flipped which flag and when. The audit trail matters when something goes wrong.
+5. Treating flags as permanent. Old flags that nobody removed turn into landmines.
+6. No tenant level flags in a product that sells to regulated industries.
+
+## Where to start, a 7 day plan
+
+1. **Day one.** Pick a flag library or build a flag table. Wire it into the application boundary.
+2. **Day two.** Add a kill switch UI. One click off, one click on, with audit logging.
+3. **Day three.** Wrap your most recently shipped AI feature in a flag. Push the change. Verify the flag works.
+4. **Day four.** Define your rollout schedule. Internal, pilot, wider, full. Write it down.
+5. **Day five and six.** Run a flag rollout on a small change to validate the process end to end.
+6. **Day seven.** Train the team. Every AI feature ticket now includes a flag requirement and a rollout schedule.
+
+For deeper reading, [the founder developer communication loop](/blog/the-founder-developer-communication-loop-a-weekly-cadence) covers the cadence that supports staged rollouts, and [the AI privacy audit](/blog/the-ai-privacy-audit-questions-every-b2b-customer-will-ask) covers the questions enterprise customers will ask about your flag system.

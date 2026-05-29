@@ -1,0 +1,122 @@
+---
+slug: "the-write-heavy-workload-a-different-set-of-tradeoffs"
+title: "The Write Heavy Workload: A Different Set of Tradeoffs"
+excerpt: "Working notes on the write heavy workload: a different set of tradeoffs. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-04-14"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-write-heavy-workload-a-different-set-of-tradeoffs"
+status: "published"
+definition: "A write-heavy workload is one where the database spends most of its time accepting and persisting new data rather than serving reads. The tradeoffs are different from read-heavy systems: indexes slow you down, normalization costs more, and the bottleneck is usually I/O throughput rather than query complexity. I approach it with a different toolset than I use for read-heavy work."
+faq: [
+  {"q":"What database is best for a write heavy workload in a SaaS application?","a":"It depends on the consistency requirement. PostgreSQL with WAL tuning and write-optimized indexes handles most SaaS write loads up to a few thousand writes per second. For append-only event streams at higher volumes, a log-structured store like Cassandra or an event streaming platform like Kafka is a better fit. Do not over-engineer until you have the actual numbers."},
+  {"q":"How does a job queue help with write heavy traffic spikes?","a":"A queue absorbs the spike. Instead of every incoming request hitting the database directly, the request is acknowledged immediately and placed on a queue. Workers consume from the queue at a controlled rate. The database sees a steady stream of writes instead of a thundering herd. The user gets a fast response and the database stays healthy."},
+  {"q":"What is write amplification and why does it matter for backend performance?","a":"Write amplification happens when one logical write from the application causes multiple physical writes to disk, because of indexes, WAL entries, replication logs, and materialized views all needing updating. At high write volumes, amplification multiplies the I/O load. Reducing the number of indexes on a write-heavy table is one of the most effective optimizations available."},
+  {"q":"When should I use an append only log instead of an update in place pattern for write heavy data?","a":"When the history of changes matters as much as the current state, or when the write rate is high enough that locking a row for an update becomes a contention point. Event sourcing is the extreme version of this. For many SaaS workloads, a hybrid works: append to an events table for the high volume stream, and maintain a summary table with periodic rollups."},
+  {"q":"How do I handle write heavy workloads without losing ACID guarantees?","a":"Use PostgreSQL with explicit transactions, batch inserts where possible, and write to a single primary. Add a queue in front of the database if the write rate exceeds what the primary can absorb. Avoid distributed transactions across multiple databases. The rule is that ACID on a well-tuned single primary goes further than most teams expect before sharding becomes necessary."},
+  {"q":"What PostgreSQL settings matter most for write heavy workloads?","a":"The most impactful are synchronous_commit, checkpoint_completion_target, and wal_buffers. Setting synchronous_commit to off for non-critical writes removes the fsync wait at the cost of a small risk of losing the last few seconds of writes on crash. Tuning checkpoint settings spreads I/O more evenly. shared_buffers and work_mem matter less for write-heavy than for read-heavy workloads."},
+  {"q":"How do I know if my SaaS has a write heavy workload versus a read heavy one?","a":"Look at your database metrics. If write latency is climbing while read latency is stable, and your CPU is driven by WAL writes and index updates rather than query planning, you have a write-heavy problem. A rough heuristic: if more than thirty percent of your database operations are inserts or updates, start thinking about write optimization strategies."}
+]
+---
+
+## What you actually need to know
+
+- Read-heavy and write-heavy workloads need different database configurations, different index strategies, and different queue designs. Treating them the same is how you hit performance walls early.
+- Indexes help reads. They slow writes. On a write-heavy table, every extra index is a tax on every insert.
+- A queue in front of the database is often the right first move for write spikes. It is cheaper and more reliable than scaling the database vertically.
+- Append-only patterns reduce contention. Row-level updates under high concurrency create lock waits that kill throughput.
+- In my experience, most SaaS teams discover they have a write problem about six months after they should have.
+
+| Pattern | Write throughput | Consistency | Complexity | Best for |
+|---|---|---|---|---|
+| Direct insert to Postgres | Moderate | Strong (ACID) | Low | Core business data, low-volume writes |
+| Queue-buffered writes | High | Eventual for reads, strong for writes | Moderate | Event ingestion, activity logs |
+| Append-only event log | Very high | Eventual (projections) | High | Audit streams, time series events |
+| Batched bulk inserts | High | Strong | Moderate | Import jobs, data pipelines |
+| Write to replica (wrong) | N/A | Breaks replication | N/A | Never |
+
+## The core argument
+
+The default mental model for database performance is query performance. Engineers profile slow reads. They add indexes. They tune query plans. This works well until the workload is not actually read-heavy. When the bottleneck is writes, the same instincts that solve read problems make write problems worse.
+
+More indexes means more index maintenance on every insert. More normalization means more rows touched per write operation. More read replicas does nothing for a bottleneck that lives on the primary. The write-heavy workload needs a different diagnosis and a different set of tools.
+
+The first thing I do when a client hits a write performance wall is count the indexes on their busiest tables. Nine times out of ten, the table has six or seven indexes that made sense when query performance was the priority. On a table that receives ten thousand inserts per hour, those indexes are significant overhead. Dropping the ones that serve reports that could run against a replica, or that serve queries run less than a dozen times a day, usually produces immediate relief.
+
+The second thing I look at is whether the write path is synchronous end to end. If a user action triggers a write to the database and the HTTP response waits for that write to complete, any slowdown in the database propagates directly to the user. Putting a queue between the user action and the database write decouples the two. The user gets an immediate response. The database gets a steady stream of writes at a rate it can handle. The queue absorbs the spikes.
+
+The third thing I look at is update patterns. If the application is frequently updating rows in place on a high-traffic table, row-level locks can start causing contention. Switching from update-in-place to append-only for the high-frequency events, with a periodic rollup that maintains the current state, often resolves contention problems that look like a hardware problem but are actually an access pattern problem.
+
+## Patterns for write-heavy systems
+
+### Queue-buffered writes
+
+The simplest and most effective intervention for write spikes. The application writes to a queue (Redis, SQS, RabbitMQ, a Postgres-backed job table). Workers consume from the queue and write to the database at a controlled rate. The database load becomes smooth and predictable. Spikes become backlogs rather than failures.
+
+The queue also gives you retry logic for free. If a write fails, the job stays in the queue and the worker tries again. Without a queue, a failed synchronous write is either lost or requires the application to implement its own retry, usually badly.
+
+### Append-only event tables
+
+For data that represents something that happened rather than something that is, append-only tables work better than update-in-place. A click event, a payment attempt, a state transition log. These records never change after they are written. They have no UPDATE operations, no row-level locks from concurrent writers, and no hot rows that become contention points.
+
+The tradeoff is that reads become more expensive. Getting the current state requires aggregating the event history. The fix is a separate summary table that gets updated by a background job on a schedule, or by a trigger that maintains running totals. The write path stays fast. The read path reads the summary.
+
+### Batch insert patterns
+
+When writes come in bursts, batching them before they hit the database reduces the per-row overhead. Instead of one INSERT per record, you accumulate a few hundred records and INSERT them in a single statement. The overhead of a database roundtrip, a transaction, and an index update is paid once for the batch instead of once per row. At high volume, this makes a large difference.
+
+Most queue-based architectures enable batching naturally. Workers consume a batch of messages and write them in a single transaction. The worker size controls the tradeoff between latency (small batches are faster to land) and throughput (larger batches have lower per-record cost).
+
+## What it actually costs
+
+| Strategy | Engineering effort | Infra cost per month at 100k users | Tradeoff |
+|---|---|---|---|
+| Index reduction only | Half a day | No change | Immediate write gain, some read queries slow |
+| Add job queue (Redis) | 1 to 3 days | 50 to 200 dollars extra | Write spikes absorbed, added operational complexity |
+| Append-only events + summary table | 3 to 7 days | Moderate storage increase | High write throughput, more complex read logic |
+| Dedicated write-optimized DB | 2 to 4 weeks | 500 to 2000 dollars extra | Best throughput, operational burden increases |
+
+## Features to demand from a write-heavy architecture
+
+- A queue in front of any write path that can spike. No exceptions for the high-volume paths.
+- Index hygiene: every index on a write-heavy table has a documented reason to exist and a read query to justify it.
+- Batch insert support at the worker layer.
+- Monitoring on write latency, WAL size, replication lag, and queue depth. If the queue is growing, the write side is slower than the input side.
+- An append-only event table for high-frequency domain events, separate from the business data tables.
+- A documented rollup process for the summary tables that downstream reads depend on.
+
+## Expert opinion
+
+> The write-heavy workload is the one most teams are not prepared for, because the preparation for it looks like premature optimization in the early days. Until it hits, adding a queue or splitting the event log feels like unnecessary work. The teams that have already separated their write path from their read path do not have an outage when the traffic spike arrives. The teams that have not are the ones calling me on a Saturday morning.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client running a SaaS analytics platform started seeing database CPU spikes every time a batch of new user events arrived from their JavaScript tracker. The events table had nine indexes, including indexes for several report queries that ran once a day. The insert rate during a spike was around five hundred rows per second, and the index maintenance was multiplying the I/O by a factor of four.
+
+The fix was in two parts. First, we dropped six of the nine indexes from the events table. The daily report queries were moved to run against a read replica where the indexes still existed. Write throughput improved by sixty percent within an hour of the change. Second, we added a Redis-backed queue for incoming tracker events. The API endpoint acknowledged events immediately and put them on the queue. A worker drained the queue in batches of two hundred at a rate the database could absorb cleanly.
+
+The following month, the client ran a marketing campaign that tripled their usual event volume for three days. The database never spiked. The queue built up a backlog during peak hours and drained it within twenty minutes. The experience is consistent with what I wrote in the [read-heavy workload post](/blog/the-read-heavy-workload-strategies-that-move-the-needle): read and write workloads require separate optimization strategies, and conflating them leads to fixes that make one side worse while trying to help the other.
+
+For the full picture of what happens when both read and write pressures arrive at the same time, [the replication lag post](/blog/the-replication-lag-problem-how-to-detect-and-defend) covers the failure mode where a read replica falls behind a write-heavy primary and starts returning stale data under load.
+
+## Common mistakes
+
+1. Adding more indexes to a write-heavy table to solve slow reads. The indexes are causing the slow writes.
+2. Scaling the database vertically before decoupling the write path with a queue.
+3. Using a read replica to absorb write traffic. Replicas do not accept writes. This is not a misunderstanding to be polite about.
+4. Ignoring WAL size and checkpoint frequency. On a write-heavy workload, these settings have more impact than shared_buffers.
+5. Writing to the database synchronously inside an HTTP request handler for high-volume events. Queues exist for this.
+6. Building append-only tables without a rollup strategy. Eventually someone needs to read the current state and there is no efficient way to do it.
+7. Not monitoring queue depth. A queue that is growing means the consumer is slower than the producer. This surfaces before the database breaks.
+8. Treating write optimization as a future problem. The right time to separate the write path is before the spike, not during it.
+
+## A 3 week plan
+
+1. **Week one.** Pull the index list for your five highest-write tables. For each index, find the query it serves and measure how often that query runs. Drop any index that serves a query running less than once per hour or that can be served by a read replica. Measure write latency before and after.
+2. **Week two.** Identify the highest-volume write path in your application. Wrap it in a queue. The simplest implementation is a Postgres-backed job table if you already have PostgreSQL. Redis or SQS if you need more throughput. Add a worker that drains the queue in batches.
+3. **Week three.** Review which events are update-in-place versus genuinely immutable. Move the immutable ones to an append-only table. Set up a rollup job to maintain the summary that reads need. Monitor queue depth, write latency, and WAL size.
+
+For the read side of this equation, [the read-heavy workload post](/blog/the-read-heavy-workload-strategies-that-move-the-needle) covers caching, read replicas, and query optimization. For deeper database tuning, [the slow query log post](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice) is the starting point for any performance investigation.

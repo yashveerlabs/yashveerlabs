@@ -1,0 +1,94 @@
+---
+slug: "the-engineering-dashboard-every-founder-should-have"
+title: "The Engineering Dashboard Every Founder Should Have"
+excerpt: "The metrics a technical founder needs to see daily to understand whether the engineering team is healthy and the product is reliable."
+date: "2025-08-22"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","founders","monitoring"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-dashboard-every-founder-should-have"
+status: "published"
+definition: "The engineering dashboard a founder needs is not a dashboard of every metric the infrastructure produces. It is a dashboard of the five to ten signals that tell the founder whether the product is working, whether the team is shipping, and whether the system is heading toward a problem. Most founders either have too much data with no interpretation or too little data until something breaks. The right dashboard sits between these."
+faq: [
+  {"q":"What is the most important metric for a founder to track about engineering?","a":"Deployment frequency. It tells you how often the team is shipping working software to production. A team that deploys frequently is testing its assumptions against real users regularly. A team that deploys rarely is accumulating risk and delaying the feedback loop. Everything else follows from this."},
+  {"q":"Should founders look at the engineering dashboard daily?","a":"Yes, but briefly. Five minutes of context on the key signals is enough for most days. The goal is to know when something is trending in the wrong direction before it becomes a crisis, not to micromanage the team. A daily glance at the dashboard is a early warning system."},
+  {"q":"What tools should the dashboard be built on?","a":"For most early-stage startups: Datadog, Grafana with Prometheus, or New Relic for infrastructure metrics; GitHub or Linear for engineering velocity; PagerDuty or Opsgenie for incident tracking. The specific tool matters less than having the signals in one place and reviewing them consistently."},
+  {"q":"How do I set up a dashboard without dedicated DevOps resources?","a":"Start with the simplest version that covers the most critical signals. Error rate and response time from Sentry and your hosting platform. Deployment frequency from your CI/CD logs. This takes an afternoon to set up and provides most of the value of a more sophisticated dashboard."},
+  {"q":"What should I do when the dashboard shows a problem?","a":"Ask questions before drawing conclusions. A spike in error rate might be a bug, a dependency outage, or a traffic spike. A deployment frequency drop might be planned (holidays, focus week) or unplanned (team blocked on a hard problem). The dashboard raises the question; the conversation with the team answers it."}
+]
+---
+
+## What you actually need to know
+
+- Deployment frequency is the most predictive signal of engineering health. Teams that deploy frequently also debug faster, catch regressions earlier, and accumulate less technical debt.
+- Error rate and p99 latency tell you whether the product is working for users right now. These are non-negotiable monitoring metrics.
+- A founder who has no view into engineering health is flying blind. A founder who is in every Jira ticket is creating overhead. The dashboard is the middle path.
+- Set up alerts that notify when metrics cross thresholds. Do not wait to notice problems by looking at dashboards manually.
+- The dashboard is a communication tool between the engineering team and the founder. Building it together establishes shared language for what "healthy" means.
+
+| Metric Category | Signal | Why It Matters |
+|---|---|---|
+| Deployment | Deployments per week | Team velocity and risk accumulation |
+| Reliability | Error rate (5xx errors) | User-facing failures right now |
+| Performance | p99 response time | Worst-case user experience |
+| Incidents | Time to detect, time to resolve | Operational maturity |
+| Feedback cycle | Time from commit to production | How fast the team can respond to learning |
+
+## The core argument
+
+Most technical founders operate with one of two failure modes in their relationship to engineering metrics. The first is no data: they trust the team completely and find out about production problems when users complain on social media or churn. The second is too much data: they have dashboards with hundreds of metrics, spend time interpreting them without the context to do so accurately, and create noise in the engineering team by asking about metrics without understanding what normal looks like.
+
+The founder who needs a dashboard is not trying to manage the engineering team. They are trying to have an informed view of product health and engineering velocity so they can make better decisions about priorities, hiring, and when to raise concerns. This is a fundamentally different posture than micromanagement. The dashboard gives the founder the context they need to have productive conversations with the engineering leader rather than asking "how is everything going?" and accepting "pretty good" as an answer.
+
+The right set of metrics for a founder dashboard is small. Five to ten signals that answer the most important questions: is the product working for users? Is the team shipping? Are we trending toward a reliability problem? Is the system getting slower or faster? These questions can be answered with metrics that are available from any modern infrastructure stack.
+
+I have built production systems for clients where the first non-engineering deliverable was a founder dashboard -- a view of the system that gave the non-technical stakeholders the context they needed without requiring them to interpret raw infrastructure metrics. The systems I built for projects like Dwarka Bricks and Velmora needed stakeholders to have confidence in system health without being in every deployment conversation. A clean, well-designed dashboard provided that confidence.
+
+## The five metrics that matter most
+
+**Deployment frequency.** How often is the team shipping working software to production? A healthy engineering team at a startup typically deploys multiple times per day to at least one environment. A team that deploys once a week or less is accumulating change risk and delaying the feedback loop with users. Deployment frequency is the DORA metric most correlated with engineering team health overall.
+
+**Error rate.** What percentage of requests to your application are returning 5xx errors? A healthy production system has an error rate near zero. Sustained error rates above one percent are user-visible problems. Spikes in error rate typically indicate a deployment regression, a dependency failure, or a traffic pattern the system was not designed for. This metric should be tracked in real time and alert immediately when it crosses a threshold.
+
+**Response time (p99).** The 99th percentile response time tells you how the slowest users are experiencing the product. The median is misleading -- a system with a 200ms median response time but a 10-second p99 response time is providing a bad experience to one in a hundred users, which scales to thousands of users at modest traffic volumes. Track p99 and set an alert when it increases significantly.
+
+**Time to detect and resolve incidents.** When something breaks, how long does it take to know it is broken and how long does it take to fix it? These metrics reveal the operational maturity of the team. A team that detects production problems through user reports has no monitoring. A team that resolves incidents in minutes has well-designed runbooks and on-call procedures.
+
+**Cycle time.** How long does it take from a code commit to that commit being in production? Short cycle times mean the team can respond quickly to discovered problems and user feedback. Long cycle times mean changes accumulate risk and the feedback loop with users is slow. For most startups, a cycle time of under four hours is achievable and valuable.
+
+## Setting up the dashboard
+
+The minimum viable founder dashboard requires three integrations: error tracking (Sentry, Bugsnag, or equivalent), infrastructure monitoring (Datadog, Grafana, New Relic, or even basic cloud provider metrics), and your CI/CD system for deployment data (GitHub Actions, CircleCI, or equivalent provides deployment frequency data).
+
+From these three sources, a simple dashboard can be built in an afternoon. Most monitoring platforms have pre-built dashboards for common metrics. The goal is to consolidate the five key metrics into a single view that can be scanned in one minute.
+
+Add alert rules immediately. An error rate alert that fires when 5xx errors exceed two percent for more than five minutes is more valuable than any dashboard because it notifies in real time rather than waiting for a scheduled dashboard review. The same applies to response time degradation and failed deployments.
+
+Review the dashboard weekly with the engineering leader. Use it as the starting point for the conversation about system health, not as a tool for unilateral conclusions. "I see the p99 response time has been increasing over the last week -- what is happening?" is a productive question. The engineering leader will have context that the dashboard does not.
+
+## Common mistakes founders make with engineering dashboards
+
+1. Building the dashboard without the engineering team's input on what metrics to track. The team knows which metrics are meaningful and which are misleading for the specific system.
+2. Setting thresholds that alert too often, creating alert fatigue. An alert that fires dozens of times per day without being actionable will be ignored. Set thresholds that represent real problems, not normal variability.
+3. Using the dashboard to evaluate individual engineer performance. Engineering dashboards measure system health, not individual contribution. Using them to evaluate people creates perverse incentives and destroys trust.
+4. Not looking at the dashboard until something breaks. The value is in early detection of trends, not post-incident diagnosis. Daily review catches problems before they become crises.
+5. Treating dashboard problems as certainties rather than hypotheses. A spike in error rate needs investigation before diagnosis. The dashboard raises questions; the investigation answers them.
+
+## Where to start: a 3-step dashboard setup
+
+**Step 1: Set up error tracking in production if it does not already exist.** Sentry is free for small volume and trivial to integrate in most stacks. Configure it to alert via email or Slack when error rate spikes. This takes one to two hours and is the highest-priority monitoring investment.
+
+**Step 2: Add response time monitoring from your hosting platform.** Most platforms (Vercel, Railway, AWS, GCP, Render) provide built-in latency metrics. Find the p99 metric and add it to a simple dashboard or set an alert threshold. If your platform does not provide this, add a lightweight APM agent.
+
+**Step 3: Export deployment frequency data from your CI/CD system.** GitHub Actions provides deployment logs. Export or visualize the number of deployments per week. Review this weekly with the engineering team and ask about trends.
+
+## Seeing the System Clearly
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The founder dashboard I have set up for my own work gives me a view into system health that lets me have informed conversations about reliability and velocity without being in every pull request. The five metrics above are what I track. They are enough to know when something is wrong before users do, and that is the goal.
+
+## Related reading
+
+- [The Disaster Recovery Plan That Fits on One Page](/blog/the-disaster-recovery-plan-that-fits-on-one-page)
+- [The Deployment Pipeline That Survives Real-World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- The On-Call Rotation That Does Not Break Engineers
+- [The Database You Did Not Think You Needed](/blog/the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse)

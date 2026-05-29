@@ -1,0 +1,125 @@
+---
+slug: "customer-health-scoring-a-founder-engineers-build"
+title: "Customer Health Scoring: A Founder Engineer's Build"
+excerpt: "A health score that the customer success team trusts is built from signals the engineer can measure. Not from sentiment. Not from feel. Here is the build I use with clients to ship a real score in weeks."
+date: "2026-05-20"
+category: "Business Automation and Ops"
+tags: ["customer-health","scoring","retention","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/customer-health-scoring-a-founder-engineers-build"
+status: "published"
+definition: "A customer health score is a single number that summarizes how likely a customer is to renew, expand, or churn. The score is built from measurable behavior signals weighted by their predictive value. The teams that use it well drive customer success interventions. The teams that build it badly produce dashboards nobody trusts. The discipline is in the signal selection and the calibration against actual outcomes."
+faq: [
+  {"q":"What signals belong in the score?","a":"Login frequency. Feature breadth used. Seat count growth. Payment history. Support ticket volume and sentiment. Time on plan boundary. Contract value relative to product usage. Each signal contributes a weighted component to the overall score."},
+  {"q":"What signals do not belong?","a":"Founder sentiment. The customer success person's gut feeling. The number of meetings the team has had with the customer. These are not measurable in a repeatable way. They drift over time and corrupt the score."},
+  {"q":"How do I weight the signals?","a":"Start with intuition. Adjust based on actual churn data over time. The signals that correlate with churn get higher weight. The signals that do not get lower weight or removed. The calibration is an ongoing discipline, not a one time exercise."},
+  {"q":"What is a good score scale?","a":"Zero to one hundred. The team understands it intuitively. The thresholds for green, yellow, and red are clear. Other scales work but introduce friction. The simpler the scale the more the team uses it."},
+  {"q":"How often should the score update?","a":"Daily or weekly for most B2B SaaS. Faster is rarely needed because customer behavior does not change minute to minute. Slower hides degrading customers until it is too late to intervene."},
+  {"q":"What is the worst scoring mistake?","a":"A score that the customer success team does not trust. The score becomes another dashboard nobody looks at. Trust comes from accuracy, transparency about the signals, and ownership by the team that uses it."},
+  {"q":"How do I validate the score?","a":"Backtest against actual churn outcomes. The score should be lower for customers who churned. The score should be higher for customers who expanded. The correlation can be measured and improved over time."}
+]
+---
+
+## What you actually need to know
+
+- The score is built from measurable behavior signals.
+- Login frequency, feature breadth, seat changes, payments, and support are the primary signals.
+- Weight by predictive value. Calibrate against actual outcomes.
+- Zero to one hundred scale is easiest for teams to use.
+- Daily or weekly update cadence fits most B2B SaaS.
+
+| Signal | Predictive power | Weight |
+|---|---|---|
+| Login frequency relative to baseline | High | High |
+| Feature breadth used | High | High |
+| Seat count change | High | High |
+| Payment history | High | Medium |
+| Support ticket volume | Medium | Medium |
+| Support ticket sentiment | Medium | Medium |
+| Time on plan boundary | Low | Low |
+| Contract value vs usage | Medium | Medium |
+
+## The core argument
+
+Customer health scoring is one of those features that founders associate with customer success software. The reality is that the score is a small engineering build. The signals come from the application. The weighting comes from team intuition refined by actual outcomes. The output is a single number that drives customer success actions.
+
+The teams that build this well treat it as application engineering. They measure the signals reliably. They weight them deliberately. They calibrate against churn over time. The score becomes the operating tool of the customer success team because it is accurate and explainable.
+
+The teams that build it badly treat it as sentiment plus a dashboard. The signals are vague. The weighting is gut feel. The calibration never happens. The score becomes another tab nobody looks at. The customer success team works from their intuition instead of from the score, which defeats the purpose.
+
+The build is small. A few engineer weeks for a useful first version. The ongoing maintenance is small. The discipline is in the weighting and the calibration, which is mostly product and ownership work rather than engineering work.
+
+## The signal architecture
+
+| Signal | Implementation |
+|---|---|
+| Login frequency | Track sessions per week. Compare to customer baseline. |
+| Feature breadth | Count distinct features used in the period. |
+| Seat count change | Delta in seat count over the last quarter. |
+| Payment history | Failed payment events. Dunning success rate. |
+| Support volume | Tickets per week. Trend. |
+| Support sentiment | LLM scored or human tagged per ticket. |
+| Time on plan boundary | Approaching limit on seats or usage. |
+| Contract value to usage | Cost per active user from the customer's view. |
+
+## How much does this cost
+
+| Build phase | Engineering cost |
+|---|---|
+| Signal instrumentation | One sprint per signal |
+| Aggregation pipeline | One sprint |
+| Scoring service | A few days |
+| Customer success dashboard | One sprint |
+| Calibration tooling | A few days |
+| Ongoing maintenance | Hours per week |
+
+The build is a few weeks for a useful first version. The maintenance is small. The return is customer success driven by data instead of by feel.
+
+## Features the scoring system must have
+
+- A documented list of signals and their weights.
+- A documented calibration process.
+- A backtest against historical churn.
+- A dashboard with the score and the contributing signals.
+- A trigger system that creates customer success tasks for score drops.
+- A trend view over time per customer.
+- An owner who maintains the score.
+- A review cadence to refine the weights.
+
+## Expert opinion
+
+> The teams that use customer health scoring well treat it as a tool, not a dashboard. The customer success team acts on the score. The engineering team maintains the signals. The product team weighs in on the weighting. The cross functional ownership produces a score that is both accurate and actionable. The teams that build the dashboard without the action loop ship a metric that nobody acts on.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had a customer success team operating on gut feel. The team owned twenty enterprise accounts each. They had no systematic way to prioritize. Some healthy accounts got too much attention. Some declining accounts got too little.
+
+We built the health score in five weeks. Login, feature breadth, seat count, payment, and support volume. Each contributed to a zero to one hundred score. The dashboard showed the score and the trend per account. Score drops triggered customer success tasks.
+
+The team started using the score to prioritize. The accounts that had been quietly declining got attention before they reached cancellation. The accounts that were healthy got less unnecessary attention. The customer success team's effective coverage doubled within a quarter.
+
+The score has been refined over the year since. The weights have shifted. Some signals have been added. Some have been removed. The discipline of calibration against actual outcomes is what kept the score useful.
+
+For more on the related work, see [churn prediction automation for SaaS](/blog/churn-prediction-automation-for-saas) and [the customer onboarding automation map](/blog/the-customer-onboarding-automation-map).
+
+## Common mistakes teams make
+
+1. Sentiment based score. Drifts and corrupts.
+2. No calibration against actual churn.
+3. Dashboard with no action loop.
+4. Single signal score. Too noisy.
+5. Daily update on signals that change quarterly. Wrong cadence.
+6. No owner. Score drifts.
+7. Hidden signals. Customer success cannot trust what they cannot see.
+8. Treating the score as solved once. Calibration is ongoing.
+
+## A 60 day build plan
+
+1. **Weeks one and two.** Inventory the signals you can measure today.
+2. **Weeks three and four.** Build the aggregation pipeline. Compute the first version.
+3. **Weeks five and six.** Build the dashboard. Set up the action loop.
+4. **Weeks seven and eight.** Backtest against the last year of churn. Refine the weights.
+
+For more on the related work, read [churn prediction automation for SaaS](/blog/churn-prediction-automation-for-saas) and [renewals and expansion revenue automation](/blog/renewals-and-expansion-revenue-automation). On the broader operations side, [building an operations stack without an operations team](/blog/building-an-operations-stack-without-an-operations-team) is the natural next read.

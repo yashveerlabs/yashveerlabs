@@ -1,0 +1,120 @@
+---
+slug: "vector-databases-compared-pinecone-weaviate-pgvector-qdrant"
+title: "Vector Databases Compared: Pinecone, Weaviate, pgvector, Qdrant"
+excerpt: "Pinecone, Weaviate, pgvector, and Qdrant each solve vector search differently. The right choice depends on your existing stack, your query patterns, and how much operational overhead your team can absorb."
+date: "2024-12-25"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 12
+ogImage: "/api/og/blog/vector-databases-compared-pinecone-weaviate-pgvector-qdrant"
+status: "published"
+definition: "A vector database stores embeddings and lets you query by semantic similarity rather than exact match. I use them in RAG pipelines, semantic search, and recommendation layers. The choice between Pinecone, Weaviate, pgvector, and Qdrant is mostly a question of operational model, query complexity, and whether your team wants another managed service or a Postgres extension."
+faq: [
+  {"q":"What is the difference between pgvector and a dedicated vector database like Pinecone?","a":"pgvector runs inside your existing Postgres instance. You get SQL, transactions, and no extra service to manage. Pinecone is a hosted service built entirely for vector search with no relation overhead. pgvector wins on simplicity for smaller datasets. Pinecone wins on query speed and scale when you are indexing tens of millions of vectors with high read throughput."},
+  {"q":"Is pgvector production ready for a serious RAG application in 2026?","a":"Yes, with caveats. HNSW indexing in recent pgvector versions handles millions of vectors acceptably. The ceiling is around twenty to fifty million vectors before query latency starts climbing under load. For most SaaS RAG use cases, that ceiling is never hit. If you are already on Postgres, pgvector is the right starting point."},
+  {"q":"When should I choose Qdrant over Pinecone?","a":"When you want self hosting, strong filtering on metadata alongside vector queries, or you need to keep data inside your own infrastructure for compliance reasons. Qdrant also has a generous free tier on their cloud product and decent local Docker support. Pinecone is simpler to get running but you are locked into their cloud."},
+  {"q":"Does Weaviate replace a traditional search engine like Elasticsearch?","a":"For semantic search use cases, yes, often. Weaviate handles hybrid search natively, combining keyword BM25 scoring with vector similarity in a single query. Elasticsearch added vector search later and the hybrid story is less elegant. If semantic search is the primary use case, Weaviate is worth evaluating seriously."},
+  {"q":"How do I choose the right embedding model for my vector database?","a":"Start with text-embedding-3-small from OpenAI or nomic-embed-text if you want something open source. Match the embedding dimension to what your database index is configured for. Do not switch embedding models mid-production without re-indexing, because vectors from different models are not comparable. Test recall on your actual query set before committing."},
+  {"q":"What are the real costs of running Pinecone at scale?","a":"A serverless Pinecone index at one million vectors with moderate query volume runs around forty to one hundred dollars a month in 2026. At ten million vectors with high throughput, expect several hundred dollars a month. The price jumps are non-linear. Benchmark your actual query load before committing to Pinecone at scale."},
+  {"q":"Can I use multiple vector databases in the same application?","a":"Technically yes, but I would not start there. Pick one and optimize it. The exception is when you have very different data types with different query patterns: user preference embeddings versus document embeddings might justify separate indexes, but usually a single store with good metadata filtering handles both."}
+]
+---
+
+## What you actually need to know
+
+- Vector databases store high-dimensional embeddings and retrieve the nearest neighbors by cosine or dot product similarity. They are the retrieval layer in most RAG pipelines.
+- The choice between these four is mostly about your operational model: managed cloud, self-hosted, or Postgres extension.
+- pgvector is the right starting point if you are already on Postgres and your vector count is under twenty million.
+- Pinecone wins on simplicity when you want zero infrastructure and your team cannot afford to maintain another service.
+- Qdrant is the best option when you need self-hosting, strong metadata filtering, or infrastructure control for compliance.
+
+| Database | Type | Hosting | Best for |
+|---|---|---|---|
+| Pinecone | Managed cloud | Fully hosted | Fast setup, high scale, no infrastructure |
+| Weaviate | Open source / cloud | Self-host or cloud | Hybrid search, multi-modal, GraphQL API |
+| pgvector | Postgres extension | Wherever Postgres runs | Simple RAG, existing Postgres stacks |
+| Qdrant | Open source / cloud | Self-host or cloud | Filtered vector search, data residency |
+
+## The core argument
+
+Most teams spend too long deciding between vector databases and not enough time tuning the embedding model and retrieval logic. The database is not the bottleneck. The bottleneck is usually the quality of the chunks you are indexing and the precision of the filters you apply at query time.
+
+That said, the choice matters at scale and it matters operationally. The team that picks Pinecone because it is easiest to get started with will eventually hit a pricing wall. The team that picks pgvector because it avoids a new service will eventually hit a performance wall if their vector count climbs. Neither wall is insurmountable, but both require migration work.
+
+My default recommendation for a new project: start with pgvector if you are on Postgres. It takes about an hour to get running, you do not need to manage another service, and you can migrate to Qdrant or Pinecone later if query latency becomes a problem. The index format is standardized enough that the migration is not as painful as it sounds.
+
+The argument for Pinecone is speed of execution, not speed of queries. If your team has two weeks to ship a working RAG feature, Pinecone's serverless tier gets you there without any infrastructure decisions. You pay for that convenience later when the bill scales with usage and you have no control over the pricing model.
+
+## How each database handles the hard parts
+
+### Filtering alongside similarity
+
+This is where the databases diverge most visibly. Pure similarity search finds the nearest vectors. Filtered similarity search finds the nearest vectors within a subset defined by metadata. If your use case is "find documents similar to this query, but only for this customer's tenant," filtering is not optional.
+
+Qdrant was designed with filtering as a first-class concern. Its payload indexing handles high-cardinality filters without the performance degradation you see in other systems. Weaviate has strong filtering too. pgvector's WHERE clause filtering works but can be slow on large tables without careful index design. Pinecone added metadata filtering and it is functional, but the filtering language is simpler than Qdrant's.
+
+### Hybrid search
+
+Hybrid search combines keyword matching with semantic similarity in one query. For most real-world retrieval, hybrid outperforms pure vector search because some queries are better served by exact keyword matching and some by semantic similarity. You rarely know in advance which type any given user query will be.
+
+Weaviate has the most mature hybrid search implementation. It runs BM25 and vector search in parallel and merges the results with a configurable alpha parameter. pgvector requires running two queries and merging in application code, which adds latency and complexity. Pinecone added sparse-dense hybrid and it works, but the setup is more manual.
+
+### Multi-tenancy
+
+For B2B SaaS, every customer's vectors need to be isolated. The patterns differ by database. Pinecone uses namespaces. Qdrant uses collections or payload filtering. pgvector uses row-level security on the Postgres table, which is familiar to any Postgres developer. Weaviate uses multi-tenancy at the class level.
+
+None of these is obviously better. The question is which model matches your existing tenant isolation pattern.
+
+## How much does it cost
+
+| Option | Free tier | Paid starting point | Notes |
+|---|---|---|---|
+| Pinecone serverless | 100K vectors free | 0.08 per 1M reads approx | Scales unpredictably under high query load |
+| Weaviate Cloud | 14 day trial | 25 dollars per month starter | Self-hosted version is free |
+| pgvector | Free (pay for Postgres hosting) | Supabase from 25 per month | RDS pgvector from 35 per month |
+| Qdrant Cloud | 1GB free | 25 dollars per month starter | Self-hosted is free, Docker image available |
+
+Prices are approximate 2026 figures from public pricing pages and my own client engagements. The pgvector line is deceptive because you are paying for the Postgres instance, not the extension itself. At scale, a well-configured Postgres instance serving vector queries is often cheaper than a dedicated vector cloud service.
+
+## What to look for when evaluating
+
+- HNSW indexing support. Flat indexes do exact search and are slow at scale. HNSW is the standard approximate nearest neighbor algorithm that keeps query time manageable.
+- Metadata filtering performance on your actual filter cardinality. Test with real data, not synthetic data.
+- Hybrid search native support if your use case involves documents where users type specific keywords.
+- Client library quality in your language. The Python clients for all four are decent. The TypeScript clients vary.
+- Multi-tenancy isolation model that matches how you partition customers.
+- Update and delete performance if your vector corpus changes frequently. Some indexes degrade on high churn.
+
+## Expert opinion
+
+> pgvector handles ninety percent of the projects I encounter. The teams that go straight to Pinecone usually do it because they are afraid of Postgres operational complexity, and then spend three months figuring out that Pinecone's pricing model does not fit their usage pattern. Start simple. Migrate when you have real numbers to justify the move.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client came to me with a half-built document search feature that used Pinecone on the free tier. The prototype worked fine. When they moved to production with a real customer corpus, the free tier limit hit in week two and the paid tier was coming in at four hundred dollars a month for their query volume. The team had not budgeted for it and the number surprised everyone.
+
+We migrated to pgvector on their existing Supabase instance over three days. The query performance was within acceptable range for their use case, the filtering logic was cleaner using SQL, and the monthly cost dropped to zero incremental cost on top of their existing database hosting. The migration was not painless but it was worth it. We lost one weekend, saved significant monthly spend, and the retrieval quality was identical because we kept the same embedding model.
+
+The lesson was not that Pinecone is bad. The lesson was that the database choice needs to include a cost projection at production scale from day one. For more on the retrieval architecture side, see [RAG retrieval augmented generation for SaaS](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not) and [building an AI powered search that actually works](/blog/building-an-ai-powered-search-that-actually-works).
+
+## Common mistakes
+
+1. Picking a database because of a demo without testing on real data at real scale.
+2. Starting with Pinecone's free tier and then being surprised by the production pricing model.
+3. Using flat exact search indexes instead of HNSW, then wondering why queries are slow at a hundred thousand vectors.
+4. Not chunking documents before indexing. Embedding entire pages produces poor retrieval. Chunk at the paragraph or section level.
+5. Switching embedding models mid-production without re-indexing all vectors. The old and new vectors are incomparable.
+6. Ignoring the multi-tenancy isolation model until the first enterprise customer asks about data separation.
+7. Building semantic search without testing hybrid search. For document retrieval, hybrid almost always outperforms pure vector search.
+8. Not setting a dimension limit on the embedding model upfront, then realizing your index is sized for 1536 dimensions when your new model produces 3072.
+
+## A 30-day plan
+
+1. **Week one.** Pick pgvector if you are on Postgres, Qdrant if you need self-hosted with strong filtering, Pinecone if you need zero infrastructure fast. Get a small index running with real data from your corpus.
+2. **Week two.** Test retrieval quality with your actual query patterns. Measure precision at k=5 and k=10. Adjust chunking and embedding model before tuning the database.
+3. **Week three.** Add metadata filtering for tenant isolation. Test filter performance with a representative number of tenants and documents per tenant.
+4. **Week four.** Run a cost projection at ten times your current data volume. If the number is uncomfortable, model the migration to pgvector or Qdrant now, before the data grows.
+
+For the broader retrieval and AI integration pattern, see [building production grade AI features without an ML team](/blog/building-production-grade-ai-features-without-an-ml-team) and [AI evals how to test your AI features like software](/blog/ai-evals-how-to-test-your-ai-features-like-software).

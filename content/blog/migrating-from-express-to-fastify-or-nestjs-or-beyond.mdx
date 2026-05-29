@@ -1,0 +1,62 @@
+---
+slug: "migrating-from-express-to-fastify-or-nestjs-or-beyond"
+title: "Migrating From Express to Fastify or NestJS or Beyond"
+excerpt: "Express still works but it shows its age in production. Here is when to migrate, which framework to migrate to, and how to do it incrementally without breaking the application that customers depend on."
+date: "2026-05-23"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration"]
+readingMinutes: 6
+ogImage: "/api/og/blog/migrating-from-express-to-fastify-or-nestjs-or-beyond"
+status: "published"
+definition: "Migrating from Express to a modern Node.js framework means replacing a minimal, unopinionated HTTP server with one that provides performance improvements, better TypeScript support, built-in validation, and structured application architecture. Fastify offers a near-drop-in replacement with significantly better throughput and native TypeScript support. NestJS provides a full application framework with dependency injection, modules, and conventions that scale to large codebases. The migration cost depends on which framework you choose and how cleanly your Express application is structured."
+faq: [
+  {"q":"What does Fastify offer over Express?","a":"Fastify is meaningfully faster than Express in benchmarks because of its optimized JSON serialization and schema-based validation. It has native TypeScript support, a plugin system that is cleaner than Express middleware, and built-in request validation using JSON Schema. For Express applications that are struggling with performance or want better TypeScript ergonomics, Fastify is the closest drop-in replacement with the highest performance gain."},
+  {"q":"When does NestJS make more sense than Fastify?","a":"NestJS is a full application framework that provides conventions for organizing code into modules, uses dependency injection for service management, and follows patterns familiar to developers who have worked with Angular or Spring. It is appropriate for large applications where multiple teams need consistent conventions. Fastify is better for teams that want a lightweight server without framework conventions. NestJS can run on top of Fastify as its HTTP adapter, combining both."},
+  {"q":"Can I migrate from Express incrementally?","a":"Yes, with either framework. The incremental approach for Fastify involves creating a Fastify app that handles new routes while existing Express routes continue to work, gradually migrating routes from Express to Fastify until Express is no longer needed. For NestJS, the approach is similar: create a NestJS module for new routes and migrate Express routes one controller at a time."},
+  {"q":"How should I handle Express middleware in a migration?","a":"Most Express middleware can be used with Fastify via @fastify/express compatibility layer, which is useful for middleware that has no Fastify equivalent. Prioritize finding native Fastify plugins for commonly used middleware: cors, compression, rate limiting, and authentication all have Fastify equivalents. Relying on the compatibility layer long-term reduces the performance benefit of migrating."},
+  {"q":"Is migrating from Express to Fastify worth the effort for a small codebase?","a":"For a small codebase with few endpoints and no performance issues, the migration cost may exceed the benefit. Express remains a capable server for moderate-traffic applications. The migration is most justified when you need better TypeScript ergonomics, when performance is a bottleneck, when you want schema-based request validation, or when onboarding new engineers who find Express's lack of conventions confusing."}
+]
+---
+
+## What you need to know
+
+- Express works and continues to receive security updates. A migration is not urgent unless there are specific pain points it does not address.
+- Fastify is the right migration target for performance, TypeScript support, and schema-based validation. The migration path is closer to a drop-in replacement than moving to NestJS.
+- NestJS is the right choice when the application has grown to the point where consistent conventions and module organization would significantly improve maintainability.
+- Incremental migration is the correct approach: migrate routes one at a time behind a shared HTTP server rather than rewriting the entire application at once.
+- The biggest risk in any framework migration is losing the implicit behavior of middleware and request/response handling that was correct in Express but needs to be explicitly re-implemented in the new framework.
+
+## The core argument
+
+The Express migration conversation usually starts with one of three pain points: performance benchmarks that show Express limiting throughput, a TypeScript adoption where Express's type definitions feel awkward compared to alternatives, or a codebase that has grown beyond what unstructured Express middleware can organize cleanly. Each pain point maps to a different migration target.
+
+Fastify addresses the performance and TypeScript pain points more directly than NestJS. The architecture is similar to Express: a router, a plugin system analogous to middleware, and route handlers. The migration involves replacing `app.use()` with `fastify.register()`, replacing inline handler signatures with Fastify's handler type, and replacing `req.body` validation with JSON Schema validation at the route level. For most Express codebases, this is a route-by-route replacement that can be done incrementally without a large parallel development effort. The performance gain is real, particularly for high-throughput APIs: Fastify handles significantly more requests per second than Express in benchmarks, and the difference shows in production under load.
+
+NestJS addresses the organization and conventions pain point. An Express application that has grown to forty or fifty routes with a mix of middleware, route handlers, and shared utilities benefits from NestJS's module system, which groups related routes, services, and middleware into cohesive modules. The dependency injection system makes testing easier by replacing direct imports with injectable services. The tradeoff is that NestJS has a steeper learning curve and a more prescriptive structure. Teams that have not worked with dependency injection frameworks before may find the migration slower than expected.
+
+## Common mistakes
+
+1. **Doing a big-bang rewrite instead of incremental migration.** Rewriting an entire Express application in Fastify or NestJS in a single sprint creates a long period where two codebases need to be maintained in parallel and the new one has not been tested against production traffic. Migrate one route group at a time.
+
+2. **Not accounting for middleware behavior differences.** Express middleware runs in the order it is registered and can modify `req` and `res` freely. Fastify's hook system has defined lifecycle points and plugin scope. Middleware that relies on Express's execution model needs to be reimplemented as Fastify hooks or plugins.
+
+3. **Keeping the Express compatibility layer long-term.** Fastify's `@fastify/express` compatibility layer allows Express middleware to run on Fastify but reduces Fastify's performance benefits. Use it as a migration bridge, not as a permanent dependency.
+
+4. **Not updating TypeScript types throughout the migration.** One benefit of migrating to Fastify or NestJS is better TypeScript support. If the migration only changes the framework code but does not update request and response types to use the new framework's types, the TypeScript benefit is not realized.
+
+5. **Migrating before the team understands the new framework's patterns.** A Fastify migration done by engineers who learned the framework two days ago will produce Express patterns written in Fastify syntax. Invest in understanding Fastify plugins and the lifecycle model before starting the migration.
+
+## Where to start
+
+1. **Start with one low-risk route or route group.** Choose a route that is not on the critical path, migrate it to the new framework running alongside Express, and deploy it to production. Verify the behavior before expanding the migration.
+
+2. **Audit your current Express middleware usage.** List every `app.use()` call and identify which ones have direct equivalents in Fastify plugins or NestJS guards and interceptors. The ones that do not have direct equivalents are the highest-risk migration items.
+
+3. **Set performance benchmarks before starting.** Measure the current throughput and response time of the key endpoints before migration. Use these as the baseline to verify that the migration produced the expected performance improvement.
+
+## Related reading
+
+- Node.js Performance Tuning: What Actually Moves the Needle
+- Tech Debt: The Real Cost and When to Pay It Down
+- [Building APIs That Survive Five Years of Customer Change Requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests)
+- [Migrating From REST to GraphQL: A Strategic Read](/blog/migrating-from-rest-to-graphql-a-strategic-read)

@@ -1,0 +1,120 @@
+---
+slug: "zapier-vs-make-vs-n8n-vs-custom-in-2026"
+title: "Zapier vs Make vs n8n vs Custom in 2026"
+excerpt: "Working notes on zapier vs make vs n8n vs custom in 2026. Written for founders, engineers, and operators who want a clear read on business automation and ops from someone who has shipped the work."
+date: "2026-03-19"
+category: "Business Automation and Ops"
+tags: ["automation","operations","internal-tools"]
+readingMinutes: 12
+ogImage: "/api/og/blog/zapier-vs-make-vs-n8n-vs-custom-in-2026"
+status: "published"
+definition: "Zapier, Make, n8n, and custom code are four different answers to the same question: how do I connect tools without writing a lot of plumbing? Each one has a different price ceiling, complexity floor, and maintenance cost. Choosing wrong costs more than choosing late. I have run all four in production and the choice almost always comes down to volume, reversibility, and how much the founder values owning the logic."
+faq: [
+  {"q":"Is Zapier still worth it for a small SaaS in 2026 or have cheaper alternatives made it obsolete?","a":"Zapier is still worth it for low volume, low complexity automations where speed of setup matters most. The per-task pricing becomes painful above a few thousand tasks per month. At that point Make or n8n is almost always the right move. Zapier's edge is its breadth of native connectors and its polish for non-technical operators."},
+  {"q":"What is the real difference between Zapier and Make for SaaS automation?","a":"Make uses a visual canvas with branching, loops, and multi-step error handling that Zapier cannot match without workarounds. Make is cheaper per operation and handles complexity better. Zapier is faster to set up and has broader app support. For anything beyond simple linear triggers, Make wins on capability and cost."},
+  {"q":"When does n8n make more sense than Make for a bootstrapped SaaS team?","a":"When you want to self-host to eliminate per-operation costs, when your automations involve code nodes for custom logic, or when you have a technical team comfortable maintaining infrastructure. n8n's self-hosted cost is effectively the server cost, which is trivial at small scale. The tradeoff is operational overhead and a smaller native connector library."},
+  {"q":"At what point should a SaaS team build custom automation code instead of using a no-code tool?","a":"When the automation runs at high volume and per-operation costs compound meaningfully. When the logic is complex enough that no-code tools require contorted workarounds. When the automation is core to the product rather than peripheral to the business. Custom code is harder to maintain but owns the complexity cleanly."},
+  {"q":"How much does Zapier actually cost for a SaaS with moderate automation needs?","a":"At 10,000 tasks per month the Professional plan runs roughly 49 USD. At 50,000 tasks it climbs to around 100 USD. At 100,000 tasks you are looking at 250 to 400 USD per month depending on plan. Make at the same volume runs 60 to 80 percent cheaper. The cost gap becomes the deciding factor at moderate scale."},
+  {"q":"Can you mix Zapier and n8n in the same operations stack without it becoming a mess?","a":"You can, but you probably should not. Two automation tools in the same stack means two mental models, two debugging contexts, and two sets of credentials to manage. The exception is a migration period where you are moving workflows from one tool to the other. In steady state, pick one and standardize."},
+  {"q":"What are the hidden costs of self-hosting n8n that teams underestimate?","a":"Server provisioning, updates, backup management, SSL certificates, and the debugging time when n8n itself has a bug or breaking change. These are small in isolation but add up across a year. Teams that do not have engineering bandwidth to maintain infrastructure often regret the self-hosted choice within six months."}
+]
+---
+
+## What you actually need to know
+
+- Zapier is fastest to start and most expensive at scale. Best for simple, low-volume triggers.
+- Make handles complexity and branching better than Zapier and costs 60 to 80 percent less per operation.
+- n8n is the self-hosted choice when you want zero per-operation cost and have engineering bandwidth to run infrastructure.
+- Custom code belongs when volume is high, logic is complex, or the automation is core to the product.
+- Mixing tools in the same stack almost always creates more problems than it solves.
+
+| Tool | Pricing model | Complexity ceiling | Self-host option | Best fit |
+|---|---|---|---|---|
+| Zapier | Per task | Medium | No | Low volume, fast setup |
+| Make | Per operation | High | No | Medium volume, complex flows |
+| n8n | Per execution (cloud) or free (self-hosted) | High | Yes | High volume, technical teams |
+| Custom code | Engineering time | Unlimited | Yes | Core product automation |
+
+## The core argument
+
+The question I get most often from founders is: which tool do I use for automation? The honest answer is that it depends on three things they usually have not thought through yet. How many operations per month. How complex the logic. And how much they value owning versus renting the plumbing.
+
+Zapier built the market for no-code automation and still has the widest connector library. If a tool has an API, Zapier probably has a native integration. That breadth has real value at the start. The cost of the breadth is pricing that scales poorly. At 50,000 tasks per month you start wondering whether you are paying for automation or for someone else's infrastructure business.
+
+Make changed the market for teams that outgrew Zapier. The visual canvas handles loops, branches, and error paths cleanly. The operations-based pricing is cheaper. The learning curve is steeper but the ceiling is higher. Most teams I advise that have outgrown Zapier end up on Make and stay there until they need something custom.
+
+n8n is the right answer for a specific type of team: technical, comfortable with self-hosted infrastructure, and volume-sensitive. The self-hosted version has no per-operation cost. The tradeoff is maintenance overhead. I have seen this go badly when the team underestimates the operational work of running their own n8n instance. The server is small. The ongoing updates and debugging are not nothing.
+
+Custom code is the answer nobody wants to hear until it becomes obvious. When the automation runs hundreds of thousands of times per month, or when the logic has enough conditions that any visual tool produces something impossible to debug, the plumbing should be code. Job queues, workers, and a good queue library cover most of what Zapier and Make do, with the full expressiveness of a programming language.
+
+## How to choose the right tool for the job
+
+The decision tree is simpler than the marketing makes it look.
+
+### Volume first
+
+Under 5,000 operations per month: use Zapier. The cost is manageable. The setup is fast. You will not regret the choice. Between 5,000 and 100,000 operations: evaluate Make seriously. The cost savings are real and the capability is comparable or better. Above 100,000 operations: the math usually points to n8n self-hosted or custom code.
+
+### Complexity second
+
+Linear automations with one trigger and one action: any tool works. Multi-step automations with branching logic, error handling, and retries: Make or n8n. Automations that involve stateful processes, complex transformations, or tight coupling to your product: custom code.
+
+### Ownership third
+
+No-code tools are rented infrastructure. They go down. They change pricing. They deprecate connectors. Zapier famously changed their pricing model in a way that surprised teams with established workflows. Make has done the same. When the automation is peripheral to the business, rented is fine. When it is core to how you deliver the product, owning the logic is worth the engineering cost.
+
+## How much does it cost
+
+| Tool | Free tier | Mid-tier monthly | High-volume monthly |
+|---|---|---|---|
+| Zapier | 100 tasks | 49 USD (Professional) | 250 to 400 USD |
+| Make | 1,000 operations | 29 USD (Core) | 99 to 199 USD |
+| n8n Cloud | 2,500 executions | 20 USD (Starter) | 50 to 120 USD |
+| n8n Self-hosted | Free | Server cost only (~10 USD) | Server cost only |
+| Custom code | N/A | Engineering time | Engineering time |
+
+The numbers are directional. Both Zapier and Make change pricing regularly and the tiers shift. The relative cost ordering has been stable: Zapier most expensive per operation, Make significantly cheaper, n8n self-hosted cheapest at scale.
+
+## Features to evaluate before you commit
+
+- Native connector library. How many of your existing tools have direct integrations?
+- Error handling and retry logic. What happens when a downstream API is down?
+- Branching and loops. Can the tool handle conditional logic without workarounds?
+- Observability. Can you see execution history, failed runs, and data payloads?
+- Credentials management. How are API keys and OAuth tokens stored and rotated?
+- Team collaboration. Can multiple team members edit workflows without stepping on each other?
+- Data export. Can you export your workflow definitions if you need to migrate?
+
+## Expert opinion
+
+> The teams that get stuck are the ones that pick Zapier for everything and then stare at a 2,000 USD monthly automation bill at 40,000 customers. The fix at that point is painful. The teams that pick tools based on a clear cost and complexity model almost never need to do an emergency migration. The decision is not complicated if you do the math upfront.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client came to me with a Zapier bill that had grown from 80 USD per month to 620 USD over eighteen months. The automations were not complex: new customer in Stripe triggers a CRM update, new support ticket triggers a Slack alert, completed onboarding triggers a sequence in the email tool. Linear triggers, no branching.
+
+We moved the stack to Make in two weeks. The workflows replicated cleanly because none of them were doing anything Make could not handle. The monthly cost dropped from 620 to 89 USD. The savings paid for the migration work in the second month.
+
+The lesson was not that Zapier is bad. It is that Zapier's pricing model does not scale and the team had not noticed the drift because the bill grew slowly. The right time to evaluate Make is before the bill becomes painful, not after. For more on the broader automation decision, see [building an operations stack without an operations team](/blog/building-an-operations-stack-without-an-operations-team) and [the business automation map where founders lose hours](/blog/the-business-automation-map-where-founders-lose-hours).
+
+## Common mistakes
+
+1. Picking Zapier by default because it is the most familiar name.
+2. Not modeling operations per month before signing up for any tool.
+3. Building complex branching logic in Zapier that belongs in Make.
+4. Self-hosting n8n without budgeting for ongoing maintenance.
+5. Using two automation tools in parallel because nobody decided which one is standard.
+6. Not setting up execution logging and alerts. Silent failures are the most expensive kind.
+7. Treating automation workflows as one-off configurations rather than versioned artifacts.
+8. Forgetting to test error cases. Happy path automation breaks on the first edge case.
+
+## A 30 day migration plan
+
+1. **Week one.** Audit the current automation stack. List every workflow, its operation count, and its complexity.
+2. **Week two.** Model the cost on Make or n8n self-hosted using the actual operation counts.
+3. **Week three.** Rebuild the two highest-volume workflows in the new tool. Validate they produce the same outputs.
+4. **Week four.** Migrate the remaining workflows. Decommission the old tool after a one week parallel run.
+
+For more on the connected work, read [workflow automation for SaaS a founders guide](/blog/workflow-automation-for-saas-a-founders-guide) and [the internal tooling build vs buy question](/blog/the-internal-tooling-build-vs-buy-question).

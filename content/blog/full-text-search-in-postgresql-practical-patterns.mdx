@@ -1,0 +1,115 @@
+---
+slug: "full-text-search-in-postgresql-practical-patterns"
+title: "Full Text Search in PostgreSQL: Practical Patterns"
+excerpt: "Postgres full text search is good enough for most SaaS. The setup is small. The performance is solid. Most teams reach for Elasticsearch when Postgres would have served them for years."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["postgres","search","full-text","backend"]
+readingMinutes: 11
+ogImage: "/api/og/blog/full-text-search-in-postgresql-practical-patterns"
+status: "published"
+definition: "Postgres full text search uses tsvector and tsquery to index and search text. The setup is mechanical. The performance is solid into the millions of rows for most queries. The features are sufficient for most SaaS search needs. Most teams reach for Elasticsearch or Algolia preemptively when Postgres full text would have served them for years. The patterns are small and worth learning."
+faq: [
+  {"q":"What is tsvector?","a":"A Postgres data type that represents a document as a list of normalized tokens. The to_tsvector function converts text into a tsvector. The tsvector is what you index and search against."},
+  {"q":"What is tsquery?","a":"A Postgres data type that represents a search query. The to_tsquery and plainto_tsquery functions build tsquery values from input. The query is matched against tsvector values to find matching documents."},
+  {"q":"How do I index for performance?","a":"Create a GIN index on the tsvector column or expression. The GIN index is the standard for full text search in Postgres. Queries that filter by tsvector match against the index. The performance is good into the millions of rows."},
+  {"q":"Should I store the tsvector or compute it on query?","a":"Store it. The tsvector should be a generated column or maintained by a trigger. Computing on query is slow. Storing trades a bit of storage for dramatically better query performance."},
+  {"q":"What about ranking?","a":"ts_rank ranks the results by how well they match. ts_rank_cd is the variant that uses cover density. Both are reasonable. Pick one and use it consistently. The ranking is what makes the results feel useful."},
+  {"q":"What about typo tolerance?","a":"Postgres has pg_trgm for trigram similarity. Combining tsvector for word matching with pg_trgm for typo tolerance produces a search that handles both exact and approximate matches. The combination is what most B2B SaaS needs."},
+  {"q":"When does Postgres full text stop being enough?","a":"At very high query volume. At very high document counts (tens of millions). When you need advanced features like faceting, semantic similarity, or sophisticated relevance tuning. Until you hit one of these, Postgres serves well."}
+]
+---
+
+## What you actually need to know
+
+- Postgres full text search handles most SaaS search needs.
+- Store the tsvector. Index with GIN. Query with tsquery.
+- Combine with pg_trgm for typo tolerance.
+- Use ts_rank for relevance ordering.
+- Move to Elasticsearch only when you hit specific limits.
+
+| Feature | Postgres approach |
+|---|---|
+| Indexing | to_tsvector with GIN index |
+| Querying | to_tsquery or plainto_tsquery |
+| Ranking | ts_rank or ts_rank_cd |
+| Phrase search | phraseto_tsquery |
+| Typo tolerance | pg_trgm extension |
+| Multiple language | Set the language config |
+| Highlight | ts_headline |
+| Faceting | Standard SQL GROUP BY |
+
+## The core argument
+
+Postgres full text search is good enough for most SaaS. The setup is small. The performance is solid. The features are sufficient. Most teams reach for Elasticsearch or Algolia preemptively when Postgres would have served them for years.
+
+The pattern is consistent. The team thinks search is hard. The team reads about Elasticsearch. The team adds a new database to the stack. The team has to keep Postgres and Elasticsearch in sync. The complexity grows. The actual search needs of the application could have been served by Postgres.
+
+The mental shift is to recognize that full text search in Postgres is not the same as the LIKE pattern matching that most engineers learn first. Postgres full text uses linguistic processing. Stop words are removed. Stems are matched. The query for write matches the document containing writes and writing. The matching is closer to what users expect.
+
+The setup is mechanical. Add a tsvector column to the table, maintained by a generated column or trigger. Create a GIN index. Query with the right operators. The whole setup is roughly an afternoon for a senior engineer.
+
+The performance is solid into millions of rows. A B2B SaaS with ten million documents can run Postgres full text search with sub hundred millisecond latency on most queries. The teams that move to Elasticsearch at smaller scale usually did not need to.
+
+The case for moving exists. Very high query volume. Tens of millions of documents. Advanced faceting or semantic similarity. Each is a real reason. Below these, Postgres usually serves better than the alternatives because it stays in the existing database without the sync complexity.
+
+## The patterns that work
+
+| Pattern | Code |
+|---|---|
+| Generated tsvector column | `search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', title || ' ' || body)) STORED` |
+| GIN index | `CREATE INDEX idx_search ON documents USING GIN(search_vector)` |
+| Basic query | `WHERE search_vector @@ plainto_tsquery('english', $1)` |
+| Ranked query | `ORDER BY ts_rank(search_vector, plainto_tsquery('english', $1)) DESC` |
+| Typo tolerance with pg_trgm | Add similarity check as a fallback |
+| Highlight | `ts_headline('english', body, query)` |
+| Phrase search | `phraseto_tsquery('english', $1)` |
+
+## How much does this cost
+
+The cost is engineering time. An afternoon for the basic setup. A day or two for the more advanced patterns like ranking, typo tolerance, and highlighting. The infrastructure cost is zero because it lives in your existing Postgres. The savings versus moving to Elasticsearch is the operational complexity that does not happen.
+
+## Features the search setup must have
+
+- Stored tsvector with GIN index.
+- Ranking with ts_rank.
+- Highlighting for the result preview.
+- Typo tolerance with pg_trgm where helpful.
+- Language configuration matching the content.
+- A way to update the tsvector when documents change.
+- Monitoring on query latency.
+- A path to move to Elasticsearch if you outgrow Postgres.
+
+## Expert opinion
+
+> Most B2B SaaS that adopted Elasticsearch could have stayed on Postgres full text search for years. The operational complexity of Elasticsearch is real. The Postgres setup is mechanical. The performance is sufficient into the millions of rows. The teams that moved early are usually paying for capability they do not use. The teams that stayed on Postgres until they hit real limits saved meaningful engineering time.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was about to add Elasticsearch for search. The team had read about it and assumed it was necessary. The documents were in the low hundreds of thousands. The query volume was modest.
+
+We built the search on Postgres full text instead. Generated tsvector column. GIN index. Ranked queries. Highlight. Typo tolerance with pg_trgm. The setup took two days. The performance was sub fifty milliseconds on every query.
+
+The team avoided adding Elasticsearch to the stack. The operational complexity did not happen. The features were sufficient for what the customers actually needed. Two years later the team is still on Postgres for search and has not hit a limit that would justify moving.
+
+For more on the related work, see [the search problem why adding it late always hurts](/blog/the-search-problem-why-adding-it-late-always-hurts) and [Algolia vs Typesense vs Meilisearch vs Postgres full text](/blog/algolia-vs-typesense-vs-meilisearch-vs-postgres-full-text).
+
+## Common mistakes teams make
+
+1. Adopting Elasticsearch preemptively.
+2. Computing tsvector on query instead of storing it.
+3. No GIN index.
+4. No ranking. Results in arbitrary order.
+5. No typo tolerance.
+6. Wrong language config.
+7. No monitoring on search latency.
+8. Treating LIKE pattern matching as full text search.
+
+## A two day setup plan
+
+1. **Day one.** Add the tsvector column. Create the GIN index. Build the basic query.
+2. **Day two.** Add ranking, highlighting, and typo tolerance. Test against realistic data volume.
+
+For more on the related work, read [Algolia vs Typesense vs Meilisearch vs Postgres full text](/blog/algolia-vs-typesense-vs-meilisearch-vs-postgres-full-text) and [building an AI powered search that actually works](/blog/building-an-ai-powered-search-that-actually-works). On the broader search side, [SaaS search at scale Postgres full text vs Algolia vs Typesense](/blog/saas-search-at-scale-postgres-full-text-vs-algolia-vs-typesense) is the natural next read.

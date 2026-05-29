@@ -1,0 +1,62 @@
+---
+slug: "saas-search-at-scale-postgres-full-text-vs-algolia-vs-typesense"
+title: "SaaS Search at Scale: Postgres Full Text vs Algolia vs Typesense"
+excerpt: "Search that returns the right result instantly is a product feature users notice. Search that is slow or irrelevant is a product problem they complain about. Here is how Postgres full text, Algolia, and Typesense compare for SaaS products."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/saas-search-at-scale-postgres-full-text-vs-algolia-vs-typesense"
+status: "published"
+definition: "Search infrastructure for SaaS encompasses the systems that allow users to find content within the product by text query. PostgreSQL full-text search uses built-in GIN indexes on tsvector columns to support full-text queries without additional infrastructure. Algolia and Typesense are dedicated search services that provide relevance ranking, typo tolerance, instant search (results as you type), and faceted search. The choice between them is primarily determined by search complexity requirements and willingness to add a dedicated search service to the infrastructure."
+faq: [
+  {"q":"When is PostgreSQL full-text search sufficient for SaaS search?","a":"PostgreSQL full-text search is sufficient when: the search corpus is under a few hundred thousand documents, search queries are primarily keyword-based rather than semantic, typo tolerance is not required (or can be handled with a pg_trgm trigram index), and real-time indexing (new data searchable within seconds) is not required. For most SaaS products in their first two to three years, Postgres full-text handles the search requirements without the operational overhead of a dedicated search service. The performance degradation at scale and the lack of relevance tuning are the most common reasons to migrate."},
+  {"q":"What is Algolia and what does it provide over Postgres full text?","a":"Algolia is a hosted search service that provides: sub-10ms search response times at any scale, typo tolerance (matches 'pubic' when searching for 'public'), instant search with results on each keystroke, faceted filtering (search results filterable by category, date range, status), and relevance ranking tunable by attribute. Algolia handles indexing asynchronously and distributes the index globally for low-latency responses anywhere. The main limitation is cost: Algolia pricing is based on search operations and record count, which becomes expensive at high search volumes or large record counts."},
+  {"q":"What is Typesense and how does it compare to Algolia?","a":"Typesense is an open-source search engine that can be self-hosted or used as a cloud service (Typesense Cloud). It provides similar features to Algolia (typo tolerance, faceted search, instant search) at lower cost because the open-source option eliminates licensing fees for self-hosted deployments. Typesense is the right choice for teams with DevOps capability who want Algolia-like search without Algolia's pricing, or for teams with data residency requirements that prohibit sending search data to Algolia's infrastructure. Typesense's documentation and community are smaller than Algolia's but have grown significantly in the last two years."},
+  {"q":"What is semantic search and when does it matter?","a":"Semantic search finds results based on meaning rather than keyword matching. A semantic search for 'how to reset my password' finds the document titled 'account recovery process' even though neither 'reset' nor 'password' appears in the title. Traditional keyword search (Postgres full text, Algolia, Typesense) finds documents containing the literal search terms. Semantic search requires vector embeddings and a vector database or vector search index. For SaaS product search (searching user-created content within the product), traditional keyword search covers the majority of use cases. Semantic search becomes valuable for knowledge base search, support documentation search, and AI-powered product features."},
+  {"q":"How do you handle search indexing when product data changes frequently?","a":"Search indexing strategies for frequently changing data: synchronous indexing (update the search index in the same transaction as the database write, ensuring immediate search visibility at the cost of write latency), asynchronous indexing via events (publish a database change event, consume it to update the search index, providing eventual consistency with no write latency impact), and scheduled full reindex (rebuild the entire search index on a schedule, simple but produces stale search results between rebuilds). For most SaaS products, asynchronous event-driven indexing is the right approach: it provides near-real-time search visibility (seconds to minutes) without adding latency to write operations."}
+]
+---
+
+## What you need to know
+
+- Postgres full-text search with GIN indexes handles search for most early-stage SaaS products. Add a dedicated search service when relevance, typo tolerance, or instant search are product requirements.
+- Algolia provides the best developer experience and the highest-quality search out of the box, at the highest price.
+- Typesense is the right alternative to Algolia for teams who want similar features with self-hosting capability and lower cost.
+- Search indexing should be asynchronous and event-driven. Synchronous indexing adds write latency; scheduled full reindex produces stale results.
+- Semantic search is different from keyword search and requires a separate vector infrastructure. Do not conflate the two.
+
+## The core argument
+
+Search quality directly affects user experience in ways that are immediately visible. Users who search for something and get irrelevant results or no results conclude the product does not have what they need, even when it does. The search quality bar has risen as users experience Algolia-powered instant search everywhere and form expectations accordingly.
+
+The decision for most SaaS products is: start with Postgres full-text for the simplest implementation, and migrate to Algolia or Typesense when search quality becomes a product concern. The migration is straightforward because search is an additive feature: the Postgres data remains the source of truth, and the search index is a derived read model. Migrating the search layer does not require changing the data model.
+
+The signal for when to migrate is consistent: users searching and not finding what they clearly should find, or search feedback in user research that mentions slow or irrelevant results. Before that signal, Postgres full-text is the right balance of simplicity and functionality. After that signal, Algolia or Typesense provides the quality improvement without a data architecture change.
+
+## Common mistakes
+
+1. **Not using GIN indexes on tsvector columns.** Postgres full-text search without GIN indexes produces sequential scans on every search query. Every table with a full-text search requirement needs a GIN index on its tsvector column (or a generated tsvector column). Without this index, full-text search performance degrades severely as the table grows.
+
+2. **Indexing everything in the search corpus.** Search quality degrades when the index contains content the user is not searching for (system-generated content, metadata, deleted records). Curate what is indexed based on what users actually search for, and maintain the search index to remove records when the corresponding data is deleted or archived.
+
+3. **Building synchronous indexing for Algolia or Typesense.** Calling the Algolia or Typesense API synchronously in the same request as the database write adds the search API latency to every write operation. Build search indexing as an asynchronous background operation triggered by database change events.
+
+4. **Not implementing search analytics.** Tracking what users search for and whether they click on results provides invaluable data for search quality improvement. Search queries with zero results are product feedback (users are looking for things the product does not have or cannot find). Implement search analytics before optimizing search relevance, because the analytics data directs optimization effort.
+
+5. **Using the same search configuration for all content types.** A product where users can search both documents and people needs different relevance configuration for each content type (searching for a person's name should match the name field at highest priority; searching for document content should match the body at highest priority). Use separate search indexes or separate configurations per content type.
+
+## Where to start
+
+1. **Implement Postgres full-text with GIN index for the primary search surface.** Add a generated tsvector column to the primary searchable table, create a GIN index on it, and write queries using the @@ operator with to_tsquery. Test the search with representative queries from users and verify that the results are relevant.
+
+2. **Instrument search with query logging and result click tracking.** Log every search query, the number of results returned, and whether the user clicked a result. This data identifies zero-result queries (immediate improvement opportunities) and low-click-through queries (relevance issues). Review this data weekly before investing in search infrastructure changes.
+
+3. **Evaluate Algolia or Typesense if the search instrumentation reveals relevance or latency problems.** The evaluation criteria: does the search service produce better results for the queries users are actually running? Test with the real query data from the search logs. If the improvement is significant for the user-facing use case, the migration cost is justified.
+
+## Related reading
+
+- [Query Optimization in PostgreSQL: Real Examples From Real Projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects)
+- [RAG (Retrieval Augmented Generation) for SaaS: When It Helps and When It Does Not](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- [SaaS Analytics Infrastructure: PostHog vs Mixpanel vs Snowflake vs Build Your Own](/blog/saas-analytics-infrastructure-posthog-vs-mixpanel-vs-snowflake-vs-build-your-own)

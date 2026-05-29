@@ -1,0 +1,113 @@
+---
+slug: "ai-function-calling-the-pattern-that-changes-product-surface-area"
+title: "AI Function Calling: The Pattern That Changes Product Surface Area"
+excerpt: "Function calling is not a feature, it is a re architecture. Done right, it shrinks your UI and grows what the user can do. Done wrong, it is a confused agent that nobody trusts."
+date: "2026-05-18"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","architecture","product"]
+readingMinutes: 11
+ogImage: "/api/og/blog/ai-function-calling-the-pattern-that-changes-product-surface-area"
+status: "published"
+definition: "AI function calling lets a model decide which of your API endpoints to invoke and with what arguments, instead of the user clicking through a UI to do it. Used well, it collapses three screens of workflow into one sentence the user types. Used carelessly, it produces an unpredictable agent that calls the wrong endpoint and erodes user trust faster than any other AI feature."
+faq: [
+  {"q":"What is function calling in plain English?","a":"You give the AI a list of tools it can use, like 'create invoice' or 'send reminder' or 'fetch report'. The AI reads what the user wants in natural language and decides which tool to call and with what arguments. The model is the dispatcher. The product code is the executor."},
+  {"q":"How is this different from a normal API?","a":"In a normal API, the developer decides which endpoint runs in response to a user click. In function calling, the model decides based on natural language. The developer's job shifts from designing click flows to designing tool definitions and guardrails."},
+  {"q":"Which scenarios are best for function calling?","a":"Workflows where the user knows what they want but cannot find the right screen. Customer support, internal tools, complex SaaS dashboards. Less well suited for visual or discovery driven products where the value is in the UI itself."},
+  {"q":"What goes wrong most often?","a":"The model calls the wrong function, calls the right function with wrong arguments, or chains functions in a way the developer did not anticipate. The fix is tight tool definitions, schema validation on every call, and a human confirmation step for destructive operations."},
+  {"q":"Should function calling replace my UI?","a":"Sometimes. For power users in internal tools, a chat interface plus function calling can replace a dashboard. For most consumer products, function calling should augment the UI, not replace it. The user still wants buttons for the things they do every day."},
+  {"q":"How do I prevent the AI from calling a destructive function by mistake?","a":"Two layers. First, do not give the model destructive tools without a confirmation step. Second, build a permissions layer that checks who is asking before the function executes. The model proposes, the system disposes."},
+  {"q":"How do I evaluate function calling reliability?","a":"Build an eval suite where each input has a known correct function call. Measure the percentage of times the model picks the right function with the right arguments. In my experience, a well designed tool set hits ninety to ninety eight percent accuracy. Below ninety percent, the tools are probably ambiguous."}
+]
+---
+
+## What you actually need to know
+
+- Function calling reframes the product surface from clicks to intents. The user describes what they want, the AI dispatches to your code.
+- The hard work is tool definition, schema validation, and confirmation flows for destructive operations.
+- The wrong scenarios for function calling are visual products and discovery driven workflows.
+- A well designed tool set hits ninety percent plus accuracy. Below that, the tools themselves are the problem.
+- In my experience, function calling pays off most in internal tools and power user workflows.
+
+| Approach | Where it fits | Where it fails |
+|---|---|---|
+| Pure chat interface | Internal tools, expert users | New users, discovery driven products |
+| UI with optional chat | Most SaaS, power user surfaces | When the chat is bolted on as a marketing feature |
+| Hidden function calling behind a button | Targeted automation, single workflow | When the workflow has too many edge cases |
+
+## The core argument
+
+Function calling sounds like an API feature. It is actually a product architecture decision. The moment you let the model decide which endpoint to invoke, you have to redesign the boundary between the model and your business logic. You have to write tool definitions that are unambiguous. You have to add schema validation on every call. You have to think about confirmation flows for anything that touches money, identity, or shared state.
+
+The teams that get this right do not start with the chat box. They start with the inventory of tools. They write down every action the user might want to take, in a format the model can read. They tune the descriptions until the model picks the right tool ninety percent of the time on a held out set of real user inputs. Only then do they wire the chat box on top.
+
+The teams that get this wrong start with the chat box. They give the model access to thirty functions on day one. They ship without an eval suite. The first time a user types a slightly ambiguous request, the model picks the wrong function. The destructive function. The function the user did not want. Trust evaporates in one bad call.
+
+The difference is discipline. Function calling rewards the team that designs the tools as carefully as they would design a public API. It punishes the team that treats the model as a magic interpreter that figures it out.
+
+## What good tool definitions look like
+
+Tool definitions are the contract between the model and your code. They need three things. A name that describes exactly what the tool does. A description that the model uses to decide whether this is the right tool for the user's input. A JSON schema for the arguments, with strict types and explicit enums where possible.
+
+The mistake I see most often is descriptions that are vague. "Update user data" is bad. "Update the email address on a customer account, given the customer ID and the new email" is good. The model needs to know not only what the tool does but also when not to use it. A description that fails to draw the line between this tool and the neighboring one is a description that produces wrong calls.
+
+The other mistake is schemas that are loose. If your tool takes a "date" argument as a string, the model will send you whatever shape of date it feels like. ISO 8601, natural language, sometimes both in the same week. Enforce the format in the schema. Reject malformed calls. Force the model to retry with the right shape.
+
+## Confirmation flows for destructive actions
+
+The model is going to call the wrong function sometimes. Plan for that. Any action that the user cannot undo with one click should require explicit confirmation. The model proposes the call, the system shows the user what is about to happen, the user approves or rejects.
+
+The pattern looks like this. The model decides to call "delete invoice." The system intercepts the call, shows the user "I am about to delete invoice 4392 for 1200 dollars. Confirm?" The user clicks confirm. The function executes. The user can also click cancel and modify their request.
+
+This pattern adds one tap to every destructive flow. The tradeoff is enormous. The team never has to apologize for an action the user did not intend. The user never feels the AI ran away with their account.
+
+## What it actually costs
+
+| Setup | Engineering effort | Outcome |
+|---|---|---|
+| Toy chat plus a few tools | One week | Demo quality, breaks in real use |
+| Five tools, schema validation, eval suite | One month | Reliable internal tool |
+| Twenty tools, confirmation flows, permissions | Two to three months | Production grade power user surface |
+| Open ended agent with broad tool access | Three to nine months | High maintenance, requires ongoing eval and tuning |
+
+These ranges come from my own client work and what I see in the broader ecosystem. The single largest cost driver is the number of tools. Each new tool adds eval cases, permission considerations, and edge cases for the dispatcher to disambiguate. Adding tools is not free.
+
+## Features to demand from the architecture
+
+- Strict JSON schemas on every tool, with the model enforced to produce valid arguments.
+- A permission layer that runs on every call, independent of what the model decided.
+- A confirmation step for any destructive or expensive operation.
+- An audit log of every function call, with the user, the input, the tool, the arguments, and the result.
+- An eval suite that runs on every prompt or model change, with a measurable accuracy score.
+- A fallback path when the model fails to pick any tool. The user should not be left guessing.
+
+## Expert opinion
+
+> Function calling is the architecture that makes AI products feel like real software. It is also the architecture that breaks the loudest when the team has not done the discipline work. The teams that ship it well treat the tool list like a public API. The teams that ship it badly treat the tool list like a magic box.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+A client project I shipped last year used function calling to replace a six step internal tool. The original workflow had the support engineer click through three screens to look up a customer, find the relevant invoice, and issue a refund. The function calling version let them type "refund the last invoice for customer 3382" and confirm the action. The same task that took ninety seconds now took twelve. The team adopted it within a week.
+
+The opposite story is one I cleaned up early in 2026. A team had built a customer facing chatbot with eighteen tools, no eval suite, and no confirmation flows. The model occasionally called "cancel subscription" when the user asked about pausing billing. Three customers churned that way before we caught the pattern. The fix was to tighten the tool descriptions, add a confirmation step for cancellation, and add an eval case for the exact ambiguous phrasing that triggered the bug. After those changes, the wrong tool problem disappeared.
+
+For more on the broader AI architecture patterns, see [building AI agents that do real work](/blog/building-ai-agents-that-do-real-work-beyond-the-demo) and [multi agent systems for SaaS](/blog/multi-agent-systems-for-saas-a-practical-architecture). For the testing discipline that function calling demands, [AI evals](/blog/ai-evals-how-to-test-your-ai-features-like-software) is the companion read.
+
+## Common mistakes teams make
+
+1. Too many tools. The model gets confused. Keep the inventory tight.
+2. Ambiguous descriptions. The model cannot tell when to use which tool, and picks one at random.
+3. Loose schemas. The arguments are malformed and the function fails silently or executes with bad data.
+4. No confirmation step on destructive actions. The first wrong call costs a customer.
+5. No eval suite. Every prompt change is a guess at whether reliability improved or regressed.
+6. Treating the chat box as the product. The chat is one surface. The UI is still the primary interaction for most users.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Inventory the actions the user takes in your product. Pick the five most frequent. Write tool definitions for those.
+2. **Week two.** Build the harness. The model takes a user message, picks a tool, the system executes. No production deployment yet.
+3. **Week three.** Build an eval suite. Twenty real user inputs with known correct calls. Measure accuracy.
+4. **Week four.** Add confirmation flows for any destructive tools. Ship to an internal team. Iterate based on real use before exposing to customers.
+
+For deeper reading on the related patterns, [the AI onboarding assistant](/blog/the-ai-onboarding-assistant-a-high-value-saas-feature) covers a specific high value use case, and [AI function calling failure modes](/blog/the-failure-modes-of-autonomous-ai-workflows) covers what happens when the architecture is missing the discipline.

@@ -1,0 +1,62 @@
+---
+slug: "runbooks-that-actually-get-used-during-incidents"
+title: "Runbooks That Actually Get Used During Incidents"
+excerpt: "Most runbooks are written once and never consulted during an actual incident. The ones that get used share specific qualities. Here is how to write runbooks that work when the pressure is on."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/runbooks-that-actually-get-used-during-incidents"
+status: "published"
+definition: "A runbook is a documented set of procedures for responding to a specific operational situation: a production incident, a scheduled maintenance task, or a known failure mode. Runbooks that are used during incidents are specific, actionable, and structured for execution under stress: numbered steps with expected outcomes, commands that can be copied and run directly, decision points that route to different procedures based on observed state, and escalation contacts for situations that exceed the runbook's scope. Runbooks that are not used are too abstract, too long, or contain commands that require interpretation before execution."
+faq: [
+  {"q":"What is the difference between a runbook and a playbook?","a":"A runbook is a procedure for a specific, defined situation with step-by-step actions. A playbook is a broader incident response strategy that may invoke multiple runbooks depending on the incident type. A runbook for a database connection pool exhaustion incident contains the specific commands to diagnose connection counts, the thresholds that indicate the problem, and the remediation steps. The incident response playbook for a P1 production incident describes how to declare the incident, who to notify, how to assign roles, and when to invoke which runbooks. Both are useful; neither replaces the other."},
+  {"q":"What makes a runbook actually usable under stress?","a":"Usable runbooks are: specific to one scenario (not a general troubleshooting guide), written for someone who knows the system but may be tired or stressed, numbered with clear expected outcomes after each step, populated with exact commands (not descriptions of commands), and structured with decision points (if you see X, go to step 8; if you see Y, escalate to the database on-call). The person executing the runbook should not need to think about what to do next; the runbook should tell them. Runbooks that require interpretation are not usable under stress."},
+  {"q":"How do you keep runbooks up to date?","a":"Runbooks decay as the system evolves: commands change, service names change, thresholds change. Keeping runbooks current requires: requiring runbook review as part of the incident postmortem (every incident that reveals a gap in the runbook results in a runbook update before the incident is closed), running runbook fire drills periodically (executing the runbook steps in a staging environment to verify they still work), and including runbook review in the deployment checklist for changes to the systems the runbook covers. Runbooks that are not reviewed on a cadence are unreliable because the system has changed without the runbook reflecting it."},
+  {"q":"What should an on-call runbook include?","a":"An on-call runbook should include: the alert name and what condition triggers it, the expected impact on users, initial diagnostic steps (what to check first to confirm the issue), common causes and their remediation steps, commands to run for diagnosis with expected output descriptions, decision trees for branching based on what is observed, escalation contacts and when to escalate (by time, by severity, by specific conditions that indicate the runbook's scope is exceeded), and rollback procedures if the remediation makes things worse. The diagnostic commands should be tested before the runbook is published."},
+  {"q":"How do you structure a runbook for a specific type of incident like a database outage?","a":"A database outage runbook structure: alert context (what triggered this runbook), immediate impact assessment (check status page, query current error rate), primary diagnosis (is the database reachable, are connections being accepted, is replication lag normal), common root causes in order of frequency with specific remediation steps for each, read replica failover procedure if the primary is confirmed down, escalation criteria and contacts for situations that require DBA involvement, and communication template for status page updates. The most frequently occurring root cause should be step one in the diagnosis section, not buried in a general troubleshooting section."}
+]
+---
+
+## What you need to know
+
+- Runbooks must be specific, not general. A runbook for "database issues" is not a runbook; it is a troubleshooting guide. Write one runbook per specific scenario.
+- Commands in runbooks must be executable as written. No placeholders, no assumptions about what the user knows to substitute. Copy-paste-ready commands.
+- Runbooks decay as systems evolve. Require a runbook review in every incident postmortem and every deployment that changes the covered system.
+- The worst time to write a runbook is during an incident. Write them after an incident, during the postmortem, when the incident is fresh.
+- Test runbooks in staging periodically. Runbooks that have never been executed are of unknown reliability.
+
+## The core argument
+
+The reason most runbooks are not used during incidents is that they are written for the wrong audience at the wrong time. They are written by engineers who deeply understand the system, for engineers who also deeply understand the system, at a time when no one is under pressure. The result is a document that assumes too much: that the person reading it knows which service name maps to which deployment, that they can interpret a partial command and fill in the right values, that they know which escalation path to take.
+
+During an incident at 2am, the engineer on call does not have the mental bandwidth to interpret, clarify, and adapt. They need a procedure that is executable as written. The bar for a runbook that works under stress is higher than the bar for documentation that works under normal conditions. Every step should have an expected outcome so the responder knows if they are on the right path. Every decision point should have explicit branching criteria. Every command should be copy-paste ready.
+
+The operational discipline that makes runbooks reliable is the postmortem. Every incident that either could not be resolved with the existing runbook or revealed a gap in the runbook's coverage results in a runbook update before the incident is closed. This creates a feedback loop: incidents improve runbooks, which improve incident response, which reduces incident severity. Teams that close incidents without updating runbooks accumulate technical debt in their incident response capability.
+
+## Common mistakes
+
+1. **Writing runbooks at too high a level of abstraction.** A runbook step that says "restart the failing service" is not actionable. Which service? What is the restart command? What is the expected behavior after restart? The step should say: `kubectl rollout restart deployment/api-server -n production` and then "after 2-3 minutes, verify the deployment is healthy with `kubectl get pods -n production` - all pods should show Running status."
+
+2. **Not including expected outputs.** A diagnostic command without an expected output leaves the responder unsure whether the command produced the right result. Include the expected output for each diagnostic step: "This command should show 3 running pods. If fewer than 3 are Running, proceed to step 7."
+
+3. **Writing runbooks for rarely occurring scenarios before the common ones.** Runbooks for catastrophic events (data center failure, security breach) are important, but the common incidents (high memory usage, slow database queries, certificate expiration) are more likely to benefit from runbooks because they occur regularly. Write runbooks in order of incident frequency, not severity.
+
+4. **Not having a version number or last-reviewed date on runbooks.** An undated runbook is of unknown reliability. Add a "last verified" date and the system version the runbook was verified against to every runbook. Any runbook older than 6 months without a review is suspect.
+
+5. **Storing runbooks in a system that is inaccessible during an incident.** Runbooks stored in the same system that is experiencing an incident are inaccessible when they are most needed. Store runbooks in a system that is independent of the production infrastructure: a public GitHub repository, a PagerDuty runbook, a dedicated documentation system on a different cloud provider. The production outage should not take down the runbook library.
+
+## Where to start
+
+1. **After the next incident, write the runbook before closing the postmortem.** The freshest and most accurate documentation of how to respond to an incident is written immediately after the incident, while the steps and commands are clear in the responder's mind. Make runbook creation a mandatory postmortem deliverable for incidents that did not have an existing runbook.
+
+2. **Identify the five most frequent alerts and write runbooks for each.** Pull the last 30 days of PagerDuty or on-call alert history and identify the five alerts that triggered most frequently. For each, write a runbook that covers the 80% case: the most common root cause and its remediation. This provides the highest coverage for the least writing effort.
+
+3. **Run a runbook fire drill quarterly.** Pick a runbook that has not been executed recently, follow the steps in a staging environment, and record any commands that fail, any steps that are unclear, or any assumptions that are not documented. Update the runbook based on the drill findings. Fire drills reveal runbook decay before an actual incident does.
+
+## Related reading
+
+- [Pager Fatigue and How to Prevent It](/blog/pager-fatigue-and-how-to-prevent-it)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Point-in-Time Recovery: A Founder's Insurance Policy](/blog/point-in-time-recovery-a-founders-insurance-policy)
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)

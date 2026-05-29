@@ -1,0 +1,105 @@
+---
+slug: "aws-ecs-vs-eks-vs-fargate-a-saas-founder-comparison"
+title: "AWS ECS vs EKS vs Fargate: A SaaS Founder Comparison"
+excerpt: "ECS for small teams who like AWS native. EKS for teams that want Kubernetes portability. Fargate for teams that do not want to manage nodes. The honest cost and operational trade offs."
+date: "2026-05-19"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["aws","ecs","eks","fargate","devops"]
+readingMinutes: 13
+ogImage: "/api/og/blog/aws-ecs-vs-eks-vs-fargate-a-saas-founder-comparison"
+status: "published"
+definition: "ECS is AWS's native container orchestrator, simpler than Kubernetes and cheaper to operate. EKS is managed Kubernetes, more portable but operationally heavier. Fargate is the serverless compute layer that runs containers without nodes for either ECS or EKS. Most SaaS startups land on ECS with Fargate, scale into ECS with EC2 for cost, and only adopt EKS when Kubernetes portability becomes a hard requirement."
+faq: [
+  {"q":"Is ECS or EKS cheaper at small scale?","a":"ECS is cheaper at small scale. EKS has a control plane fee of 72 USD per month per cluster. ECS does not. A team running one or two services on ECS Fargate often pays under 100 USD per month. The same workload on EKS adds the control plane and a worker node minimum."},
+  {"q":"When should I use Fargate instead of EC2 backed nodes?","a":"Use Fargate when your workload is bursty, low scale, or you do not want to manage nodes. Use EC2 backed when your workload is steady state at meaningful scale. The break even is usually around twenty containers running continuously. Above that, EC2 with reserved instances is cheaper."},
+  {"q":"Do I need EKS to run Kubernetes?","a":"On AWS, yes, if you want managed Kubernetes. You can run vanilla Kubernetes on EC2 yourself, but the operational cost is high. The control plane fee is the price of not running your own etcd cluster."},
+  {"q":"Can I migrate from ECS to EKS later?","a":"Yes, but it is a real project. The container images move directly. The task definitions translate to Kubernetes manifests with care. The service discovery and networking layers are the harder pieces. Plan four to twelve weeks depending on complexity."},
+  {"q":"What about App Runner and Lightsail?","a":"App Runner is the simplest path for a single web service. Lightsail is fine for very early MVPs. Both have lower ceilings than ECS or EKS. They are good defaults for the first six months. Migrate when you have more than one service or need fine grained control."},
+  {"q":"Should I avoid AWS for container orchestration?","a":"For teams that want a simpler experience, look at Fly.io, Railway, Render, or Google Cloud Run. The cost is often lower at small scale. The cost at large scale crosses over and AWS wins. The right call depends on your growth model."},
+  {"q":"What is the most common mistake?","a":"Picking EKS too early. The operational tax is real. A team of two engineers running EKS without a platform team will spend a quarter of their time on cluster work. Pick ECS Fargate first. Move to EKS only when you have a reason."}
+]
+---
+
+## What you actually need to know
+
+- ECS with Fargate is the right default for most SaaS startups on AWS.
+- EKS makes sense when Kubernetes portability is a hard requirement.
+- Fargate removes node management. EC2 backed nodes win on cost at scale.
+- The migration from ECS to EKS is real but not catastrophic.
+- Start simple. The platform team you do not have is paying the operational tax.
+
+| Option | Setup time | Monthly cost at small scale | Operational tax | Best fit |
+|---|---|---|---|---|
+| ECS with Fargate | One day | 50 to 300 USD | Low | Most SaaS startups |
+| ECS with EC2 | Two to three days | 100 to 800 USD | Medium | Cost optimized at scale |
+| EKS with Fargate | Three to five days | 150 to 500 USD | Medium | Teams committed to Kubernetes |
+| EKS with EC2 | One to two weeks | 250 to 1500 USD | High | Mature platforms |
+| App Runner or Lightsail | Half a day | 50 to 200 USD | Lowest | MVPs and single services |
+
+## The core argument
+
+I have run ECS, EKS, and Fargate in production for client work. The mental model that keeps me out of trouble is to pick the option that matches the team I am running it for. A team of two engineers should not be running EKS. A team of fifteen engineers with a platform engineer should not be running raw EC2 instances by hand.
+
+ECS is AWS's own container orchestrator. It is simpler than Kubernetes, integrates cleanly with the rest of AWS, and works well for teams that do not need the Kubernetes ecosystem. The downside is portability. ECS is AWS specific. If you ever want to move your workload elsewhere, the task definitions do not translate cleanly.
+
+EKS is managed Kubernetes. The control plane is operated by AWS, the worker nodes are operated by you, and the application contract is the standard Kubernetes API. The win is portability and ecosystem. The cost is operational complexity. A team running EKS without a dedicated platform engineer pays the tax in time and incidents.
+
+Fargate is the serverless compute layer. It runs containers without nodes. You pay per task per second. The win is no node management. The cost is roughly two to three times the EC2 backed equivalent at steady state. The break even depends on workload shape.
+
+The right call for most SaaS startups is ECS with Fargate. Cheap to start, simple to operate, no node management. Move to ECS with EC2 once you have steady state workload at scale. Adopt EKS when portability becomes a real requirement, not a hypothetical one.
+
+## The honest cost math
+
+Take a SaaS at modest scale. Two backend services, one frontend, one background worker, a database, a Redis. The compute is roughly four containers running continuously.
+
+On ECS with Fargate, the compute bill is roughly 150 to 250 USD per month. On ECS with EC2 reserved instances, the same workload is roughly 80 to 120 USD per month. On EKS with Fargate, add 72 USD for the control plane plus the same Fargate compute. On EKS with EC2, add the control plane plus your worker node minimums.
+
+At ten times the scale, the absolute numbers grow linearly but the percentage difference is the same. The control plane fee becomes negligible at scale. The compute cost is what dominates.
+
+## Features to demand from any setup
+
+- Zero downtime deployment as a first class concern.
+- Centralized logging to CloudWatch or a third party.
+- Centralized metrics with alarms on real SLOs.
+- Secret management through Parameter Store or Secrets Manager.
+- Network isolation through VPC, security groups, and load balancers.
+- Auto scaling on real signal, not just CPU.
+- A runbook for the on call engineer.
+
+## Expert opinion
+
+> The instinct to pick Kubernetes early is almost always wrong. The Kubernetes ecosystem is large, mature, and powerful. It is also a full time job to operate well. A startup with two engineers running EKS is a startup with one and a half engineers building product. Pick the simpler option until you have a real reason to upgrade.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was running on EKS because the founding engineer had Kubernetes experience from a previous job. The cluster was two months old. The team had spent roughly thirty percent of their engineering time on cluster work. Two outages had been caused by misconfigured node groups.
+
+We ran the math on migrating to ECS with Fargate. The compute cost would rise by roughly twenty five percent. The operational tax would drop from thirty percent of engineering time to under five percent. The team agreed.
+
+The migration took three weeks. The new platform has run for fourteen months with zero infrastructure incidents. The product velocity nearly doubled. The cost difference is real but small compared to the engineering time recovered.
+
+For more on the broader infrastructure decisions, see [Kubernetes for startups when it makes sense when it does not](/blog/kubernetes-for-startups-when-it-makes-sense-when-it-does-not) and [serverless vs containers vs bare metal a cost and flexibility map](/blog/serverless-vs-containers-vs-bare-metal-a-cost-and-flexibility-map).
+
+## Common mistakes teams make
+
+1. Picking EKS for a two engineer team. The operational tax kills velocity.
+2. Running EC2 backed Fargate without understanding the cost crossover.
+3. No auto scaling. The cluster either over provisions or fails under load.
+4. No centralized logging. Debugging a production incident becomes a fishing expedition.
+5. Mixing development and production in the same cluster. The blast radius is too large.
+6. No runbook. The on call engineer wakes up and stares at the console.
+7. Skipping load balancer health checks. The traffic hits unhealthy tasks.
+
+## A two week setup plan for ECS with Fargate
+
+1. **Days one to two.** Create the VPC, subnets, security groups, and the ECS cluster.
+2. **Days three to four.** Define the task definitions. One per service. Wire them to the load balancer.
+3. **Days five to six.** Set up CloudWatch logs, metrics, and alarms. Define the on call rotation.
+4. **Days seven to eight.** Add auto scaling. Test under synthetic load.
+5. **Days nine to ten.** Wire the deployment pipeline. Zero downtime as the default.
+6. **Days eleven to twelve.** Write the runbook. Walk it with the team.
+7. **Days thirteen to fourteen.** Shadow the existing system. Cut over. Decommission the old.
+
+For more on the operational side, read [CI CD pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library) and [blue green deployments vs canary vs rolling a decision tree](/blog/blue-green-deployments-vs-canary-vs-rolling-a-decision-tree). On the cost side, [how to read AWS Azure and GCP invoices without crying](/blog/how-to-read-aws-azure-and-gcp-invoices-without-crying) is the natural next read.

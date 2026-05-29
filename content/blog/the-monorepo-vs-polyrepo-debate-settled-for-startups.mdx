@@ -1,0 +1,222 @@
+---
+slug: "the-monorepo-vs-polyrepo-debate-settled-for-startups"
+title: "The Monorepo vs Polyrepo Debate Settled for Startups"
+excerpt: "For startups with 1-10 engineers, the monorepo wins: shared types, one CI pipeline, and no cross-repo dependency headaches."
+date: "2025-07-29"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","monorepo","ci-cd"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-monorepo-vs-polyrepo-debate-settled-for-startups"
+status: "published"
+definition: "A monorepo is a single Git repository that contains multiple related packages or applications. A polyrepo (or multirepo) is a separate Git repository for each package or application. The debate between them is about developer experience, CI/CD complexity, and team coordination overhead. For startups and small teams, the monorepo wins on nearly every dimension: shared TypeScript types across frontend and backend, one CI pipeline to maintain, atomic commits across related changes, and no dependency versioning across repositories."
+faq: [
+  {"q":"What are the specific advantages of a monorepo for a startup?","a":"Four advantages that are most pronounced at startup scale: shared TypeScript types across the frontend and backend (change an API type once, TypeScript flags it everywhere), atomic commits for cross-cutting changes (one PR changes the database schema, the API, and the frontend type -- no coordination across repos), one CI pipeline to maintain rather than one per repo, and consistent tooling (one linting config, one test runner config, one formatting config applies everywhere). These advantages compound as the codebase grows and the team adds engineers."},
+  {"q":"When does a monorepo become a liability?","a":"When the repository is so large that routine Git operations (clone, checkout, log) become slow, when the CI pipeline is so complex that targeted builds require significant tooling investment, or when different packages have genuinely incompatible tooling requirements (mixing TypeScript with Python with Go in one repo, each with different build systems). For JavaScript/TypeScript codebases, these limitations typically appear at 50+ engineers and hundreds of packages -- well beyond startup scale. For mixed-language codebases, the monorepo benefits are reduced because sharing types across language boundaries is not straightforward."},
+  {"q":"What tooling manages a JavaScript/TypeScript monorepo?","a":"Turborepo is the current standard for JavaScript/TypeScript monorepos: it manages build caching, parallel task execution, and task dependency ordering across packages. pnpm workspaces (or npm/yarn workspaces) manages package dependencies and linking. The combination of pnpm workspaces + Turborepo handles the two core monorepo problems: dependency management between packages and incremental build execution (only rebuild packages that changed). For Next.js-based monorepos, Vercel owns Turborepo and the integration is well-supported."},
+  {"q":"How do you share TypeScript types between frontend and backend in a monorepo?","a":"Create a shared `packages/types` package that exports common types (API response types, shared domain types, database entity types). The frontend and backend both import from this package. In a monorepo with workspace linking, the import looks like a regular package import (`import { User } from '@yourorg/types'`) but is actually symlinked to the local package -- no publishing required. When the type changes, TypeScript immediately flags mismatches in both the frontend and backend, without a publish-and-update cycle across separate repositories."},
+  {"q":"What does a monorepo CI/CD pipeline look like for a Next.js + Express project?","a":"Turborepo's `--filter` flag runs tasks only for packages that have changed, based on the git diff. A CI pipeline with Turborepo: run `turbo build --filter=[HEAD^1]` to build only packages affected by the current commit, `turbo test --filter=[HEAD^1]` to test only affected packages. For deployment, each deployable package has its own deployment step that runs only when that package is included in the affected set. Vercel handles Next.js deployment automatically with monorepo detection; backend services deploy to Railway or Fly.io via a separate workflow that triggers when the backend package changes."}
+]
+---
+
+## What you actually need to know
+
+- For a 1-10 engineer startup with a TypeScript frontend and TypeScript backend, use a monorepo. The shared types and atomic commits alone justify it.
+- Turborepo + pnpm workspaces is the standard 2026 monorepo toolchain for JavaScript/TypeScript projects.
+- The monorepo CI pipeline uses affected-package detection to run only what changed. One repo does not mean running all tests on every commit.
+- The polyrepo is the right choice when the applications are genuinely independent (different teams, different languages, no shared types) -- not as a premature optimization for a future state.
+- Monorepo limitations (slow Git operations, CI complexity) appear at 50+ engineers and hundreds of packages. Startups do not encounter them.
+
+| Consideration | Monorepo | Polyrepo |
+|---|---|---|
+| Shared TypeScript types | Automatic (local packages) | Requires publishing + versioning |
+| Cross-cutting changes | One PR, one review | Multiple PRs, coordination overhead |
+| CI pipeline | One pipeline, affected-package detection | One pipeline per repo |
+| Tooling consistency | One config for all packages | Per-repo config drift |
+| Repository cloning | One clone | Multiple clones |
+| Team independence | Shared codebase | Full isolation |
+| Git performance at scale | Degrades at 100s of packages | Scales with team size |
+
+## The core argument
+
+The polyrepo is often chosen for reasons that do not apply to the startup context: "we want team independence," "we want different deployment cadences," "we want to avoid coupling." These are real concerns -- at scale, with large teams, where true independence is needed. For a team of 3-6 engineers building one product, these concerns are hypothetical, and the polyrepo's costs are immediate.
+
+The most concrete cost: shared TypeScript types across a frontend and backend in separate repositories require a publishing workflow. Change the `User` type in the backend? You must publish the types package, update the version in the frontend's `package.json`, install the new version, and then the TypeScript errors appear. In a monorepo, the same change is made once, and TypeScript immediately flags every downstream mismatch in the same repository. The feedback loop difference is 30 seconds (monorepo) versus 5-10 minutes (polyrepo).
+
+Multiply this by every cross-cutting change over the product's lifetime and the developer experience cost of the polyrepo becomes significant. Multiply it by the number of times a junior engineer forgets to bump the shared types version and the production bug risk becomes measurable.
+
+The monorepo also simplifies the question "what changed in this release?" Every change in a release is in one git log. Cross-repository coordination, changelog aggregation, and rollback are all simpler when the entire codebase is one repository.
+
+## The monorepo structure for a Next.js SaaS product
+
+A typical monorepo for a SaaS with a Next.js frontend and an Express API:
+
+```
+my-product/
+  apps/
+    web/                    -- Next.js application
+      package.json
+      src/
+    api/                    -- Express API
+      package.json
+      src/
+  packages/
+    types/                  -- Shared TypeScript types
+      package.json
+      src/index.ts
+    ui/                     -- Shared React components
+      package.json
+      src/
+    config/                 -- Shared configuration (ESLint, TypeScript)
+      package.json
+      eslint-config.js
+      tsconfig.json
+  package.json              -- Root workspace config
+  pnpm-workspace.yaml
+  turbo.json
+```
+
+The root `pnpm-workspace.yaml`:
+```yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+```
+
+The root `turbo.json`:
+```json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+The `^build` dependency means: run the `build` task in all dependency packages before running `build` in this package. This ensures `packages/types` is built before `apps/web` tries to import from it.
+
+## Shared types in practice
+
+The `packages/types` package exports types shared between the frontend and API:
+
+```typescript
+// packages/types/src/index.ts
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  plan: 'free' | 'starter' | 'pro';
+  createdAt: string;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+```
+
+In the Next.js app:
+```typescript
+import type { User, ApiResponse } from '@myproduct/types';
+
+async function getUser(id: string): Promise<ApiResponse<User>> {
+  const response = await fetch(`/api/users/${id}`);
+  return response.json();
+}
+```
+
+In the Express API:
+```typescript
+import type { User, ApiResponse } from '@myproduct/types';
+
+app.get('/api/users/:id', async (req, res) => {
+  const user = await db.users.findById(req.params.id);
+  const response: ApiResponse<User> = { data: user };
+  res.json(response);
+});
+```
+
+When the `User` type changes (adding a field, changing a type), TypeScript flags every usage in both apps simultaneously. No publishing, no version coordination.
+
+## The CI/CD pipeline
+
+Turborepo's `--filter` flag runs tasks only for packages affected by the current commit:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for Turborepo affected-package detection
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint and type check
+        run: pnpm turbo lint typecheck
+
+      - name: Test
+        run: pnpm turbo test --filter=[HEAD^1]
+
+      - name: Build
+        run: pnpm turbo build --filter=[HEAD^1]
+```
+
+The `--filter=[HEAD^1]` runs tasks only for packages that changed since the previous commit. A commit that only changes `apps/web` does not trigger the API's test suite. The CI time grows with the scope of the change, not with the total repository size.
+
+For deployment: the web app deploys to Vercel automatically (Vercel has native monorepo support for Next.js). The API deploys to Railway when the `apps/api` package changes, using a conditional deployment step.
+
+## Common mistakes teams make with monorepos
+
+1. Not using a build orchestration tool. A monorepo without Turborepo (or Nx, or similar) has no build caching and runs all tasks on every commit. This produces slow CI times that grow linearly with the repository size. Build orchestration is not optional.
+2. Sharing too many packages. The `packages/ui` shared component library is appropriate; the `packages/button-specifically-for-the-checkout-page` is not. Over-granular package splitting creates version management overhead without benefit. Keep the number of packages small.
+3. Not setting up TypeScript project references. Without TypeScript project references, the TypeScript compiler does not understand the monorepo's package dependency graph. This produces slower type checking and missing cross-package type errors. Configure `tsconfig.json` with `references` to the packages the app depends on.
+4. Using npm workspaces instead of pnpm workspaces. npm workspaces have stricter hoisting behavior that causes phantom dependency problems (importing a package that is available because it is a dependency of a dependency, but is not explicitly listed). pnpm's stricter module resolution prevents this class of problem.
+5. Putting secrets or environment-specific configuration in the shared `packages/config`. Shared configuration is for linting rules, TypeScript settings, and development tooling -- not for API keys, database URLs, or environment variables. Each application's secrets remain in each application's environment configuration.
+
+## Where to start: a 3-step monorepo setup
+
+**Step 1: Initialize a pnpm workspace with the `apps/` and `packages/` directory structure.** Move the existing applications into `apps/web` and `apps/api`. Create an empty `packages/types` with the shared types that are currently duplicated between the two apps.
+
+**Step 2: Add Turborepo and configure the `turbo.json` task graph.** Run `pnpm turbo build` locally and verify the build order is correct (types build before the apps that use them). Enable remote caching with Vercel's Turborepo remote cache to share build artifacts between CI runs.
+
+**Step 3: Update the CI pipeline to use Turborepo's affected-package detection.** Replace `npm test` with `turbo test --filter=[HEAD^1]`. Verify that a commit to `apps/web` does not trigger the `apps/api` test suite.
+
+## The Repository That Moves as One
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. Expert Tutorials runs as a monorepo with a Next.js app and a separate API service. The setup took one day -- converting the two separate repositories to a pnpm workspace with Turborepo and migrating the duplicated type definitions to a shared `packages/types`. The first benefit appeared in the same week: a breaking change to the user API response format was caught immediately by TypeScript in the frontend, before any build or deployment. In the polyrepo setup, that type mismatch would have required a publish-update-install cycle to surface. The monorepo catches it in the editor, in real time. That is the developer experience difference that makes the one-day setup cost clearly worthwhile.
+
+## Related reading
+
+- The CI/CD Pipeline for a Solo Developer
+- [The Migration from Heroku: A Step By Step](/blog/the-migration-from-heroku-a-step-by-step)
+- [The Modern Web App Stack: A 2026 Survey](/blog/the-modern-web-app-stack-a-2026-survey)
+- [The Modular Monolith: How to Buy Yourself Two Years](/blog/the-modular-monolith-how-to-buy-yourself-two-years)

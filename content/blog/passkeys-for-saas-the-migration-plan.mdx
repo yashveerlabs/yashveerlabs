@@ -1,0 +1,62 @@
+---
+slug: "passkeys-for-saas-the-migration-plan"
+title: "Passkeys for SaaS: The Migration Plan"
+excerpt: "Passkeys are the successor to passwords and are now supported across all major platforms. Here is what passkeys actually are, how they work technically, and how to migrate an existing SaaS application without breaking current users."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/passkeys-for-saas-the-migration-plan"
+status: "published"
+definition: "Passkeys are cryptographic credentials that replace passwords for authentication. Each passkey consists of a public key stored on the server and a private key stored on the user's device. Authentication proves possession of the private key using device biometrics or PIN, without transmitting the private key or any shared secret. Passkeys are phishing-resistant because they are bound to the origin (domain) they were created for and cannot be used on lookalike sites. They are part of the WebAuthn (FIDO2) standard."
+faq: [
+  {"q":"How do passkeys work technically?","a":"Passkey authentication is a public-key cryptography challenge-response protocol. Registration: the server sends a challenge, the client generates a public-private key pair, stores the private key securely on the device (protected by biometrics or PIN), and sends the public key to the server. Authentication: the server sends a challenge signed with the stored public key, the client verifies the user's identity (biometric or PIN), signs the challenge with the private key, and sends the signature to the server for verification. The private key never leaves the device."},
+  {"q":"What is phishing resistance and why do passkeys provide it?","a":"Passkeys are bound to the origin (domain + protocol + port) they were created for. A passkey created for app.example.com cannot be used on app.examp1e.com (a lookalike domain). When a user is redirected to a phishing site, the browser refuses to use the passkey because the origin does not match. Traditional passwords are not origin-bound: a user who types their password on a phishing site has provided it to the attacker. This origin binding is the primary security advantage of passkeys over passwords and TOTP-based MFA."},
+  {"q":"What happens when a user loses their device with their passkeys?","a":"Passkeys stored in platform authenticators (Apple Keychain, Google Password Manager, Windows Hello) sync across the user's devices within the same ecosystem. A user who loses an iPhone can access their passkeys on a new iPhone after signing in with their Apple ID. For cross-device scenarios, passkeys can be used on a new device by using an existing device as an authenticator through QR code and Bluetooth proximity verification. Account recovery for users with no remaining devices requires a fallback recovery flow (backup codes, email verification) that must be designed into the application."},
+  {"q":"Can passkeys coexist with passwords during migration?","a":"Yes, and coexistence is the recommended migration approach. Add passkey support as an additional authentication method alongside existing password and MFA flows. Prompt users who authenticate successfully with a password to create a passkey for future use. Over time, the proportion of passkey users grows as users opt in. Eventually, the application can offer passwordless-only authentication as the primary path while maintaining password authentication as a fallback for users who have not migrated. A hard cutover from passwords to passkeys is not recommended."},
+  {"q":"What WebAuthn libraries exist for implementing passkeys?","a":"For Node.js backends, the @simplewebauthn/server and @passwordless/node libraries handle the server-side WebAuthn protocol. For browser clients, @simplewebauthn/browser handles the client-side ceremonies. For React Native, the Expo passkeys library and the React Native Passkey library provide native platform integration. Auth0, Clerk, and WorkOS support passkeys as a configuration option if the application uses one of these providers."}
+]
+---
+
+## What you need to know
+
+- Passkeys are phishing-resistant because they are bound to the specific domain they were created for. No password manager prompt to fall for, no lookalike domain attacks.
+- Passkeys sync across devices within platform ecosystems (Apple, Google, Microsoft). Users who set up a passkey on an iPhone can use it on their iPad and Mac automatically.
+- Migration should be additive, not a cutover. Add passkey support alongside passwords, prompt users to create passkeys after successful password authentication, and let adoption grow over time.
+- Every passkey implementation needs an account recovery path for users who lose all their registered devices. Design this before launch, not after the first user gets locked out.
+- WebAuthn is the underlying standard. Passkeys are the consumer-friendly name for platform-backed WebAuthn credentials. The technical implementation uses the WebAuthn API.
+
+## The core argument
+
+Passkeys represent the most significant improvement in authentication security for typical SaaS users in a decade. Phishing is responsible for a significant portion of credential compromise incidents, and passkeys are technically immune to phishing when implemented correctly. For a SaaS product serving business users, migrating to passkey support is a competitive and security differentiator that gets easier to implement as platform support matures.
+
+The migration challenge is not technical complexity (WebAuthn libraries handle the protocol correctly) but user experience design. Authentication is one of the highest-stakes user experiences in a SaaS product: a friction increase in the sign-in flow causes measurable drop-off, and a confusing passkey setup flow causes users to give up and stick with passwords. The migration plan must include a setup flow that is clear about what a passkey is, a prompt that appears at the right moment (after successful authentication, not on every sign-in), and a fallback that makes users who decline passkeys not feel penalized.
+
+The most common failure mode I see in passkey implementations is not the WebAuthn protocol but the account recovery story. Passkeys are bound to devices. Users lose devices, sell devices, and switch platforms. An application that does not have a clear, tested account recovery flow will have users locked out of their accounts within weeks of launching passkeys. Recovery flows must be designed before launch: backup codes, backup email verification, administrator recovery, or a combination. The recovery flow must also not become the phishing vector that passkeys were meant to prevent (a recovery page that accepts only an email address is weaker than the password it replaces).
+
+## Common mistakes
+
+1. **Implementing passkeys as a replacement for all authentication rather than as an addition.** Users on older devices, users in enterprise environments with managed devices, and users who have not opted in to their platform's credential sync are not ready for passkey-only authentication. Add passkeys as an option; do not remove passwords immediately.
+
+2. **Not handling the cross-device authentication scenario.** Users frequently sign in on a device that does not have their passkeys (a work computer, a public terminal). WebAuthn supports cross-device authentication via QR code and Bluetooth, but this flow must be tested and documented. Users who cannot figure out how to authenticate from a new device will log a support ticket.
+
+3. **Storing the credential ID insecurely.** The public key credential is not sensitive (it is public key material), but the credential ID is a user identifier that should be treated with appropriate security. Store it encrypted at rest with the rest of user authentication data.
+
+4. **Not prompting passkey creation at the right moment.** Prompting immediately after a user creates a new account interrupts onboarding. Prompting before a user has experienced the product value produces low uptake. The highest conversion point for passkey creation prompts is immediately after a successful password authentication: the user is authenticated, the passkey benefit is obvious, and the setup takes 30 seconds.
+
+5. **Not testing passkey authentication across browsers and platforms.** WebAuthn behavior varies between Chrome, Safari, and Firefox, and between mobile and desktop. Test the registration and authentication ceremonies on at least four platform combinations (Chrome/Mac, Safari/iPhone, Chrome/Android, Edge/Windows) before launch.
+
+## Where to start
+
+1. **Choose a WebAuthn library and read the server-side implementation guide.** For Node.js, @simplewebauthn/server has the most comprehensive documentation. For providers like Clerk or Auth0, passkeys may be a configuration option. Understand the registration and authentication ceremonies before writing implementation code.
+
+2. **Design the passkey registration UX before implementation.** Decide: when does the passkey creation prompt appear, what does the explanation say, what happens when the user declines, and how does the user manage their registered passkeys. These design decisions are as important as the technical implementation.
+
+3. **Design and test the account recovery flow.** Before launching passkeys to any users, simulate the scenario where a user has no accessible passkeys and needs to recover their account. Document the steps, test the flow manually, and ensure it cannot be bypassed with social engineering.
+
+## Related reading
+
+- [Multi-Factor Authentication: WebAuthn, TOTP, and Beyond](/blog/multi-factor-authentication-webauthn-totp-and-beyond)
+- [OAuth 2.0 Without Tears: A Founder Engineer's Guide](/blog/oauth-2-0-without-tears-a-founder-engineers-guide)
+- [JWT Best Practices in 2026: What Has Changed](/blog/jwt-best-practices-in-2026-what-has-changed)
+- [OWASP Top Ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026)

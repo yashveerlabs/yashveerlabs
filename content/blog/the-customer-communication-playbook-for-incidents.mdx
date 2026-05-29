@@ -1,0 +1,77 @@
+---
+slug: "the-customer-communication-playbook-for-incidents"
+title: "The Customer Communication Playbook for Incidents"
+excerpt: "What to say to customers during an outage, when to say it, and how to write the update that rebuilds trust after the incident ends."
+date: "2025-08-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","incident-response","communication","operations"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-customer-communication-playbook-for-incidents"
+status: "published"
+definition: "Customer communication during incidents is the discipline that separates companies that survive outages from the ones that lose accounts because of them. The technical fix matters. The communication around it matters just as much. Customers who are informed promptly, honestly, and with a clear timeline tolerate downtime far better than customers left in silence."
+faq: [
+  {"q":"How quickly should I send the first incident update?","a":"Within 15 minutes of confirming an incident is real. The first update does not need to have answers. It needs to acknowledge that something is wrong, confirm you are investigating, and promise the next update by a specific time. Silence for the first 30 minutes is the worst thing you can do."},
+  {"q":"Should I publish updates on the status page or send email?","a":"Both. The status page is the first place customers check. Email is the backup for customers who do not check the status page. Slack or in-app notifications work for products where customers are actively using the platform. All three channels matter during a major incident."},
+  {"q":"How honest should I be about the cause during the incident?","a":"Honest about impact, careful about cause. During the incident, say what is affected and what you are doing. Wait until after mitigation to explain the root cause. Speculating about cause during an incident is risky because your first hypothesis is often wrong."},
+  {"q":"What goes in the post-incident review that customers see?","a":"Three things: what happened (impact, timeline, root cause), what you did to fix it (mitigation steps), and what you are doing to prevent recurrence. Be specific. Generic post-mortems that say 'we are improving our monitoring' without specifics do not rebuild trust."},
+  {"q":"How do I write the post-incident summary without making my team look bad?","a":"Be direct about what failed and why. Customers respect honesty more than spin. A post-incident summary that clearly explains a configuration mistake and what was done to prevent it next time builds more trust than a vague statement about system improvements."}
+]
+---
+
+## What you actually need to know
+
+- The first update should go out within 15 minutes of confirming an incident, even if you have no answers yet.
+- Customers tolerate downtime. They do not tolerate silence during downtime.
+- Status page plus email is the minimum communication stack. In-app notifications add significant reach.
+- The post-incident review is a trust-building document, not a defensive one. Write it to rebuild, not to protect.
+- Every communication during an incident should include: what is affected, what you are doing, and when the next update will come.
+
+| Communication Channel | Reach | Latency | Best For |
+|---|---|---|---|
+| Status page | Users who check | Immediate | All incidents, first channel |
+| Email to affected accounts | High | 5 to 10 minutes | Major incidents, account-level impact |
+| In-app banner or notification | Active users only | Immediate | Products with high active session rates |
+
+## The core argument
+
+The worst incident communication I have seen is the one that does not exist. A 45-minute outage where the company posted nothing until after service was restored. By the time they updated the status page, the support inbox had 200 tickets, three enterprise customers had emailed their account managers, and one of them had started a cancellation request.
+
+The outage itself was recoverable. The silence was not. Customers who are left in the dark during an outage fill the silence with assumptions. Usually the worst ones. A company that does not communicate during a major incident is either hiding something or does not have its act together. Neither impression is good.
+
+The playbook is simple. Acknowledge fast. Update regularly. Explain honestly. Commit to follow-up. The specific words matter less than the cadence. A status update every 30 minutes during a major incident tells customers that someone is working the problem and that they will not be forgotten.
+
+## The incident communication template
+
+**Initial acknowledgment (within 15 minutes):**
+"We are currently investigating an issue affecting [service or feature]. We know this is impacting [number or type] of customers. Our team is on it. Next update in 30 minutes."
+
+**Progress update (every 30 minutes during the incident):**
+"Update as of [time]: We have identified [what you know]. We are working on [what you are doing]. Service is expected to recover by [time estimate, or 'we will update in 30 minutes']."
+
+**Resolution announcement:**
+"As of [time], the issue affecting [service] has been resolved. [Brief description of what was wrong and how it was fixed]. We will publish a full post-incident review by [time]."
+
+**Post-incident review (within 24 hours):**
+Timeline, root cause, mitigation steps, prevention actions. One to two pages. Published on the status page and sent to affected customers.
+
+## Common mistakes teams make during incidents
+
+1. Waiting to communicate until you have all the answers. The first update does not need answers. It needs acknowledgment.
+2. Posting one update and then going silent for an hour. The cadence matters as much as the content.
+3. Being vague about impact. "Some users may experience issues" is less useful than "Users attempting to log in from 9:15 AM to 9:45 AM UTC were unable to complete authentication."
+4. Writing the post-incident review as a legal document. Customers want a plain-English explanation, not indemnification language.
+5. Not publishing a post-incident review at all for major incidents. Customers who experienced significant downtime are watching to see if you learned from it.
+
+## Where to start: a 3-step incident communication setup
+
+**Step 1: Set up your status page before you need it.** Use Statuspage.io, BetterUptime, or a self-hosted option. Pre-write the templates for initial acknowledgment, progress updates, and resolution announcements. Do not write templates under pressure.
+
+**Step 2: Define the communication roles.** Who updates the status page during an incident? Who sends the email? Who manages incoming support tickets? Define these roles before the incident. Confusion about who is responsible for customer communication during an active incident wastes critical time.
+
+**Step 3: Run a tabletop drill.** Once per quarter, simulate an incident response. A team member plays the customer. The on-call team works through the incident communication protocol. The first real incident should not also be the first time you have practiced the communication workflow.
+## Related reading
+
+- [Incident Response for Startups: A Playbook](/blog/incident-response-for-startups-a-playbook)
+- [The SaaS Status Page: Build, Buy, or Both](/blog/the-saas-status-page-build-buy-or-both)
+- [The Post Mortem Culture That Improves Security](/blog/the-post-mortem-culture-that-improves-security)
+- [Runbooks That Actually Get Used During Incidents](/blog/runbooks-that-actually-get-used-during-incidents)

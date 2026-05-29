@@ -1,0 +1,65 @@
+---
+slug: "shadcn-ui-in-production-a-practical-read"
+title: "shadcn/ui in Production: A Practical Read"
+excerpt: "shadcn/ui gives you ownership over your components. Here is what that actually means in a real project."
+date: "2026-05-23"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","shadcn","component-library"]
+readingMinutes: 7
+ogImage: "/api/og/blog/shadcn-ui-in-production-a-practical-read"
+status: "published"
+faq: [
+  {"q":"Does shadcn/ui work with frameworks other than Next.js?","a":"Yes. It works with any React setup and has official support for Vite, Remix, and Astro. The CLI adapts to the project structure. The Tailwind dependency is the main requirement."},
+  {"q":"How does shadcn/ui compare to Headless UI?","a":"Both use Radix-style accessibility primitives (though Headless UI uses its own). shadcn/ui includes more pre-built components and a stronger default styling system. Headless UI leaves more styling to you. For teams that want sensible defaults they can modify, shadcn/ui is the better starting point."},
+  {"q":"What happens when shadcn/ui components have bugs?","a":"Because the components are in your repo, you fix them yourself. You can also check the registry for the updated version and patch manually. This is the tradeoff of the copy-paste model: no waiting for an upstream release, but no automatic fixes either."},
+  {"q":"Is shadcn/ui accessible out of the box?","a":"The interactive components built on Radix primitives (Dialog, Select, Dropdown, Accordion) are accessible by default. Static components (Card, Badge, Table) follow semantic HTML patterns but require your team to use them correctly. The starting point is good; the result depends on implementation."},
+  {"q":"Does shadcn/ui support TypeScript?","a":"Yes. All components ship with TypeScript types. The CLI generates TypeScript files by default."}
+]
+---
+
+# shadcn/ui in Production: A Practical Read
+
+**shadcn/ui is not a component library you install as a dependency. It is a collection of components you copy into your project and own outright. Built on Radix UI primitives and styled with Tailwind CSS, it gives you accessible, composable components that you can modify without fighting a library's internals. The tradeoff is that updates to the upstream components are manual. The benefit is that your components are yours.**
+
+## What you need to know
+
+- Components are added via CLI and live in your codebase, meaning full customization with no version conflicts
+- Radix UI handles accessibility primitives (focus management, keyboard navigation, ARIA attributes), so you get correct behavior without building it yourself
+- Tailwind CSS variants power the styling layer; if you are not already on Tailwind, adopting shadcn/ui means adopting Tailwind
+- The CLI pulls from a registry; you can selectively add only the components you need rather than loading an entire library
+- Upgrading components when the upstream registry changes is manual; budget periodic review time
+
+## The core argument
+
+I adopted shadcn/ui as the component foundation for Nyxera's interface and have used it across two other client builds. The case for it over alternatives like Chakra, MUI, or Ant Design is simple: you stop fighting the library. With an installed component library, every time the design deviates from the library's opinions, you are either overriding styles through specificity hacks or building custom variants that break on the next version bump. With shadcn/ui, the component is in your repo. Modify it. Extend it. Delete the parts you do not need. Nothing breaks because nothing is importing from a remote package.
+
+The accessibility story is the part that often gets overlooked. Radix UI, which powers the interactive parts of shadcn/ui (dialogs, dropdowns, tooltips, accordions), has invested heavily in WAI-ARIA compliance. The focus trap in the Dialog component works correctly. The keyboard navigation in the Select component follows the listbox pattern. The tooltip delays are configurable and accessible. When I was building the settings UI for Velmora, the Dialog and Sheet components from shadcn/ui handled all the focus management work that would otherwise have been custom code. That is engineering time saved on infrastructure that is not a differentiator.
+
+The honest limitation is maintenance. shadcn/ui components in your codebase will drift from upstream over time. The CLI makes it straightforward to re-add a component and compare the diff, but it is a manual process. For a small team shipping features fast, periodic dependency hygiene reviews need to include shadcn/ui component updates alongside package.json bumps. Teams that skip this end up with component implementations that are months behind the accessibility and bug fix improvements in the registry.
+
+## Common mistakes
+
+1. **Adding every component upfront.** The CLI makes it easy to add everything. Only add components you are actively using. Dead code in your components directory obscures what the project actually depends on.
+
+2. **Not customizing the theme variables.** shadcn/ui ships with a default color system. Production projects should update the CSS variables in globals.css to match the actual design system. Shipping with the default shadcn/ui color palette is a missed opportunity for design differentiation.
+
+3. **Treating shadcn/ui components as unmodifiable.** They are yours. When a component does not quite fit the use case, modify it. That is the point of the pattern.
+
+4. **Forgetting the dark mode wiring.** shadcn/ui has built-in dark mode support via CSS variables and the class strategy. Configuring it correctly in next-themes takes fifteen minutes. Skipping it and retrofitting dark mode later takes much longer.
+
+5. **Mixing shadcn/ui with another full component library.** Using shadcn/ui alongside MUI or Chakra for different parts of the app creates conflicting styling systems and accessibility patterns. Pick one approach per project.
+
+## Where to start
+
+1. **Initialize with the CLI.** Run `npx shadcn@latest init` in your Next.js project. It configures Tailwind, sets up the CSS variables, and adds the utils module. Take the time to configure your actual brand colors in the theme variables before adding components.
+
+2. **Add components progressively.** Start with Button, Input, and Dialog. Build a real feature with those three before adding more. You learn the pattern faster with real constraints than with a full library added at once.
+
+3. **Set a quarterly component audit.** Mark a recurring task to run through your shadcn/ui components and check the upstream registry for changes. For components with accessibility implications (Dialog, Select, Tooltip), prioritize the updates.
+
+## Related reading
+
+- [Component Libraries vs Custom Design Systems](/blog/component-libraries-vs-custom-design-systems)
+- [Headless UI Libraries: Radix, Headless UI, Ariakit](/blog/headless-ui-libraries-radix-headless-ui-ariakit)
+- [Tailwind UI vs shadcn vs Headless UI vs Build Your Own](/blog/tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own)
+- [The Accessibility Audit Every Web App Should Pass](/blog/the-accessibility-audit-every-web-app-should-pass)

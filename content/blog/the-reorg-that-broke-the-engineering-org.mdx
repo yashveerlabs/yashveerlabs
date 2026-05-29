@@ -1,0 +1,117 @@
+---
+slug: "the-reorg-that-broke-the-engineering-org"
+title: "The Reorg That Broke the Engineering Org"
+excerpt: "Working notes on the reorg that broke the engineering org. Written for founders, engineers, and operators who want a clear read on startup failure postmortems and fear from someone who has shipped the work."
+date: "2026-03-05"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","failure","incidents"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-reorg-that-broke-the-engineering-org"
+status: "published"
+definition: "A reorg is not a solution. It is a hypothesis that a different reporting structure will produce different outcomes. Most engineering reorgs I have seen failed because they changed the org chart without changing the underlying conditions that produced the original problem. The structure shifted. The communication patterns did not. The output stayed the same, but now nobody was sure who owned what."
+faq: [
+  {"q":"Why do engineering reorgs so often make things worse instead of better?","a":"Because most reorgs address the symptom, not the cause. Slow delivery looks like a coordination problem so the org chart gets restructured to reduce dependencies. But if the codebase is tightly coupled, new team boundaries do not reduce coordination cost. Engineers still have to talk to each other about the same shared systems. The reorg adds new management overhead without removing the underlying coupling."},
+  {"q":"How should founders decide whether an engineering reorg is the right response to a delivery problem?","a":"First diagnose the actual cause of the problem. Is delivery slow because of unclear ownership, architectural coupling, too many interruptions, or poor requirements? A reorg helps with unclear ownership. It does not help with the others. Reorg only when the diagnosis specifically identifies org structure as the cause."},
+  {"q":"What is the minimum time an engineering team needs to recover full productivity after a reorg?","a":"In my experience, three to four months for a team that is already functioning well, and six months or more for a team that was already struggling. The first month is orientation. The second is new team norms. The third is when real collaboration patterns form. Expecting pre-reorg productivity within weeks is a common and expensive mistake."},
+  {"q":"How do you run an engineering reorg without destroying team morale?","a":"Communicate the why clearly and honestly before making any structural changes. Give engineers as much input as reasonable on which team they join. Avoid reorgs during high-stakes delivery periods. Do not make the reorg contingent on performance issues unless it is explicitly a performance action. Engineers who understand the reason for a change can adapt. Engineers who find out via an org chart update cannot."},
+  {"q":"What are the most common structural mistakes made when reorganizing an engineering team?","a":"Splitting teams that share a codebase without also splitting the codebase. Creating new team boundaries without defining ownership boundaries. Assigning managers to teams before those managers understand the team's current work. Moving engineers away from the projects they understand best for reasons of headcount balance rather than capability alignment."},
+  {"q":"Should a startup reorganize engineering around products, platforms, or skills?","a":"At most startup stages, organizing around products works best because ownership and accountability are clear. Platform teams make sense when there are shared technical capabilities that multiple product teams need and that are complex enough to warrant dedicated focus. Skill-based teams create coordination overhead and work best only in consulting or agency contexts."},
+  {"q":"How do you measure whether an engineering reorg actually worked?","a":"Track four metrics before and after: delivery cycle time, the number of cross-team dependencies per sprint, engineer satisfaction scores, and the percentage of work that required coordination outside the team. If the reorg improved org structure, these should all improve within three to six months. If they do not, the diagnosis was wrong."}
+]
+---
+
+## What you actually need to know
+
+- Most engineering reorgs are a diagnosis substituted for a solution. The problem was something else; the reorg was the action that felt decisive.
+- Changing the org chart without changing the codebase structure almost never reduces coordination costs. Teams are reorganized but the systems they own still have the same coupling.
+- Engineers lose two to three months of productivity after a reorg regardless of how well it is executed. The question is whether the reorganization justifies that cost.
+- The engineers who leave during or immediately after a reorg are usually not the ones who needed to leave.
+- Communication is the actual engineering asset that reorgs destroy. Informal knowledge-sharing relationships take months to rebuild in a new structure.
+
+| Reorg Approach | When It Makes Sense | What It Fixes | What It Does Not Fix |
+|---|---|---|---|
+| Product-aligned teams | Multiple products, unclear ownership | Ownership clarity, delivery accountability | Technical coupling, shared codebase coordination |
+| Platform and product split | Shared infra serving multiple teams | Infrastructure investment, reliability | Alignment on product priorities, interface contracts |
+| Functional split (front/back) | Rare; mostly wrong at startup stage | Skill specialization | Coordination overhead, context-switching cost |
+| Geographic reorganization | Multiple offices, timezone issues | Timezone-aligned communication | Culture gaps, knowledge distribution |
+
+## The core argument
+
+The reorg announcement comes after a bad quarter. Delivery has been slow, a feature shipped late, two engineers quit in the same month, and the founders have been reading management books. The org chart looks messy. There are seven direct reports to the CTO and unclear ownership on three of the five main products. A reorg feels like the obvious move.
+
+Six months later, the delivery problem is the same. Three more engineers have left, two of them people who were not planning to leave before the reorg. The new team structure has introduced a new set of coordination meetings that did not exist before. The engineers who remain are uncertain about their career paths because the reporting lines changed and nobody has explained what that means for them.
+
+I am not arguing that reorgs are always wrong. I am arguing that they are overused as a response to problems that are not actually structural. When the problem is architectural coupling, a reorg does not fix coupling. When the problem is unclear product requirements, a reorg does not fix requirements. When the problem is one engineer who is not performing, a reorg that moves everyone around is not a performance management process.
+
+The reorg that actually works is the one that changes the structure to match a problem that is genuinely structural. Clear ownership that did not exist before. Reduced cross-team dependencies because the teams are now aligned to the actual seams in the system. These are real benefits. They require a real diagnosis first.
+
+## What breaks during a reorg
+
+The thing nobody accounts for in a reorg timeline is the loss of informal communication structure. Every engineering team builds up a network of informal relationships that carry enormous amounts of operational knowledge. Who to ask about the billing integration. Who wrote the background job framework and understands its edge cases. Who has context on why the auth service works the way it does.
+
+These relationships exist regardless of the org chart. They were built through proximity, shared projects, and time. A reorg does not erase them immediately, but it restructures the team in ways that make them harder to use and harder to rebuild. The engineer who had context on the billing integration is now on a different team with different priorities. The informal ping that used to take two minutes becomes a cross-team request that takes two days.
+
+### The three months of confusion
+
+The first three months after a reorg are defined by confusion about ownership. Which team owns this system? Who approves changes to this service? Who is responsible for this incident? In a pre-reorg team these questions had informal answers. In a post-reorg team they need to be worked out explicitly, and that process takes time.
+
+During this period, delivery slows. Not because the engineers are less capable, but because the organizational scaffolding that made fast delivery possible has been temporarily removed. Teams that expected a quick recovery after the reorg are usually disappointed.
+
+### Who leaves after a reorg
+
+The engineers who leave after a reorg are rarely the ones who needed to leave. The engineers who are least comfortable with ambiguity, who have the strongest external alternatives, and who had the clearest informal relationships in the old structure are most likely to leave. These are often the most experienced engineers on the team.
+
+The engineers who stay are disproportionately those with fewer options, less tenure, or higher tolerance for organizational uncertainty. This is not a universal pattern but it is common enough to be considered in the decision.
+
+## How long does it take
+
+| Recovery Phase | What to Expect | Typical Duration |
+|---|---|---|
+| Announcement period | Uncertainty, informal departures begin, delivery slows | 2-4 weeks |
+| Orientation period | New team norms forming, ownership questions surfacing | 4-8 weeks |
+| Stabilization period | Informal relationships rebuilding, ownership becoming clear | 6-12 weeks |
+| Full productivity recovery | Delivery back to pre-reorg baseline | 3-6 months |
+
+## What to look for before deciding to reorg
+
+- A specific diagnosis of what the reorg will fix, written down, not verbal
+- Evidence that the problem is structural rather than process, technical, or personnel
+- An ownership map of the current systems and how it will change under the new structure
+- A communication plan for engineers that explains the why, not just the what
+- A retention risk assessment for the engineers most likely to leave
+- A realistic expectation of the productivity cost and how long it will take to recover
+- A decision on what happens to shared systems and shared codebases that span the new team boundaries
+
+## Expert opinion
+
+> The reorgs that worked, in my experience, were the ones where the founders could articulate exactly which dependency or ownership problem the new structure would eliminate. "We need team A to be able to ship the checkout flow without coordinating with team B" is a real reason to restructure. "Delivery feels slow and we need to shake things up" is not. One of these produces a targeted change with measurable success criteria. The other produces organizational disruption with no way to know whether it worked.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I consulted for a forty-person startup that reorganized its engineering team of sixteen around products, splitting into three teams of four to five. The decision was made in response to slow delivery and a perception that too many engineers were involved in too many decisions. Both of those observations were accurate. The reorg was not the wrong call. The execution had gaps.
+
+The codebase was not split along the same boundaries as the teams. All three teams shared a core domain layer that any team could modify. Ownership of that layer was not assigned to any team, so it became a coordination bottleneck that replicated the problem the reorg was meant to solve. The team also lost two senior engineers in the first six weeks who had been informal owners of critical subsystems.
+
+They recovered, eventually, but it took four months to reach pre-reorg delivery cadence. The codebase split that should have happened alongside the reorg became a separate project that ran for a quarter after the reorg itself. The [co-founder conflict](/blog/the-co-founder-conflict-that-killed-the-engineering-team) that had been contributing to the original delivery problems also remained unaddressed, because the reorg had been used as a substitute for that harder conversation. For teams navigating similar org decisions, the [tech lead vs engineering manager decision](/blog/the-tech-lead-vs-engineering-manager-decision) is relevant context on what a reorg implicitly changes.
+
+## Common mistakes
+
+1. Using a reorg to avoid a direct conversation about a specific performance or leadership problem.
+2. Reorganizing teams without also reorganizing the ownership of the systems they maintain.
+3. Announcing a reorg without communicating the specific problem it is solving and how success will be measured.
+4. Expecting delivery to recover in less than three months after a reorg.
+5. Assigning managers to new teams without giving them time to understand the team's current work and priorities.
+6. Treating the reorg as complete when the org chart changes rather than when ownership and communication patterns have stabilized.
+7. Not doing retention risk assessment before the reorg announcement. The engineers most likely to leave are identifiable in advance.
+8. Running a reorg during a high-stakes delivery period, such as a launch or a compliance deadline.
+
+## A twelve-week reorg stabilization plan
+
+1. Before announcing: write the diagnosis. What specific problem does this structure change solve? What will success look like in three months?
+2. Announcement week: communicate the why to all engineers individually before the org chart is published. Give at least one week between announcement and the structural change taking effect.
+3. Weeks two and three: run explicit ownership mapping sessions for every system the new teams will touch. Assign owners. Document them.
+4. Weeks four through six: watch for retention signals. Engineers who are quiet, who are updating public profiles, or who are asking questions about career paths are worth a direct conversation.
+5. Weeks seven through ten: measure the coordination cost of shared systems across new team boundaries. If the coordination cost is not decreasing, the system ownership needs to be addressed.
+6. Weeks eleven and twelve: evaluate against the success criteria from the diagnosis. Did the specific problem get better? Use the [technical founders quarterly review](/blog/the-technical-founders-quarterly-review) process to make this assessment structured rather than impressionistic. Also review [the vp engineering hire](/blog/the-vp-engineering-hire-what-founders-get-wrong) if the reorg involved adding a new engineering leadership layer.

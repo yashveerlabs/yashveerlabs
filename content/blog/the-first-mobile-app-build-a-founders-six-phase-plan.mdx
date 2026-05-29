@@ -1,0 +1,113 @@
+---
+slug: "the-first-mobile-app-build-a-founders-six-phase-plan"
+title: "The First Mobile App Build: A Founder's Six Phase Plan"
+excerpt: "The six phases of a successful first mobile app build -- from framework choice to app store approval -- with the decisions that determine whether each phase goes smoothly."
+date: "2025-02-11"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","founders","app-store"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-first-mobile-app-build-a-founders-six-phase-plan"
+status: "published"
+definition: "The first mobile app build fails most often not because of technical problems but because of planning gaps: an unclear requirement of what platform to build for, insufficient time allocated for App Store review, no plan for the native capabilities required, and assumptions about cross-platform parity that the platform does not provide. The six-phase framework covers the decisions that determine the outcome of the build before a line of code is written."
+faq: [
+  {"q":"Should I build a native app or use a cross-platform framework for my first mobile app?","a":"Use a cross-platform framework unless there is a specific reason not to. React Native and Flutter both produce apps that perform well enough for most use cases and share code between iOS and Android, which is a significant cost and time reduction. The reasons to go native: the app requires deep platform integration (ARKit, custom camera, specific hardware APIs), performance is mission-critical (real-time gaming, video processing), or the team has existing native expertise."},
+  {"q":"How long does a first mobile app build typically take?","a":"Four to twelve weeks for the initial build, plus two to four weeks for App Store review and iteration. The wide range depends on the complexity of the app, the team's mobile experience, and whether the back-end API already exists. Apps that can share an existing API are faster to build than apps that require new back-end work alongside the mobile build."},
+  {"q":"What is the most common cause of App Store rejection?","a":"Privacy policy gaps (missing or insufficient privacy policy), guideline violations (subscription mechanics that do not follow Apple's rules, or in-app purchase mechanics that bypass Apple's payment system), and incomplete or misleading app descriptions. Review Apple's App Store Review Guidelines before starting the build, not after the app is ready to submit."},
+  {"q":"How do I handle the difference between iOS and Android in a cross-platform app?","a":"Assume there will be differences even in cross-platform frameworks and design for them from the start. Navigation patterns differ (iOS back button is a swipe, Android has a back button). UI components look different. Push notification handling differs. Testing on both platforms throughout the build is more efficient than testing iOS first and then discovering Android issues at the end."},
+  {"q":"Do I need a mobile-specific back end or can I use the same API as the web app?","a":"In most cases, the same API that serves the web app can serve the mobile app. Mobile-specific considerations: the API should handle intermittent connectivity gracefully (mobile users lose network frequently), heavy payloads should be paginated for mobile network conditions, and background sync or push notification delivery may require mobile-specific endpoints or server events."}
+]
+---
+
+## What you actually need to know
+
+- Cross-platform frameworks (React Native or Flutter) are the right choice for most first mobile apps. Native development is justified only by specific technical requirements.
+- App Store submission and review adds two to four weeks to every release cycle. Plan for this from the start.
+- Test on both iOS and Android throughout the build. Discovering Android issues after iOS is complete is expensive.
+- The back-end API design significantly affects the mobile build. Design for mobile network conditions from the beginning.
+- The most expensive mobile app decisions are made in the first week: framework, platform priority, and scope. Get these right.
+
+| Phase | Duration | Key Decision | Common Failure |
+|---|---|---|---|
+| 1. Define and decide | 1-2 weeks | Framework, platform, scope | Scope not bounded before development starts |
+| 2. Architecture and design | 1-2 weeks | Navigation, data flow, offline behavior | Navigation pattern not decided before coding |
+| 3. Core build | 4-8 weeks | Feature priority, API integration | Both platforms not tested throughout |
+| 4. Platform-specific work | 1-2 weeks | Native integrations, permissions | Discovered late, extends timeline |
+| 5. Testing and polish | 1-2 weeks | Device testing, performance | Tested only on developer devices |
+| 6. Submission and launch | 2-4 weeks | App store requirements, review | Guidelines not read before submission |
+
+## The core argument
+
+The first mobile app build that goes over budget and over timeline almost always has the same root cause: decisions that should have been made before development started were made during development. The framework was chosen based on what the developer was comfortable with rather than what the app required. The scope was not bounded before coding began. The App Store requirements were not reviewed until the app was ready to submit. The Android differences were not considered until the iOS build was complete.
+
+The six-phase plan is a structure for making these decisions in the right sequence. Each phase has a clear output that enables the next phase. The founder who understands the plan can hold the team accountable to the decisions that need to be made at each phase and catch the gaps before they become expensive surprises.
+
+The plan is not a rigid waterfall -- phases overlap, and discoveries in later phases sometimes require revisiting earlier decisions. But the sequence of decisions is right: framework and scope before architecture, architecture before implementation, platform-specific work alongside the core build rather than after it, and App Store research before the app is nearly done.
+
+## Phase 1: Define and decide
+
+Phase 1 produces three outputs: the platform decision (iOS only, Android only, or both simultaneously), the framework decision (native, React Native, Flutter, or a simpler tool like Expo), and the scope definition (exactly which features are in the first version and which are not).
+
+The platform decision: most apps should target both iOS and Android simultaneously with a cross-platform framework. The economic argument is straightforward -- mobile markets are roughly split between iOS and Android, and building only one platform from the start limits the addressable market by roughly half. The exception: if the target market is known to heavily favor one platform (enterprise apps often favor iOS in US markets, many emerging markets are predominantly Android), build that platform first.
+
+The scope definition is the most important output of Phase 1. An app scope that is not explicitly bounded before development starts will grow during development as each team member identifies features that seem obvious or important. Scope growth during development extends timelines, increases costs, and often results in a first version that is overcomplicated for the first users. The rule: if a feature is not in the scope document before coding starts, it is not in the first version.
+
+## Phase 2: Architecture and design
+
+Phase 2 produces the navigation architecture, the data model and data flow, and the UI design. These three elements must be defined before significant development begins because changes to any of them during development are expensive.
+
+The navigation architecture: how do users move through the app? What are the main screens, how are they connected, and what triggers transitions between them? For cross-platform apps, the navigation library choice (React Navigation for React Native, Navigator/go_router for Flutter) affects how the code is structured throughout the app. Changing the navigation library mid-build is a significant refactor.
+
+The data flow: where does data come from, how is it stored locally (if at all), and how does the app handle offline states? Many mobile apps need to function at least partially without network connectivity. Designing for offline behavior requires architectural decisions that are expensive to add after the app is built.
+
+The UI design: mobile screens have specific constraints that web design does not. Touch targets must be large enough for fingers. Navigation must conform to platform conventions. Status bar and keyboard interactions must be handled correctly. Investing in mobile-specific design review in Phase 2 is more efficient than redesigning after the app is built.
+
+## Phase 3: Core build
+
+Phase 3 is the main development phase. The highest-priority discipline is testing on both iOS and Android simultaneously, not sequentially. Development teams that build for iOS first and then address Android later consistently discover significant Android-specific issues that require rework. The issues: navigation behavior, platform-specific component rendering, font rendering differences, and push notification handling all differ meaningfully between platforms.
+
+The API integration work should parallel the core build, not follow it. A mobile app that is waiting for API development to finish before UI development can proceed is blocked unnecessarily. Mock data and stub implementations allow the UI to be built and tested before the real API is available. Integration testing then verifies that the real API produces the expected results with the real UI.
+
+## Phase 4: Platform-specific work
+
+Every mobile app requires some platform-specific work, even cross-platform apps. Push notifications require platform-specific setup (APNs for iOS, FCM for Android). Camera access, location, contacts, and other device capabilities require platform-specific permission requests. iOS-specific work includes app icon generation, launch screen configuration, and any App Store-specific requirements. Android-specific work includes APK/AAB configuration, Google Play console setup, and Android-specific permission explanations.
+
+Phase 4 is when this work happens. Discovering it for the first time in Phase 5 or 6 is a timeline risk. Platforms-specific work that takes two weeks to implement delays the submission by two weeks if it is discovered at the submission stage.
+
+## Phase 5: Testing and polish
+
+Phase 5 is device testing, performance profiling, and UI polish. The discipline: test on real devices that represent the low end of the target market, not just on developer devices or high-end simulators. A React Native app that runs smoothly on an iPhone 15 Pro may perform unacceptably on a three-year-old Android device that represents a significant portion of the target market.
+
+Performance profiling in Phase 5: identify and fix the screens or interactions that are slow. Mobile apps that feel slow get deleted. The user's patience for a mobile app that lags is shorter than for a web app. The performance work in Phase 5 is the investment that prevents negative reviews in the weeks after launch.
+
+## Phase 6: Submission and launch
+
+Phase 6 begins with App Store and Play Store research. The App Store Review Guidelines must be read before submission. The most common rejections are avoidable if the guidelines are reviewed in advance. Subscription apps have specific requirements. Apps that handle payments have specific requirements. Apps that collect user data have specific requirements. None of these requirements are obscure -- they are all documented.
+
+The iOS App Store review takes one to seven days in most cases. Plan for the worst case when setting the launch date. Android Google Play review is typically faster but not immediate. The submission that is complete and compliant the first time advances quickly. The submission that triggers a rejection requires responding and resubmitting, which adds one to two weeks to the process.
+
+## Common mistakes founders make with the first mobile app build
+
+1. Not reviewing App Store guidelines before development starts. The app that violates a guideline requires a significant change before the first version can be approved. This is entirely preventable.
+2. Building iOS first, Android second, and discovering Android issues at the end. Test both simultaneously throughout the build.
+3. Not allocating time for App Store review in the project plan. A launch date that does not include review time will be missed.
+4. Over-scoping the first version. The first version should do one thing well and ship it. The second version adds the features that the first version's users ask for.
+5. Not testing on real devices that represent the low end of the target market. Performance issues that are invisible on developer devices are visible on the devices that most users have.
+
+## Where to start: a 3-step mobile build initiation
+
+**Step 1: Make the platform and framework decision explicitly.** Who is the target user, and what platform do they predominantly use? What are the specific technical requirements of the app? Does the answer to the second question require native capabilities that cross-platform frameworks cannot provide? If not, choose React Native (with Expo for faster setup) or Flutter.
+
+**Step 2: Write the Phase 1 scope document.** List every feature that is in the first version and sign off on it with the development team. Every feature not on the list is explicitly out of scope for the first version. This document is the contract that prevents scope growth during development.
+
+**Step 3: Read the App Store Review Guidelines for the specific features planned.** If the app has subscriptions, read the subscription guidelines. If the app has in-app purchases, read the purchase guidelines. If the app handles health data, read the health guidelines. Do this before Phase 2, not before Phase 6.
+
+## The Mobile Build That Ships
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The mobile apps I have built for clients -- including the work for Prominence Football Academy -- followed the six-phase structure because the decisions made in the first two phases determine the outcome of the build. The founder who understands the structure can hold the development team to it. The founder who learns the structure after the build has started discovers the value of making these decisions early through the cost of making them late.
+
+## Related reading
+
+- The Cross-Platform Decision: React Native vs Flutter in 2025
+- The App Store Submission Checklist That Actually Works
+- [The First Project Test: How to Trial a Developer Without Risking Everything](/blog/the-first-project-test-how-to-trial-a-developer-without-risking-everything)
+- [The Founder Who Vibe Coded Their MVP: A Postmortem and Rescue Plan](/blog/the-founder-who-vibe-coded-their-mvp-a-postmortem-and-rescue-plan)

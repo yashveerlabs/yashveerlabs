@@ -1,0 +1,123 @@
+---
+slug: "event-driven-architectures-when-they-help-and-when-they-hurt"
+title: "Event Driven Architectures: When They Help and When They Hurt"
+excerpt: "Event driven architectures solve real problems and create new ones. The teams that use them well pick the surfaces deliberately. The teams that go event driven by default end up with systems that are hard to reason about."
+date: "2026-05-22"
+category: "SaaS Architecture and Scaling"
+tags: ["event-driven","architecture","saas","patterns"]
+readingMinutes: 12
+ogImage: "/api/og/blog/event-driven-architectures-when-they-help-and-when-they-hurt"
+status: "published"
+definition: "Event driven architecture is the pattern where services communicate by emitting and consuming events rather than calling each other directly. The pattern decouples producers from consumers. New consumers can be added without changes to producers. The trade off is that the flow of control is no longer visible from any single piece of code. Used well, it scales well. Used poorly, it produces systems nobody can debug."
+faq: [
+  {"q":"When does event driven actually help?","a":"When the same event needs multiple consumers. When the producer and consumer have different scaling profiles. When the workflow has natural fan out. When you need to add new functionality without modifying existing services. Each is a real shape that event driven serves well."},
+  {"q":"When does event driven hurt?","a":"When the flow of control is the main thing you need to debug. When the events are essentially direct calls in disguise. When the team does not have the operational maturity to handle eventual consistency. When the workflow is fundamentally synchronous. Each is a case where direct calls would have been clearer."},
+  {"q":"What is the difference between events and messages?","a":"An event is a fact about something that happened. The producer does not know or care who will react to it. A message is a directive to a specific consumer. The semantics differ. Events fit pub or sub. Messages fit queues."},
+  {"q":"What about eventual consistency?","a":"Inherent in event driven systems. The consumer reacts to the event some time after the producer emitted it. The system is consistent at some point after the event. The application has to handle the window where producer state has changed and consumer state has not."},
+  {"q":"What is event storming?","a":"A workshop technique for discovering the events in a domain. The team puts events on a wall. Identifies the producers and consumers. The pattern is useful for designing event driven systems and for understanding existing ones."},
+  {"q":"What are the operational requirements?","a":"Strong observability across services. Distributed tracing to follow events. Dead letter handling for failed events. Idempotency on every consumer. Each is a real cost. Without them the event driven system becomes opaque."},
+  {"q":"What is the worst event driven mistake?","a":"Going event driven for every interaction. The system becomes impossible to debug. The flow of control is hidden. The team spends days understanding what should have been a synchronous call. The right pattern is event driven for specific surfaces, not for everything."}
+]
+---
+
+## What you actually need to know
+
+- Event driven helps with fan out and decoupling. Hurts with synchronous flows.
+- Eventual consistency is inherent. The application has to handle it.
+- Observability across services is required.
+- Idempotency on every consumer is non negotiable.
+- Going event driven for everything produces unreadable systems.
+
+| Workload | Event driven? |
+|---|---|
+| Fan out to multiple consumers | Yes |
+| Producer and consumer scale differently | Yes |
+| Adding new functionality without modifying producer | Yes |
+| Synchronous business workflow | No |
+| Strong consistency required | No |
+| Single producer to single consumer | Probably not |
+| Long running multi step workflow | Workflow engine, not raw events |
+
+## The core argument
+
+Event driven architecture is one of those patterns that sounds good in concept and produces complexity in practice unless used deliberately. The pattern decouples producers from consumers. The producer emits an event. The consumers react. New consumers can be added without changes to the producer. The flexibility is real.
+
+The cost is also real. The flow of control is no longer visible from any single piece of code. The team that needs to understand what happens when a user signs up has to trace events across multiple services. The debugging is harder. The reasoning is harder. The eventual consistency is something the application has to handle.
+
+The teams that use event driven well pick specific surfaces. A signup that needs to trigger emails, analytics, and onboarding flows is a good event driven surface. The producer does not need to know about the consumers. The consumers can be added or modified independently. The fan out is the value.
+
+The teams that use event driven badly go event driven for every interaction. Direct service to service calls become events. The flow is broken into pieces nobody can follow. The system becomes impossible to debug. The team has to rebuild the synchronous flow conceptually every time someone needs to change anything.
+
+The right approach is selective. Pick the surfaces that benefit from decoupling and fan out. Use direct calls or workflow engines for everything else. The hybrid system is easier to reason about than the pure event driven one.
+
+## The decision map
+
+| Question | Event driven | Direct call |
+|---|---|---|
+| Multiple consumers for the same event? | Yes | No |
+| Producer should not know about consumers? | Yes | No |
+| Need to add new consumers without modifying producer? | Yes | No |
+| Strong consistency required? | No | Yes |
+| Synchronous business flow? | No | Yes |
+| Single producer to single consumer? | Probably not | Yes |
+| Long running multi step? | Workflow engine | N/A |
+
+## How much does this cost
+
+| Investment | Cost |
+|---|---|
+| Event broker (Kafka, SQS, Redis Streams) | Modest infrastructure |
+| Observability and tracing | Real engineering investment |
+| Idempotency in consumers | Per consumer engineering |
+| Dead letter handling | Per consumer engineering |
+| Team learning curve | Real, weeks of investment |
+| Ongoing operations | Real |
+
+## Features the event driven setup must have
+
+- Event broker with appropriate guarantees.
+- Schema registry for event shapes.
+- Idempotency on every consumer.
+- Dead letter handling.
+- Distributed tracing across producers and consumers.
+- Documentation of which events exist.
+- A clear catalog of producers and consumers.
+- Observability on event latency and throughput.
+
+## Expert opinion
+
+> Event driven architecture is a powerful tool used for the right problems and a complexity tax used for the wrong ones. The teams that pick surfaces deliberately get the decoupling and fan out where it helps. The teams that go event driven for everything produce systems that are hard to reason about and hard to debug. The discipline is to know which interactions benefit from events and which do not.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had built their entire backend as event driven. Every interaction was an event. The team had spent six months on the architecture. The product velocity had crashed.
+
+We audited the events. Most of them were single producer to single consumer. The events added complexity without benefit. The flow of control was hidden behind broker indirection that nobody needed.
+
+We migrated the single consumer events to direct calls. The pattern became hybrid. Fan out events stayed event driven. Single consumer interactions became direct calls. Long running workflows moved to a workflow engine.
+
+The velocity recovered. The debugging became tractable. The team has run the hybrid architecture for two years without significant issues. The lesson was that event driven is a tool, not an architecture choice for everything.
+
+For more on the related work, see [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) and [message queues compared SQS Kafka RabbitMQ Redis streams](/blog/message-queues-compared-sqs-kafka-rabbitmq-redis-streams).
+
+## Common mistakes teams make
+
+1. Going event driven for every interaction.
+2. Single consumer events that should have been direct calls.
+3. No idempotency on consumers. Reruns produce duplicates.
+4. No dead letter handling. Failed events disappear.
+5. No distributed tracing. Debugging is a fishing expedition.
+6. No schema registry. Events drift in shape.
+7. No documentation. Tribal knowledge.
+8. Treating event driven as the modern architecture rather than as a tool.
+
+## A 30 day decision and adoption plan
+
+1. **Week one.** Inventory the candidate interactions. Identify the ones with fan out.
+2. **Week two.** Set up the event broker. Establish patterns for idempotency and dead letter.
+3. **Week three.** Migrate the first fan out surface.
+4. **Week four.** Document the architecture. Train the team. Set up observability.
+
+For more on the related work, read [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) and [batch processing vs streaming the choice founders often conflate](/blog/batch-processing-vs-streaming-the-choice-founders-often-conflate). On the broader architecture side, [the modular monolith how to buy yourself two years](/blog/the-modular-monolith-how-to-buy-yourself-two-years) is the natural next read.

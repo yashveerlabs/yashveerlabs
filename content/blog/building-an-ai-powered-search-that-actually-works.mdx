@@ -1,0 +1,119 @@
+---
+slug: "building-an-ai-powered-search-that-actually-works"
+title: "Building an AI Powered Search That Actually Works"
+excerpt: "Pure semantic search loses. Pure keyword search loses. Hybrid retrieval with rerank wins. Here is the architecture I use to ship an AI powered search that beats both naive approaches."
+date: "2026-05-20"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","search","retrieval","semantic"]
+readingMinutes: 13
+ogImage: "/api/og/blog/building-an-ai-powered-search-that-actually-works"
+status: "published"
+definition: "AI powered search that works is a hybrid retrieval system. It combines keyword search for exact match precision, semantic search for intent matching, and a reranker to put the right results at the top. The architecture is more complex than either approach alone. The quality is dramatically better than either alone. The cost is modest at modern model prices."
+faq: [
+  {"q":"What is wrong with pure semantic search?","a":"Pure semantic search fails on specific terms. A user searching for a specific error code, a product SKU, or a person's name often gets results that are semantically similar but factually wrong. The keyword search wins on these queries. Pure semantic search drops the precision."},
+  {"q":"What is wrong with pure keyword search?","a":"Pure keyword search fails on intent matching. A user describing a problem in their own words rarely uses the exact terms in the documents. Semantic search finds the right document. Keyword search misses it. Pure keyword search drops the recall."},
+  {"q":"What is hybrid retrieval?","a":"Run both keyword and semantic searches in parallel. Combine the results with a fusion algorithm like reciprocal rank fusion. Pass the combined top results through a reranker that scores them for relevance. Return the top reranked results."},
+  {"q":"What is a reranker?","a":"A model that takes a query and a candidate result and outputs a relevance score. Cross encoder models like Cohere Rerank or open source equivalents work well. The reranker turns a list of candidates into a list of high quality top results."},
+  {"q":"How much does this cost?","a":"At modest scale, 100 to 500 USD per month for vector storage and rerank calls. At higher scale, 500 to 5000 USD. The cost scales with query volume and corpus size. Caching the top queries cuts it significantly."},
+  {"q":"What vector database should I use?","a":"For most teams starting out, pgvector on the existing Postgres is sufficient. For higher scale, Pinecone, Weaviate, or Qdrant offer more performance. For dedicated search needs, Typesense or Elastic with vector support. Pick by team familiarity."},
+  {"q":"How do I evaluate search quality?","a":"Build a labeled set of queries with expected top results. Measure recall at K, precision at K, and mean reciprocal rank. Run the suite on every change. Without the eval, every change to the pipeline is a guess."}
+]
+---
+
+## What you actually need to know
+
+- Hybrid retrieval beats pure semantic or pure keyword.
+- The reranker turns candidates into a clean top result list.
+- pgvector is fine for starting. Move up only when scale demands.
+- Caching the top queries cuts the cost dramatically.
+- The eval suite is what keeps the pipeline honest.
+
+| Layer | Purpose | Tools |
+|---|---|---|
+| Keyword search | Precision on specific terms | Postgres FTS, Elasticsearch, Typesense |
+| Semantic search | Recall on intent | pgvector, Pinecone, Weaviate, Qdrant |
+| Fusion | Combine results | Reciprocal rank fusion |
+| Reranker | Top result quality | Cohere Rerank, BAAI bge-reranker |
+| Eval suite | Quality control | Labeled query set |
+
+## The core argument
+
+AI powered search is one of the features that founders most reliably build badly. The pattern is consistent. The team reads about embeddings, builds a semantic search pipeline, ships it, and discovers that the results are worse than the keyword search they replaced. The user types a specific term, gets back five vaguely related results, and decides the new search is broken.
+
+The fix is not abandoning semantic search. The fix is hybrid retrieval. Run keyword and semantic searches in parallel. Combine the results. Pass the combined candidates through a reranker. The output beats either pure approach.
+
+The reason the hybrid approach wins is that keyword and semantic search fail in complementary ways. Keyword search has high precision and low recall. Semantic search has high recall and low precision. The fusion captures both. The reranker reorders the combined list to put the highest quality results at the top.
+
+The architecture is more complex than either pure approach. The cost is also higher. Both are justified by the quality improvement. A well built hybrid search feels like the user is being understood. A poorly built one feels like the user is fighting the system.
+
+## The architecture
+
+The corpus is ingested into two stores. A keyword store like Postgres full text search or Elasticsearch. A vector store like pgvector with embeddings from a model like text-embedding-3 or an open source alternative.
+
+The query pipeline issues two retrievals. A keyword search returns the top K candidates. A semantic search returns the top K candidates. Both K values are typically 20 to 50.
+
+The fusion step combines the two ranked lists. Reciprocal rank fusion is the standard. The combined list has up to 2K candidates with merged ranks.
+
+The reranker scores each candidate against the query. Cohere Rerank, BAAI bge-reranker, or a custom cross encoder. The reranker returns the top N final results, typically 5 to 10.
+
+The cache layer stores the top results for the most common queries. The cache invalidates when the corpus changes meaningfully. The cache cuts the cost and latency for repeated queries.
+
+## How much does this cost
+
+| Cost layer | Modest scale | High scale |
+|---|---|---|
+| Vector storage | 50 to 300 USD per month | 500 to 3000 USD |
+| Embedding generation at ingest | One time per document, then on changes | Same |
+| Embedding generation at query | A fraction of a cent per query | Scales |
+| Reranker calls | 0.001 USD per query roughly | Scales |
+| Cache layer | Negligible | Modest |
+| Total at 10k queries per day | 200 to 800 USD per month | Higher |
+
+The numbers come from projects I have worked on. The reranker cost is the largest single line item for most teams. Caching the top queries cuts it significantly.
+
+## Features the search must have
+
+- Hybrid retrieval combining keyword and semantic.
+- A reranker for top result quality.
+- Caching for popular queries.
+- A clear path to update the corpus and invalidate the cache.
+- Multi tenant isolation in the vector store.
+- Telemetry on query latency, result count, and click through.
+- An eval suite with labeled queries.
+- A clear path for the user to refine the query.
+
+## Expert opinion
+
+> The teams that ship great AI powered search treat retrieval as an engineering problem with measurable quality. Recall, precision, mean reciprocal rank. They run the eval on every change. The teams that ship bad AI powered search treat retrieval as a vibe. They ship the embedding model they read about and never measure. The first kind of team improves over time. The second kind plateaus at mediocrity.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client added search to their knowledge base product. The first version was pure semantic search using embeddings. The results were impressive in demos. The customer support team reported that users complained the new search was worse than the old keyword search.
+
+We migrated to hybrid retrieval. Postgres full text for keyword, pgvector for semantic, reciprocal rank fusion for combination, and Cohere Rerank for the top results. The deployment took three weeks.
+
+The customer satisfaction with search jumped immediately. Specific term queries that had been failing now succeeded. Intent based queries continued to succeed. The team has not made significant changes to the retrieval pipeline in twelve months because it just works.
+
+For more on the related work, see [RAG retrieval augmented generation for SaaS when it helps and when it does not](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not) and [the search problem why adding it late always hurts](/blog/the-search-problem-why-adding-it-late-always-hurts).
+
+## Common mistakes teams make
+
+1. Pure semantic search. Loses on specific terms.
+2. Pure keyword search. Loses on intent matching.
+3. No reranker. The top results are noisy.
+4. No eval suite. Quality drifts.
+5. Mixing tenants in the vector store.
+6. No caching. The cost grows fast.
+7. Embedding a model that does not match the language. Choose embeddings that match your content language and domain.
+8. Treating search as solved once it is deployed.
+
+## A 30 day plan to ship hybrid search
+
+1. **Week one.** Ingest the corpus into the keyword store. Build the baseline keyword search. Measure on the eval set.
+2. **Week two.** Ingest the corpus into the vector store. Build the semantic search. Measure on the eval set.
+3. **Week three.** Build the fusion step. Add the reranker. Measure the hybrid against the baselines.
+4. **Week four.** Add caching, telemetry, and the user refinement path. Ship.
+
+For more on the related work, read [SaaS search at scale Postgres full text vs Algolia vs Typesense](/blog/saas-search-at-scale-postgres-full-text-vs-algolia-vs-typesense) and [vector databases compared Pinecone Weaviate pgvector Qdrant](/blog/vector-databases-compared-pinecone-weaviate-pgvector-qdrant). On the broader AI side, [the difference between an AI wrapper and an AI product](/blog/the-difference-between-an-ai-wrapper-and-an-ai-product) is the natural next read.

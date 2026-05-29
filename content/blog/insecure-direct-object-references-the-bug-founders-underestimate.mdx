@@ -1,0 +1,62 @@
+---
+slug: "insecure-direct-object-references-the-bug-founders-underestimate"
+title: "Insecure Direct Object References: The Bug Founders Underestimate"
+excerpt: "IDOR vulnerabilities let attackers access other users' data by changing an ID in a URL or API request. They are simple to introduce and expensive to miss. Here is how to find and prevent them."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","founders"]
+readingMinutes: 6
+ogImage: "/api/og/blog/insecure-direct-object-references-the-bug-founders-underestimate"
+status: "published"
+definition: "An Insecure Direct Object Reference (IDOR) is a vulnerability where an application exposes internal object identifiers in URLs or API requests without verifying that the requesting user has permission to access the referenced object. The result is that any user can access any other user's data by guessing or enumerating the identifier. IDOR vulnerabilities are consistently in the OWASP Top 10 and are among the most commonly reported in bug bounty programs."
+faq: [
+  {"q":"What does a typical IDOR look like in a SaaS application?","a":"An API endpoint like GET /api/invoices/12345 that returns the invoice with ID 12345, regardless of whether the authenticated user owns that invoice. If the application authenticates the request but does not check ownership, any authenticated user can retrieve any invoice by incrementing the ID. The bug is the absence of an ownership check, not the use of sequential IDs."},
+  {"q":"Are UUIDs a fix for IDOR?","a":"No. UUIDs make IDs harder to guess, which reduces the risk of enumeration attacks, but they do not prevent IDOR. If a user obtains another user's UUID through a shared link, a leaked log, or any other mechanism, they can still use it to access that user's data if the authorization check is missing. The fix is always an authorization check, never just an opaque identifier."},
+  {"q":"How do I test for IDOR in my own application?","a":"Log in as user A and note the IDs of your resources. Log in as user B in an incognito window and try to access user A's resources using those IDs through the API. If user B can retrieve, modify, or delete user A's data, you have an IDOR. This test should be part of every feature review that introduces a new resource with an API endpoint."},
+  {"q":"What is the difference between IDOR and broken access control?","a":"IDOR is a specific type of broken access control. Broken access control is the broader category that includes horizontal privilege escalation (accessing another user's data at the same permission level), vertical privilege escalation (accessing admin functions as a regular user), and other authorization failures. IDOR specifically refers to the case where the object reference itself is the attack vector."},
+  {"q":"Do row-level security policies in the database prevent IDOR?","a":"Yes, when implemented correctly, row-level security at the database level prevents IDOR even if the application layer authorization check is missing. Postgres RLS policies that enforce tenant isolation are a defense-in-depth approach that catches the cases where application code forgets to filter by user. They are not a substitute for application-level authorization but add a meaningful second layer."}
+]
+---
+
+## What you need to know
+
+- IDOR vulnerabilities result from missing authorization checks, not from using sequential IDs. UUIDs reduce guessability but do not prevent the bug.
+- Every API endpoint that accepts an object identifier must verify that the authenticated user has permission to access the referenced object. Authentication proves who you are. Authorization proves what you can access.
+- IDOR is consistently one of the highest-severity findings in bug bounty programs and security audits because it often grants direct access to other customers' data.
+- Row-level security at the database level provides a defense-in-depth layer against IDOR. Postgres RLS and equivalent features in other databases enforce authorization at the data layer, not just the API layer.
+- Testing for IDOR requires two accounts and a willingness to try to access one account's resources from the other. This test should be part of every feature deployment.
+
+## The core argument
+
+The reason IDOR appears so frequently in early-stage SaaS applications is that it looks like working code. The endpoint returns the right data, the authentication works, and the feature does what the user expects. The bug is in what happens when a different user makes the same request with a different ID. That scenario does not appear in the happy path test, which is the test most developers run. It takes deliberate adversarial thinking to catch it, and most product engineers are not thinking adversarially when they are focused on shipping features.
+
+The pattern that introduces IDOR is straightforward: an endpoint receives an identifier in the URL or request body, queries the database for the object with that ID, and returns the result. The authentication middleware verifies that the request is authenticated. Nobody writes the authorization check that verifies the object belongs to the authenticated user. This is not negligence; it is a missing step in a process that did not include an authorization checklist. The fix is equally straightforward: every query that retrieves or modifies a user-owned resource should include the authenticated user's ID as a filter condition. `WHERE id = $1 AND user_id = $2` instead of `WHERE id = $1`.
+
+The multi-tenant case is where IDOR gets more complex and the consequences of getting it wrong are more severe. In a multi-tenant SaaS where each customer's data is stored with a `tenant_id`, an IDOR in a tenant-owned resource gives one customer access to another customer's data. This is the scenario that ends customer relationships and triggers regulatory notifications. The defense is layered: application-level authorization checks on every endpoint, row-level security policies in the database that enforce tenant isolation, and regular testing from a second tenant account. When I built the data isolation architecture for Velmora, a three-layer approach was the standard: middleware that sets the current tenant context, query filters that always include the tenant ID, and RLS policies that enforce isolation even if both upper layers miss a check.
+
+## Common mistakes
+
+1. **Assuming authentication implies authorization.** Authentication verifies that a request comes from a known user. It says nothing about whether that user has permission to access the specific resource they are requesting. They are separate checks and both must be present.
+
+2. **Relying on UUIDs for security.** UUIDs make ID enumeration harder but do not prevent authorization failures. Any system that relies on ID secrecy for security has a broken authorization model.
+
+3. **Not testing cross-user access during feature development.** Most developers test that their feature works for themselves. Testing that the feature correctly rejects requests from a different user is a separate test that needs to be part of the review process.
+
+4. **Applying authorization checks inconsistently across the API.** A codebase where some endpoints check ownership and others do not is a codebase with IDOR vulnerabilities. Authorization checks should be systematic, not case-by-case.
+
+5. **Not auditing bulk operations.** Endpoints that accept lists of IDs, such as batch delete or bulk export, need authorization checks on every ID in the list, not just the first one. A bulk operation that authorizes the first ID and then processes the rest without checking is a high-severity IDOR.
+
+## Where to start
+
+1. **Audit every API endpoint that accepts an object ID.** For each one, verify that the query includes a user or tenant ownership filter. A code search for your primary resource query patterns will surface the ones that are missing the ownership check.
+
+2. **Write a two-account IDOR test for each resource type.** Create accounts A and B in your test environment. Log in as A, note the IDs of A's resources. Log in as B and try to access them. Add this test to your test suite to prevent regressions.
+
+3. **Enable row-level security for your primary data tables.** In Postgres, RLS policies can enforce tenant or user ownership at the database level as a second layer of defense. This catches the cases where application code is incomplete.
+
+## Related reading
+
+- OWASP Top 10 for SaaS Founders: What Actually Matters
+- Multi-Tenant Architecture: Shared vs Isolated Data Models
+- JWT vs Session Tokens: The Auth Decision That Affects Everything
+- [How to Sell to Enterprise Without a Full Compliance Stack](/blog/how-to-sell-to-enterprise-without-a-full-compliance-stack)

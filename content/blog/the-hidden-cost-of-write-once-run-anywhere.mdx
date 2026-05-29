@@ -1,0 +1,107 @@
+---
+slug: "the-hidden-cost-of-write-once-run-anywhere"
+title: "The Hidden Cost of \"Write Once, Run Anywhere\""
+excerpt: "The real engineering cost of cross-platform mobile development -- what works, what does not, and the platform-specific work that remains no matter which framework you choose."
+date: "2025-02-04"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","cost","cross-platform"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-hidden-cost-of-write-once-run-anywhere"
+status: "published"
+definition: "Cross-platform mobile frameworks promise to eliminate the cost of building separately for iOS and Android. The promise is approximately true for the UI layer but systematically understated for the platform-specific work that every production app requires. Push notifications, deep linking, camera and photo library access, permissions handling, in-app purchases, and background processing all require significant platform-specific work regardless of which cross-platform framework is used. The hidden cost of 'write once, run anywhere' is the platform-specific work that the promise implies does not exist."
+faq: [
+  {"q":"Does React Native or Flutter actually reduce mobile development cost?","a":"Yes, substantially, for the UI layer. Sharing UI components between iOS and Android reduces the cost of building and maintaining the visual layer by 50-70 percent compared to separate native development. The cost reduction is real. The caveat: the platform-specific work that remains -- push notifications, permissions, in-app purchases, deep linking -- is a significant portion of the total project cost that is not reduced by the cross-platform framework."},
+  {"q":"What platform-specific work remains with React Native?","a":"Push notification setup (APNs for iOS, FCM for Android, plus the React Native bridge), deep linking configuration (iOS Universal Links, Android App Links, both requiring server-side configuration), in-app purchase implementation (Apple StoreKit, Google Play Billing, with different APIs and review requirements), camera and photo library access (different permission models and APIs on each platform), and background task handling (iOS and Android have different restrictions and APIs for background work)."},
+  {"q":"How do I estimate the platform-specific work in a cross-platform mobile project?","a":"Review the feature list for any features that interact with device hardware (camera, location, sensors), device services (push notifications, calendar, contacts), or platform marketplaces (in-app purchases). For each, estimate the iOS-specific work and the Android-specific work separately. These items typically account for 20-35 percent of total mobile project time, regardless of which cross-platform framework is used."},
+  {"q":"Is Expo a solution to the platform-specific work problem?","a":"Partially. Expo's managed workflow abstracts many platform-specific configurations, and Expo's SDK provides pre-built modules for common platform integrations (camera, location, push notifications). The managed workflow reduces the platform-specific work for common use cases. The limitation: when the required native capability is not covered by Expo's SDK, the team must eject to bare workflow, which requires the native development knowledge they were trying to avoid."},
+  {"q":"When should I avoid cross-platform frameworks and build native?","a":"When the app requires deep platform integration that cross-platform frameworks cannot support: custom camera pipelines (not just taking photos), ARKit or ARCore for augmented reality, specific health platform integrations (HealthKit, Google Fit) with complex data requirements, or high-performance real-time processing (audio, video, gaming). Also avoid cross-platform if the team has strong existing native expertise -- the cross-platform benefit is greatest when native expertise is absent."}
+]
+---
+
+## What you actually need to know
+
+- Cross-platform frameworks (React Native, Flutter) reduce UI development cost by 50-70 percent. They do not reduce platform-specific integration cost.
+- Platform-specific work -- push notifications, deep linking, in-app purchases, camera, background tasks -- typically accounts for 20-35 percent of total mobile project time regardless of framework.
+- The "write once, run anywhere" promise applies to UI components, not to mobile platform integration.
+- Expo's managed workflow reduces platform-specific friction for common cases but is a leaky abstraction for uncommon ones.
+- A realistic cross-platform mobile estimate should include separate line items for iOS-specific work and Android-specific work, even when using React Native or Flutter.
+
+| Work Category | Write Once? | Platform-Specific Cost | Framework Dependence |
+|---|---|---|---|
+| UI components and screens | Yes | Very low | High (framework handles it) |
+| Business logic and state | Yes | Very low | Medium |
+| Navigation | Mostly | Low | High (navigation library handles it) |
+| Push notifications | No | High (separate setup per platform) | Low |
+| Deep linking | No | Medium-high (separate config per platform) | Low |
+| In-app purchases | No | High (different APIs, different review) | Low |
+| Camera and media | Partially | Medium (Expo SDK, but different behavior) | Medium |
+| Background tasks | No | High (different restrictions per platform) | Low |
+
+## The core argument
+
+The engineering estimate that says "we are using React Native so we only need to build once" is underestimating the project by a predictable amount. The amount depends on which platform-specific features the app requires, but for most production apps -- apps with push notifications, deep links, and some form of camera or media access -- the platform-specific work is 20-35 percent of total project time.
+
+This is not a criticism of cross-platform frameworks. React Native and Flutter are genuine engineering achievements that make mobile development significantly more efficient for teams that would otherwise need separate iOS and Android codebases. The criticism is of the expectation that "write once" applies uniformly to all layers of a mobile application. It does not, and understanding which layers it does and does not apply to produces more accurate estimates and more realistic project timelines.
+
+I have delivered React Native projects that came in on time and under budget because the estimate correctly accounted for the platform-specific work. I have also been brought in to assess projects that were over budget because the original estimate assumed that cross-platform meant no platform-specific work. The over-budget projects consistently discovered the platform-specific costs mid-project, which is the most expensive time to discover them.
+
+## The push notification reality
+
+Push notifications are among the most commonly required mobile features and one of the most platform-specific to implement. The happy path -- sending a notification and having it appear on the user's device -- requires:
+
+iOS: an Apple Developer account with the correct entitlements, APNs (Apple Push Notification service) credentials configured in the app, a push notification certificate or key configured in the backend, the correct notification permission request at the right time in the user journey, and handling for the cases where notifications are delivered in the foreground (which requires explicit handling in React Native).
+
+Android: Firebase Cloud Messaging (FCM) configured for the project, the google-services.json file in the correct location, the notification channels defined for Android 8+ (required since API level 26), handling for notification categories that the user can silence, and handling for the different notification behavior when the app is in the foreground versus background versus killed.
+
+Both platforms: a backend service that manages device tokens, handles token refreshes (tokens expire and change), and sends to the correct platform-specific endpoint.
+
+This is not speculative complexity -- it is the actual implementation work required for production push notifications. It takes 2-4 days per platform for an experienced engineer who has done it before. For an engineer encountering it for the first time, double or triple those estimates.
+
+Expo's `expo-notifications` package abstracts much of the configuration in the managed workflow. When it works, it works well. When it does not -- specific notification behaviors, background notification handling, advanced notification categories -- the debugging crosses into native code that requires platform-specific knowledge to navigate.
+
+## Deep linking: two separate problems
+
+Deep linking (the ability to open a specific screen in the app from a URL, including from emails, other apps, and search results) requires separate configuration on each platform.
+
+iOS Universal Links require: a domain with an HTTPS certificate, an apple-app-site-association file served from that domain with the correct JSON structure, the Universal Links entitlement in the iOS app, and the app-side handler that parses the URL and navigates to the correct screen.
+
+Android App Links require: a Digital Asset Links file served from the domain, the intent filters configured in AndroidManifest.xml, and the app-side handler (which may or may not share code with the iOS handler, depending on how the navigation is structured).
+
+The configuration for each platform is straightforward but requires correct server-side setup (the association files must be served from the correct URL with the correct MIME type) and app-side setup that is different for each platform. Testing deep links requires a real device (simulators handle deep links inconsistently). The total implementation time is 1-2 days per platform for an engineer who has done it before.
+
+## In-app purchases: two separate review processes
+
+In-app purchases (subscriptions and one-time purchases) have a cost beyond the implementation: Apple and Google both review in-app purchase configurations, and the reviews have different requirements, different timelines, and different rejection criteria.
+
+Apple's StoreKit requires: products configured in App Store Connect (before submission), the StoreKit API integrated in the app (StoreKit 2 for newer apps), and backend receipt validation (server-to-server) to prevent receipt spoofing. Apple's subscription terms require specific UI treatment (displaying price, subscription period, and cancellation information in specific places) and reject apps that do not follow the requirements.
+
+Google Play Billing requires: products configured in the Google Play Console, the Google Play Billing Library integrated in the app, and server-side purchase token validation. Google's requirements are similar to Apple's but not identical, and the APIs are different.
+
+The implementation cost is typically 3-5 days per platform for a new integration. The review cost is the time for App Store and Play Store review (1-7 days for each), plus the potential cost of a rejection that requires changes and resubmission.
+
+## Common mistakes founders make when estimating cross-platform projects
+
+1. Estimating the UI work and assuming the rest is handled by the framework. The UI work is the "write once" part. The platform-specific integrations are not.
+2. Not allocating time for App Store and Play Store review and potential rejection iteration. The review process adds 1-2 weeks to the project timeline and is not optional.
+3. Assuming Expo's managed workflow eliminates all native work. It reduces native work for common cases. It does not eliminate it for custom integrations.
+4. Not having a dedicated test device for each platform throughout development. Testing push notifications, deep links, and some camera behaviors requires real devices. Simulator testing misses platform-specific behaviors.
+5. Expecting identical behavior on iOS and Android. Navigation gestures, notification behavior, keyboard interaction, status bar, and safe area insets all differ between platforms. Design reviews should include both platforms.
+
+## Where to start: a 3-step cross-platform cost estimate
+
+**Step 1: List every feature in the project that interacts with platform services.** For each: push notifications, deep linking, in-app purchases, camera/photo library, location, calendar/contacts, background processing, home screen widgets, Watch or WearOS support. These are the features that require platform-specific work.
+
+**Step 2: For each platform-specific feature, estimate the iOS and Android work separately.** Use the estimates in this post as a baseline and adjust for team experience (engineers who have done these integrations before work significantly faster than those who have not).
+
+**Step 3: Add the platform-specific estimates to the framework estimate and review the total.** If the platform-specific work is more than 30 percent of the total estimate, examine whether the feature set can be scoped to reduce the platform-specific components in the first version. A first version without in-app purchases (if the business model allows it) saves 6-10 days and one App Store review cycle.
+
+## The Cost That Was Always There
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The cross-platform mobile work I have done -- including the Prominence Football Academy app in React Native -- consistently confirms the pattern: the cross-platform framework handles the UI layer efficiently, and the platform-specific integrations require the same careful work they would require in a native project. The promise of "write once, run anywhere" is real for the UI. The platform-specific integration work exists independently of which framework is used. Accounting for both from the beginning is the difference between an estimate that is accurate and one that is optimistic.
+
+## Related reading
+
+- [The First Mobile App Build: A Founder's Six Phase Plan](/blog/the-first-mobile-app-build-a-founders-six-phase-plan)
+- The Cross-Platform Decision: React Native vs Flutter in 2025
+- The App Store Submission Checklist That Actually Works
+- [The Honest Cost of Building an App in 2026: Global Breakdown](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown)

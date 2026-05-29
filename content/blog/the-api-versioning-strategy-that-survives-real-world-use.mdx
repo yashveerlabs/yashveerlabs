@@ -1,0 +1,71 @@
+---
+slug: "the-api-versioning-strategy-that-survives-real-world-use"
+title: "The API Versioning Strategy That Survives Real World Use"
+excerpt: "The API versioning approach that keeps customer integrations stable while letting your product move fast. URL versioning, header versioning, and when each is right."
+date: "2025-03-16"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","versioning"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-api-versioning-strategy-that-survives-real-world-use"
+status: "published"
+definition: "API versioning is the contract between your product and every customer who has integrated with it. Break the contract without a plan and you break integrations. Ignore versioning entirely and you are unable to evolve the API. The strategy that survives real-world use is the one that makes breaking changes explicit, gives customers a migration window, and keeps the surface area manageable."
+faq: [
+  {"q":"Should I use URL versioning (/v1/) or header versioning?","a":"URL versioning wins for simplicity and debuggability. Header versioning is cleaner in theory and harder in practice because customers forget to set the header and browsers cannot express it easily. Start with URL versioning. If you outgrow it in three major versions, revisit."},
+  {"q":"How long should a deprecated API version stay live?","a":"Minimum 6 months for most SaaS. 12 months for enterprise customers with slower procurement cycles. Give an exact sunset date in writing, not just a vague deprecation notice. Customers who know the date can plan. Customers who only know 'soon' cannot."},
+  {"q":"When should I bump from v1 to v2?","a":"When you need to make a breaking change that cannot be avoided. Not every time you add fields. Not when you feel like a new version. JSON APIs can add optional fields without breaking existing clients. Reserve version bumps for changes that would break existing integrations if they were invisible."},
+  {"q":"What counts as a breaking change?","a":"Removing a field, renaming a field, changing a field's type, changing authentication requirements, changing the URL structure, and changing error response format all count. Adding optional fields does not. Adding new endpoints does not. The test is: would an existing client that does not know about this change break?"},
+  {"q":"Should I have multiple major API versions active at once?","a":"Try to keep it to two: the current stable version and one legacy version in deprecation. Three active major versions is a maintenance burden that compounds fast. Every bug that matters needs to be patched in all active versions. The cost of a third version is usually higher than the cost of migrating customers faster."}
+]
+---
+
+## What you actually need to know
+
+- API versioning is a commitment to customers. The design decision you make in v1 stays with you until the last customer migrates off.
+- The most important versioning decision is what counts as a breaking change. Define this before you ship v1.
+- URL versioning (/v1/, /v2/) is the most widely understood approach and the one with the fewest surprises.
+- Deprecation requires a timeline, not just an announcement. Give customers a date.
+- Running more than two active major versions simultaneously is almost always a trap.
+
+| Versioning Strategy | Discoverability | Complexity | Best For |
+|---|---|---|---|
+| URL versioning (/v1/) | High | Low | Public APIs, REST-first teams |
+| Header versioning (Accept: application/vnd.api+json;version=1) | Low | Medium | Internal APIs, strict REST purists |
+| Parameter versioning (?version=1) | Medium | Low | Quick implementation, not production-grade |
+
+## The core argument
+
+The API is a public contract. Once a customer integrates with it, every change you make without coordination costs them engineering time and trust. The teams that build good APIs build them with this relationship in mind. The teams that build bad APIs treat the API as an internal implementation detail and change it whenever the product changes.
+
+The versioning strategy is how you honor that contract while still being able to evolve the product. A strict no-changes policy protects customers but freezes the product. A changes-without-notice policy lets the product move fast but destroys integrations. The right approach is somewhere between the two: a clear definition of what constitutes a breaking change, a versioning scheme that makes breaking changes visible, and a deprecation process that gives customers time to migrate.
+
+I have built APIs that were versioned well from day one, and I have inherited APIs that had no versioning strategy at all. The difference at year three is enormous. A well-versioned API has two active major versions, a documented migration guide, and customers who trust the stability. An un-versioned API has accumulated special cases, undocumented field name changes, and at least one customer who is pinned to a specific server version because any update would break their integration.
+
+## The versioning approach I use on client projects
+
+URL versioning with explicit version prefixes. Every endpoint starts with `/api/v1/` or `/api/v2/`. When a breaking change is necessary, I introduce the new behavior under `/api/v2/` while keeping `/api/v1/` running. I announce the v1 deprecation with a sunset date, typically 6 to 12 months out. I send deprecation warnings in the response headers of every v1 request so clients that instrument their API calls see the warnings in their logs.
+
+The migration guide ships at the same time as v2. Not after. Not when customers ask. At the same time. Customers who integrate new APIs integrate faster when the documentation is already there. Customers who have to wait for documentation will wait longer, and the deprecation window shrinks from both ends.
+
+The sunset date is firm. I have seen teams extend deprecation windows twice because a big customer was not ready. Each extension teaches every other customer that the deadline is not real. Hold the date. Give advance warning. Make migration easy. But hold the date.
+
+## Common mistakes teams make with API versioning
+
+1. Not defining what counts as a breaking change before shipping v1. Once customers are integrated, the definition gets harder to enforce.
+2. Bumping versions too aggressively. Every major version is a migration cost for customers. Reserve v2 for genuine breaking changes.
+3. Announcing deprecation without a sunset date. "This will be deprecated" with no date is ignored. A date is a forcing function.
+4. Running three or more active major versions. The maintenance cost grows faster than the customer base that needs the old versions.
+5. Not sending deprecation warnings in response headers. Customers who miss the email will catch the header warning in their logs.
+
+## Where to start: a 3-step versioning plan
+
+**Step 1: Define breaking changes before you ship.** Write a document that lists what counts as a breaking change for your API. Removing fields, changing types, changing authentication. Get the team to agree. Put it in your API documentation. This definition is the foundation of every versioning decision that follows.
+
+**Step 2: Choose URL versioning and commit to it.** Add `/v1/` to every endpoint from day one. It is slightly verbose but it means every API call is self-documenting. A support engineer looking at logs can immediately tell which version a customer is calling without reading the headers.
+
+**Step 3: Build the deprecation workflow before you need it.** Write the response header logic that flags deprecated endpoints. Write the email template for deprecation notices. Build the migration guide template. These assets take a day to build and are used every time you need to retire a version. Having them ready means you can execute a clean deprecation on short notice.
+## Related reading
+
+- [Designing an API That Customers Will Not Curse in Five Years](/blog/designing-an-api-that-customers-will-not-curse-in-five-years)
+- [REST vs GraphQL vs gRPC: A Decision Matrix for Founders](/blog/rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders)
+- [API Documentation That Developers Actually Read](/blog/api-documentation-that-developers-actually-read)
+- [Building APIs That Survive Five Years of Customer Change Requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests)

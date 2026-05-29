@@ -1,0 +1,61 @@
+---
+slug: "stripe-tax-vs-lemonsqueezy-vs-manual-tax-compliance-compared"
+title: "Stripe Tax vs Lemonsqueezy vs Manual: Tax Compliance Compared"
+excerpt: "Three approaches to sales tax compliance for SaaS founders. Here is what each one actually costs and where each one breaks."
+date: "2026-05-24"
+category: "Comparisons and Vendor Decisions"
+tags: ["stripe", "tax", "payments", "compliance", "saas", "lemonsqueezy"]
+readingMinutes: 7
+ogImage: "/api/og/blog/stripe-tax-vs-lemonsqueezy-vs-manual-tax-compliance-compared"
+status: "published"
+faq: [
+  {"q":"What is a merchant of record?","a":"A merchant of record is the legal entity that processes a sale and is responsible for the associated tax and compliance obligations. When you use Lemon Squeezy, they are the merchant of record. When you use Stripe directly, you are the merchant of record and the compliance is your responsibility."},
+  {"q":"Does Stripe Tax handle international VAT?","a":"Stripe Tax covers EU and UK VAT automatically, as well as Australian GST and several other jurisdictions. It does not cover every country where VAT exists, and it does not handle the registration and filing process in most regions. Check the current country support list before assuming coverage."},
+  {"q":"How much does Lemon Squeezy charge compared to Stripe?","a":"Lemon Squeezy charges approximately 5 percent plus payment processing per transaction. Stripe's standard rate is 2.9 percent plus 30 cents. The difference is the cost of merchant of record compliance. At low volume, it is worth it. At high volume, it is a significant fee to evaluate against the compliance cost of the Stripe Tax route."},
+  {"q":"When should I consider Avalara instead of TaxJar?","a":"Avalara is the enterprise option: more jurisdictions covered, more complex product tax code mapping, better ERP integrations. TaxJar is simpler, cheaper, and right for most SaaS companies. Consider Avalara when you have complex multi-state filing, international compliance, or enterprise customers requiring specific reporting formats."},
+  {"q":"Can I switch from Lemon Squeezy to Stripe Tax later?","a":"Yes, but it is a significant migration. You need to move your customer billing relationships, update checkout integrations, register for tax in the states where you have nexus, and communicate the change to existing subscribers. Plan for several weeks of engineering time and customer communication if you make this switch."}
+]
+---
+
+# Stripe Tax vs Lemonsqueezy vs Manual: Tax Compliance Compared
+
+**Sales tax compliance for SaaS is a genuinely hard problem that most founders ignore until they get a notice from a state tax authority. The three main approaches are Stripe Tax, which adds automatic tax calculation and collection to your existing Stripe setup; Lemon Squeezy, which acts as the merchant of record so tax becomes their problem entirely; and manual compliance, which means calculating and remitting taxes yourself or hiring a firm. Each approach makes sense in a specific context.**
+
+## What you need to know
+
+- Economic nexus rules mean you may owe sales tax in US states where you have never set foot, purely based on revenue volume
+- Lemon Squeezy's merchant of record model completely removes tax compliance from your plate but takes a larger fee and limits your control over the checkout experience
+- Stripe Tax automates calculation and collection but leaves remittance to you or a tool like TaxJar or Avalara
+- Manual compliance is only viable at very low transaction volume and in a small number of jurisdictions
+- VAT and GST for international customers adds a separate layer of complexity that all three approaches handle differently
+
+## The core argument
+
+Sales tax compliance went from a nice-to-have to a legal requirement for most SaaS businesses in 2019, when the Supreme Court's South Dakota v. Wayfair decision opened the door for states to collect sales tax from remote sellers who meet economic nexus thresholds. In most US states, that threshold is $100,000 in sales or 200 transactions. If you are a SaaS product with any meaningful traction, you almost certainly have nexus in multiple states and may not know it.
+
+Stripe Tax solves the calculation problem cleanly. You enable it in your Stripe dashboard, map your products to the correct tax codes, and Stripe automatically calculates the right tax for each transaction based on the customer's location. The rate tables are updated automatically. This is a significant improvement over manual lookup tables. The gap is on the remittance side: Stripe Tax collects the money, but you are still responsible for filing returns and remitting tax to each state where you have nexus. Most SaaS founders pair Stripe Tax with a filing service like TaxJar or Avalara, which adds cost but covers the full compliance chain.
+
+Lemon Squeezy's merchant of record model is a fundamentally different approach. When you sell through Lemon Squeezy, the transaction is legally between your customer and Lemon Squeezy, not between your customer and you. Lemon Squeezy handles all tax calculation, collection, filing, and remittance globally. VAT, GST, US sales tax across all states, all of it. This completely removes the tax compliance problem from your business. The tradeoff is fees (typically around 5 percent plus payment processing), reduced control over the checkout experience, and constraints on what kinds of products you can sell. For solo founders and early-stage products with simple checkout flows, the tradeoff often makes sense. For products with complex pricing, enterprise customers, or high transaction volume where the fee math is painful, Stripe Tax plus a filing service is usually the better architecture.
+
+## Common mistakes
+
+1. **Assuming you do not have nexus because you are incorporated in one state.** Economic nexus is based on where your customers are and how much you sell there, not where your business is registered. If you have meaningful revenue in California, New York, or Texas, you almost certainly have nexus there.
+2. **Enabling Stripe Tax without mapping products to correct tax codes.** Software as a Service is taxable at different rates in different states, and some SaaS products qualify for exemptions in certain jurisdictions. Generic product codes give you the wrong tax rate in a meaningful number of cases.
+3. **Choosing the merchant of record model late in a product's life.** Migrating from Stripe to Lemon Squeezy mid-product is a significant engineering and customer communication project. If you want the merchant of record model, it is much easier to start with it than to switch later.
+4. **Ignoring VAT for international customers.** If you sell to customers in the EU, UK, Australia, or other VAT-implementing countries, you have separate compliance obligations. Stripe Tax covers EU VAT with a registration. Lemon Squeezy covers all of this automatically. Manual handling of international VAT is not advisable for most SaaS teams.
+5. **Not collecting the right customer information at checkout.** Tax compliance often depends on the customer's business status, location, and whether they have a valid VAT number. Collecting this information correctly at checkout prevents reconciliation problems later.
+
+## Where to start
+
+**Step 1: Run a nexus analysis before you choose your approach.** If you have been selling for more than six months, you likely have nexus in multiple states. Use a tool like Avalara's nexus checker or consult a tax advisor to understand your current exposure before deciding how to handle it going forward.
+
+**Step 2: For early-stage products under $50k ARR, start with Lemon Squeezy or another merchant of record.** The fee is a fair price for eliminating an entire category of legal and accounting complexity at the stage where you have the least bandwidth to deal with it.
+
+**Step 3: For products above $100k ARR with Stripe already integrated, add Stripe Tax plus TaxJar.** The fee savings versus a merchant of record will pay for the TaxJar subscription many times over at meaningful revenue. The setup takes a weekend and covers the full US compliance chain.
+
+## Related reading
+
+- [Stripe vs Paddle vs Lemonsqueezy in 2026](/blog/stripe-vs-paddle-vs-lemonsqueezy-in-2026)
+- [Tax Compliance for International SaaS: The Real Engineering Lift](/blog/tax-compliance-for-international-saas-the-real-engineering-lift)
+- [The Real Cost of Compliance: SOC 2, GDPR, HIPAA Compared](/blog/the-real-cost-of-compliance-soc-2-gdpr-hipaa-compared)
+- [The Hidden Costs of Custom Software Development](/blog/the-hidden-costs-of-custom-software-development)

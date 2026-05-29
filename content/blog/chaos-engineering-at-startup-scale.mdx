@@ -1,0 +1,120 @@
+---
+slug: "chaos-engineering-at-startup-scale"
+title: "Chaos Engineering at Startup Scale"
+excerpt: "Chaos engineering at startup scale is not Netflix's chaos monkey. It is a small set of deliberate failure tests that catch the issues you would otherwise meet in production. Here is the scaled down playbook."
+date: "2026-05-20"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["chaos","reliability","startup","engineering"]
+readingMinutes: 12
+ogImage: "/api/og/blog/chaos-engineering-at-startup-scale"
+status: "published"
+definition: "Chaos engineering for startups is the deliberate practice of injecting failure into your system to discover weaknesses before customers do. Startup chaos is not the production wide automated chaos that large companies practice. It is targeted exercises that simulate specific failures the team has not yet tested. Database outage. Slow dependency. Disk full. The exercises take hours per quarter and prevent days of incidents."
+faq: [
+  {"q":"Do startups actually need chaos engineering?","a":"Yes for any startup whose customers depend on the product. The scale is different from Netflix style chaos. The principle is the same. Test the failure modes before they appear in production. The cost is small. The return is incidents that do not happen."},
+  {"q":"What is the simplest chaos experiment?","a":"Disconnect the database from staging during a test. See what the application does. Does it return a useful error or does it crash. Does it leak any data. Does it surface the failure to the user clearly. The exercise takes thirty minutes. The lessons are significant."},
+  {"q":"How often should we run chaos exercises?","a":"Quarterly is the minimum for startups. Monthly if you have a real on call rotation. The exercises do not have to be elaborate. A few focused experiments per quarter cover the most important failure modes."},
+  {"q":"Should we run chaos in production?","a":"Not yet at startup scale. Run in staging first. Make sure the team can handle injected failures gracefully there. Move to production chaos only when the staging exercises stop finding issues."},
+  {"q":"What failure modes should we test?","a":"Database unavailable. Dependency slow. Dependency down. Disk full. CPU pinned. Network partition. Authentication service down. Each of these has happened to every SaaS at some point. Testing them is cheaper than discovering them in a real incident."},
+  {"q":"What is the most common chaos failure?","a":"The application crashes hard when a dependency is slow. The user sees a generic error. The on call engineer cannot diagnose. The exercise produces a list of work to do. The next quarter the same failure is handled gracefully."},
+  {"q":"How does this relate to incident response?","a":"Chaos engineering is the proactive version. Incident response is the reactive version. The chaos exercises rehearse the response so the real incidents go better. Both are needed. Neither replaces the other."}
+]
+---
+
+## What you actually need to know
+
+- Startup chaos is small targeted exercises, not Netflix style automation.
+- Quarterly cadence catches most of the value at minimal cost.
+- Run in staging until the exercises stop finding issues.
+- The most common failure is hard crashes when a dependency is slow.
+- The exercises rehearse the real incident response.
+
+| Experiment | What it tests | Time required |
+|---|---|---|
+| Database unavailable | Application graceful degradation | 30 to 60 minutes |
+| Dependency slow | Timeout and retry behavior | 30 to 60 minutes |
+| Dependency down | Failover and fallback | 30 to 60 minutes |
+| Disk full | Storage handling | 30 to 60 minutes |
+| Authentication service down | Cached session behavior | 30 to 60 minutes |
+| Network partition | Distributed system behavior | 60 to 120 minutes |
+| Tabletop incident | Response process | 60 minutes |
+
+## The core argument
+
+Chaos engineering at startup scale gets dismissed for the wrong reasons. The team thinks of chaos as Netflix's chaos monkey randomly killing servers in production. That version is appropriate for large companies with mature on call rotations and high availability requirements. It is not appropriate for a startup of ten engineers running on a single region.
+
+The version that does apply at startup scale is small and targeted. The team picks a specific failure mode and tests it in staging. They observe what the application does. They identify gaps. They fix the gaps. They move on. The whole exercise takes an afternoon. The lessons compound.
+
+The reason chaos at startup scale works is that small teams have not tested most of their failure modes. The product was built quickly. The happy path works. The unhappy paths were never exercised. The first time the database goes slow is in production. The first time the auth service is down is in production. The team is improvising during a real incident with real customer impact.
+
+The chaos exercises move the discovery from production to staging. The cost is hours of engineering time per quarter. The return is incidents that either do not happen or get handled gracefully when they do.
+
+## The experiment menu
+
+| Experiment | Setup |
+|---|---|
+| Database unavailable | Block the connection in staging. Observe the application. |
+| Dependency slow | Inject latency on calls to a specific service. |
+| Dependency down | Return errors from a mocked dependency. |
+| Disk full | Fill the disk in staging. Watch the writes fail. |
+| CPU pinned | Run a CPU saturation process during a test. |
+| Network partition | Drop packets between two services. |
+| Cache cleared | Empty Redis. Watch the database load. |
+| Auth service down | Block auth calls. Test session behavior. |
+
+## How much does this cost
+
+| Investment | Cost |
+|---|---|
+| Quarterly chaos exercise | A few engineer hours each |
+| Documentation and runbook updates | A few hours after each exercise |
+| Tooling | Free to a few hundred USD per month at startup scale |
+| Tabletop incident | One hour per quarter |
+
+The cost is small. The return is incidents that do not happen.
+
+## Features the chaos practice must have
+
+- A documented set of experiments.
+- A rotation of who runs each one.
+- A staging environment that mirrors production.
+- A way to inject the failures (toggles, network tools, mocks).
+- A retrospective after each exercise.
+- A list of fixes that came out of each exercise.
+- A cadence the team respects.
+
+## Expert opinion
+
+> The startups that run chaos exercises quarterly have measurably better incidents than the startups that do not. The exercises rehearse the response. The fixes that come out of them harden the system. The cost is hours. The return is the difference between a five hour incident and a fifty minute one when something actually goes wrong.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had never run chaos exercises. The first quarter we ran four experiments. Database unavailable, dependency slow, disk full, auth service down. Each one revealed gaps. The application crashed when the database was slow rather than returning a clean error. The disk full case produced corrupt writes. The auth outage produced silent session failures.
+
+We documented the gaps. The team fixed the most impactful ones in the following month. The next quarter's exercises revealed fewer gaps because the previous ones had been closed. The third quarter ran cleanly with only minor issues.
+
+Six months later, an actual production incident occurred when a dependency went slow. The application handled it gracefully because the exercise had identified and the team had fixed the timeout behavior. The incident lasted forty minutes instead of the multi hour event it would have been the previous year.
+
+For more on the related work, see [the incident response for startups a playbook](/blog/incident-response-for-startups-a-playbook) and [the post mortem culture that improves security](/blog/the-post-mortem-culture-that-improves-security).
+
+## Common mistakes teams make
+
+1. Running chaos in production before the team is ready.
+2. No documentation of what was tested and what was found.
+3. No follow up. The gaps stay open.
+4. Treating chaos as a one time exercise.
+5. Single engineer responsibility. The lessons do not spread.
+6. Skipping the tabletop incident. The process is not rehearsed.
+7. Choosing failure modes that nobody believes will happen. The exercise is theater.
+8. No cadence. The practice fades.
+
+## A 90 day plan
+
+1. **Weeks one and two.** Build the experiment menu. Pick the first four.
+2. **Weeks three to four.** Run the first exercise. Retrospect. Document fixes.
+3. **Weeks five to six.** Run the second exercise. Implement the highest priority fixes.
+4. **Weeks seven to eight.** Run the third and fourth. Establish the cadence.
+5. **Weeks nine to twelve.** Adjust the menu. Schedule the next quarter.
+
+For more on the related work, read [incident response for startups a playbook](/blog/incident-response-for-startups-a-playbook) and [resilience patterns circuit breakers retries bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads). On the broader reliability side, [designing for failure a backend engineers mental model](/blog/designing-for-failure-a-backend-engineers-mental-model) is the natural next read.

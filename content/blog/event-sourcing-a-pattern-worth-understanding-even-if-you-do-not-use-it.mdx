@@ -1,0 +1,117 @@
+---
+slug: "event-sourcing-a-pattern-worth-understanding-even-if-you-do-not-use-it"
+title: "Event Sourcing: A Pattern Worth Understanding Even If You Do Not Use It"
+excerpt: "Event sourcing is one of those patterns that shapes how you think about state even when you do not adopt it directly. The concepts are valuable. The full implementation is rare. Here is the honest read."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["event-sourcing","architecture","backend","patterns"]
+readingMinutes: 12
+ogImage: "/api/og/blog/event-sourcing-a-pattern-worth-understanding-even-if-you-do-not-use-it"
+status: "published"
+definition: "Event sourcing is the pattern of storing every change as an event in an append only log. The current state of any entity is derived by replaying the events. The pattern provides perfect audit, time travel, and the ability to derive new views from historical data. The full implementation is rare in SaaS because of the operational complexity. The concepts shape good thinking about state even in systems that do not adopt the pattern fully."
+faq: [
+  {"q":"What does event sourcing actually look like?","a":"Instead of updating a row in a database, the application appends an event to a log. The events describe what happened. The current state of any entity is derived by replaying its events. The log is the source of truth. The current state is a projection."},
+  {"q":"What problems does event sourcing solve?","a":"Perfect audit. Time travel to any historical state. The ability to derive new views from historical data. Easy debugging because every change is recorded. Strong fit for domains where the history matters, like accounting and version control."},
+  {"q":"What does event sourcing cost?","a":"Operational complexity. Schema evolution is harder. Performance work to handle large event streams. Snapshotting to avoid replaying everything. Read model rebuilding when projections change. The team has to be ready for the complexity."},
+  {"q":"When does the full pattern make sense?","a":"Accounting systems. Audit critical systems. Version control. Domains where the history is itself the product. Most B2B SaaS does not have this shape, which is why the full pattern is rare."},
+  {"q":"Can I use some of the ideas without the full pattern?","a":"Yes. The outbox pattern captures events alongside the state change. Audit logs capture sensitive events. Append only tables for important history. Each is event sourcing influenced without the full ceremony. The hybrid is common and useful."},
+  {"q":"What is the relationship to CQRS?","a":"Often paired but independent. Event sourcing stores events. CQRS separates write models from read models. The two work together naturally because the read models can be projections of the events. Either can be used without the other."},
+  {"q":"What is the worst event sourcing mistake?","a":"Adopting the full pattern for a domain that does not need the history. The operational tax is paid without the benefit. The team struggles with schema evolution and read model rebuilding. The right call would have been a simpler model."}
+]
+---
+
+## What you actually need to know
+
+- Event sourcing stores every change as an event. State is derived from the log.
+- The pattern fits domains where history is the product. Accounting. Version control.
+- Operational complexity is significant. Schema evolution is hard.
+- The concepts influence good thinking even in systems that do not adopt fully.
+- The hybrid approach picks ideas without full ceremony.
+
+| Pattern element | Value | Cost |
+|---|---|---|
+| Append only event log | Audit, time travel | Schema evolution complexity |
+| Projections | Multiple views from same data | Read model rebuilding |
+| Snapshotting | Performance | Operational overhead |
+| Replay capability | Debugging, derived views | Storage and CPU |
+| Hybrid use of ideas | Most of the value | Less of the cost |
+
+## The core argument
+
+Event sourcing is the kind of pattern that engineers either love or refuse to consider. The lovers adopt it everywhere. The refusers dismiss it as overkill. The honest reality is that the pattern fits some domains exquisitely, fits most domains badly, and contains concepts that influence good thinking about state in any domain.
+
+The full pattern is rare for good reasons. Storing every change as an event makes the write path simple but creates significant operational complexity downstream. Schema evolution is hard because old events have old shapes. Replaying long event streams is expensive. Read model rebuilding is a major operation. The team has to invest in tooling to handle all of these.
+
+The hybrid approach picks the valuable ideas without the full ceremony. The outbox pattern captures events alongside the state change. Audit logs capture the sensitive events. Append only tables capture the important history. Each is event sourcing influenced. The full pattern is not adopted. The benefits where they matter are kept.
+
+The pattern is worth understanding even if you do not use it. Reading a book on event sourcing teaches you to think about state changes as events. The thinking improves your design choices in any architecture. The patterns of immutability, derivation, and time travel show up everywhere. The investment in learning is small.
+
+## When the full pattern fits
+
+| Domain | Fit |
+|---|---|
+| Accounting | Strong. History is the product. |
+| Version control | Strong. The point of the system. |
+| Audit critical | Strong. The audit trail is required. |
+| Banking | Strong. Regulatory and operational. |
+| Workflow automation | Sometimes. Step history matters. |
+| Generic CRUD SaaS | Weak. The state is the point. |
+| Real time collaboration | Weak. CRDTs are usually a better fit. |
+| Analytics | Weak. Specialized stores fit better. |
+
+## How much does the full pattern cost
+
+| Phase | Cost |
+|---|---|
+| Initial architecture | A quarter to set up properly |
+| Storage | Larger than typical due to event volume |
+| Schema evolution | Significant ongoing engineering |
+| Read model rebuilding | Operational complexity |
+| Team learning | Real, weeks to months |
+
+## Features the event sourcing implementation must have
+
+- Append only event store.
+- Schema registry for event types.
+- Snapshotting strategy.
+- Read model projection pipeline.
+- Read model rebuilding capability.
+- Replay tooling.
+- Documentation of the event types.
+- Versioning strategy for evolved events.
+
+## Expert opinion
+
+> Event sourcing is one of those patterns that improves your thinking about state regardless of whether you adopt the full pattern. The concepts of immutability, derivation, and time travel are valuable everywhere. The full implementation is rare and right for specific domains. The hybrid use of ideas is common and right for many more. The reading is cheap. The full adoption is expensive. The discipline is to choose deliberately.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client had built a complex billing system as classic CRUD. The team was struggling with audit, refunds, and customer disputes because the history of state changes was not captured cleanly. The team was considering full event sourcing.
+
+We did a hybrid implementation instead. The billing entities stayed CRUD. The state changes were captured as events in a separate append only store via the outbox pattern. The audit log was derived from the events. The customer dispute resolution drew on the event history.
+
+The hybrid solved the audit and dispute problems. The full event sourcing pattern would have cost a quarter of work and added operational complexity the team did not need. The hybrid cost two weeks and produced most of the benefit.
+
+For more on the related work, see [CQRS in practice when the complexity earns its keep](/blog/cqrs-in-practice-when-the-complexity-earns-its-keep) and [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code).
+
+## Common mistakes teams make
+
+1. Adopting full event sourcing for a domain that does not need history.
+2. No snapshotting. Replaying everything from scratch.
+3. No schema evolution strategy.
+4. Treating event sourcing as a microservices requirement. It is not.
+5. Refusing to learn the pattern because the full version felt heavy.
+6. Skipping the outbox pattern that would have given most of the value.
+7. No read model rebuilding capability.
+8. Hidden tribal knowledge of how to read the events.
+
+## A decision and learning plan
+
+1. **Step one.** Read about event sourcing. Understand the concepts.
+2. **Step two.** Identify whether your domain has the shape that fits the full pattern.
+3. **Step three.** If yes, plan a real adoption with the operational investment.
+4. **Step four.** If no, adopt the ideas that fit. Outbox. Audit log. Append only history.
+
+For more on the related work, read [CQRS in practice when the complexity earns its keep](/blog/cqrs-in-practice-when-the-complexity-earns-its-keep) and [audit logs that pass real audits](/blog/audit-logs-that-pass-real-audits). On the broader architecture side, [event driven architectures when they help and when they hurt](/blog/event-driven-architectures-when-they-help-and-when-they-hurt) is the natural next read.

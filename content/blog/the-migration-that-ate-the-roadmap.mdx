@@ -1,0 +1,102 @@
+---
+slug: "the-migration-that-ate-the-roadmap"
+title: "The Migration That Ate the Roadmap"
+excerpt: "The postmortem of a six-month database migration that consumed the engineering roadmap and produced almost nothing visible to users."
+date: "2026-02-26"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","failure","incidents","tech-debt","migration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-migration-that-ate-the-roadmap"
+status: "published"
+definition: "The migration that ate the roadmap is a failure pattern where a large infrastructure or data migration is initiated without adequate scoping, staged planning, or rollback capability, and ends up consuming most of the engineering team's capacity for months longer than estimated. The team produces no visible product progress during this period, customer-facing features are delayed, and the migration itself often delivers less than the original estimate promised. The pattern is common in startups that have accumulated significant technical debt and decide to address it all at once."
+faq: [
+  {"q":"What are the warning signs that a migration will take longer than expected?","a":"Five signals that a migration estimate is too optimistic: the scope was estimated by the engineer who proposed it rather than by someone reviewing the data independently; the estimate does not include time for testing in a staging environment that mirrors production; the migration has no clear rollback plan ('we cannot go back once we start'); the migration touches data that has been live for more than a year without a clear schema; and the migration is planned as a weekend or single-day event rather than a phased rollout."},
+  {"q":"How should large migrations be scoped to avoid consuming the roadmap?","a":"The answer is phase-based planning with defined checkpoints. Phase 1: build and test the migration tooling against a copy of production data. Phase 2: migrate non-critical data and verify correctness. Phase 3: migrate critical data with a rollback plan that is tested before the migration runs. Phase 4: switch traffic to the migrated system. Each phase has a clear 'go/no-go' decision. If Phase 2 surfaces unexpected data quality issues, the team can stop, reassess, and rescope without having committed production data to an incomplete migration."},
+  {"q":"What is the right communication pattern for a migration that is taking longer than expected?","a":"Weekly written updates to stakeholders with three components: what was completed this week, what was discovered (data issues, scope changes, problems that extended the timeline), and the revised estimate with the specific assumptions behind it. The temptation to avoid the conversation when the estimate slips is understandable and counterproductive. Stakeholders who receive weekly honest updates adjust their plans accordingly. Stakeholders who are told 'still on track' until the problem cannot be hidden adjust too late, and trust the engineering team less afterward."},
+  {"q":"How do I maintain product velocity during a large migration?","a":"The migration must be time-boxed and capacity-constrained. Assign a specific subset of engineering capacity to the migration (typically 1-2 engineers) and protect the remaining capacity for product work. Accept that the migration will take longer with constrained capacity -- the alternative, which is assigning the full team to the migration, halts product velocity entirely. The constrained-capacity migration that takes six months while product work continues is almost always better than the full-team migration that takes two months and produces nothing visible to customers."},
+  {"q":"When should a migration be abandoned rather than completed?","a":"When the ongoing cost of the migration (engineering time consumed, product velocity lost, team morale) exceeds the expected benefit of the completed migration. This calculation is hard to do honestly because sunk cost bias makes teams reluctant to abandon work they have invested in. The clearest signals: the migration has consumed more than 150 percent of the original estimate and is still not complete; the team has discovered that the original problem the migration was meant to solve is less severe than thought; or the migration approach has been shown to have fundamental problems that require redesign."}
+]
+---
+
+## What you actually need to know
+
+- The migration that is scoped as a weekend event and runs for six months is a failure of planning, not engineering execution. The signals that the scope is wrong are visible before the migration starts.
+- Phase-based migration with clear go/no-go checkpoints is the pattern that prevents roadmap consumption. Each phase is scoped to be completable in days, not months.
+- Capacity-constrained migration (1-2 engineers while others continue product work) produces a longer migration timeline but preserves product velocity. The full-team migration is almost never the right choice.
+- Weekly honest updates to stakeholders when the timeline slips are less damaging to trust than a late disclosure that the migration is running significantly over estimate.
+- The sunk cost calculation is the most dangerous part of a runaway migration. Teams that are six months into a migration feel unable to stop even when the rational decision is to stop, reassess, and restart with better planning.
+
+| Migration Stage | What Can Go Wrong | Prevention |
+|---|---|---|
+| Scoping | Estimate too optimistic, no rollback plan | Independent review, phase-based plan |
+| Phase 1: Tooling | Migration tooling built against wrong assumptions | Test against production data copy |
+| Phase 2: Non-critical data | Data quality issues surface, extend timeline | Build data quality checks into tooling |
+| Phase 3: Critical data | Rollback not tested, not executable | Test rollback before Phase 3 begins |
+| Phase 4: Traffic switch | Unexpected performance in migrated system | Load test before traffic switch |
+
+## The core argument
+
+The migration that consumes the roadmap is one of the most common and most damaging failure patterns in engineering teams. It is not a story about technical incompetence -- it is a story about planning failure that is predictable, identifiable before it starts, and almost entirely preventable.
+
+The pattern: an engineer identifies a real problem (data model is wrong, database is the wrong technology, schema has accumulated enough debt to make development slow). The engineer proposes a migration. The estimate is optimistic because migrations are hard to estimate well and because the engineer who proposes a solution is often the least qualified to estimate its scope (they are excited about the solution). The migration is approved. It starts. Data quality issues surface that were not in the estimate. The migration takes twice as long as planned. Product features are delayed. The team is demoralized. The migration is eventually completed -- or it is quietly abandoned after consuming months of capacity.
+
+What makes this pattern so damaging is not just the time cost. It is the opportunity cost. Six months of migration work that produces nothing customer-visible is six months of features not built, customer feedback not incorporated, competitive positioning not advanced. For a startup, six months of roadmap consumption can be existential.
+
+## How the pattern starts
+
+The migration that ate the roadmap almost always starts with a real problem. The data model that was built quickly during the MVP phase has not scaled well. The database technology that was chosen for speed-to-market is not well-suited to the current query patterns. The schema has accumulated enough inconsistency that adding new features requires workarounds.
+
+These problems are real. The mistake is in the proposed solution: a large, comprehensive migration that addresses everything at once. This is the "big bang" migration, and it fails for a predictable reason: the scope of a large migration is not estimable from the outside. The data quality issues, the edge cases in the migration tooling, the unexpected dependencies -- these are all invisible until the migration is underway.
+
+The alternative is not "do not migrate." It is "migrate in phases that are small enough to be scoped, tested, and rolled back independently." A migration that moves data from an old schema to a new schema in a single weekend is not a phase-based migration; it is a bet that every assumption about the data is correct. In a production database with years of data, some assumptions will be wrong.
+
+## The specific planning failures
+
+**No rollback plan.** The migration with no rollback plan is the migration that cannot stop once it starts. When the migration hits a problem at 60 percent complete, the team has no choice but to push through -- they cannot go backward and they cannot stop. Every decision from that point is made under time pressure, which is the worst condition for making good decisions. The rollback plan should be designed and tested before the migration begins, not after problems are encountered.
+
+**No staging test against production data.** The migration tested in staging against development data finds development-data-quality issues. It does not find production-data-quality issues, which are almost always different and more varied. A copy of production data (sanitized for privacy) in the staging environment is the prerequisite for a reliable migration estimate. Without it, the estimate is guesswork.
+
+**Full-team allocation.** The migration that is assigned to all available engineers stops product delivery for the duration. This is justified with the logic that a faster migration means faster resumption of product work. The flaw: migrations almost always take longer than planned, and the full-team allocation means the team produces nothing product-visible for the extended duration. The constrained-capacity migration (1-2 engineers) takes longer but preserves product velocity for the rest of the team.
+
+**No time-box.** The migration without a defined end date runs until it is complete, regardless of how long that takes. The time-boxed migration runs for the allocated time and then forces a decision: is the remaining work worth the continuing cost, or should the migration be stopped, the approach reassessed, and a revised plan proposed? The time-box is not a deadline -- it is a forcing function for the reassessment that most teams avoid because of sunk cost bias.
+
+## What a well-planned migration looks like
+
+A migration from an old authentication system to a new one, as an example:
+
+**Phase 1 (1 week): Build and validate migration tooling.** Write the migration scripts. Run them against a copy of production data. Identify data quality issues and edge cases. Update the scripts. At the end of Phase 1, the migration tooling handles 99+ percent of production data correctly and the remaining edge cases are documented.
+
+**Phase 2 (1 week): Migrate non-production environments.** Run the migration on staging and verify the application works correctly with the migrated data. This week of testing in an environment that mirrors production is worth more than any amount of local testing.
+
+**Phase 3 (2-4 days): Migrate production, non-critical data first.** Apply the migration to data that is not in the hot path -- historical records, inactive accounts. Verify in production before touching active user data.
+
+**Phase 4 (1 day): Migrate critical data with rollback standing by.** Run the migration on active user data. Keep the old system accessible for rollback for 24-48 hours after the migration completes.
+
+This phased approach takes longer than a single-weekend migration. It takes 4-6 weeks instead of 1-2 days. But it produces a reliable migration with a clear rollback path, a tested estimate, and no roadmap-consuming surprises.
+
+## Common mistakes teams make with large migrations
+
+1. Starting the migration before testing rollback. The rollback plan that has never been tested is not a rollback plan -- it is an untested hypothesis. Test rollback in staging before Phase 3 begins.
+2. Underestimating data quality issues in old schemas. Production databases that have been live for more than a year almost always have data that violates implicit assumptions in the migration script. The estimate should include a data quality audit phase.
+3. Not communicating timeline slips until the problem is severe. Weekly honest updates when the timeline is slipping are less damaging than the late disclosure that the migration is six weeks behind.
+4. Conflating "the migration is code-complete" with "the migration is done." A migration is done when the migrated system has been in production for long enough to verify correctness, the rollback plan has been formally retired, and the old system has been decommissioned. "Code-complete" is the beginning of validation, not the end of the migration.
+5. Abandoning the migration halfway and leaving both systems running. The migration that is 70 percent complete and stopped leaves the system in a state that is harder to maintain than either the old or the new state. Stopping a migration requires a clear plan for the incomplete state -- not just stopping.
+
+## Where to start: a 3-step migration planning process
+
+**Step 1: Build a phase-based plan with go/no-go checkpoints before writing any migration code.** Define what each phase produces, how long each phase should take, and what the go/no-go criteria are. This plan should be reviewed by someone who is not the migration's proposer.
+
+**Step 2: Set up a production data copy in staging and run the migration tooling against it before committing to a production timeline.** The data quality issues that are not visible in development will be visible here. Add one week to the estimate for each significant category of data quality issue discovered.
+
+**Step 3: Define the time-box and the capacity allocation.** Decide how much engineering capacity this migration gets (not the full team) and how long it runs before a formal reassessment. Write these decisions down and review them at the reassessment point regardless of the migration's progress.
+
+## The Migration That Should Have Taken Six Weeks
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I was brought in to assess a migration project that had been running for four months at a client company. The migration was moving customer data from a legacy schema to a new one. The original estimate was three weeks. At four months, it was approximately 60 percent complete. The team was exhausted, the product roadmap had not moved in four months, and the CTO was under pressure from investors about the lack of visible progress. The problem was not engineering competence -- the team was strong. The problem was the planning: no data quality audit before the estimate, no phase-based plan, no time-box, and no rollback plan that had been tested. We stopped the migration, moved the data that had been migrated back to a dual-schema model that supported both old and new formats, resumed product work, and replanned the migration as a phased six-week project that ran alongside normal product development. The migration completed five months later with no further roadmap impact. The four-month sunk cost was real; the only thing to do with it was learn from it.
+
+## Related reading
+
+- [The Legacy Codebase: A Senior Engineer's Five Day Audit](/blog/the-legacy-codebase-a-senior-engineers-five-day-audit)
+- [The Five Architectural Failures That Killed Startups I Worked With](/blog/the-five-architectural-failures-that-killed-startups-i-worked-with)
+- The Tech Debt Conversation: How to Explain It to Non-Technical Stakeholders
+- The Incremental Refactor: How to Modernize Without Stopping

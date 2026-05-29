@@ -1,0 +1,62 @@
+---
+slug: "schema-evolution-adding-columns-without-downtime"
+title: "Schema Evolution: Adding Columns Without Downtime"
+excerpt: "Schema migrations on live production databases require care that most tutorials omit. Here is how to add columns, change types, and restructure tables on large production databases without taking downtime."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/schema-evolution-adding-columns-without-downtime"
+status: "published"
+definition: "Schema evolution refers to the process of modifying a database schema (adding columns, changing types, dropping tables, creating indexes) while the application is running and serving production traffic. Zero-downtime schema migration requires careful sequencing of DDL statements, application code changes, and data backfills to avoid table locks that block reads and writes, and to maintain compatibility between the old and new application code during the deployment window."
+faq: [
+  {"q":"What operations in PostgreSQL require a table lock and how long do they hold it?","a":"PostgreSQL DDL operations that acquire an exclusive lock and block all reads and writes: adding a NOT NULL column without a default (requires table rewrite in older versions), changing a column type that requires data rewriting, dropping a column (marks as invisible but does not release space immediately), adding a CHECK constraint without VALIDATE CONSTRAINT. Operations that are safe on large tables: adding a column with a DEFAULT and NOT NULL in PostgreSQL 11+ (default is stored in catalog, not written to rows until updated), creating an index with CREATE INDEX CONCURRENTLY (uses ShareUpdateExclusiveLock, allows reads and writes during build), adding a nullable column."},
+  {"q":"How do you add a new NOT NULL column to a large production table without downtime?","a":"The four-step process: first, add the column as nullable with no default (ALTER TABLE ADD COLUMN new_col TYPE; fast, no lock). Second, backfill the column for existing rows in batches (UPDATE with LIMIT to avoid long-running transactions and table bloat). Third, add a NOT NULL constraint using ALTER TABLE ALTER COLUMN SET NOT NULL with VALIDATE CONSTRAINT split into two steps (add constraint as NOT VALID, then validate separately; validation does not require exclusive lock in newer PostgreSQL versions). Fourth, update application code to write the new column and remove the nullable fallback. This process avoids any exclusive lock on the full table."},
+  {"q":"How do you change a column type without downtime?","a":"Changing a column type that requires data rewriting (varchar to integer, timestamp to timestamptz) on a large table requires a shadow column approach: add a new column with the new type, backfill the new column from the old column using a background job, deploy application code that reads and writes both columns (dual-read, write to both), verify the new column has correct data, deploy application code that reads only the new column, then drop the old column. This avoids a table rewrite that would hold an exclusive lock for the duration of the operation on a large table."},
+  {"q":"What is the expand-contract migration pattern?","a":"The expand-contract pattern (also called parallel change or branch by abstraction at the schema level) is a technique for making breaking schema changes safely. Expand: add the new structure (new column, new table) alongside the old. Migrate: run the application with both old and new structure, writing to both. Contract: remove the old structure once all reads and writes have been migrated. This pattern is the framework behind most zero-downtime migration techniques. It works because expanding (adding) schema is almost always safe and fast, while contracting (removing) schema happens only after all application code has been updated and traffic confirmed on the new structure."},
+  {"q":"How do you create an index on a large production table without blocking traffic?","a":"CREATE INDEX CONCURRENTLY builds an index without holding an exclusive lock on the table. It takes longer than a regular CREATE INDEX because it must scan the table twice and track changes during the build, but reads and writes continue normally during the operation. Caveats: CONCURRENTLY cannot run inside a transaction block; it may fail and leave an invalid index if interrupted (check pg_indexes for invalid indexes after failure and DROP them before retrying); it uses more I/O than a regular index build. Always use CREATE INDEX CONCURRENTLY on production tables with any meaningful data volume."}
+]
+---
+
+## What you need to know
+
+- Most DDL operations that cause downtime do so because they hold an exclusive table lock. Understanding which operations require locks and which do not is the foundation of zero-downtime migrations.
+- Adding a nullable column is always safe and fast. Adding a NOT NULL column requires a multi-step process to avoid a table rewrite.
+- CREATE INDEX CONCURRENTLY builds indexes without blocking reads or writes. Always use it on production tables.
+- The expand-contract pattern is the framework behind all zero-downtime schema changes: add the new structure, migrate data and code, remove the old structure.
+- Backfilling large tables must be done in batches. A single UPDATE on millions of rows creates a long-running transaction and table bloat.
+
+## The core argument
+
+Schema migrations are where well-intentioned engineering practice diverges sharply from production reality. In a tutorial environment, running a migration file is a one-step process. In production, on a table with 50 million rows and 500 concurrent connections, the same migration can cause a full service outage if executed without care.
+
+The source of danger is the lock hierarchy. PostgreSQL acquires locks at different levels for different operations, and certain DDL statements acquire an AccessExclusiveLock that blocks every read and write until it completes. On a small table, this lock is held for milliseconds. On a large table, the same operation takes minutes, during which the application sees every database call timeout or queue, and connection pools exhaust.
+
+The good news is that zero-downtime migrations are possible for almost every schema change, but they require a different mental model than sequential migration scripts. Each schema change becomes a multi-step process: an expand phase that adds structure without removing anything, a migration phase where application code and data catch up to the new structure, and a contract phase where the old structure is removed after the migration is verified. For Velmora, adopting this process reduced migration-related incidents from a regular occurrence to zero, at the cost of making migrations take longer to plan and execute.
+
+## Common mistakes
+
+1. **Running migrations in the same deployment as the application code change.** When the migration and the code change deploy simultaneously, there is no safe rollback: if the application fails after the migration runs, rolling back the application to the previous version leaves it running against the new schema. Deploy schema migrations separately, before the application code that depends on them. This requires backward-compatible migrations (new nullable columns, not renamed or dropped columns).
+
+2. **Backfilling large tables in a single UPDATE statement.** UPDATE without a WHERE clause on a large table locks every row for the duration of the update, preventing concurrent writes. Batch the backfill: process 1,000 to 5,000 rows per transaction, with a brief sleep between batches to allow the autovacuum to reclaim dead tuples and avoid table bloat. The total backfill takes longer but has no impact on application throughput.
+
+3. **Not checking for invalid indexes after a failed CONCURRENTLY build.** If CREATE INDEX CONCURRENTLY is interrupted (server restart, network failure), it leaves an index in the pg_indexes catalog marked as invalid. Invalid indexes exist but are not used by the query planner. They do consume space and add maintenance overhead. Check for invalid indexes after any migration that uses CONCURRENTLY and DROP them if found before retrying the build.
+
+4. **Dropping columns immediately when application code stops using them.** When application code is updated to stop using a column, the column can technically be dropped immediately. But if the deployment is rolled back, the old application code reading the dropped column will fail. Leave dropped columns in place for at least one deployment cycle after the application code has stopped using them. Then drop in the contract phase once rollback is no longer required.
+
+5. **Not testing migrations against a production-size database.** A migration that completes in 10 seconds on the 100,000-row staging database may take 30 minutes on the 100-million-row production database. Test migrations on a replica of production data before scheduling the production run. If the migration takes longer than acceptable, redesign it using the expand-contract pattern before proceeding.
+
+## Where to start
+
+1. **Adopt a migration tool that supports transactional DDL.** Tools like Flyway, Liquibase, or Golang-migrate track migration history in a database table and ensure each migration runs exactly once. The tooling provides the plumbing. The zero-downtime patterns above provide the technique. Having consistent tooling makes the multi-step expand-contract process manageable because each step is a versioned migration file with a clear execution record.
+
+2. **Define a migration policy for the team.** Write down the rules: all migrations are backward compatible (no column drops or renames without a multi-step process), all indexes use CONCURRENTLY, all backfills run in batches. Codify these rules in a code review checklist for migration files. The policy prevents the mistakes when team members are working quickly under feature pressure.
+
+3. **Run a migration drill on a large table in staging.** Take the largest table in the production schema and practice adding a NOT NULL column with a backfill using the multi-step process. Time each step. Verify that the application runs correctly with the table in intermediate states. This drill builds the muscle memory for zero-downtime migrations before a real migration requires it under production pressure.
+
+## Related reading
+
+- [Schema Design Decisions That Haunt You at Million User Scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale)
+- [Query Optimization in PostgreSQL: Real Examples From Real Projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects)
+- [Scaling from One Thousand to One Hundred Thousand Users: The Invisible Database Bottlenecks](/blog/scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks)
+- [Soft Deletes vs Hard Deletes: A SaaS Data Strategy Debate](/blog/soft-deletes-vs-hard-deletes-a-saas-data-strategy-debate)

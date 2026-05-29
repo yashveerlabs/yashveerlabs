@@ -1,0 +1,113 @@
+---
+slug: "audit-logs-that-pass-real-audits"
+title: "Audit Logs That Pass Real Audits"
+excerpt: "Most teams build audit logs for SOC 2 and stop there. The ones that pass real audits, year after year, treat the audit log as a product. Here is how I build them."
+date: "2026-05-19"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","soc2"]
+readingMinutes: 13
+ogImage: "/api/og/blog/audit-logs-that-pass-real-audits"
+status: "published"
+definition: "An audit log that passes a real audit is structured, append only, queryable by both customer and auditor, retained for the regulatory minimum, and tied to a controlled vocabulary of action names. It captures who did what, on which resource, in which tenant, from which network. It is reviewed regularly. It survives the auditor walking through it line by line and asking why each field exists."
+faq: [
+  {"q":"What is the difference between an audit log and an application log?","a":"Application logs capture operational events to help engineers debug. Audit logs capture security relevant events for compliance and trust. Application logs change shape often. Audit logs are stable, structured, and append only. The two should live in different stores and serve different consumers."},
+  {"q":"Which compliance frameworks actually inspect the audit log?","a":"SOC 2 Type II, ISO 27001, HIPAA, PCI DSS, FedRAMP, and most enterprise security questionnaires. Each one cares about retention, integrity, and the ability to answer who did what to which resource. The exact field requirements vary, but the bar is similar across regimes."},
+  {"q":"How long do I have to retain audit logs?","a":"For SOC 2 expect a year at minimum. HIPAA expects six years. PCI DSS expects one year online and three years total. For FedRAMP the bar is higher. Pick the longest applicable regime and tier hot and cold storage to control cost."},
+  {"q":"How do auditors test the audit log?","a":"They pick a sample of sensitive actions, ask for the corresponding records, and check the records line up with the documented policy. They look for gaps, edits, and missing events. If the log fails the sample, the audit either fails or moves to a remediation track."},
+  {"q":"Can I store audit logs in my main database?","a":"You can. You should not. A compromised application that shares a database with its own audit log can tamper with the audit trail. A separate store with append only semantics removes that risk and is what mature auditors expect to see."},
+  {"q":"What is the smallest viable audit log for a startup?","a":"A separate Postgres table written through a single internal service, with a controlled vocabulary, immutable rows, daily backups, and a documented retention policy. That alone passes SOC 2 Type I and gives you a foundation to grow into a real audit pipeline later."},
+  {"q":"Should the audit log be customer facing?","a":"For B2B SaaS, yes. Enterprise security teams will ask for an API or export. Make it queryable by time, actor, action, and resource. Charge for it on higher tier plans if you want. The ones that ship a customer audit API close enterprise deals faster than the ones that do not."}
+]
+---
+
+## What you actually need to know
+
+- A real audit log is structured, append only, and stored separately from the application database.
+- The action names come from a controlled vocabulary, not free text.
+- Retention is tiered. Hot for the most recent ninety days. Cold for the rest of the regulatory window.
+- Customers and auditors both query the same data. Build the API once.
+- Reviewing the log on a cadence is what turns it from compliance theater into a real control.
+
+| Audit log maturity | What it looks like | What it survives |
+|---|---|---|
+| Tier 1 | Postgres table, ad hoc inserts, no retention policy | A friendly SOC 2 Type I |
+| Tier 2 | Dedicated service, controlled vocabulary, retention tiers | SOC 2 Type II, ISO 27001 |
+| Tier 3 | Append only store, customer API, alerting, quarterly review | HIPAA, FedRAMP, enterprise procurement |
+
+## The core argument
+
+Most teams build the audit log the night before the SOC 2 fieldwork starts. The result is a table called `audit_logs` with a JSON blob, a timestamp, and a user ID. It passes the first audit because the auditor is checking the existence of the control. It does not pass the second audit, because by then the auditor is testing whether the control is operating effectively. That is the gap I keep seeing in my client work.
+
+The audit log that passes year after year is built once, deliberately, with a clear definition of what is auditable and what is not. The action names are part of the product vocabulary. The retention policy is documented and tested. The pipeline that produces the events is decoupled from the application so a compromise in the application cannot rewrite the trail. The customer can query their slice of it. The internal team reviews suspicious patterns on a cadence.
+
+The investment is real. Two to six weeks of engineering depending on the starting point. The payoff is also real. Enterprise deals that would otherwise stall at the security review move forward. Audits run on rails instead of fire drills. The internal team has a clean record to pull from when a customer asks what happened to their data on a specific day.
+
+The teams that resist this investment are usually the ones that have not yet had an enterprise prospect walk away over a weak audit story. The ones that have already lost a deal that way build the audit log to Tier 2 inside a quarter. The choice is whether to learn the lesson on your own money or someone else's deal.
+
+## What auditors actually look for
+
+The four things every auditor I have worked with checks. First, integrity. Can the log be tampered with by the application that produces it. The answer should be no, demonstrated by a separate write path and append only storage. Second, completeness. Are the events documented in the policy actually being captured. The auditor samples records and checks. Third, retention. Are the records still available for the full regulatory window. The auditor asks for records from eleven months ago. Fourth, review. Is anyone actually looking at the log. The auditor asks for evidence of regular review and follow up on anomalies.
+
+The fifth item, which the better auditors check, is access. Who can read the audit log and on what authority. The right answer is a small group of internal staff with a clear approval path and a separate audit trail for the audit log itself. Recursive but necessary.
+
+## How much does building this cost
+
+| Maturity tier | Engineering time | Monthly storage | Tools |
+|---|---|---|---|
+| Tier 1 minimum viable | One to two weeks | Under 20 dollars | Postgres, your existing stack |
+| Tier 2 production grade | Three to six weeks | 50 to 500 dollars | Postgres or DynamoDB, S3 for cold, alerting |
+| Tier 3 enterprise grade | Six to twelve weeks | 500 to 3000 dollars | Append only store, customer API, dashboards |
+
+The numbers come from projects I have shipped or rescued. Most B2B SaaS startups land in Tier 2 by the time their first enterprise contract is signed. Tier 3 is the right call for healthcare, finance, and any product where the audit log is itself a sold feature.
+
+## Features the implementation must have
+
+- Controlled vocabulary of action names committed to a registry.
+- Separate write path from the application database.
+- Append only storage that the application service account cannot edit or delete.
+- Trace IDs that link events across services for the same user request.
+- Customer query API with filters on time, actor, resource, and action.
+- Export to CSV and JSON.
+- Tiered retention with hot and cold paths.
+- Anomaly alerting on patterns like bulk export, off hour access, and repeated permission escalations.
+- A documented review cadence with a name on it.
+
+## Expert opinion
+
+> The audit log is the only control most auditors actually exercise during fieldwork. They will sample real records, ask why those records exist, and compare them against your written policy. A team that built the audit log as a checkbox struggles in that hour. A team that built it as a product walks through it like a feature demo.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a client engagement
+
+A B2B SaaS client came to me three weeks before their SOC 2 Type II fieldwork with a Tier 1 audit log and no retention policy. The auditor had already pre-flagged audit logging as a likely deficiency. We had eighteen working days to move them to a defensible Tier 2.
+
+The work split into four streams. Move the audit pipeline out of the application service into its own ingestion endpoint. Lock the storage to append only with row level integrity hashes. Backfill ninety days of historical data from application logs into the structured format. Write the retention policy, the review cadence, and the runbook for the customer query API.
+
+We hit the deadline with three days of buffer. The auditor sampled twenty records across the ninety days, asked for the policy and the runbook, and noted the control as operating effectively. The team has run the same audit log for two more annual cycles without significant changes. The cost of the original sprint paid back twice in deals where the audit log was an explicit selection criterion.
+
+For the broader compliance backdrop on which this control sits, see [SOC 2 Type I vs Type II](/blog/soc-2-type-i-vs-type-ii-a-founders-guide-to-both) and [ISO 27001 for engineering founders](/blog/iso-27001-for-engineering-founders-a-practical-reading).
+
+## Common mistakes teams make
+
+1. Free text action names. The log becomes unsearchable inside a year.
+2. Storing audit logs in the application database. Tampering risk and noisy neighbor risk.
+3. No retention policy. Either expensive forever storage or accidental deletion.
+4. No customer query API. Enterprise will ask. The retrofit under deal pressure is brutal.
+5. No review cadence. Auditors check for evidence of review. So do good prospects.
+6. Logging too much. The log floods. Real signal is buried.
+7. Logging too little. The auditor asks for actions that were not captured. Remediation track.
+8. Treating audit logs as immutable in policy but not in storage. Make the storage enforce the rule.
+
+## A 60 day plan to get to Tier 2
+
+1. **Week one.** Decide what is auditable. Write the controlled vocabulary. Get sign off from product and security.
+2. **Week two.** Build the ingestion endpoint as a separate service. Wire the application services through it.
+3. **Week three.** Migrate storage to an append only target. Add the integrity hashes and trace IDs.
+4. **Week four.** Build the customer query API. Validate the export formats.
+5. **Week five.** Define retention. Configure hot and cold tiers. Document the policy.
+6. **Week six.** Set up anomaly alerting. Define the review cadence. Run the first review.
+7. **Week seven.** Write the auditor runbook. Walk it with someone outside the team.
+8. **Week eight.** Tabletop a sample audit. Sample twenty records. Confirm they match the policy.
+
+For the related pattern on customer facing logs, read [audit trails for sensitive actions the pattern that earns trust](/blog/audit-trails-for-sensitive-actions-the-pattern-that-earns-trust). For the storage and architecture side, read [audit logs for SaaS a compliance and trust tool](/blog/audit-logs-for-saas-a-compliance-and-trust-tool). The customer security questionnaire side of this work is in [the customer security questionnaire a strategic asset](/blog/the-customer-security-questionnaire-a-strategic-asset).

@@ -1,0 +1,98 @@
+---
+slug: "the-first-hire-in-devops-when-and-what"
+title: "The First Hire in DevOps: When and What"
+excerpt: "The signals that tell you it is time to hire a dedicated DevOps or infrastructure engineer -- and what the role should actually cover at startup scale."
+date: "2025-08-26"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","hiring","operations"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-first-hire-in-devops-when-and-what"
+status: "published"
+definition: "The first DevOps hire at a startup is justified when the infrastructure work required to keep production reliable and the development environment productive is consuming more engineering time than a dedicated hire would cost. Most startups reach this point between 8 and 15 engineers. The role at this scale is not a traditional operations role -- it is a software engineering role focused on the internal platform that product engineers build on."
+faq: [
+  {"q":"What triggers the first DevOps hire?","a":"When product engineers are spending more than 10-15 percent of their time on infrastructure problems -- slow CI, manual deployment steps, repeated environment setup issues, production incidents without runbooks -- and the cost of that time exceeds what a DevOps engineer would cost. The calculation is straightforward: if 10 engineers each spend 3 hours per week on infrastructure work, that is 30 hours per week of product engineering time on non-product work. A DevOps engineer's full-time job solving those problems costs less."},
+  {"q":"What is the difference between a DevOps engineer and a platform engineer at startup scale?","a":"At startup scale, the titles are often used for the same role. A DevOps engineer typically focuses on CI/CD, deployment automation, and operational practices. A platform engineer typically focuses on the internal developer platform -- the tools, services, and abstractions that product engineers build on. In practice, the first hire at a startup will do both. The distinction matters more at 50+ engineers when the functions may justify separate teams."},
+  {"q":"Should the DevOps hire be senior or junior?","a":"Senior. The first DevOps hire is defining the infrastructure architecture and the operational practices for the entire engineering team. A junior DevOps engineer who makes foundational choices that are incorrect creates technical debt that is expensive to fix later. A senior hire is more expensive but makes better initial decisions that the entire team benefits from."},
+  {"q":"What should the DevOps hire's first 90 days look like?","a":"The first 90 days should be an audit of the current infrastructure and a prioritized remediation plan. What are the most painful infrastructure problems for product engineers? What is the current deployment process and where does it break down? What is the monitoring and alerting situation? The first 90 days should produce a plan with quick wins (things that can be improved immediately) and longer-term investments (infrastructure changes that require more time)."},
+  {"q":"How do I evaluate a DevOps candidate without deep DevOps expertise myself?","a":"Ask for specific examples of problems they have solved: a CI pipeline they made significantly faster, an incident they detected and resolved, an infrastructure change they made that improved developer productivity. Good candidates have specific numbers: 'reduced CI time from 45 to 12 minutes by implementing parallel test execution and caching.' Candidates who speak in generalities without specific outcomes have not done the work."}
+]
+---
+
+## What you actually need to know
+
+- The first DevOps hire is justified by the engineering time currently spent on infrastructure problems, not by headcount thresholds.
+- This hire should be senior. Junior DevOps engineers making foundational infrastructure decisions create technical debt that the entire engineering team inherits.
+- The role at startup scale is infrastructure engineering, not traditional IT operations. The hire should write code.
+- The first 90 days should be an audit and prioritization exercise before any significant changes are made.
+- The highest-return early investments: CI pipeline speed, deployment automation, and monitoring that catches production problems before users report them.
+
+| DevOps Investment | Engineering Time Saved | Implementation Time | Priority |
+|---|---|---|---|
+| CI pipeline optimization | 2-5 hours/engineer/week | 2-4 weeks | Very high |
+| Automated deployment | 1-3 hours/deploy event | 3-6 weeks | Very high |
+| Monitoring and alerting | Variable (prevents incident time) | 4-8 weeks | High |
+| Environment setup automation | 4-8 hours per new hire | 1-2 weeks | High |
+| Infrastructure as code | Variable long-term | 6-12 weeks | Medium |
+
+## The core argument
+
+Most startups delay the DevOps hire until the infrastructure problems are causing significant pain. By then, the product engineers have developed workarounds for a slow CI pipeline, manual deployment has become a ritual that everyone dreads but accepts, and production incidents are resolved through heroics rather than runbooks. The infrastructure that was built quickly in the early days is a source of ongoing drag that everyone complains about but no one owns fixing.
+
+The DevOps hire at this point is a remediation hire -- an engineer who inherits a pile of technical debt and must fix it while keeping the engineering team productive. This is harder than the alternative: hiring a DevOps engineer when the infrastructure is still manageable and giving them the mandate to build it right rather than to fix what is broken.
+
+The calculus for when to hire: add up the hours that product engineers spend each week on infrastructure-related work. Include: waiting for CI to finish, resolving environment setup issues for themselves or new hires, executing manual deployment steps, participating in production incidents that a good monitoring and alerting system would have caught earlier, and reviewing and fixing infrastructure configurations that should be automated. Multiply by the loaded hourly cost of a product engineer.
+
+If this total exceeds the cost of a DevOps engineer's time, the hire is economically justified. For most startups with 8 to 15 engineers, this threshold is crossed well before the infrastructure pain becomes severe. Hiring before the pain is severe means hiring from a position of initiative rather than desperation.
+
+## What the first DevOps hire actually does
+
+The first DevOps hire at a startup is a full-stack infrastructure engineer who writes code. They are not a systems administrator who manages hardware. They are not a cloud operations person who monitors dashboards. They are an engineer who builds the internal platform that product engineers rely on.
+
+The specific responsibilities vary by company, but the highest-value work in the first six months almost always includes: CI/CD pipeline optimization and maintenance, deployment automation that allows product engineers to deploy without manual steps, monitoring and alerting that catches production problems before users report them, environment setup automation that reduces new engineer onboarding friction, and cloud cost management that prevents the infrastructure bill from growing unconstrained.
+
+Each of these is software engineering work. The CI pipeline is a set of configuration files, scripts, and tools that must be maintained, debugged, and improved. The deployment automation is a set of workflows and scripts that must be tested and operated. The monitoring system is a set of dashboards, alert rules, and runbooks that must be configured and maintained.
+
+The DevOps engineer who treats this work as software -- with version control, code review, documentation, and continuous improvement -- builds infrastructure that is maintainable and improvable. The DevOps engineer who treats it as operations -- with manual changes, tribal knowledge, and one-off fixes -- builds infrastructure that is fragile and resistant to improvement.
+
+## The CI/CD pipeline as the first priority
+
+The CI/CD pipeline is almost always the highest-return first investment for the DevOps hire. The pipeline is the infrastructure that every product engineer interacts with on every code change. A pipeline that runs in 8 minutes instead of 40 minutes returns 32 minutes to each engineer for each pull request. With 10 engineers each opening three pull requests per day, this is 1,600 minutes -- over 26 hours -- of engineering time per day.
+
+The typical CI pipeline optimizations that the first DevOps hire implements: parallel test execution (running tests across multiple machines simultaneously rather than sequentially), caching of dependencies and build artifacts (avoiding re-downloading packages that have not changed), selective test execution (running only the tests that are relevant to the changed code), and test isolation (eliminating tests that are slow because of side effects or external dependencies).
+
+The deployment automation work transforms the deployment from a manual process that requires specific knowledge to an automated process that any engineer can trigger with a single command or that happens automatically when a pull request is merged. This eliminates the deployment as a coordination bottleneck and enables more frequent, smaller deployments that reduce the risk of each change.
+
+## Evaluating candidates
+
+The DevOps candidate evaluation should focus on specific accomplishments, not on tool familiarity. The engineer who has improved a specific CI pipeline from 40 minutes to 8 minutes has demonstrated the problem-solving and engineering skill required for the role. The engineer who lists every DevOps tool on their resume but cannot describe a specific problem they solved with any of them has not.
+
+The interview should include a technical discussion of a specific infrastructure problem: describe a slow CI pipeline and ask how the candidate would diagnose and improve it. Ask what they would look at, what tools they would use, what they would change, and how they would verify the improvement. The candidate who walks through a structured diagnostic approach and identifies the types of changes that produce the most improvement is demonstrating the right methodology.
+
+Ask about their philosophy on infrastructure as code: do they believe all infrastructure should be defined in version-controlled code, and how do they enforce this in practice? Ask about how they handle the tension between infrastructure stability and infrastructure improvement. Ask about how they communicate infrastructure changes to the engineering team.
+
+## Common mistakes startups make with the first DevOps hire
+
+1. Hiring junior and expecting senior outcomes. The infrastructure decisions made in the first six months affect the entire engineering team for years. This is not the place to hire a developer who wants to learn DevOps.
+2. Not giving the DevOps hire authority to make infrastructure decisions. A DevOps engineer who must get approval from the CTO for every infrastructure change cannot move fast enough to address the backlog of infrastructure problems.
+3. Treating the DevOps hire as a ticket-resolver rather than a platform builder. A DevOps engineer who spends all their time resolving individual engineer infrastructure tickets is not building the platform that eliminates those tickets. Allocate 60-70 percent of their time to platform building and 30-40 percent to support.
+4. Not including the DevOps engineer in engineering planning. The infrastructure investments that would most accelerate product engineering velocity are visible to the DevOps engineer. Not including them in planning means these investments are not made.
+5. Measuring the DevOps hire by uptime alone. Uptime is a lagging indicator. The leading indicators of DevOps effectiveness are deployment frequency, CI pipeline runtime, new engineer onboarding time, and product engineer self-reported satisfaction with the developer experience.
+
+## Where to start: a 3-step DevOps hire process
+
+**Step 1: Measure the current infrastructure cost.** Ask product engineers to track time spent on infrastructure-related work for two weeks. Calculate the total hours and multiply by the loaded hourly cost of a product engineer. This is the infrastructure cost to justify the DevOps hire against.
+
+**Step 2: Write the DevOps role description around the specific problems to solve.** Not "manage our cloud infrastructure" but "reduce CI pipeline runtime from 40 to under 10 minutes, automate our deployment process to eliminate manual steps, and build the monitoring that lets us detect production problems before users report them." This specificity attracts candidates who have solved these problems.
+
+**Step 3: Interview for specific accomplishments, not tool familiarity.** Require candidates to describe a specific infrastructure improvement they made with specific numbers: before, after, how they got there. Filter out candidates who cannot provide this level of specificity.
+
+## The Infrastructure That Sets the Pace
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The infrastructure work I do for my own projects -- CI configuration, deployment automation, monitoring -- is the work the DevOps hire takes off the product engineering team's plate. It is unglamorous and invisible when it works well and obvious and painful when it does not. The startup that invests in this function before the pain becomes severe is the startup that keeps its product engineers in flow state instead of resolving infrastructure problems.
+
+## Related reading
+
+- [The Engineering Operations Team: When You Need One](/blog/the-engineering-operations-team-when-you-need-one)
+- [The Deployment Pipeline That Survives Real-World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- [The Engineering Dashboard Every Founder Should Have](/blog/the-engineering-dashboard-every-founder-should-have)
+- [The First Five Hires for a Bootstrapped SaaS](/blog/the-first-five-hires-for-a-bootstrapped-saas)

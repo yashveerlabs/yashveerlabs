@@ -1,0 +1,126 @@
+---
+slug: "the-three-hour-performance-audit-every-team-should-run-quarterly"
+title: "The Three Hour Performance Audit Every Team Should Run Quarterly"
+excerpt: "A quarterly performance audit does not require a dedicated week or a specialist. Three hours, the right sequence of checks, and a shared document is enough to catch most regressions before they reach customers."
+date: "2025-07-17"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-three-hour-performance-audit-every-team-should-run-quarterly"
+status: "published"
+definition: "A three-hour performance audit is a structured quarterly review covering database query health, API endpoint percentiles, front-end bundle size, and caching layer effectiveness. I run these with client teams as a repeating calendar item. The goal is not perfection. It is catching the regressions that compound quietly over a quarter and turning each one into a tracked task before a customer notices."
+faq: [
+  {"q":"How often should a small SaaS team run a performance audit?","a":"Quarterly is the minimum. Monthly is better for teams shipping features at pace. The audit does not need to be long. Three focused hours catches the compounding regressions that individual code reviews miss. More frequent, lighter checks beat infrequent deep dives for most teams at under 50 engineers."},
+  {"q":"What should a performance audit cover for a SaaS backend?","a":"Four areas: database query health using pg_stat_statements or slow query log, API endpoint percentiles at p50, p95, and p99, connection pool utilization, and background job queue depths and failure rates. Each area can be checked in under 45 minutes with the right tooling in place."},
+  {"q":"What tools do I need to run a three-hour performance audit?","a":"An observability tool showing endpoint percentiles, your database's slow query data, a bundle analyzer for front end, and access to your CDN cache hit rate. You do not need specialized tools. Sentry, Grafana, or Datadog cover most of the backend. webpack-bundle-analyzer or Next.js bundle analysis covers the front end."},
+  {"q":"How do I benchmark API performance during the audit without affecting real users?","a":"Use synthetic monitoring tools like Checkly or Datadog Synthetics, or run k6 load tests against a staging environment. For baseline comparison, use your APM tool's historical percentile data. You do not need to generate new load during the audit. The data already in your observability tool is sufficient."},
+  {"q":"What are the most common regressions found in quarterly performance audits?","a":"Missing indexes on new columns added during the quarter, N+1 query patterns introduced by new ORM relationships, front-end bundle size growth from new dependencies, and cache bypass patterns from new endpoints that skip caching headers. These four account for the majority of regressions I find in practice."},
+  {"q":"How do I get the team to take quarterly performance audits seriously?","a":"Connect the audit output directly to customer-visible metrics. Show p95 latency for the top five endpoints before and after each quarter. When the numbers improve, customers feel it, and churn data eventually reflects it. Teams that see that connection start protecting the cadence."},
+  {"q":"What is the difference between a performance audit and a performance budget?","a":"A performance budget is a standing commitment: specific latency targets per endpoint, enforced in CI. A performance audit is a periodic review that checks whether reality matches the budget and finds regressions the continuous monitoring missed. Both are needed. The audit finds what the budget did not catch."}
+]
+---
+
+## What you actually need to know
+
+- Three hours is enough if you have observability tooling in place. If you do not, the audit takes longer the first time.
+- Split the time: 45 minutes on database health, 45 minutes on API percentiles, 30 minutes on front-end bundle, 30 minutes on caching, 30 minutes on documenting findings and assigning owners.
+- A quarterly audit is not a substitute for continuous monitoring. It is a catch-all for what the monitors missed.
+- Every finding should leave the audit as a tracked task, not a note in a document no one reads.
+- Regressions compound. A five percent slowdown per quarter is a 20 percent slowdown per year before anyone calls it a crisis.
+
+| Area | What to check | Primary tool |
+|---|---|---|
+| Database query health | Top 10 by total time, new slow queries vs last quarter | pg_stat_statements, slow query log |
+| API endpoint percentiles | p50, p95, p99 per endpoint, trend over 90 days | Datadog, Grafana, Sentry Performance |
+| Front-end bundle | Total JS size, largest chunks, new dependencies | webpack-bundle-analyzer, Next.js build output |
+| Caching layer | Cache hit rate, stale-on-write gaps, TTL mismatches | CDN dashboard, Redis INFO stats |
+
+## The core argument
+
+Performance regressions do not announce themselves. A new feature ships, it adds 20 milliseconds to the login endpoint, and no alert fires because 20 milliseconds is inside the threshold. Another feature ships. Another 15 milliseconds. Over a quarter, the login endpoint goes from 180 milliseconds to 280 milliseconds at p95. No incident, no page, no ticket. Just a product that feels slightly worse than it did three months ago.
+
+The quarterly audit catches this. Not because the tools are better than what you have running continuously, but because you sit down with the intent to look for drift, not just for fires. The mindset is different. You are comparing now against three months ago, not now against an alert threshold.
+
+The three-hour format is deliberate. Longer than that, and it becomes a project that teams defer. Shorter than that, and you are sampling without enough depth. Three hours, broken into structured blocks, is enough to cover the areas that produce the most regressions in practice. Not everything. The areas that matter most for user-facing performance.
+
+Running the audit quarterly also gives the team something the continuous monitors cannot: a cadence for having the performance conversation. The audit meeting is the moment the team collectively agrees on priorities. Without the meeting, performance work competes with features in the backlog and usually loses.
+
+## How to run each section
+
+### Database health (45 minutes)
+
+Pull the top 10 queries from pg_stat_statements sorted by total time. Compare to last quarter's list. Any new entries in the top 10 that were not there before are candidates for immediate investigation. Run EXPLAIN ANALYZE on the top three. Look for sequential scans on tables that have grown since last quarter.
+
+Check for index bloat on tables with high write volume. PostgreSQL's VACUUM does not always reclaim index space immediately. Bloated indexes are slower to scan.
+
+### API percentiles (45 minutes)
+
+Pull p50, p95, and p99 for the top 20 endpoints by traffic. Compare to the 90-day-ago baseline. Flag any endpoint where p95 has grown by more than 20 percent quarter over quarter. That threshold sounds permissive but catches real drift without generating false positives.
+
+Look especially at authentication and data listing endpoints. These carry the most traffic and are the most visible to users.
+
+### Front-end bundle (30 minutes)
+
+Run the bundle analyzer against the current production build. Compare total JS size to last quarter. Flag any new dependency over 50 kilobytes. Look for duplicate libraries, particularly utility libraries where two packages serve the same purpose.
+
+For Next.js teams, the build output shows per-route bundle sizes. Any route that grew significantly is worth examining.
+
+### Caching layer (30 minutes)
+
+Check your CDN cache hit rate. Below 70 percent for a typical SaaS is a signal that caching headers are missing or misconfigured on high-traffic endpoints. Check Redis memory and hit rate if you use application-layer caching. Look for patterns where the cache is populated but bypassed, often caused by new endpoints that do not set cache headers.
+
+## What the audit actually costs
+
+| Frequency | Engineer hours per quarter | Prerequisite setup cost |
+|---|---|---|
+| Quarterly audit, tooling in place | 3 hours | 1 to 2 weeks of initial setup |
+| Quarterly audit, no prior tooling | 6 to 8 hours first time | N/A |
+| Monthly lighter version | 1.5 hours per month | Same as above |
+| Ad hoc only (reactive) | 8 to 20 hours per incident | Ongoing incident cost |
+
+The tooling setup is the one-time cost that makes future audits tractable. Without pg_stat_statements, Grafana dashboards, and a bundle analyzer already configured, the first audit is mostly setup work.
+
+## What to look for across all sections
+
+- Quarter-over-quarter regressions of 15 percent or more on any key metric.
+- New top-10 entries in slow query data that were not present last quarter.
+- Bundle chunks that doubled in size after a specific deploy.
+- Cache hit rate decline without a corresponding traffic change.
+- Any endpoint where p99 crossed one second that was under it last quarter.
+- Background job queue depth trending up over the quarter rather than staying flat.
+
+## Expert opinion
+
+> The quarterly audit is the easiest performance investment a team can make. It costs three hours per quarter and consistently finds regressions that the continuous monitors miss. The monitors look for threshold violations. The audit looks for drift. Those are different things, and both matter. Every team I have pushed to adopt this cadence has found something in the first session.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A product team I work with had been shipping features at pace and had not looked at performance holistically in six months. The continuous monitors had not fired. The product felt fine. We ran the first quarterly audit and found four issues in three hours.
+
+The worst was a database query introduced in a new reporting feature. It had grown to become the second most expensive query by total time, but it was under the slow query threshold individually, so the log had not captured it. It ran 8,000 times a day at 90 milliseconds each. pg_stat_statements surfaced it immediately. An index on the reporting table's date column dropped mean execution time to 4 milliseconds.
+
+We also found the front-end bundle had grown by 140 kilobytes in one quarter. A charting library had been added for a single dashboard. The fix was lazy-loading the chart component. The savings were immediate on the pages that did not use charts, which was the majority of the product.
+
+For the discipline that runs continuously between audits, [the slow query log a discipline every SaaS team should practice](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice) covers the standing database monitoring practice, and [API response times how to track what matters](/blog/api-response-times-how-to-track-what-matters) explains the endpoint percentile tracking that feeds the audit's API section.
+
+## Common mistakes
+
+1. Skipping the baseline comparison. Looking at current numbers without last quarter's reference makes it impossible to identify drift.
+2. Running the audit without a documentation template. Findings that are not written down and assigned are not addressed.
+3. Treating the audit as a replacement for continuous monitoring. The audit and the monitors serve different purposes.
+4. Only auditing the backend. Front-end bundle regressions and CDN cache degradation are as common as database issues.
+5. Not assigning an owner to each finding. A shared document with unowned items is a graveyard.
+6. Running the audit but not scheduling remediation time. Findings without follow-up sprint capacity are theater.
+7. Using p50 as the primary metric during the audit. Most regressions hide in p95 and p99.
+
+## A quarterly audit template plan
+
+1. **Two weeks before.** Identify the four section owners. Pull last quarter's baseline data and put it in a shared document.
+2. **Audit day, block one (90 minutes).** Database health and API percentiles. Two people, two screens, one shared doc.
+3. **Audit day, block two (60 minutes).** Front-end bundle and caching layer. Same format.
+4. **Audit day, block three (30 minutes).** Triage findings. Assign priority and owner to each. Add to the backlog before the meeting ends.
+5. **Within two weeks.** Address any finding classified as high priority. Medium findings go into the next sprint cycle.
+
+For a deeper look at what to do when the audit surfaces something serious, [the hot path finding and optimizing it](/blog/the-hot-path-finding-and-optimizing-it) covers the investigation work, and [backend performance budgets how to set them](/blog/backend-performance-budgets-how-to-set-them) explains how to use audit findings to calibrate the targets that continuous monitoring enforces.

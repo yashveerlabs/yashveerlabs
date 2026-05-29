@@ -1,0 +1,62 @@
+---
+slug: "loading-states-skeletons-and-optimistic-ui"
+title: "Loading States, Skeletons, and Optimistic UI"
+excerpt: "How you handle loading states is one of the most visible indicators of product quality. Here is the decision framework for when to use spinners, skeletons, and optimistic updates, and the common mistakes that make apps feel slow."
+date: "2026-05-23"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 6
+ogImage: "/api/og/blog/loading-states-skeletons-and-optimistic-ui"
+status: "published"
+definition: "Loading state design is the set of decisions about what users see while asynchronous operations are in progress. Spinner loading states block the UI until the operation completes. Skeleton screens show the layout structure before content arrives. Optimistic UI assumes success and shows the result before confirmation from the server, reverting if the server reports failure. Each pattern trades user perception of performance against implementation complexity and error handling requirements."
+faq: [
+  {"q":"When should you use a skeleton screen instead of a spinner?","a":"Use skeleton screens for content that has a predictable layout structure: lists of items, card grids, profile sections, and data tables. The skeleton shows the shape of the content before it arrives, which prevents the jarring layout shift of content appearing from nothing and reduces perceived wait time. Use a spinner for operations where the result structure is unpredictable or where the operation is short enough (under 300 milliseconds) that a skeleton would appear and disappear before the user registers it."},
+  {"q":"What is optimistic UI and what are the risks?","a":"Optimistic UI updates the interface immediately when a user takes an action, before the server confirms the operation. A like button that turns red instantly on click rather than waiting for the API response is optimistic UI. The risk is that if the server operation fails, the UI must revert cleanly. Optimistic UI requires robust error handling and reversal logic. For simple mutations with high success rates, it is the best pattern. For complex operations where failure is common, it creates a confusing experience."},
+  {"q":"How do you handle optimistic UI rollback when a request fails?","a":"Capture the pre-mutation state before applying the optimistic update. In React Query, the onMutate callback provides access to the previous cache state, which you can restore in the onError callback. In Zustand or Redux, snapshot the relevant state slice before the update. The key is that the rollback must happen in the same render cycle as the error to avoid a visible flicker."},
+  {"q":"Should every mutation have an optimistic update?","a":"No. Optimistic updates are worth the implementation cost for high-frequency, reversible mutations where the server success rate is high: liking content, marking items complete, toggling settings, adding to cart. They are not appropriate for destructive or irreversible operations (deleting an account), complex multi-step operations where partial success is ambiguous, or mutations where the server response contains information the client needs (generated IDs, server-computed values)."},
+  {"q":"What is the correct minimum duration for showing a loading spinner?","a":"200 milliseconds is the practical minimum for showing any loading indicator. An indicator that appears and disappears in under 200 milliseconds is perceived as a flicker rather than feedback. For operations that typically complete in under 200 milliseconds, skip the loading state entirely. For operations between 200 and 500 milliseconds, a subtle indicator is appropriate. For operations over 500 milliseconds, a visible loading state is required."}
+]
+---
+
+## What you need to know
+
+- Spinners are for unpredictable-layout operations or operations where the timing is uncertain. Skeletons are for content with a predictable layout that takes more than 300 milliseconds to load.
+- Optimistic UI makes apps feel instant. The implementation cost is the rollback logic. Use it for high-frequency, high-success-rate mutations and not for complex or destructive operations.
+- A loading state that appears for less than 200 milliseconds feels like a bug, not feedback. Add a minimum display duration or skip the loading state for operations that are typically fast.
+- The loading state design is visible product quality. An app with well-designed loading states feels faster and more professional than one with inconsistent spinners and layout shifts.
+- Cumulative Layout Shift is the performance metric most affected by loading state design. Reserving space for loading content with skeleton placeholders is one of the most effective CLS fixes.
+
+## The core argument
+
+Loading state design is where perceived performance diverges from actual performance. An app that takes 1.2 seconds to load a data table with a well-designed skeleton screen feels faster than one that takes 800 milliseconds with a full-page spinner. The skeleton communicates that the content exists, the structure is known, and the wait is bounded. The spinner communicates that something is happening but the user has no information about what or how long. The perceived wait time in the skeleton case is shorter even when the actual wait is longer.
+
+Optimistic UI is the next level: instead of showing a loading state, you show the result immediately and reconcile with the server in the background. A task app where checking a task as complete marks it visually complete before the API call returns is optimistic. The user's action feels instantaneous. The implementation requirement is that the failure case reverts cleanly. In React Query, the pattern is established: `onMutate` applies the optimistic update, `onError` rolls back using the previous state snapshot, `onSettled` refetches the canonical state. This pattern is two to three hours to implement correctly and produces a perceivably faster interface for any mutation users perform frequently.
+
+The decision tree I use is: if the operation takes under 200 milliseconds consistently, no loading state needed. If it takes 200 to 500 milliseconds and has a high success rate and the user expects an immediate response, use optimistic UI. If it takes 200 to 500 milliseconds and the result structure is known, use a skeleton. If it takes over 500 milliseconds or is an initial data load, use a skeleton with a clear layout. Reserve full-page spinners for initial authentication checks and page transitions where the content structure is genuinely unknown. This framework produces consistent loading state behavior across a product without over-engineering each individual case.
+
+## Common mistakes
+
+1. **Using spinners for operations with known layout structure.** If you know the content that is loading is a list of five cards, show five skeleton cards. The spinner is less informative and produces more layout shift when the content arrives.
+
+2. **Not handling the error state after an optimistic update failure.** Applying an optimistic update without implementing the rollback means users see changes that were not persisted. This is a data integrity perception problem. Every optimistic update requires a rollback path.
+
+3. **Showing a loading spinner for less than 200 milliseconds.** A spinner that flashes briefly creates a worse experience than no spinner. Either increase the minimum display duration or skip the loading state for fast operations.
+
+4. **Not reserving space for loading content.** Content that appears and pushes other content down the page creates Cumulative Layout Shift. Skeleton screens and placeholder elements with explicit dimensions prevent this. Setting min-height or aspect-ratio on loading containers is the simplest fix.
+
+5. **Using the same loading pattern for all operations regardless of type.** A full-page spinner for clicking a like button, and a skeleton for the initial page load, and no loading state for saving a form setting are inconsistent. Define a loading state pattern library and apply it consistently across the product.
+
+## Where to start
+
+1. **Audit the three most-used data loading points in your app.** For each one, note the current loading pattern, the typical load time, and whether the content structure is known before it loads. Apply the decision framework: skeleton for known structure, spinner for unknown, optimistic for frequent high-success mutations.
+
+2. **Implement skeleton screens for the two highest-traffic list views.** Build a skeleton component that matches the layout of the real content. Measure the CLS score on those pages before and after with Lighthouse.
+
+3. **Add optimistic UI to the most frequent mutation in your product.** Identify the action users take most often (marking a task complete, liking content, adding an item). Implement the optimistic update with rollback logic. Verify the rollback works by temporarily forcing a server error.
+
+## Related reading
+
+- [INP: The New Core Web Vital Most Teams Are Failing](/blog/inp-the-new-core-web-vital-most-teams-are-failing)
+- [Largest Contentful Paint: The Metric That Changes Conversions](/blog/largest-contentful-paint-the-metric-that-changes-conversions)
+- React Server Components vs Client Components: The Real Trade-offs
+- [Frontend Performance Budgets: A Pattern That Sticks](/blog/frontend-performance-budgets-a-pattern-that-sticks)

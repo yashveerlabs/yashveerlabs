@@ -1,0 +1,109 @@
+---
+slug: "api-authentication-in-2026-api-keys-jwts-oauth-mtls"
+title: "API Authentication in 2026: API Keys, JWTs, OAuth, mTLS"
+excerpt: "Four authentication schemes, four very different threat models. The right choice depends on who you trust, how you rotate, and how much pain you can absorb. Here is the call I make per project."
+date: "2026-05-18"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","api","compliance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/api-authentication-in-2026-api-keys-jwts-oauth-mtls"
+status: "published"
+definition: "API keys are simple and the right call for first party server to server. JWTs are stateless and the right call for user sessions inside your own product. OAuth is the right call for third party integrations. mTLS is the right call for high trust internal services and regulated industries. The teams that mix the right scheme for the right use case ship secure APIs. The teams that use one scheme for everything trade off security or operational pain in places they did not have to."
+faq: [
+  {"q":"Why are API keys still common in 2026?","a":"Because they are simple and they work. For server to server calls between trusted systems, an API key with rotation discipline is fine. The complexity of OAuth or mTLS is not justified for every integration."},
+  {"q":"What are the real downsides of JWTs?","a":"They are hard to revoke. Once issued, they remain valid until they expire. For long lived tokens this is a real risk. Use short expirations, a refresh flow, and a revocation list if you need to invalidate sessions immediately."},
+  {"q":"When should I require OAuth?","a":"When you let third party apps act on behalf of your users. OAuth is designed for delegated authorization. Building it yourself is a years long mistake. Use a provider or a well audited library."},
+  {"q":"Is mTLS worth the operational cost?","a":"For internal service to service traffic in a regulated industry, yes. For external customer APIs, almost never. The certificate management and rotation are a real burden. Pick mTLS only when the threat model demands it."},
+  {"q":"What is the right token expiration?","a":"For user access tokens, fifteen minutes to an hour. For refresh tokens, days to weeks. For machine to machine API keys, rotate every ninety days as a habit. Shorter is safer, but operational pain rises sharply."},
+  {"q":"How do I rotate API keys without downtime?","a":"Issue the new key, support both old and new for a deprecation window, then disable the old one. Communicate the rotation in writing to every API consumer. Without communication, rotations break partners and erode trust."},
+  {"q":"What goes wrong with bearer tokens in browsers?","a":"They get stolen via XSS or stored in places they should not be stored. The right pattern is httpOnly cookies for browser sessions, with CSRF protection. Bearer tokens in localStorage are a vector waiting to be exploited."}
+]
+---
+
+## What you actually need to know
+
+- Each authentication scheme fits a specific use case. Mixing them is normal in a mature system.
+- API keys are fine for server to server. Rotate them, scope them.
+- JWTs are good for stateless user sessions inside your own product. Keep them short lived.
+- OAuth is the only honest answer for third party app authorization.
+- mTLS is the right call for high trust internal traffic, not for general external APIs.
+- In my experience, the teams that get this right have written down which scheme covers which use case, and they hold the line.
+
+| Scheme | Best for | Watch out for |
+|---|---|---|
+| API key | Server to server, scoped third party use | Hard to revoke if leaked, rotate aggressively |
+| JWT | User sessions, microservice to microservice | Revocation is painful, keep them short lived |
+| OAuth 2 | Third party authorization on behalf of users | Build wrong and you ship a security incident |
+| mTLS | High trust internal, regulated industries | Certificate management is real operational cost |
+
+## The core argument
+
+API authentication is the topic where senior engineers and junior engineers most visibly disagree. The junior wants one scheme that works for everything. The senior knows that one scheme that works for everything is the same scheme that handles every case badly. The right mental model is to start with the use case and pick the scheme that matches.
+
+The use cases break down cleanly. A backend service calling another backend service inside your infrastructure. A user signing into your web app. A third party app accessing your user's data with their permission. A regulated system that needs cryptographic identity for every call. Each of these has a default answer. API key, JWT, OAuth, mTLS. The teams that map the default answer to the default use case avoid most of the pain.
+
+The pain shows up when teams cross the streams. Using OAuth for an internal service call adds complexity for no benefit. Using API keys for user sessions in a browser exposes the key to anyone with browser access. Using JWTs without thinking about revocation creates a window where a stolen token works forever. Using mTLS on a public API adds operational cost that the security benefit does not justify.
+
+The decision framework is the use case. The implementation framework is rotation, scoping, and observability. Every scheme requires those three. The teams that skip the implementation discipline ship a system that looks secure on paper and fails in practice.
+
+## Per scheme guidance
+
+**API keys.** Default for server to server inside your infrastructure and for scoped third party access. Rotate every ninety days as a habit. Scope the key to the minimum permissions it needs. Treat key leakage as a security incident, not a maintenance task.
+
+**JWTs.** Default for user sessions inside your own product and for internal microservice calls. Keep expirations short, between fifteen minutes and an hour for access tokens. Add a refresh flow. Maintain a revocation list for the cases where immediate invalidation is required. Never store the signing key in code. Use the right algorithm. RS256 or ES256 are safer defaults than HS256.
+
+**OAuth 2.** Default for any third party app acting on behalf of your users. Use a managed provider or a well audited library. Never roll your own. Implement PKCE for public clients. Choose authorization code flow for server based clients. Stay current on the threat model, because the OAuth attack surface evolves.
+
+**mTLS.** Default for high trust internal traffic between services that need cryptographic identity. Default for regulated industries that require it. Build the certificate rotation pipeline from day one. Manual rotation breaks in production at the worst possible moment.
+
+## What it actually costs
+
+| Setup | Engineering | Ongoing |
+|---|---|---|
+| API keys with rotation | One sprint | Quarterly rotation work |
+| JWT with refresh tokens | One to two sprints | Token revocation considerations |
+| OAuth 2 server | Three to six months if built, one sprint if integrated | Ongoing security maintenance |
+| mTLS for internal traffic | Two to four months including certificate pipeline | Real ongoing operational cost |
+
+The numbers come from my own client work and what I see across teams. Build OAuth yourself only if your product is in the auth business. Otherwise integrate. The savings are not in code, they are in the security audits you do not have to fail.
+
+## Features to demand from the auth layer
+
+- A centralized identity service that owns the issuance and revocation.
+- Audit logs for every authentication event, with the user, the scope, the method, and the result.
+- A rotation pipeline for keys and certificates that runs without human intervention.
+- A clear documentation of which scheme covers which use case in your product.
+- A test harness that exercises the auth layer on every change. Auth regressions are silent and dangerous.
+- A clear plan for what happens when the auth provider has an outage.
+
+## Expert opinion
+
+> The teams that get API authentication right are not the teams with the most sophisticated scheme. They are the teams with the most disciplined rotation, the clearest scope, and the best audit logs. The scheme is a means. The discipline is the win.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client project, the previous engineering team had used JWTs for everything. User sessions, internal service calls, third party API keys. Tokens never expired. There was no revocation. A single leaked token had access to half the system. We rebuilt the auth layer in three sprints. Each use case got the right scheme. API keys for server to server with ninety day rotation. JWTs with thirty minute access tokens and refresh tokens for users. OAuth for the one third party integration the product supported. The complexity went up. The actual security went up much more.
+
+The opposite story is a team I declined to take work from until they fixed their auth model. They were using OAuth for internal service to service calls inside Kubernetes, on the theory that "OAuth is the most secure." The operational pain was enormous. I told them to switch the internal calls to mTLS or scoped API keys and reserve OAuth for the third party flows. They did, and the engineering velocity recovered.
+
+For more on the broader security topic, see [SOC 2 type I vs type II](/blog/soc-2-type-i-vs-type-ii-a-founders-guide-to-both), [JWT best practices in 2026](/blog/jwt-best-practices-in-2026-what-has-changed), and [OAuth 2 0 without tears](/blog/oauth-2-0-without-tears-a-founder-engineers-guide).
+
+## Common mistakes teams make
+
+1. Using one scheme for every use case.
+2. JWTs with no expiration and no revocation. The biggest unforced error in modern auth.
+3. API keys stored in client side code. They will leak.
+4. OAuth implemented from scratch. Use a provider or a well audited library.
+5. mTLS without an automated certificate rotation pipeline. The first manual rotation will be the last one before an outage.
+6. No audit logs on authentication events. The team has no visibility into what is happening.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Inventory every authenticated path in your system. For each, write down the use case in one sentence.
+2. **Week two.** Map each use case to a scheme. API key, JWT, OAuth, mTLS. Write the rationale.
+3. **Week three.** Audit the current implementation against the map. Note every mismatch.
+4. **Week four.** Plan the migration for the highest risk mismatches. Most teams can fix the top two or three in a sprint and revisit the rest over the quarter.
+
+For deeper reading, [SQL injection in 2026 still happening still preventable](/blog/sql-injection-in-2026-still-happening-still-preventable) covers a related layer of API hygiene, and [authorization patterns RBAC ABAC ReBAC explained](/blog/authorization-patterns-rbac-abac-rebac-explained) covers what to do once the user is authenticated.

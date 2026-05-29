@@ -1,0 +1,62 @@
+---
+slug: "scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks"
+title: "Scaling from One Thousand to One Hundred Thousand Users: The Invisible Database Bottlenecks"
+excerpt: "The performance problems that kill products at 100,000 users were invisible at 1,000. They are almost always in the database. Here is what they are, when they appear, and how to address them before they become outages."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks"
+status: "published"
+definition: "Database bottlenecks at scale refer to the performance degradation that occurs when a database system that performs adequately at low user volumes begins to show latency, lock contention, or capacity problems as user counts and data volumes grow. These bottlenecks are often invisible at early scale because query execution times and connection counts are low enough that inefficiencies are not measurable. They become visible and painful as data volumes grow and query patterns that were fast on small tables become slow on large ones."
+faq: [
+  {"q":"What is the most common database bottleneck at 10,000 to 100,000 users?","a":"The most common bottleneck in this range is missing indexes on columns that become query filter targets as the product matures. At 1,000 users, a full table scan on a 10,000-row table completes in milliseconds and is invisible. At 100,000 users, the same full table scan on a 10-million-row table takes seconds and causes user-visible latency. The specific columns depend on the product, but in SaaS products the most commonly missing indexes are on created_at (for time-range queries), status (for filtering active vs archived records), and foreign keys that are queried as parent or child lookups."},
+  {"q":"What is N+1 query problem and when does it become critical?","a":"The N+1 query problem occurs when code loads a list of N records and then executes a separate query for each record to load related data, producing N+1 total queries instead of 1 or 2. At 1,000 users, loading 20 records with 20 additional queries produces 21 queries total, which may complete in 100ms and be unnoticed. At 100,000 users, the same code path running under higher concurrency produces thousands of queries per second that overwhelm the database connection pool. N+1 problems are usually discoverable through query logging: look for query patterns where the same query executes many times with slightly different IDs within a single request."},
+  {"q":"What is connection pool exhaustion and how does it manifest?","a":"Connection pool exhaustion occurs when all available database connections are in use and new requests must wait for a connection to become available. It manifests as latency spikes that correlate with traffic spikes, requests queuing behind the connection pool, and errors like 'too many connections' or 'connection pool timeout.' The fix is usually a combination of: reducing connection pool size per application instance (more small pools are better than one large pool), adding PgBouncer connection pooling at the database level, and optimizing slow queries that hold connections for longer than necessary."},
+  {"q":"What is write contention and which schemas produce it?","a":"Write contention occurs when multiple concurrent transactions attempt to modify the same rows or tables, causing transactions to queue behind each other or fail with lock timeout errors. Common schemas that produce write contention at scale: counters updated on every event (page view counts, notification badges), status fields updated by multiple concurrent processes (order status, payment status), and append-only tables with sequential primary key generation that causes index hot spots. The fix depends on the pattern: counters should use Redis or a CRDT approach; status machines should use row-level locking carefully; sequential IDs should be replaced with UUIDs."},
+  {"q":"When should you add a read replica vs optimize queries first?","a":"Add a read replica when: query optimization has reached diminishing returns and read load is genuinely the bottleneck, the product has a clear separation between write operations (user actions) and read operations (dashboards, reports), and the team has capacity to manage replica lag in application code. Optimize queries first when: slow queries are clearly suboptimal (missing indexes, N+1 patterns, sequential scans on large tables), because a read replica distributes bad queries across more servers rather than fixing them. In my experience, most products in the 10,000 to 100,000 user range have significant query optimization headroom before needing a replica."}
+]
+---
+
+## What you need to know
+
+- The bottlenecks at 100,000 users were present at 1,000 users but invisible at low data volumes. They are almost always in the database.
+- Missing indexes on high-traffic filter columns are the single most common source of performance degradation as data volumes grow.
+- N+1 query patterns that are invisible at low concurrency become critical at scale. Identify them through query logging before they cause outages.
+- Connection pool exhaustion is a symptom of slow queries holding connections too long, not (usually) a connection count problem.
+- Read replicas distribute load but do not fix slow queries. Optimize first, scale horizontally second.
+
+## The core argument
+
+The performance problems that appear at 100,000 users were present in the code from the beginning. The code that performs a full table scan on the users table was written when the users table had 500 rows. The N+1 pattern that loads 30 users and then runs 30 additional queries was written when the list was short and the queries were fast. The missing index on the created_at column was never noticed because time-range queries completed in milliseconds on a small table.
+
+What changes between 1,000 users and 100,000 users is not the code. It is the data volume, the query execution time, and the concurrency. A query that took 2ms on 50,000 rows takes 2,000ms on 50,000,000 rows if it is a sequential scan. That same 2,000ms query, running under 50 concurrent users, holds 50 database connections for 2 seconds each, which exhausts a connection pool of 20 and causes every other request to queue. The cascade is predictable and avoidable if the underlying query is fixed.
+
+The right time to address database bottlenecks is before they become user-visible. Run EXPLAIN ANALYZE on the slowest queries monthly. Track query execution time distribution, not just average latency. The 99th percentile is where the problems hide before they become the median. For Nyxera, we instrumented query timing at the application layer before reaching significant scale, which meant we caught a missing index on a tenant filter column in a staging environment rather than in production during a traffic spike.
+
+## Common mistakes
+
+1. **Not running EXPLAIN ANALYZE on production queries.** Development and staging databases have different data volumes and query plans than production. A query that uses an index efficiently on 100 rows may do a sequential scan on 5 million rows if the query planner decides the index is not selective enough. EXPLAIN ANALYZE on production data (on a read replica to avoid impact) is the only reliable way to verify that queries are using indexes as intended.
+
+2. **Adding indexes after performance problems appear.** Adding an index to a large production table without a concurrent build causes a table lock that blocks writes during the build. PostgreSQL's CREATE INDEX CONCURRENTLY builds the index without locking writes but takes longer. Plan index additions before the table is large rather than during an incident when the lock risk is highest.
+
+3. **Misconfiguring shared_buffers and work_mem.** PostgreSQL's default configuration is conservative and does not reflect the actual memory available on modern servers. shared_buffers should typically be 25 percent of total RAM. work_mem controls memory per sort or hash operation and affects whether operations spill to disk. Tuning these two parameters is often the highest-leverage configuration change for a Postgres instance that is underperforming relative to hardware.
+
+4. **Not tracking slow query logs.** PostgreSQL's log_min_duration_statement configuration logs queries that take longer than a threshold. Setting this to 100ms in production and reviewing the slow query log weekly identifies performance degradation before users report it. Most teams only look at this log after a performance incident, which is reactive rather than preventive.
+
+5. **Over-indexing on write-heavy tables.** Every index added to a table must be maintained on every write to that table. A table with 15 indexes pays 15 index maintenance operations per insert or update. On a high-write table, index overhead can be a larger bottleneck than missing indexes elsewhere. Profile the write patterns on high-throughput tables before adding indexes to them.
+
+## Where to start
+
+1. **Enable slow query logging and review it this week.** Set log_min_duration_statement to 100ms, let it run for 24 hours, and identify the five slowest query patterns. These five queries are the highest-impact optimization targets. Run EXPLAIN ANALYZE on each to understand whether they are hitting indexes or performing sequential scans.
+
+2. **Audit foreign key columns for missing indexes.** In PostgreSQL, foreign keys are not automatically indexed. Any column that ends in _id and is used in a JOIN or WHERE clause needs an index. Run a query against information_schema to find foreign key columns without corresponding indexes. This audit takes 30 minutes and often reveals missing indexes that have been silently degrading query performance.
+
+3. **Instrument query execution time at the application layer.** Add timing around database calls in the application code. Log queries that take more than 50ms with the query pattern (parameterized, not with actual values). This application-layer instrumentation produces the data needed to identify N+1 patterns (many similar queries in one request), connection pool pressure (many concurrent slow queries), and regressions introduced by new features.
+
+## Related reading
+
+- [Query Optimization in PostgreSQL: Real Examples From Real Projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects)
+- [Read Replicas: When They Save You and When They Lie to You](/blog/read-replicas-when-they-save-you-and-when-they-lie-to-you)
+- [Schema Design Decisions That Haunt You at Million User Scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)

@@ -1,0 +1,116 @@
+---
+slug: "the-public-api-decision-when-to-build-one-when-to-resist"
+title: "The Public API Decision: When to Build One, When to Resist"
+excerpt: "Working notes on the public api decision: when to build one, when to resist. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-03-20"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-public-api-decision-when-to-build-one-when-to-resist"
+status: "published"
+definition: "A public API is a formal contract between your product and the outside world. Once live it carries a stability obligation that shapes every engineering decision downstream. I treat the decision to build one as a product launch, not a feature release, because the cost of a poorly designed public API compounds for years while the cost of waiting one more quarter almost never does."
+faq: [
+  {"q":"When should a SaaS company build a public API for the first time?","a":"When at least two enterprise customers have asked for one and described a concrete integration they need to ship. One request is a signal. Two is a pattern. Building a public API to attract customers who have not asked for it yet is usually the wrong order of operations. Build it for the customers you have, not the customers you imagine."},
+  {"q":"What is the real maintenance cost of a public API that most teams underestimate?","a":"Versioning and backward compatibility. Every change to a public endpoint either breaks existing integrations or requires a new version. Teams that ship a public API without a versioning strategy end up with three parallel versions within eighteen months, each with a customer base that refuses to upgrade. The ongoing cost of supporting old versions is the hidden line item that never appears in the original API budget."},
+  {"q":"How is a public API different from an internal API in terms of engineering responsibility?","a":"An internal API can be changed any time you update the consumers. A public API cannot. External developers have built against your contract and have their own release cycles. Breaking changes require deprecation notices, migration guides, and often parallel support periods. The engineering discipline required is significantly higher, closer to maintaining a library than maintaining a service."},
+  {"q":"Should a startup build a public API or a webhook system first?","a":"Webhooks first. A webhook system lets external developers react to events in your system without requiring them to poll. It covers the most common integration pattern at a fraction of the complexity. A full public API is the right next step after you understand what data and operations developers actually need, which webhooks will tell you."},
+  {"q":"What is the difference between a partner API and a public API for a B2B SaaS?","a":"A partner API is invitation-only and purpose-built for a known set of integrations. It can change with more flexibility because you control who uses it. A public API is open to any developer and carries a formal stability commitment. Most B2B SaaS teams are better served by a partner API for the first year or two before they understand the full surface area they are committing to support."},
+  {"q":"How do you version a public REST API in a way that does not turn into a nightmare?","a":"URL versioning with a clear deprecation timeline. Each version lives at a path prefix like /v1/ or /v2/. Announce deprecation twelve months before end of life, email affected API key holders at six months and thirty days, then shut down the old version. Do not add major new features to old versions. Treat each version as a stable branch that only receives security and critical bug fixes."},
+  {"q":"What documentation does a public API need before it can launch to real developers?","a":"A quick start that gets a developer to their first successful call in under five minutes. A complete reference for every endpoint including all parameters, response shapes, and error codes. At least three cookbook recipes showing how to combine endpoints for the most common use cases. A changelog. Authentication documentation. Rate limit documentation with upgrade instructions. Anything less and your support queue will tell you what is missing."}
+]
+---
+
+## What you actually need to know
+
+- A public API is a contract, not a feature. The moment you ship it, you inherit a stability obligation that outlasts any single sprint.
+- Webhooks cover the most common integration need at far lower engineering and maintenance cost. They belong before the API in the build order.
+- The teams that build a public API too early spend the next two years managing a compatibility surface they did not need yet.
+- The decision should be driven by concrete customer demand, not by what you think will make the product look more mature.
+- In my experience, a private partner API for a known integration is almost always the right first step before committing to a public surface.
+
+| API model | Stability obligation | Who can use it | Maintenance cost | When it fits |
+|---|---|---|---|---|
+| Internal API | Low, change at will | Your services only | Low | Always, from day one |
+| Partner API | Medium, coordinate with partners | Approved integrators | Medium | First external integrations |
+| Public REST API | High, versioning required | Any developer | High | Product platform, developer ecosystem |
+| Webhooks | Low, addable without breaking | Any developer | Low | Event-driven integrations, early stage |
+
+## The core argument
+
+The question is never whether a public API would be useful. It would. The question is whether you can afford the engineering discipline it requires right now, at this stage, with this team.
+
+A public API is a product. It has users. It has a support inbox. It has breaking changes that you have to communicate in advance. It has a deprecation cycle. It has documentation that needs to stay current as the underlying service evolves. The teams that treat a public API as a feature they ship and move on from end up with an abandoned surface that damages trust more than no API would have.
+
+The right time to build a public API is when the answer to every question in this paragraph is yes. You have customers who have asked for one and described what they would build with it. You have the engineering capacity to maintain it alongside the product. You have a plan for versioning. You have a plan for documentation. You have a plan for support. You have a plan for deprecation. If any of those answers is "we will figure that out later," you are not ready.
+
+The cost of waiting is smaller than most founders think. A well-scoped partner API or a webhook system covers the most urgent integration needs. Enterprise customers who demand a public API in a procurement questionnaire are asking whether you have a developer story, not whether the API is open to the internet. A documented partner integration usually satisfies that requirement just as well.
+
+## The build decision, step by step
+
+### Step one: diagnose the actual need
+
+Before writing any code, talk to the customers asking for API access. What do they want to build? What data do they need? What operations? In most cases the answer is one of three things: they want to sync your data to their data warehouse, they want to automate a workflow that currently requires them to log into your UI, or they want to trigger actions based on events in your system. The first two needs are met by a private export API or a partner endpoint. The third is met by webhooks. None of these require a public API.
+
+### Step two: consider webhooks first
+
+A webhook system that fires events on state changes covers the third category immediately. It is low to build, easy to document, and imposes almost no backward compatibility burden. Events can be added to the payload without breaking existing consumers. If you add one thing to your external developer story, webhooks should be it.
+
+### Step three: scope the public surface carefully
+
+If you proceed to a public API, scope it to the minimum surface your known integrators need. Every endpoint you add is a contract you are signing. The narrower the initial surface, the lower the maintenance burden and the easier versioning becomes. Start with read endpoints. Write endpoints carry more risk. Destructive endpoints carry the most.
+
+## What it actually costs
+
+| Scope | Engineering time to build | Ongoing maintenance per quarter | Support load |
+|---|---|---|---|
+| Webhook system | 2 to 4 weeks | Low | Low |
+| Partner API, 5 to 10 endpoints | 4 to 8 weeks | Medium | Medium |
+| Public API v1, 20 to 40 endpoints | 10 to 20 weeks | High | High |
+| Public API with SDK | Add 4 to 12 weeks | Very high | High |
+
+These are the numbers I have seen on real projects. The ongoing maintenance column is the one that surprises teams. Every quarter you ship a product change, someone on the team has to assess whether it is a breaking change for the API, update documentation, and communicate to API key holders if there is an impact.
+
+## What to look for before you commit
+
+- At least two concrete integration requests from paying customers, with described use cases.
+- A versioning strategy agreed on before the first endpoint goes live.
+- A documentation plan: quick start, reference, and at least three cookbook recipes at launch.
+- A dedicated engineering owner for the API surface, someone who reviews every change for backward compatibility.
+- An API key management system that lets you revoke keys, inspect usage, and enforce rate limits.
+- A communication channel to reach API key holders when breaking changes are coming.
+
+## Expert opinion
+
+> The public API decisions I have seen go wrong share a pattern. The team builds it to attract a category of customer they do not yet have. The existing customers do not use it. The documentation is thin. Nobody owns the backward compatibility review. Eighteen months later the API is a liability. The teams that get it right build it for a specific customer, document it properly, and assign ownership before the first endpoint ships.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client was fielding requests for API access from three enterprise prospects. The product team wanted to ship a full public REST API. I pushed back. We spent two weeks interviewing the three prospects and mapping what they actually wanted to build. All three needed the same two things: read access to a specific resource and a webhook when that resource changed status. Neither required a public API.
+
+We built a narrow partner API with two read endpoints and a webhook subscription system. All three enterprises integrated in under a month. The total engineering time was six weeks, compared to the estimated twenty weeks for a full public surface. Two years later that partner API is still in production, unchanged, with six integrators. When we eventually build the public API it will be designed around the patterns those six integrators have established. That is the right order.
+
+For the documentation side of this decision, see [API documentation that developers actually read](/blog/api-documentation-that-developers-actually-read). For the versioning question, see [webhooks: the reliable pattern that most companies get wrong](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong) for the event side of the developer story.
+
+## Common mistakes
+
+1. Building a public API before any external developer has asked for one.
+2. Launching without a versioning strategy, then discovering what backward compatibility means the hard way.
+3. Generating documentation from OpenAPI and calling it done. The quick start and cookbook require human writing.
+4. Shipping a write API before a read API. Read endpoints carry lower risk and teach you what developers actually need.
+5. No dedicated owner for the API surface. Every engineer assumes someone else is tracking breaking changes.
+6. Rate limits set too high at launch because you want to seem generous. Lowering them later breaks integrations.
+7. Skipping authentication documentation. Half the support questions in the first month are about auth.
+8. Treating the API launch like a feature release rather than a product launch. It needs its own go-to-market, however small.
+
+## A 60-day plan
+
+1. **Week one.** Interview every customer who has asked for API access. Document exactly what they want to build and which operations they need.
+2. **Week two.** Build a webhook subscription system if you do not have one. This covers the most common integration pattern immediately.
+3. **Week three to four.** Design the minimum partner API surface based on the interview findings. Agree on versioning before writing any endpoint code.
+4. **Week five to six.** Build the partner API. Write the quick start and reference documentation in parallel.
+5. **Week seven to eight.** Invite the requesting customers to test the partner API. Fix what breaks. Document what they ask.
+6. **Week eight.** Decide whether to move to a public surface based on what you learned. Most teams at this stage find the partner API satisfies the need and the public API can wait.
+
+For the broader API design discipline, see [designing an API that customers will not curse in five years](/blog/webhooks-vs-polling-vs-server-sent-events-vs-websockets) and [the state machine pattern](/blog/the-state-machine-pattern-a-backend-engineers-quiet-hero) for the backend models that make a clean API surface possible.

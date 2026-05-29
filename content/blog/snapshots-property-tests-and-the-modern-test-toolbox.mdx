@@ -1,0 +1,65 @@
+---
+slug: "snapshots-property-tests-and-the-modern-test-toolbox"
+title: "Snapshots, Property Tests, and the Modern Test Toolbox"
+excerpt: "Unit tests and integration tests are not the whole story. Here is what else belongs in a serious test suite."
+date: "2026-05-23"
+category: "Tech Debt and Refactoring"
+tags: ["testing","tech-debt","quality","snapshots","property-tests"]
+readingMinutes: 7
+ogImage: "/api/og/blog/snapshots-property-tests-and-the-modern-test-toolbox"
+status: "published"
+faq: [
+  {"q":"What is a property-based test?","a":"A property-based test defines a property that should always hold true for a function (like \"the result is always non-negative\" or \"the output length never exceeds the input length\") and then generates hundreds of random inputs to verify the property holds. When it fails, it reports the minimal input that caused the failure."},
+  {"q":"Are snapshot tests worth the maintenance?","a":"For stable outputs (API response schemas, email template rendering, PDF layouts), yes. For frequently-changing UI components, no. The rule I use: if the output changing without a deliberate code change is a bug, snapshot it. If the output changes frequently as part of normal development, do not snapshot it."},
+  {"q":"What is mutation testing?","a":"Mutation testing introduces deliberate bugs into your code (mutations), runs your test suite, and reports how many mutations are caught. A mutation that is not caught means your tests do not actually verify that behavior. It measures test quality, not test quantity."},
+  {"q":"How does contract testing differ from integration testing?","a":"Integration testing runs both services together and checks that they work. Contract testing stores the agreed-upon API contract separately and verifies each side independently. Contract testing scales better across teams and works even when services are deployed separately."},
+  {"q":"Do I need all of these testing approaches?","a":"No. Pick the one that addresses your most significant testing blind spot. If your tests frequently miss edge case bugs, add property-based tests. If cross-service integration breaks silently, add contract tests. If your tests pass but production still has bugs, run mutation testing to find out why."}
+]
+---
+
+# Snapshots, Property Tests, and the Modern Test Toolbox
+
+**Most engineering teams cover unit tests and maybe integration tests, then stop. Snapshot tests, property-based tests, mutation tests, and contract tests each catch a different class of bug that traditional testing misses. Understanding which tool catches which class of problem is the difference between a test suite that builds confidence and one that passes CI while hiding production failures.**
+
+## What you need to know
+
+- Snapshot tests catch unintended UI and output changes; they are fast to create but expensive to maintain if misused
+- Property-based tests generate hundreds of random inputs and find edge cases your hand-written tests never would have considered
+- Mutation testing checks whether your tests are actually doing their job by introducing deliberate bugs and verifying the suite catches them
+- Contract tests ensure that the API contract between services matches on both sides, catching integration failures before deployment
+- Most codebases benefit from two or three of these tools strategically applied, not all of them everywhere
+
+## The core argument
+
+The failure mode of most test suites is not that they are too small; it is that they test what the developer expected to happen rather than what could happen. A hand-written test for a function that formats a date will test the obvious cases: a normal date, a null input, a leap year. It probably will not test the case where the timezone offset causes the date to flip to the previous day, or where a non-standard locale changes the decimal separator in unexpected ways. Property-based testing generates hundreds of random inputs automatically and finds the edge cases you forgot to imagine.
+
+I introduced property-based testing to the Nexli codebase for the fee calculation logic. Fee calculations involve currency rounding, percentage-based additions, conditional discounts, and edge cases around zero-value line items. Hand-written tests covered the normal cases well. Property-based tests (using fast-check for TypeScript) found three rounding errors within the first run that were present in production but had never been triggered by the normal test inputs. The fix was two lines. The alternative discovery path was a confused parent with an incorrect invoice.
+
+Snapshot testing gets misused more than any other tool. The pattern is: write a component, run the snapshot test, commit the snapshot, and from then on any change to the component output requires updating the snapshot. The problem is that snapshot updates become a mechanical step in every PR, and the "does the snapshot look right" review stops happening because reviewers stop reading diffs they can regenerate. Used well, snapshots are for stable, thoroughly designed outputs where unexpected changes are genuinely a signal of a problem. Used badly, they are a ceremony that adds noise to every PR without catching anything meaningful.
+
+## Common mistakes
+
+1. **Treating snapshot failures as "update and move on."** A failing snapshot test is either a legitimate problem (something changed that should not have) or a test that should not exist (testing implementation details rather than behavior). The answer is not automatically to update the snapshot.
+
+2. **Using property-based tests without understanding what properties you are actually testing.** Property-based tests require you to define the invariant you are testing: "this function always returns a positive number" or "this function produces the same result regardless of input order." Without a clear invariant, the test does not communicate intent.
+
+3. **Running mutation tests on every PR.** Mutation testing is computationally expensive. Run it on a schedule (weekly or before major releases) rather than blocking every push on it.
+
+4. **Building contract tests without tooling.** Contract tests between services need a broker (Pact is the standard choice) to store the contracts and verify them independently on each side. Without tooling, "contract test" is just a named integration test that breaks silently when either service changes.
+
+5. **Skipping snapshot tests entirely because they are "too maintenance-heavy."** Snapshot tests for critical rendering logic (email templates, PDF generation, API response shapes) are low maintenance and catch real production regressions. The problem is not snapshots; it is over-applying them to volatile components.
+
+## Where to start
+
+1. **Add property-based tests to your most complex business logic.** Fee calculations, discount rules, permission logic, anything with multiple conditional paths. Use fast-check (TypeScript/JavaScript) or Hypothesis (Python). Start with one function and the results will make the value obvious.
+
+2. **Audit your existing snapshot tests.** If you have them, answer: when did a snapshot test last catch a real bug rather than a deliberate change? If the answer is "never," reassess whether the snapshots are covering things that should change vs things that should be stable.
+
+3. **Add contract tests at your service boundaries.** If you have two services where an API contract change could break production silently, that boundary is where contract testing earns its place. Pact is the standard tooling. A single boundary contract test prevents an entire class of cross-team integration failures.
+
+## Related reading
+
+- [The Test Pyramid for SaaS: Unit, Integration, End to End](/blog/the-test-pyramid-for-saas-unit-integration-end-to-end)
+- [Test Coverage: A Metric With a Story](/blog/test-coverage-a-metric-with-a-story)
+- [The Mock Versus Real Service Debate](/blog/the-mock-versus-real-service-debate)
+- [Why Your Test Suite Is Slow and How to Fix It](/blog/why-your-test-suite-is-slow-and-how-to-fix-it)

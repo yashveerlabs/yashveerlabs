@@ -1,0 +1,62 @@
+---
+slug: "multi-agent-systems-for-saas-a-practical-architecture"
+title: "Multi Agent Systems for SaaS: A Practical Architecture"
+excerpt: "Multi-agent AI systems are becoming a practical architecture choice for SaaS products. Here is how to design an orchestrator-agent pattern that is reliable, observable, and cost-controlled in production."
+date: "2026-05-23"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/multi-agent-systems-for-saas-a-practical-architecture"
+status: "published"
+definition: "A multi-agent system for SaaS is an architecture where an orchestrating agent breaks a complex task into sub-tasks, dispatches them to specialized sub-agents with appropriate context and tools, and synthesizes the results. The pattern is appropriate when a single LLM call cannot reliably complete a complex workflow, when different tasks require different model capabilities or context, or when parallelism can reduce total completion time. The challenge is coordination, error handling, and cost control."
+faq: [
+  {"q":"When does a multi-agent system make sense compared to a single LLM call?","a":"Multi-agent architecture is appropriate when the task exceeds what a single context window can reliably handle, when different steps of the workflow require different tools or models, or when parallel execution of independent subtasks would reduce total completion time. For most SaaS AI features like summarization, classification, and simple generation, a single well-prompted LLM call is more reliable and cheaper than a multi-agent orchestration."},
+  {"q":"What is an orchestrator agent?","a":"An orchestrator agent receives a high-level task, breaks it into sub-tasks, dispatches those sub-tasks to specialized agents (or LLM calls) with appropriate context, monitors completion, and synthesizes the results into a final output. The orchestrator does not necessarily perform the work itself; it coordinates the work. The orchestrator can be implemented as an LLM call that generates a plan, or as deterministic code that follows a fixed workflow."},
+  {"q":"How do you handle failures in a multi-agent system?","a":"Each agent call can fail: the LLM returns an error, produces invalid output, or exceeds token limits. The orchestrator must handle partial failures: which sub-tasks can be retried independently, which require the entire workflow to restart, and which allow the final output to be produced from partial results. Most production multi-agent systems require explicit retry logic at the sub-task level and a fallback for orchestrator-level failures."},
+  {"q":"How do you control costs in a multi-agent system?","a":"Model selection per sub-task is the primary cost lever. Summarization and extraction tasks can use smaller, cheaper models. Complex reasoning tasks may require a larger model. Token budget limits per agent call, with graceful degradation when the budget is exceeded, prevent runaway cost on individual runs. Caching repeated sub-task results (the same document summarized in multiple runs should be cached) reduces redundant API calls significantly."},
+  {"q":"What observability does a multi-agent system require?","a":"Trace-level logging for each agent call: the input, the model used, the output, the latency, and the token usage. The orchestrator run should be traceable as a parent span with each sub-agent call as a child span. This trace structure allows debugging of multi-agent workflows at the individual step level. LangSmith, Langfuse, and similar LLM observability platforms provide this structure natively."}
+]
+---
+
+## What you need to know
+
+- Multi-agent systems are appropriate for complex, multi-step workflows that exceed single-context-window reliability. They are not appropriate as a default for simple AI features.
+- The orchestrator's primary responsibility is coordination and error handling. The quality of the orchestration logic determines the reliability of the entire system.
+- Model selection per sub-task is the most important cost optimization. Smaller models for routine sub-tasks and larger models for complex reasoning reduce total cost substantially.
+- Observability at the sub-task level is required. A multi-agent workflow that is not fully traceable is not debuggable in production.
+- Deterministic orchestration (code that follows a fixed workflow) is more reliable than fully dynamic orchestration (an LLM that decides the workflow). Use dynamic orchestration only when the workflow genuinely cannot be determined in advance.
+
+## The core argument
+
+The multi-agent pattern solves a specific problem: there are workflows where no single LLM call can reliably produce the correct output because the task is too complex, requires too much context, or benefits from specialization. Research tasks that require searching multiple sources, synthesizing findings, and generating recommendations fall into this category. Auditing a large document against a complex set of criteria, where each criterion requires focused attention, is another. For these workflows, the multi-agent pattern is genuinely better than a single mega-prompt.
+
+The architecture that works in production is a deterministic orchestrator with specialized sub-agents. The orchestrator is code, not an LLM: it knows the workflow, dispatches sub-tasks in the right order, handles failures, and synthesizes results. The sub-agents are LLM calls with specific tools and prompts optimized for their particular task. This separation makes the system more reliable and more debuggable: the workflow logic is in code (which can be tested, version-controlled, and reasoned about), and the LLM decisions are scoped to individual sub-tasks where their outputs can be validated.
+
+The failure handling design is where most multi-agent implementations have gaps. An orchestrator that dispatches ten sub-tasks and expects all ten to succeed before producing output is fragile. In practice, some sub-tasks will fail, produce low-confidence outputs, or exceed their token budget. The orchestrator should be designed with explicit policies: which sub-tasks are required for the final output, which are optional enhancements, how many retries each sub-task gets, and what the fallback looks like when a required sub-task fails after maximum retries. Designing these policies before implementation prevents the common pattern of a multi-agent system that works in testing but fails unpredictably in production.
+
+## Common mistakes
+
+1. **Using a multi-agent architecture for tasks that a single prompt handles reliably.** Multi-agent systems have more failure points, higher latency, and higher cost than single LLM calls. Use the simpler architecture when it works. The complexity of multi-agent systems is a cost to pay for tasks that genuinely require it.
+
+2. **Using an LLM as the orchestrator without validating its plan.** An LLM orchestrator that dynamically decides which sub-agents to call and in what order can produce incorrect workflows when the input is unusual. Validate the orchestrator's plan before executing it, or use deterministic orchestration for workflows where the structure is predictable.
+
+3. **Not implementing per-sub-task timeout and error handling.** An agent that hangs indefinitely or produces an error without the orchestrator handling it blocks the entire workflow. Every sub-task call needs a timeout, an error handler, and a defined behavior on failure.
+
+4. **Not caching sub-task results.** In workflows where multiple runs process the same inputs, uncached sub-task calls waste tokens and increase cost. A cache keyed on the sub-task input (including the model and prompt version) provides consistent results and significantly reduces cost at volume.
+
+5. **Building multi-agent workflows without LLM observability tooling.** Debugging a multi-agent workflow from raw logs is significantly harder than viewing a structured trace. Set up LangSmith, Langfuse, or equivalent observability before deploying a multi-agent system to production.
+
+## Where to start
+
+1. **Identify one complex AI feature in your product that consistently produces low-quality output from a single LLM call.** Analyze why it fails: is it context length, task complexity, or the need for different tools at different steps? If the failure mode matches what multi-agent architecture solves, prototype the orchestrator-agent split.
+
+2. **Design the orchestration as code before introducing an LLM orchestrator.** Write the workflow as a fixed function with defined steps and error handling. Only introduce a dynamic LLM orchestrator if the workflow cannot be determined in advance.
+
+3. **Add trace-level logging to every sub-agent call from day one.** Before the system is in production, establish the observability infrastructure. Each call should log input, output, model, latency, and token usage with a correlation ID that links it to the parent orchestration run.
+
+## Related reading
+
+- RAG Architecture: From Prototype to Production
+- Streaming AI Responses: How to Build It Without the Jank
+- [Human in the Loop Design: The Pattern Behind Trustworthy AI Features](/blog/human-in-the-loop-design-the-pattern-behind-trustworthy-ai-features)
+- AI Feature Flags and Gradual Rollouts for LLM Products

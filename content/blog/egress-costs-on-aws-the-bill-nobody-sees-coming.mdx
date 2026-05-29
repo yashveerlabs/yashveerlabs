@@ -1,0 +1,118 @@
+---
+slug: "egress-costs-on-aws-the-bill-nobody-sees-coming"
+title: "Egress Costs on AWS: The Bill Nobody Sees Coming"
+excerpt: "AWS egress costs grow silently with usage. The bill arrives a month later. The teams that take egress seriously cut it by an order of magnitude. The teams that do not pay the full rate forever."
+date: "2026-05-22"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["aws","cost","egress","cloud"]
+readingMinutes: 11
+ogImage: "/api/og/blog/egress-costs-on-aws-the-bill-nobody-sees-coming"
+status: "published"
+definition: "Egress costs on AWS are the fees charged when data leaves AWS for the public internet or moves across regions and availability zones. The rate is 0.09 USD per GB to the internet for most regions in 2026, after the first 100 GB free. Cross AZ transfer is 0.01 USD per GB each direction. At scale these add up. The teams that engineer for low egress save tens of thousands per month. The teams that do not pay the full rate."
+faq: [
+  {"q":"How much does AWS egress actually cost?","a":"0.09 USD per GB to the public internet for most regions after the first 100 GB monthly free tier. CloudFront egress is cheaper at roughly 0.085 USD per GB but with volume discounts. Cross AZ transfer is 0.01 USD per GB each direction. Cross region transfer is 0.02 USD per GB."},
+  {"q":"What is the biggest egress lever?","a":"CloudFront in front of any public traffic. The CDN cache absorbs most user requests so the origin egress is dramatically lower. The savings can be 70 to 90 percent of the egress bill for a typical SaaS."},
+  {"q":"What about NAT gateway egress?","a":"NAT gateway data processing is separate from internet egress. It is 0.045 USD per GB processed. A workload that sends or receives data through NAT pays both the NAT processing and the internet egress. VPC endpoints for AWS services bypass the NAT for that traffic."},
+  {"q":"What is cross AZ traffic and why does it matter?","a":"Data transferred between availability zones costs 0.01 USD per GB each direction. At scale this is meaningful. A service that talks across AZs heavily pays a tax. The fix is AZ aware service placement and load balancers configured for the right zonal behavior."},
+  {"q":"What about egress to other clouds?","a":"Egress to other clouds is internet egress. Multi cloud architectures pay this on every cross cloud call. The cost can dominate at scale. The decision to multi cloud should account for the egress bill that comes with it."},
+  {"q":"How do I find where my egress goes?","a":"Cost Explorer with the data transfer breakdown. VPC Flow Logs for granular visibility. The two together show which services and which destinations are driving the egress. The audit is the first step before optimizing."},
+  {"q":"What is the worst egress mistake?","a":"Talking to S3 over the public path instead of through a VPC endpoint. The team thinks the call is internal because both ends are AWS. The traffic goes through NAT and pays both the NAT processing and a small internet egress. The VPC endpoint eliminates both."}
+]
+---
+
+## What you actually need to know
+
+- Egress to internet is 0.09 USD per GB after the free tier.
+- CloudFront cuts most of the bill for public traffic.
+- VPC endpoints eliminate NAT processing for AWS service calls.
+- Cross AZ is 0.01 USD per GB each direction. Adds up at scale.
+- Audit before optimizing. Cost Explorer plus VPC Flow Logs.
+
+| Egress type | 2026 rate |
+|---|---|
+| Internet (most regions) | 0.09 USD per GB after first 100 GB free |
+| CloudFront | 0.085 USD per GB with volume discounts |
+| NAT gateway processing | 0.045 USD per GB |
+| Cross AZ | 0.01 USD per GB each direction |
+| Cross region | 0.02 USD per GB |
+| VPC endpoint to S3 | Free |
+| VPC endpoint to other AWS services | Variable |
+
+## The core argument
+
+Egress is the AWS cost that surprises founders most consistently. The compute and storage costs are visible because they show up in the same line items every month. The egress hides until the bill grows large enough to investigate. By then the team has been paying the full rate for months.
+
+The fix is mostly architectural. CloudFront in front of any public traffic. VPC endpoints for any call to AWS services. AZ aware placement for services that talk to each other heavily. Each is a one time setup. Each cuts a meaningful percentage of the egress bill.
+
+The pattern that catches most teams is talking to S3 over the public path. The application is in a VPC. The S3 bucket is in the same region. The call goes through the NAT gateway and back into AWS via the public endpoint. The team pays NAT processing plus a small internet egress for every call. The VPC endpoint for S3 makes the call direct and free.
+
+The teams that audit their egress find these patterns and fix them. The teams that do not audit pay the full rate for years. The audit is hours of work. The savings can be tens of thousands per month at scale.
+
+## The biggest levers
+
+| Lever | Typical savings |
+|---|---|
+| CloudFront in front of public traffic | 70 to 90 percent of public egress |
+| VPC endpoint for S3 | All S3 NAT processing |
+| VPC endpoint for other AWS services | Variable but meaningful |
+| AZ aware service placement | 50 to 90 percent of cross AZ |
+| Compress responses | 30 to 70 percent of public egress |
+| Use HTTP/2 or HTTP/3 | Modest, helps mobile |
+| Image and video optimization | Large for media heavy apps |
+| Static asset versioning with long cache | Large for asset heavy apps |
+
+## How much does this cost
+
+| Workload | Monthly egress before optimization | After |
+|---|---|---|
+| Small SaaS | 100 to 500 USD | 30 to 150 USD |
+| Growth SaaS | 1000 to 5000 USD | 300 to 1500 USD |
+| Media heavy | 10000 USD plus | 2000 USD or less |
+| Multi region | Higher | Significant savings with right architecture |
+
+## Features the egress optimization must have
+
+- CloudFront in front of public traffic.
+- VPC endpoints for AWS service calls.
+- AZ aware service placement.
+- Response compression.
+- Asset optimization for media.
+- Long cache headers on hashed static assets.
+- A monthly review of the egress bill.
+- An owner for the cost work.
+
+## Expert opinion
+
+> Egress costs are the most preventable line item on a typical AWS bill. The teams that audit and optimize cut the bill dramatically. The teams that do not audit pay the full rate forever. The cost of the audit is a day of engineering. The savings can be tens of thousands per month at scale. The math is consistently favorable.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was paying roughly 9000 USD per month in AWS data transfer costs. The investigation surfaced three issues. The application served images and videos directly from S3 to users on the public internet without CloudFront. The application made many S3 calls through the NAT gateway. The services talked across AZs heavily because the deployment was random.
+
+We put CloudFront in front of the public traffic. We added a VPC endpoint for S3. We deployed services with AZ awareness so dependent services prefer the same AZ.
+
+The data transfer bill dropped to roughly 1200 USD per month. The savings were 7800 USD per month against an investment of about a week of engineering. The payback was the first week of the new month.
+
+For more on the related work, see [cloud hosting costs at scale what founders underestimate](/blog/cloud-hosting-costs-at-scale-what-founders-underestimate) and [CDN strategy for a global SaaS in 2026](/blog/cdn-strategy-for-a-global-saas-in-2026).
+
+## Common mistakes teams make
+
+1. No CloudFront in front of public traffic.
+2. S3 calls through NAT gateway instead of VPC endpoint.
+3. AZ unaware service placement.
+4. No response compression.
+5. Uncompressed images and videos served directly.
+6. No long cache headers on hashed assets.
+7. No monthly review of the data transfer bill.
+8. Treating egress as fixed cost. It is not.
+
+## A 30 day egress audit and optimization
+
+1. **Week one.** Audit current data transfer line items in Cost Explorer.
+2. **Week two.** Add CloudFront. Add VPC endpoints for AWS services.
+3. **Week three.** AZ aware placement. Response compression.
+4. **Week four.** Asset optimization. Monthly review cadence.
+
+For more on the related work, read [cloud hosting costs at scale what founders underestimate](/blog/cloud-hosting-costs-at-scale-what-founders-underestimate) and [reserved instances and cost math when they pay off](/blog/reserved-instances-and-cost-math-when-they-pay-off). On the broader CDN side, [CDN strategy for a global SaaS in 2026](/blog/cdn-strategy-for-a-global-saas-in-2026) is the natural next read.

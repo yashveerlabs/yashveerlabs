@@ -1,0 +1,117 @@
+---
+slug: "the-http-caching-strategy-that-most-teams-get-wrong"
+title: "The HTTP Caching Strategy That Most Teams Get Wrong"
+excerpt: "The specific HTTP caching headers that control browser and CDN caching -- why most teams misconfigure them and the performance and correctness implications."
+date: "2025-06-28"
+category: "Performance Optimization"
+tags: ["performance","caching","http","cdn","web"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-http-caching-strategy-that-most-teams-get-wrong"
+status: "published"
+definition: "HTTP caching is the mechanism by which browsers and CDNs store responses and serve them without contacting the origin server. The correct caching strategy depends on whether the content changes frequently, whether it is user-specific, and what the acceptable staleness window is. Most teams either over-cache (serving stale user-specific data) or under-cache (disabling caching for static assets that could safely be cached for months). The difference between a correct and incorrect caching strategy is measurable in page load time, infrastructure costs, and the correctness of what users see."
+faq: [
+  {"q":"What are the key HTTP caching headers and what do they do?","a":"Cache-Control is the primary header: `max-age=N` tells the browser to cache the response for N seconds; `no-cache` tells the browser to revalidate with the server before using the cached version; `no-store` prevents caching entirely; `private` prevents CDN caching (for user-specific content); `public` allows CDN caching. ETag and Last-Modified enable conditional requests, allowing the server to respond with 304 Not Modified (no body, lower bandwidth) when the cached version is still current."},
+  {"q":"What is the most common HTTP caching mistake?","a":"Not using content-based hashing for static assets. An asset at /app.js with max-age=86400 will be cached for one day. When the file changes, users will see the old version for up to a day. The correct strategy: name the asset with a hash of its content (/app.abc123.js) and set max-age to one year. The hash changes when the content changes, so users always get the latest version, and the CDN caches aggressively because the URL is stable as long as the content is stable."},
+  {"q":"Should API responses be cached?","a":"Depends on the response. User-specific API responses (the current user's profile, their private data) should use Cache-Control: private, max-age=N or no-cache. Public API responses that change infrequently (product listings, public content) can use Cache-Control: public, max-age=N with appropriate stale-while-revalidate to avoid latency on revalidation. Never cache API responses with sensitive data in a CDN (they would be served to all users, not just the authenticated user)."},
+  {"q":"What is stale-while-revalidate and when should I use it?","a":"stale-while-revalidate=N tells the browser to serve the cached version immediately (even if it is stale) while fetching a fresh version in the background. The user gets instant response with potentially slightly stale data; the next request gets the fresh data. Appropriate for content where slight staleness is acceptable (blog posts, product descriptions, public data that changes infrequently). Not appropriate for data where staleness could mislead the user (account balance, subscription status, permissions)."},
+  {"q":"How does CDN caching interact with user-specific content?","a":"CDN caching is dangerous for user-specific content. If a CDN caches a response that contains user A's data and serves it to user B's request for the same URL, user B sees user A's data -- a serious privacy breach. Prevent CDN caching of user-specific responses by using Cache-Control: private (CDNs respect this and do not cache the response). The browser still caches the response; only the CDN is prevented from caching it."}
+]
+---
+
+## What you actually need to know
+
+- Static assets (JavaScript, CSS, images) with content-based hashes in their filenames should be cached for one year (`max-age=31536000, immutable`). They will not be stale because the URL changes when the content changes.
+- HTML pages should use `no-cache` or very short `max-age` (60-300 seconds) with `must-revalidate`. They reference the hashed static assets; if the HTML is stale, users see the wrong asset URLs.
+- API responses with user-specific data must use `Cache-Control: private` to prevent CDN caching. CDN caching of user-specific data is a privacy breach.
+- `stale-while-revalidate` is the right strategy for public content that changes infrequently -- instant response plus fresh content on the next request.
+- Incorrect cache headers that cannot be changed without a full cache purge are more expensive to fix than misconfigured code. Test caching behavior in staging before deploying.
+
+| Content Type | Recommended Cache-Control | CDN Cacheable? | Staleness Risk |
+|---|---|---|---|
+| Hashed JS/CSS/fonts | max-age=31536000, immutable | Yes | None (hash changes with content) |
+| Non-hashed images | max-age=86400 | Yes | Low (images change infrequently) |
+| HTML pages | no-cache or max-age=60 | Maybe (short TTL) | Medium |
+| User-specific API responses | private, max-age=60 | No | Low (private to browser) |
+| Public API responses | public, max-age=300, stale-while-revalidate=600 | Yes | Low to medium |
+| Authentication state | no-store | No | Must not be cached |
+
+## The core argument
+
+HTTP caching is one of the highest-return performance optimizations available -- correctly configured, it serves responses directly from the browser cache (zero network latency) or from the CDN (low latency, no origin server load). Incorrectly configured, it either serves stale content (users see the wrong version of the product) or disables caching for content that could safely be cached (unnecessary origin server load and worse performance for users).
+
+The mistakes in both directions are common. Teams that disable caching for everything ("we do not want to think about it") pay the performance cost of unnecessary origin requests for content that does not change per-user. Teams that cache everything with aggressive TTLs serve stale HTML pages that reference old JavaScript bundles, creating version mismatch errors that appear as blank pages or broken functionality.
+
+The correct strategy is not complicated -- it is a set of rules that apply to different content types, applied consistently. The complication is that incorrect caching is hard to test locally (local development often disables caching) and hard to debug in production (the cached version and the current version can be different in ways that are only visible to specific users with specific browser caches).
+
+## The static asset caching strategy
+
+The canonical strategy for static assets (JavaScript bundles, CSS files, fonts, images) that are served by a web application:
+
+Use content-based hashing in the file name. Most modern build systems (Vite, Webpack, Next.js) do this automatically: `app.js` becomes `app.abc123def.js` where `abc123def` is derived from the file's content. When the file changes, the hash changes and the URL changes.
+
+Because the URL changes when the content changes, the asset can be cached forever -- any URL that was previously valid is still valid, and any URL that is no longer valid (because the content changed) is now a different URL that will be fetched fresh. The cache headers for these files:
+
+```
+Cache-Control: public, max-age=31536000, immutable
+```
+
+`max-age=31536000` is one year. `immutable` is a hint to the browser that the resource will not change while it is valid -- the browser can skip the conditional revalidation that it would otherwise attempt for long-TTL resources.
+
+The one exception: fonts served from Google Fonts or similar CDNs often do not have hashed URLs and should be cached for a shorter period (30 days is typical).
+
+## The HTML page caching strategy
+
+HTML pages reference the static assets by URL. If the HTML page is cached aggressively and an asset URL changes, the cached HTML points to an old asset URL that may no longer exist. This produces the "blank page" failure mode where the browser loads the cached HTML but cannot find the referenced JavaScript file.
+
+The correct HTML caching strategy: `no-cache` with `must-revalidate`, or a very short `max-age` (60-300 seconds).
+
+`no-cache` means the browser must check with the server before using the cached version. The server responds with `304 Not Modified` if the content has not changed (no body, low bandwidth) or with the new content if it has changed. This ensures users always get the current HTML while the server can still avoid sending the full body when the content has not changed.
+
+For Next.js and similar frameworks that generate HTML at build time or request time, the default behavior handles this correctly -- Next.js sets appropriate cache headers for each page type based on whether the page is static, server-rendered, or client-side rendered.
+
+## The API response caching strategy
+
+API responses require case-by-case analysis. The two categories that matter:
+
+**User-specific responses:** Any API response that returns data specific to the authenticated user (profile data, private content, account state, permissions) must use `Cache-Control: private` to prevent CDN caching. The browser can still cache these responses (the user's browser sees only their own data), but the CDN must not cache them (the CDN serves responses to all users, not just the owner of the data). Failing to use `private` on user-specific API responses can result in user A's data being served to user B -- a privacy breach that is difficult to detect and potentially severe.
+
+**Public responses:** API responses for public content (blog posts, product listings, pricing information) can use `Cache-Control: public, max-age=N` with a CDN. The TTL should match the content's update frequency -- blog posts that are updated occasionally can have a 5-minute TTL; prices that change frequently should have a shorter TTL or use `no-cache` with `stale-while-revalidate`.
+
+## The stale-while-revalidate pattern
+
+`stale-while-revalidate` is a directive that allows serving a stale cached response while fetching a fresh one in the background:
+
+```
+Cache-Control: public, max-age=60, stale-while-revalidate=300
+```
+
+This means: serve the cached response immediately if it was cached within the last 60 seconds (fresh). If the cached response is between 60 and 300 seconds old (stale but within the stale-while-revalidate window), serve it immediately and fetch a fresh version in the background. If the cached response is more than 300 seconds old, fetch a fresh version before serving.
+
+The benefit: the user never waits for a revalidation request. The cost: the user may see slightly stale data for the duration of the background fetch. This tradeoff is acceptable for content that changes infrequently and where seeing data that is a few minutes old has no meaningful consequence.
+
+## Common mistakes teams make with HTTP caching
+
+1. Not using content hashing for static assets. Deploying `app.js` without a hash and setting a long TTL means users see old JavaScript for the duration of the TTL after a deployment.
+2. Using `no-cache` for static assets that should be cached forever. `no-cache` means "check with the server before using the cache" -- it requires a network round trip on every request. Hashed static assets should never need this.
+3. Not setting `private` on user-specific API responses. CDN caching of user-specific data is a privacy breach.
+4. Setting `max-age=0` instead of `no-cache`. `max-age=0` sets the TTL to zero but does not require revalidation. `no-cache` requires revalidation before serving cached content. They are not equivalent.
+5. Not testing caching behavior with cache cleared. Browser developer tools allow disabling the cache; clearing the cache simulates a first visit. Testing after clearing the cache reveals whether the caching strategy is working as expected.
+
+## Where to start: a 3-step caching audit
+
+**Step 1: Check the Cache-Control headers on your three most-visited page types.** In Chrome DevTools, open the Network tab, load the page with cache disabled, and examine the response headers for the HTML and the main JavaScript bundle. Verify that the HTML has `no-cache` or a short `max-age`, and that the JavaScript bundle has content hashing in its filename and `max-age=31536000`.
+
+**Step 2: Check the Cache-Control headers on your three most-called API endpoints.** Verify that user-specific endpoints have `private` and that public data endpoints have an appropriate `max-age`.
+
+**Step 3: If any headers are incorrect, fix them and deploy.** Most caching header changes are one-line changes in the framework's configuration or the CDN's rules. The performance improvement from correcting under-caching (adding caching to assets that should be cached) is visible in Core Web Vitals and in CDN cache hit rates.
+
+## The Cache That Serves Two Purposes
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The caching audit I ran on the Expert Tutorials platform discovered that the main JavaScript bundle was being served without a content hash in the filename and with a max-age of 1 hour. After a deployment, some users saw the old JavaScript bundle for up to an hour because their browser had a cached copy. After adding content hashing and setting max-age to one year, the CDN cache hit rate for static assets increased to 98 percent and the deployment-day user confusion disappeared. The audit took 30 minutes; the fix took 2 hours; the improvement was permanent.
+
+## Related reading
+
+- [The Hot Path: Finding and Optimizing It](/blog/the-hot-path-finding-and-optimizing-it)
+- [The Frontend Build System: Why It Matters More Than Founders Think](/blog/the-frontend-build-system-why-it-matters-more-than-founders-think)
+- [The Edge Rendering Bet: When It Pays Off](/blog/the-edge-rendering-bet-when-it-pays-off)
+- [The Hidden Cost of Eventual Consistency: A SaaS Postmortem](/blog/the-hidden-cost-of-eventual-consistency-a-saas-postmortem)

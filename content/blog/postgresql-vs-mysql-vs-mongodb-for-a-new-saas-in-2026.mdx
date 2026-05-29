@@ -1,0 +1,62 @@
+---
+slug: "postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026"
+title: "PostgreSQL vs MySQL vs MongoDB for a New SaaS in 2026"
+excerpt: "Most new SaaS products should use PostgreSQL. The cases for MySQL and MongoDB exist but are more narrow than their market share suggests. Here is the honest comparison and what actually drives the decision."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026"
+status: "published"
+definition: "PostgreSQL, MySQL, and MongoDB are the three most commonly evaluated database choices for new SaaS applications. PostgreSQL is a relational database with strong ACID compliance, extensive feature set (JSON columns, full-text search, geometric types, extensions), and broad managed hosting support. MySQL is a relational database with wide compatibility and specific advantages in read-heavy workloads. MongoDB is a document database that stores data as JSON documents without enforcing a schema. Each has appropriate use cases and inappropriate use cases for SaaS applications."
+faq: [
+  {"q":"Why does PostgreSQL win for most new SaaS products?","a":"PostgreSQL's combination of full SQL support, ACID compliance, JSON document storage, full-text search, and extension ecosystem (pgvector for vector search, PostGIS for geographic data, TimescaleDB for time series) covers the majority of requirements a SaaS product will encounter without switching databases. The feature set that other databases provide as separate products (document storage, full-text search, vector search) are available in PostgreSQL as native features or well-maintained extensions. Using PostgreSQL as the primary database reduces the operational complexity of managing multiple data stores."},
+  {"q":"When does MySQL still make sense over PostgreSQL?","a":"MySQL has specific advantages in replication topology management and is the underlying database for PlanetScale's branching and sharding infrastructure. For teams already deeply familiar with MySQL and its operational patterns, the familiarity advantage is real. MySQL is also the default for many PHP-based applications and some legacy frameworks. For new SaaS projects starting without strong existing preferences or constraints, PostgreSQL's richer feature set is generally preferable, but MySQL is not a wrong choice and many successful products run on MySQL."},
+  {"q":"What are the legitimate use cases for MongoDB?","a":"MongoDB is well-suited for applications with highly variable or schema-less document structures: content management systems where documents have very different schemas, product catalogs with heterogeneous product attributes, or applications that need to store arbitrary user-defined fields. MongoDB's flexible schema allows documents to have different fields without schema migrations. For applications where the data is heavily normalized and relational (most B2B SaaS), MongoDB's document model adds complexity rather than reducing it."},
+  {"q":"What is the performance difference between the three databases?","a":"At typical SaaS scale (under 10 million rows per table, under 1,000 concurrent connections), the performance difference between PostgreSQL and MySQL is not a differentiating factor; both perform adequately for standard transactional workloads. MongoDB's performance advantage is in write-heavy, schema-less workloads where the document model allows denormalization that avoids expensive joins. For read-heavy, relational data with complex queries, PostgreSQL's query planner produces efficient plans that are competitive with MongoDB's document model."},
+  {"q":"What happens when a SaaS product needs both relational and document data?","a":"PostgreSQL's JSONB column type allows storing arbitrary JSON documents alongside relational data in the same database. A SaaS product that needs structured relational data (users, subscriptions, invoices) and flexible document data (user-defined form submissions, heterogeneous product metadata) can handle both in PostgreSQL without running a separate MongoDB instance. The JSONB type supports GIN indexing for efficient JSON key lookup and supports JSON operators for querying nested document content."}
+]
+---
+
+## What you need to know
+
+- PostgreSQL is the right default database for new SaaS products in 2026. The cases where MySQL or MongoDB are the better choice are specific and narrower than their market share implies.
+- MySQL is not a wrong choice and has specific advantages, but for a new project without existing constraints, PostgreSQL's feature set (extensions, JSON, full-text search) provides more future flexibility.
+- MongoDB is appropriate for genuinely schema-less document storage use cases. It is inappropriate for B2B SaaS with primarily relational data.
+- PostgreSQL's JSONB column eliminates many MongoDB use cases: flexible document storage, arbitrary user-defined fields, and heterogeneous schemas can be handled in PostgreSQL without a separate document database.
+- The decision should be driven by the data model requirements, not by team familiarity or database brand preference.
+
+## The core argument
+
+The database choice debate for new SaaS products should be shorter than it typically is. PostgreSQL has added features over the past decade (JSONB, pgvector, partition improvements, logical replication) that address the use cases that previously required separate databases. A team that chooses PostgreSQL as the primary database can add vector search (pgvector), time-series storage (TimescaleDB), and geographic queries (PostGIS) without adding operational complexity from a separate database service. This convergence makes PostgreSQL the natural default for new projects that do not have a specific requirement that PostgreSQL does not meet.
+
+MongoDB's market position was built on the flexibility advantage during a period when PostgreSQL lacked good JSON support. JSONB in PostgreSQL provides a document storage model within a relational database: documents can be indexed, queried, and modified with SQL operators. For most MongoDB use cases in SaaS, PostgreSQL JSONB provides equivalent functionality. The remaining MongoDB advantages are real but specific: horizontal sharding through native partitioning (MongoDB's sharding is more mature than PostgreSQL's), schema validation that is designed around document structure (MongoDB's validation is more flexible for heterogeneous documents), and MongoDB Atlas's full-text search integration.
+
+The MySQL choice is often a legacy or familiarity decision rather than a technical one. MySQL is a capable relational database with a large community, well-understood operational patterns, and broad managed hosting support. The cases where MySQL is technically superior to PostgreSQL for SaaS are narrow: some specific replication topologies, PlanetScale's Vitess-based sharding (which requires MySQL), and applications where the specific MySQL-compatible syntax is required for existing integration. For new projects, these are not common requirements, and PostgreSQL's feature richness is a practical differentiator.
+
+## Common mistakes
+
+1. **Choosing MongoDB because the data "feels document-like."** Most data feels document-like at the application layer: JSON objects are a natural programming model. This is different from the data being genuinely schema-less or requiring the document storage model for correctness or performance. JSON objects served from a PostgreSQL backend with JSONB columns are also document-like from the application's perspective.
+
+2. **Starting with MongoDB for flexibility and discovering the need for transactions.** MongoDB supports multi-document transactions, but they are more complex and less performant than PostgreSQL transactions. Applications that started with MongoDB for its schema flexibility and later needed complex multi-document atomic operations often find PostgreSQL's transaction model was what they needed.
+
+3. **Not considering pg_stat_statements and extension support when choosing a managed platform.** Some managed PostgreSQL platforms have restrictions on extensions or lack pg_stat_statements monitoring. Verify that the managed platform supports the extensions required (pgvector, PostGIS) before selecting it.
+
+4. **Migrating between databases after the product is in production.** Changing the primary database after significant production data has accumulated is one of the most painful engineering migrations. Choose correctly at the start; the data model decisions made early are expensive to change.
+
+5. **Using MySQL for a new project because the team knows it, without evaluating PostgreSQL's advantages.** Familiarity is a legitimate factor in database choice, but it should be weighed against feature requirements. A team comfortable with MySQL building a product that will need vector search or geographic queries will add technical debt if they choose MySQL over PostgreSQL without evaluating the extension requirements.
+
+## Where to start
+
+1. **Define the data model before choosing the database.** What are the primary entities, how are they related, and which fields are variable versus fixed? A schema with mostly fixed fields and relational structure points to a relational database (PostgreSQL or MySQL). A schema with genuinely heterogeneous documents and no consistent structure points toward MongoDB or PostgreSQL JSONB.
+
+2. **List extension requirements.** Will the product need vector search (pgvector), full-text search (pg_trgm), geographic queries (PostGIS), or time-series storage (TimescaleDB)? PostgreSQL extensions that cover these use cases eliminate the need to add a separate specialized database. Verify that the chosen managed platform supports the required extensions.
+
+3. **Choose the managed platform alongside the database.** The database and the managed platform are evaluated together. AWS RDS PostgreSQL, Neon, Supabase, and other managed PostgreSQL options have different features, pricing, and operational characteristics. The platform choice matters as much as the database choice.
+
+## Related reading
+
+- [PostgreSQL vs Supabase vs Neon vs Planetscale](/blog/postgresql-vs-supabase-vs-neon-vs-planetscale)
+- [PlanetScale vs Supabase vs Neon vs Aurora Serverless](/blog/planetscale-vs-supabase-vs-neon-vs-aurora-serverless)
+- [JSON Columns in Postgres: When They Make Sense](/blog/json-columns-in-postgres-when-they-make-sense)
+- [Message Queues Compared: SQS, Kafka, RabbitMQ, Redis Streams](/blog/message-queues-compared-sqs-kafka-rabbitmq-redis-streams)

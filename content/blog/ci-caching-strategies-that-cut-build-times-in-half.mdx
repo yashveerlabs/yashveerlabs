@@ -1,0 +1,112 @@
+---
+slug: "ci-caching-strategies-that-cut-build-times-in-half"
+title: "CI Caching Strategies That Cut Build Times in Half"
+excerpt: "Slow CI is the silent productivity tax on most engineering teams. The right caching strategies cut build times in half with a day of engineering work. Here is what works in 2026."
+date: "2026-05-20"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["ci","caching","build","engineering-productivity"]
+readingMinutes: 12
+ogImage: "/api/og/blog/ci-caching-strategies-that-cut-build-times-in-half"
+status: "published"
+definition: "CI caching strategies are the techniques that reuse work across builds so each new build does not redo everything from scratch. Dependency caches, build artifact caches, container layer caches, test caches, and incremental compilation each save real time. Combined, they typically cut total CI time in half. The investment is a day of engineering. The return is faster feedback loops for every engineer on every change."
+faq: [
+  {"q":"What is the highest leverage CI cache?","a":"The dependency cache. Node modules, Python venv, Rust target, Go modules, Java m2. Every build downloads these unless cached. Caching them well saves minutes per build. The first cache you set up should be this one."},
+  {"q":"What is Docker layer caching?","a":"When you build a Docker image, each instruction creates a layer. Subsequent builds can reuse layers whose inputs have not changed. Done well, the image build takes seconds instead of minutes. Done poorly, every build rebuilds every layer."},
+  {"q":"What is a build cache?","a":"The artifact of compilation cached so the next build can skip work that has not changed. Webpack, Vite, Turbo, Nx, Bazel, sbt all support this. The cache key has to match the inputs precisely. Wrong keys produce stale or incorrect builds."},
+  {"q":"What is test caching?","a":"Tools like Turbo and Nx skip tests that do not need to run because their inputs have not changed. The savings can be large on monorepo style codebases. The cost of incorrect cache hits is missed test failures, so the cache key must be precise."},
+  {"q":"How do I measure CI speed?","a":"Total time from push to deploy on the main branch. Time from PR open to checks complete. Time of the slowest job in the pipeline. Track all three. Optimization targets the slowest job first."},
+  {"q":"What is the most common CI mistake?","a":"No caching at all. Every build downloads all dependencies and recompiles everything. The build that takes ten minutes could have taken three. The productivity tax compounds across every engineer on every change."},
+  {"q":"What about caching in self hosted runners?","a":"Self hosted runners can reuse the local disk across runs. Dependencies stay warm. The first build is the same as cloud. Subsequent builds are dramatically faster. The trade off is managing the runner pool."}
+]
+---
+
+## What you actually need to know
+
+- Dependency cache is the highest leverage first step.
+- Docker layer caching, build artifact caching, test caching all stack.
+- The cache key has to match inputs precisely or you get stale results.
+- Self hosted runners give the largest speedup for teams that can manage them.
+- Measure push to deploy time as the bottom line.
+
+| Cache type | Typical savings | Risk |
+|---|---|---|
+| Dependency cache | 1 to 5 minutes per build | Low |
+| Docker layer cache | 1 to 10 minutes per build | Low |
+| Build artifact cache | 1 to 10 minutes per build | Medium if key is wrong |
+| Test cache | Variable, large in monorepos | Medium if key is wrong |
+| Self hosted runner with warm disk | Variable, often large | Operational tax |
+
+## The core argument
+
+CI build time is the silent productivity tax on most engineering teams. The engineer pushes a change. The build runs. The engineer waits. If the build is fast, the engineer keeps working. If the build is slow, the engineer context switches to something else, comes back later, finds a failure, and has to context switch again. The cost compounds.
+
+The cost is invisible because no individual build feels slow enough to complain about. A ten minute build is not catastrophic. A ten minute build that happens fifteen times per engineer per day is one hundred and fifty minutes per engineer per day spent waiting. For a team of ten engineers, that is twenty five hours per day of waiting. Across a quarter, it is significant.
+
+The fix is caching. Most teams have either no caching or default caching that is barely doing anything. The teams that take CI caching seriously cut build times by half or more. The investment is a day of engineering. The return is permanent.
+
+The discipline is the same as application caching. Pick the right cache for the right work. Use the right key. Invalidate appropriately. Monitor the hit rate. The teams that apply these principles get the savings without the bugs. The teams that hack caching in get the bugs that occasional incorrect cache hits produce.
+
+## The cache stack
+
+| Layer | What it caches | Tools |
+|---|---|---|
+| Dependencies | npm, pip, cargo, m2, go modules | Actions cache, CircleCI cache, native CI cache |
+| Docker layers | Image layers between builds | BuildKit, registry layer cache |
+| Build outputs | Compiled artifacts | Turbo, Nx, Bazel, Vite cache |
+| Test results | Test runs skipped if unchanged | Turbo, Nx, Bazel |
+| Linter and type check | Stale entries skipped | ESLint cache, TypeScript incremental |
+| Browser test snapshots | Visual regression baselines | Percy, Chromatic |
+
+## How much does this cost
+
+The cost is mostly engineering time. A day to set up the major caches. A few hours per month to tune and audit. The cloud CI provider cache storage is usually free up to generous limits. Self hosted runner storage is whatever you pay for the disks.
+
+The savings show up as faster builds. The engineering time saved per quarter is usually much larger than the day spent setting up caching.
+
+## Features the cache strategy must have
+
+- Cache key strategy documented per cache.
+- Hit rate monitoring per cache.
+- A clear path to invalidate when needed.
+- CI configuration in version control.
+- Pull request status checks that respect the cache.
+- A nightly clean build to catch issues that caching might hide.
+- Cache size limits to prevent runaway storage.
+
+## Expert opinion
+
+> The teams that cut CI time in half often did so with a single day of focused work on caching. The investment is small. The return is permanent and compounds across every engineer on every change. The teams that resist this work usually do so because the slow CI is not visible to leadership. The engineers know. The output suffers. The leadership wonders why velocity is what it is.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client's CI was running for fourteen minutes on every pull request. The team had grown frustrated. They were considering hiring a build engineer to manage CI as a full time job.
+
+We audited the pipeline. The dependency installation was running fresh on every build. The Docker image was being rebuilt from scratch. The test suite was running everything every time. No layer of caching was meaningful.
+
+We added dependency caching with explicit keys. We rewrote the Dockerfile to maximize layer cache hits. We added Turbo for the monorepo to skip unchanged work. We tuned the test runner to run only what had changed.
+
+The fourteen minute pipeline dropped to four and a half minutes. The team's velocity improved measurably over the next month. The build engineer hire was canceled. The engineering team spent the recovered time on product work.
+
+For more on the related work, see [CI CD pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library) and [GitHub Actions vs CircleCI vs Buildkite in 2026](/blog/github-actions-vs-circleci-vs-buildkite-in-2026).
+
+## Common mistakes teams make
+
+1. No caching at all.
+2. Cache keys that include too much. Cache never hits.
+3. Cache keys that include too little. Stale results.
+4. Docker builds that invalidate the cache early in the Dockerfile.
+5. No hit rate monitoring. Cannot tune.
+6. No nightly clean build. Bugs hide.
+7. Cache storage with no limit. Storage cost grows.
+8. Treating CI time as fixed. It is not.
+
+## A one day plan to cut CI time
+
+1. **Hour one and two.** Measure current build times. Identify the slowest jobs.
+2. **Hour three and four.** Set up dependency caching with the right keys.
+3. **Hour five and six.** Optimize the Dockerfile. Verify layer cache hits.
+4. **Hour seven and eight.** Add build output caching if applicable. Add test caching if applicable.
+
+For more on the related work, read [CI CD pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library) and [the deployment pipeline that survives real world pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure). On the broader engineering productivity side, [building internal AI tools for your engineering team](/blog/building-internal-ai-tools-for-your-engineering-team) is the natural next read.

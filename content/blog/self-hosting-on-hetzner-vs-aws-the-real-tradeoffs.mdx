@@ -1,0 +1,62 @@
+---
+slug: "self-hosting-on-hetzner-vs-aws-the-real-tradeoffs"
+title: "Self Hosting on Hetzner vs AWS: The Real Tradeoffs"
+excerpt: "Hetzner is dramatically cheaper than AWS. The question is what that cost difference buys and what it costs in terms of operations, compliance, and scale capability. Here is an honest comparison for teams making this decision."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/self-hosting-on-hetzner-vs-aws-the-real-tradeoffs"
+status: "published"
+definition: "Self-hosting on Hetzner refers to deploying application infrastructure on dedicated or cloud servers from Hetzner, a German hosting provider known for significantly lower prices than major cloud providers. The comparison to AWS represents a broader choice between commodity hosting (Hetzner, OVH, Vultr) and hyperscale cloud (AWS, GCP, Azure). The trade-offs involve price per compute unit, managed service ecosystem, geographic availability, compliance certifications, and the operational overhead of managing infrastructure without managed services."
+faq: [
+  {"q":"How much cheaper is Hetzner vs AWS for equivalent compute?","a":"Hetzner's CPX51 server (8 vCPU, 32 GB RAM) costs approximately EUR 25 per month. The equivalent AWS instance (m5.2xlarge, 8 vCPU, 32 GB RAM) costs approximately $280 per month. The price difference is roughly 10x for raw compute. For teams with predictable, consistent compute needs and no requirement for the AWS managed service ecosystem, this 10x price difference compounds significantly: a 10-server infrastructure costs $350/month on Hetzner vs $2,800/month on AWS. GPU servers show even larger gaps: Hetzner's GTX 1080-equivalent GPU dedicated servers run a fraction of the A10G on-demand price on AWS."},
+  {"q":"What does Hetzner not provide that AWS does?","a":"Key AWS capabilities that Hetzner does not replicate: managed database services (RDS Aurora, ElastiCache Redis) with automatic failover, backup, and patching; serverless compute (Lambda, Fargate) with pay-per-invocation pricing; managed Kubernetes (EKS) with integrated IAM; native CDN and DDoS mitigation (CloudFront, Shield); compliance certifications beyond SOC 2 Type II and ISO 27001 (HIPAA BAA, FedRAMP are not available on Hetzner); global geographic distribution across 30+ regions. Teams that use managed services heavily on AWS will find no equivalent on Hetzner and must either run and maintain these services themselves or use third-party managed alternatives."},
+  {"q":"What is the operational cost of self-hosting on bare metal or commodity cloud?","a":"Self-hosting on Hetzner requires managing infrastructure that AWS manages for you: database patching, backups, and failover; Redis or cache cluster management; load balancer configuration and TLS termination; server security patching and kernel updates; monitoring and alerting infrastructure; and incident response for hardware failures. These tasks require DevOps engineering time, which has a real cost even when not billed directly. In my experience, managing bare infrastructure for a small team (under 10 engineers) requires roughly 10 to 20 percent of one DevOps engineer's time. For a team without dedicated DevOps, this overhead falls on product engineers and reduces feature velocity."},
+  {"q":"Which compliance certifications does Hetzner support?","a":"Hetzner is SOC 2 Type II and ISO 27001 certified, which covers a significant portion of compliance requirements for SaaS products. Hetzner does not offer a HIPAA Business Associate Agreement (BAA), which is required for HIPAA-covered entities processing protected health information. Hetzner's primary data centers are in Germany and Finland, which satisfies GDPR data residency requirements for EU data subjects but may not satisfy data localization requirements for US government, financial regulated, or other jurisdiction-specific compliance needs. Teams with HIPAA requirements must use a provider that offers a BAA (AWS, GCP, Azure all offer BAAs)."},
+  {"q":"What is the right use case for Hetzner vs AWS?","a":"Hetzner is the right choice for: teams with straightforward compute-intensive workloads (ML training, rendering, high-traffic web serving), teams with strong DevOps capability who are comfortable managing infrastructure directly, European-based products where Hetzner's EU data centers satisfy data residency requirements, and cost-sensitive projects where the 10x compute cost difference meaningfully affects unit economics. AWS is the right choice for: products with HIPAA or FedRAMP compliance requirements, teams that rely heavily on managed services (RDS, Lambda, SQS) and cannot absorb the overhead of self-managing them, products requiring true global distribution across multiple regions, and early-stage teams without dedicated DevOps who need to minimize infrastructure management overhead."}
+]
+---
+
+## What you need to know
+
+- Hetzner compute is roughly 10x cheaper than AWS for equivalent specifications. The price difference is real and significant.
+- Hetzner does not offer HIPAA BAAs, managed databases with automatic failover, or global distribution across dozens of regions.
+- Self-hosting on commodity infrastructure requires DevOps engineering time that has a real cost even if not directly billed.
+- For EU data residency requirements, Hetzner's German and Finnish data centers are a compliance advantage over US-based cloud providers.
+- The right choice is Hetzner for compute-intensive workloads with strong DevOps capability, and AWS for managed-service-dependent or compliance-sensitive applications.
+
+## The core argument
+
+The Hetzner vs AWS decision is not primarily a technology decision. It is a team capability and product requirements decision. Hetzner is genuinely cheaper for raw compute, and the price difference is large enough to matter for products where compute is a significant cost line. A team that can manage its infrastructure competently and does not need HIPAA compliance or heavy reliance on AWS managed services can run a significantly more cost-effective infrastructure on Hetzner.
+
+The hidden cost in the Hetzner choice is the operational overhead of the things AWS manages. A managed RDS PostgreSQL instance on AWS includes automated backups, point-in-time recovery, automatic minor version upgrades, and failover for multi-AZ deployments. Running PostgreSQL on a Hetzner server means the team is responsible for all of those things. A team that has done this before knows what it involves and has the processes for it. A team encountering database management for the first time will discover the operational overhead after the first incident.
+
+In my experience, the team that benefits most from Hetzner is the one that has already operated on AWS and learned what managed services cost (both in money and in operational convenience) before making the switch. Teams that start on Hetzner without prior managed-service experience often underestimate the operational overhead and spend more engineering time on infrastructure than they saved in cloud costs.
+
+## Common mistakes
+
+1. **Comparing raw compute prices without accounting for managed service replacements.** If the team runs PostgreSQL on Hetzner, the correct cost comparison is not Hetzner instance vs RDS instance. It is Hetzner instance + DevOps engineering time for database management vs RDS instance cost. For teams with a dedicated DevOps engineer, the math often favors Hetzner. For teams without one, the math is less clear.
+
+2. **Assuming Hetzner is faster to set up than AWS.** Hetzner provides servers, not configured infrastructure. Initial setup on Hetzner requires more work than deploying on a PaaS or using managed services: configuring firewall rules, setting up monitoring, deploying load balancers, and configuring deployments. The ongoing cost is lower, but the upfront engineering investment is higher than using managed platforms.
+
+3. **Not testing Hetzner's network throughput and latency for the product's use case.** Hetzner's European data centers have excellent throughput and latency for European-based users. Products serving primarily US or Asian users may see higher latency from Hetzner's Ashburn data center compared to US-based AWS regions. Test the actual latency from target user locations before committing to Hetzner for a latency-sensitive application.
+
+4. **Ignoring the lock-in direction.** Moving from AWS to Hetzner requires re-architecting managed service dependencies (replacing RDS with self-managed Postgres, replacing SQS with Redis-based queues, replacing Lambda with container-based jobs). This migration has a real cost. Moving from Hetzner to AWS is easier because managed services are additive. Choose Hetzner when the team is confident it will not need AWS-specific managed services at scale.
+
+5. **Not using Hetzner Cloud for elastic compute alongside dedicated servers.** Hetzner Cloud (virtual machines) is elastic; dedicated servers have a minimum commitment period. For applications with variable load, using Hetzner Cloud for burst capacity while running base load on dedicated servers combines the cost efficiency of dedicated hardware with the elasticity of virtual instances.
+
+## Where to start
+
+1. **List the AWS managed services the product currently uses and find their self-managed equivalents.** For each managed service, estimate the DevOps time to manage the equivalent self-hosted version. If the total DevOps overhead is less than the cost difference between Hetzner and AWS, Hetzner is the economically favorable choice. If the overhead is comparable or larger, the cost comparison is neutral or negative.
+
+2. **Run a pilot deployment on Hetzner for a non-critical service.** Deploy one service (a background job processor, a static site, a development environment) on Hetzner. Measure the setup time, learn the operational patterns, and assess whether the team can manage the infrastructure comfortably. This pilot produces real data about the operational overhead before committing the full infrastructure.
+
+3. **Calculate the 12-month cost difference for the current infrastructure.** Compare what the current AWS monthly bill would be if migrated to Hetzner equivalent servers. Multiply the difference by 12. This is the potential annual saving. Compare it against the estimated migration engineering cost and ongoing DevOps overhead. If the saving is larger, proceed. If it is not, the effort is better spent elsewhere.
+
+## Related reading
+
+- [Render vs Fly.io vs Railway vs Heroku in 2026](/blog/render-vs-fly-io-vs-railway-vs-heroku-in-2026)
+- [Serverless vs Containers vs Bare Metal: A Cost and Flexibility Map](/blog/serverless-vs-containers-vs-bare-metal-a-cost-and-flexibility-map)
+- [Reserved Instances and Cost Math: When They Pay Off](/blog/reserved-instances-and-cost-math-when-they-pay-off)
+- [Secrets in CI: The Patterns That Avoid Leaks](/blog/secrets-in-ci-the-patterns-that-avoid-leaks)

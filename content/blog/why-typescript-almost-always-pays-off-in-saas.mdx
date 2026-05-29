@@ -1,0 +1,110 @@
+---
+slug: "why-typescript-almost-always-pays-off-in-saas"
+title: "Why TypeScript Almost Always Pays Off in SaaS"
+excerpt: "TypeScript is not faster to write. It is faster to maintain, faster to refactor, and faster to onboard new engineers into. For a SaaS that will live for years, that math is decisive."
+date: "2025-09-16"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-typescript-almost-always-pays-off-in-saas"
+status: "published"
+definition: "TypeScript pays off in SaaS because the time horizon is years, not weeks. The cost is up front: a slower first month and a steeper learning curve. The benefits compound: fewer runtime bugs, faster refactors, faster onboarding, and a codebase that documents itself. For anything that will outlive the founders' first sprint, the tradeoff is decisive."
+faq: [
+  {"q":"Is TypeScript slower to write than JavaScript?","a":"For the first week, yes. For everything after, no. Once the types are in place, the editor catches mistakes you would have hit at runtime. Refactors that would be archaeology in plain JavaScript become trivial in TypeScript because the compiler points at every call site that needs to change."},
+  {"q":"What is the real cost of adopting TypeScript?","a":"A learning curve for the team, some initial friction wiring up the build, and the discipline to keep types meaningful instead of any-ed out. The compile step itself is cheap with modern tooling. The friction comes from engineers who have never used a typed language treating the types as bureaucracy instead of a tool."},
+  {"q":"When is TypeScript NOT worth it?","a":"For genuinely short-lived prototypes that will be deleted within weeks, or for tiny scripts. Once a project is going to be maintained, by more than one person, for more than a few months, TypeScript pays for itself. Most SaaS code is by definition long-lived."},
+  {"q":"Can we migrate an existing JavaScript codebase to TypeScript gradually?","a":"Yes, and that is the recommended approach. Rename files .ts incrementally, set noImplicitAny: false to start, and tighten the config over months. The strictest settings can wait until the codebase has been mostly converted. Trying to flip everything at once is how migrations stall."},
+  {"q":"What is the difference between any and unknown?","a":"Any disables type checking for that value. Unknown forces you to narrow the type before using it. Any is escape hatch. Unknown is defensive. Use unknown by default for values whose shape you genuinely do not know, like external API responses. Save any for the rare case where you really do not care."},
+  {"q":"Does TypeScript hurt performance?","a":"At runtime, no. TypeScript compiles to JavaScript. The types are erased. At build time, it adds a compile step that takes seconds to minutes depending on size. Modern tooling like swc and esbuild compile TypeScript fast. The build cost is rarely a bottleneck in practice."},
+  {"q":"How do I convince a skeptical team to adopt TypeScript?","a":"Show them, do not argue. Pick a hot file in the codebase, the one everyone fears to touch. Convert it. Demonstrate a refactor that would have been days in JavaScript and was an hour in TypeScript because the compiler did the work. The argument lands faster from evidence than from advocacy."}
+]
+---
+
+## What you actually need to know
+
+- TypeScript pays off in SaaS because the timeline is long enough for the tradeoff to favor maintenance over first-week velocity.
+- The up-front cost is real but bounded. The benefits compound for every year the codebase lives.
+- Refactors are the killer feature. What is archaeology in JavaScript is mechanical in TypeScript.
+- A gradual migration works. A flag-day migration usually stalls.
+- Any is a code smell. Unknown is the right default for genuinely unknown shapes.
+
+| Concern | JavaScript reality | TypeScript reality |
+|---|---|---|
+| First-week velocity | Faster | Slower by 20 to 30 percent |
+| Refactor confidence | Low; archaeology required | High; compiler points at every site |
+| Onboarding new engineers | Read the code, run it, hope | Editor shows the shape of everything |
+| Runtime type bugs | Common, found by users | Rare, found by compiler |
+| Five-year maintenance cost | Higher each year | Lower each year |
+
+## The core argument
+
+The argument against TypeScript that I hear most often is that it slows the team down. This is true for the first month and false for every month after. The teams I have worked with who measured velocity before and after a TypeScript migration found that productivity recovered within four to six weeks and was higher afterward, because the time saved on debugging, refactoring, and onboarding outweighed the time spent writing types.
+
+What makes SaaS particularly suited to TypeScript is the time horizon. A SaaS product lives for years. The same code gets touched by many engineers, most of whom did not write it. Every refactor and every feature addition has to work in a codebase the engineer did not build. In that environment, types are not bureaucracy. They are the documentation that does not get stale because the compiler enforces it.
+
+A second argument I hear is that types do not catch the bugs that matter. This is partially true. Types do not catch logic errors or business rule violations. They catch a different class: passing the wrong shape, misnaming a property, forgetting to handle a case, or breaking the contract of a function the caller depended on. Those bugs are not glamorous, but in production they show up daily and they consume an enormous amount of engineering time. Eliminating them is the win.
+
+The third argument is that TypeScript is too complex. The type system has corners. You do not have to use them. Most production TypeScript code uses interfaces, simple unions, and the inference the compiler gives you for free. The advanced features exist for library authors. Application code rarely needs them.
+
+## Where TypeScript actually changes the work
+
+### Refactors
+
+This is the largest single benefit. A rename that touches a hundred files is a coffee break in TypeScript and a half-day in JavaScript. The compiler tells you every place that needs to change. Test coverage stops mattering for this class of work because the compiler does the check the tests would have done.
+
+### Onboarding
+
+A new engineer can read TypeScript and understand the shape of the data without running the code or reading the schema. The types are the documentation. They get to "I can change this" in days instead of weeks. For a SaaS that hires regularly, that compounds.
+
+### Contracts at boundaries
+
+Where your code talks to other code, your code talks to a database, your code talks to an API, TypeScript lets you declare the shape and have the compiler enforce it. The bug class of "the API changed and we deployed code expecting the old shape" gets caught at build time instead of at 3am.
+
+## How long does the migration take
+
+| Codebase size | Time to migrate gradually | Time to reach strict config |
+|---|---|---|
+| Small (under 10k LOC) | Two to four weeks | Two to three months |
+| Medium (10k to 100k LOC) | Two to three months | Six to nine months |
+| Large (100k+ LOC) | Six months to a year | A year or more |
+| New project | Day one | Day one with strict from the start |
+
+The migration is not the heavy work. The discipline of keeping any out of the codebase is. Without that discipline, the codebase ends up with TypeScript syntax and no type safety, which is worse than plain JavaScript because it looks safer than it is.
+
+## What a successful adoption looks like
+
+- A noImplicitAny: true config from week one, even if other strictness comes later.
+- A linter rule that flags any in code review.
+- A house style for typing the data layer: database rows, API responses, queue messages.
+- Generated types from your database or API where possible. Hand-typed contracts drift.
+- A culture that treats type narrowing as part of writing the feature, not as a chore at the end.
+
+## Expert opinion
+
+> I have shipped SaaS products in both JavaScript and TypeScript. The TypeScript ones spent less engineering time per feature after the first month, less time onboarding new engineers, and produced fewer production bugs in the class that types prevent. The JavaScript ones felt faster in the first week and slower for every quarter after. The decision is not really about taste. It is about how long you intend the code to live.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS team I worked with had a JavaScript codebase that had grown for three years. Every feature took longer to ship than the team expected. Refactors were avoided because the team did not trust the test suite to catch the breakages. The team had a list of bugs that they suspected were type-related but could not prove without rewriting big sections.
+
+We migrated to TypeScript over four months. The first month felt slow. The second month was about even with where we had been. The third and fourth months were noticeably faster, because the compiler caught a class of bug that previously had been caught by customers. Six months later, the team measured a 30 percent reduction in production bugs of the type-error class. The pattern matches what I have seen on every well-run TypeScript adoption, and it is the same compounding logic that shows up in [why most rewrites fail](/blog/why-most-rewrites-fail): incremental investments in a living codebase beat dramatic ones almost every time. For more on getting tests under control in a related way, see [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad).
+
+## Common mistakes
+
+1. Adopting TypeScript and using any everywhere. You get the costs without the benefits.
+2. Trying to migrate the whole codebase in one branch over a quarter. The branch goes stale.
+3. Treating the compiler as bureaucracy and disabling strict rules.
+4. Hand-typing database rows instead of generating them. They drift.
+5. Skipping the noImplicitAny setting and shipping unsafe code that looks safe.
+6. Letting types become a domain unto themselves. Application code rarely needs the advanced features.
+7. Forgetting that types are erased at runtime. You still need runtime validation at boundaries.
+
+## A 90 day plan to introduce it
+
+1. **Week one.** Set up the build. Pick a small leaf module. Convert it. Confirm the toolchain works in CI.
+2. **Weeks two to four.** Convert a steady trickle of files. Set noImplicitAny: true. Accept that the type coverage is not strict yet.
+3. **Weeks five to eight.** Type the data layer. Generate types from the database schema. Type the API responses you consume and produce.
+4. **Weeks nine to twelve.** Tighten the strict config. Add a lint rule against any. Document the team's typing conventions in a [lightweight ADR](/blog/the-architecture-decision-record-a-lightweight-discipline).
+5. **Ongoing.** Treat type drift as a class of tech debt. Audit any usage during the same kind of review you would give a [tech debt audit](/blog/the-tech-debt-audit-a-two-day-process). The codebase compounds in your favor for every quarter you keep this up.

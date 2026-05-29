@@ -1,0 +1,119 @@
+---
+slug: "bug-fixes-are-expensive-why-and-how-to-budget-for-them"
+title: "Bug Fixes Are Expensive: Why and How to Budget for Them"
+excerpt: "A bug fix in production costs five to ten times what it would have cost during development. Most founders budget bug fixing as rounding error. The right founders budget it as a primary line item."
+date: "2026-05-19"
+category: "Software Costs and Budgeting"
+tags: ["budgeting","bugs","maintenance","cost"]
+readingMinutes: 11
+ogImage: "/api/og/blog/bug-fixes-are-expensive-why-and-how-to-budget-for-them"
+status: "published"
+definition: "A bug fix costs much more than the diff suggests. The real cost includes the customer impact, the support time, the engineer context switch, the regression risk, and the trust damage. A bug found in production costs five to ten times what the same bug would have cost if caught during development. Budgeting for bugs is not pessimism. It is acknowledging the actual cost structure of software."
+faq: [
+  {"q":"How much should I budget for bug fixing?","a":"Plan for 20 to 30 percent of engineering capacity to go to bug fixing and ongoing maintenance in the first year after launch. By year three this usually drops to 10 to 15 percent. Products in regulated industries trend higher. Products with thin scope trend lower."},
+  {"q":"Why are production bugs so much more expensive?","a":"Five reasons. The engineer has to context switch from new work. The customer has to be supported during the issue. The regression risk increases because the codebase has more constraints. The trust damage shows up in churn and reviews. The post mortem and follow up work takes engineering time that does not ship features."},
+  {"q":"Should I prioritize bug fixing over new features?","a":"Sometimes. The right rule is to fix bugs that affect customer trust or block usage immediately. Fix bugs that affect a small percentage of users on a weekly cadence. Fix cosmetic bugs as part of feature work. The classification matters more than the absolute priority."},
+  {"q":"How do I keep the bug backlog from growing?","a":"Set a weekly cap on new bugs. Close more bugs than you open. Hold engineering responsible for the bug count. The team that lets the backlog grow forever ends up unable to ship features because the bug load is permanent context."},
+  {"q":"What is the cheapest way to reduce bug cost?","a":"Catching bugs earlier. The order of magnitude is roughly cost during code review is 1x, during automated testing is 2x, during staging is 5x, in production is 10x. Investment in code review discipline and test coverage pays back faster than almost any other engineering investment."},
+  {"q":"How do I report bug cost to non technical stakeholders?","a":"Three numbers. The percentage of engineering capacity spent on bugs. The customer facing incidents per quarter. The mean time to repair. The numbers make the cost visible without requiring code understanding."},
+  {"q":"Should I have a dedicated bug fix engineer?","a":"Rotate the role rather than dedicate. A permanent bug fix role burns out the engineer assigned. A weekly rotation distributes the work and exposes the whole team to the bug surface, which improves the quality of new code."}
+]
+---
+
+## What you actually need to know
+
+- Bug fixes in production cost five to ten times what they would have cost in development.
+- Budget 20 to 30 percent of engineering capacity for bugs in year one.
+- Catching bugs earlier is the cheapest way to reduce bug cost.
+- Rotate bug duty rather than dedicating an engineer.
+- The bug backlog should not grow indefinitely.
+
+| Where bug is caught | Relative cost | Time impact |
+|---|---|---|
+| Code review | 1x | Minutes |
+| Automated tests | 2x | Hours |
+| Staging | 5x | Days |
+| Production, small scope | 10x | Weeks |
+| Production, customer trust | 50x or higher | Quarters |
+
+## The core argument
+
+Bug fixing is the line item that founders most reliably underestimate. The reason is psychological. The diff that fixes a bug is often a few lines. The engineer's hands on time is a few hours. The visible cost is small. The invisible cost is large.
+
+The invisible cost is real. The engineer had to stop what they were doing and context switch. The customer had to be supported. The product manager had to triage and reprioritize. The CEO had to answer the email. The trust damage shows up later in churn. The regression risk increases because the codebase has accumulated more constraints. The post mortem and the follow up work takes time that does not ship features.
+
+The teams that take bugs seriously treat them as a real cost. They budget for them. They measure them. They invest in catching them earlier. The teams that do not take bugs seriously end up with backlogs that grow forever and product velocity that mysteriously slows down a year into the build.
+
+The investment that pays back fastest is code review discipline and test coverage. Both are cheap. Both compound. Neither is glamorous. The teams that invest here have lower bug rates and faster delivery in steady state. The teams that skip the investment have to spend the saved time later, with interest.
+
+## How to model bug cost
+
+| Stage of product | Bug rate per release | Capacity dedicated to bugs |
+|---|---|---|
+| Pre launch beta | High | 30 to 40 percent |
+| Year one after launch | Medium high | 20 to 30 percent |
+| Year two | Medium | 15 to 20 percent |
+| Steady state mature | Low | 10 to 15 percent |
+| Regulated industry mature | Medium | 15 to 25 percent |
+
+The numbers are realistic ranges from projects I have worked on. The variation depends on test coverage, code review culture, and the complexity of the product surface.
+
+## How to reduce bug cost
+
+Catch them earlier. Invest in code review. Two reviewers minimum on any change to a critical surface. The cost is a few hours per change. The benefit is dramatic.
+
+Invest in tests. Not for coverage targets but for the bugs you have already seen and the surfaces that hurt most when they break. A regression test is the cheapest form of insurance.
+
+Make the staging environment real. Most staging environments are theater because they do not see real production data shapes. A staging environment that mirrors production catches a class of bugs that staging without mirror never sees.
+
+Triage ruthlessly. Most bugs are not equally important. The triage process is where engineering time gets allocated well or poorly. A triage process that distinguishes customer trust bugs from cosmetic bugs saves a lot of engineering time.
+
+Invest in observability. The bug you can see in metrics or logs is the bug you can fix in hours. The bug you have to reproduce from a vague customer report takes days.
+
+## Features the bug process must have
+
+- A triage process with named owners.
+- A weekly cap on new bugs or a cadence that closes more than it opens.
+- Customer trust bugs marked and tracked separately.
+- A post mortem culture for any bug that affected customers.
+- A regression test for every bug fixed.
+- Observability on the metrics that surface bugs.
+- A rotation for bug duty.
+
+## Expert opinion
+
+> The teams that complain about bug load are usually the teams that built the bug load. The bugs did not appear by accident. They were shipped, often quickly, often without enough review. The fastest path out of the load is to ship more carefully, not to fix faster. The fastest fix is the bug that never gets shipped.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had a growing bug backlog. The team was spending roughly forty percent of engineering capacity on bugs and the backlog was still growing. The founder was frustrated.
+
+We made three changes. We instituted two reviewer minimum on critical surface changes. We added regression tests for every bug fix. We started a weekly triage with the founder, the engineering lead, and the product manager.
+
+The first month showed no improvement. The second month showed a small drop in incoming bug rate. The fourth month, the backlog started shrinking. By month nine, the team was spending eighteen percent of capacity on bugs and the backlog was a third of what it had been.
+
+The investment was real. The triage hour every Monday. The discipline of two reviewers. The time to write the regression tests. Each was small. Together they shifted the product trajectory. The team started shipping features again because the bug load was no longer permanent context.
+
+For more on the related work, see [the cost of tech debt a founders worst bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill) and [why most app quotes are wrong and how to spot it](/blog/why-most-app-quotes-are-wrong-and-how-to-spot-it).
+
+## Common mistakes founders make
+
+1. Budgeting bug fixes as rounding error.
+2. No bug triage. Everything is urgent which means nothing is.
+3. No regression tests. The same bug ships twice.
+4. Dedicating an engineer to bug duty permanently. Burnout follows.
+5. Treating all bugs equally regardless of customer impact.
+6. No observability. Bugs are discovered by customer report instead of by metric.
+7. No post mortem. The lessons evaporate.
+8. Skipping code review under deadline pressure. The bug appears anyway, just later.
+
+## A 30 day plan to reduce bug cost
+
+1. **Week one.** Inventory the open bugs. Classify by customer impact.
+2. **Week two.** Set up the weekly triage. Define the owners.
+3. **Week three.** Add regression tests for the five most painful recent bugs.
+4. **Week four.** Tighten code review. Two reviewers on critical surfaces.
+
+For more on the related work, read [the cost of tech debt a founders worst bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill) and [maintenance budgets what to expect after launch](/blog/maintenance-budgets-what-to-expect-after-launch). On the broader operations side, [the post mortem culture that improves security](/blog/the-post-mortem-culture-that-improves-security) is the natural next read.

@@ -1,0 +1,115 @@
+---
+slug: "explain-analyze-a-tour-of-postgresqls-best-diagnostic-tool"
+title: "EXPLAIN ANALYZE: A Tour of PostgreSQL's Best Diagnostic Tool"
+excerpt: "EXPLAIN ANALYZE is the most useful Postgres tool most engineers never master. The output looks scary. The patterns are simple. Here is the tour that makes it useful in your daily work."
+date: "2026-05-22"
+category: "Performance Optimization"
+tags: ["postgres","explain","performance","queries"]
+readingMinutes: 12
+ogImage: "/api/og/blog/explain-analyze-a-tour-of-postgresqls-best-diagnostic-tool"
+status: "published"
+definition: "EXPLAIN ANALYZE runs a query and reports the actual execution plan including timing, row counts, and the operations the database performed. The output is the most useful diagnostic for query performance work. The format looks complex. The patterns are simple. The engineers who can read EXPLAIN ANALYZE fix performance problems in minutes that take other engineers days."
+faq: [
+  {"q":"What is the difference between EXPLAIN and EXPLAIN ANALYZE?","a":"EXPLAIN shows the planned execution. EXPLAIN ANALYZE actually runs the query and shows what really happened. The differences between planned and actual reveal bad statistics, wrong indexes, and other issues. Always use ANALYZE for diagnostic work."},
+  {"q":"What is the most important thing to look at?","a":"The operation that took the most time. The output is a tree. Each node shows the time. The slowest node is usually where the fix is. The fix is often an index, a query rewrite, or a parameter change."},
+  {"q":"What is a sequential scan and when is it bad?","a":"A seq scan reads every row in the table. Fine on small tables. Brutal on large ones. The fix is the right index. The EXPLAIN ANALYZE shows whether the planner chose seq scan or index scan."},
+  {"q":"What is the difference between index scan and index only scan?","a":"Index scan reads the index then fetches the row from the table. Index only scan reads only the index because all the needed columns are in the index. Index only scan is faster. The INCLUDE clause on the index can make a regular query an index only query."},
+  {"q":"What is a nested loop join and when does it hurt?","a":"A nested loop joins by looking up each row of the outer table in the inner table. Fast when the outer is small or the lookup is by index. Slow when the outer is large and the inner is unindexed. The fix is often the right index on the join column."},
+  {"q":"What is a hash join?","a":"The database builds a hash table on one side of the join and probes it with the other. Fast for large joins where neither side has a useful index. Memory intensive. The planner picks this when it expects it to be the fastest."},
+  {"q":"What is the BUFFERS option?","a":"EXPLAIN ANALYZE BUFFERS shows how many disk blocks were read from cache versus from disk. High disk reads suggest the working set does not fit in memory. The fix is more memory or a smaller working set."}
+]
+---
+
+## What you actually need to know
+
+- EXPLAIN ANALYZE runs the query and shows the actual plan.
+- The slowest node in the tree is usually where the fix is.
+- Sequential scans on large tables are usually the problem.
+- Nested loop joins on large unindexed columns are problems.
+- BUFFERS shows cache versus disk reads.
+
+| Plan node | What it means | When to worry |
+|---|---|---|
+| Seq Scan | Reading every row | On large tables |
+| Index Scan | Using an index | Almost always fine |
+| Index Only Scan | Reading only index | Better than index scan |
+| Nested Loop | Per row inner lookup | Large outer, unindexed inner |
+| Hash Join | Hash table join | Memory pressure |
+| Merge Join | Sorted merge | Both sides already sorted |
+| Sort | Ordering rows | Large unsorted result |
+| Bitmap Scan | Combining indexes | OR conditions usually |
+
+## The core argument
+
+EXPLAIN ANALYZE is the most useful Postgres diagnostic tool that most engineers never bother to learn. The output looks intimidating. The patterns are actually simple. The engineers who learn to read it fix performance problems in minutes that take other engineers days.
+
+The mental model is small. The output is a tree. Each node represents an operation. The slowest node is usually where the fix is. The patterns of what the slowest node means are limited. Sequential scan on a large table means you need an index. Nested loop with high cost means you need an index on the join column. Sort with high cost means you have a missing index or a large result that should be smaller.
+
+The investment to learn is hours. Read the documentation. Run EXPLAIN ANALYZE on a few slow queries. Identify the slowest node. Try a fix. Run again. The pattern recognition builds quickly. After a week of practice the tool becomes natural.
+
+The teams that have engineers fluent in EXPLAIN ANALYZE solve performance problems quickly. The teams that do not throw hardware at problems that an index would have fixed. The investment in learning is small. The savings on infrastructure and engineering time is large.
+
+## The patterns to recognize
+
+| Pattern | Likely fix |
+|---|---|
+| Seq Scan on large table with WHERE clause | Add index on the WHERE columns |
+| Nested Loop with high row estimate | Add index on join columns or rewrite |
+| Sort with high cost | Index on the ORDER BY columns |
+| Filter after index scan | Multi column index that covers the filter |
+| Bitmap Heap Scan with many rows | Consider a more selective index |
+| High estimated vs actual rows | Statistics out of date. ANALYZE the table. |
+| Disk reads dominate buffers | Working set too large for memory |
+| Hash Join with high memory | Larger work_mem or query rewrite |
+
+## How much does this cost
+
+The cost of learning EXPLAIN ANALYZE is hours. The savings is the performance work that goes faster. A team where one engineer is fluent in EXPLAIN ANALYZE handles most query performance work efficiently. A team where nobody is fluent struggles with the same problems repeatedly.
+
+## Features the EXPLAIN ANALYZE workflow must have
+
+- A practice of running EXPLAIN ANALYZE on suspect queries.
+- pg_stat_statements enabled to find candidates.
+- A way to capture and share plan output.
+- A learning practice for new engineers.
+- A way to compare plans before and after a change.
+- BUFFERS analysis for cache pressure questions.
+- A documented set of patterns and fixes.
+
+## Expert opinion
+
+> EXPLAIN ANALYZE is the engineering equivalent of reading lab results. Once you can read it, performance problems become diagnosable rather than mysterious. The patterns are limited. The fixes are mechanical. The teams that invest in learning the tool solve performance work in hours that other teams cannot solve in weeks. The investment is hours. The return compounds across every performance investigation.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS reported that a specific report endpoint was slow. The team had spent two weeks investigating without finding the cause. The senior engineer had not run EXPLAIN ANALYZE.
+
+We ran EXPLAIN ANALYZE on the query. The plan showed a sequential scan on a multi million row table because of a missing index on a filter column. The fix was a one line CREATE INDEX. The query latency dropped from 4 seconds to 30 milliseconds.
+
+The team had been guessing at the cause for two weeks. The plan made the cause obvious in two minutes. The team adopted EXPLAIN ANALYZE as standard practice. The next performance investigation took an hour instead of two weeks.
+
+For more on the related work, see [database indexes a practical primer for SaaS engineers](/blog/database-indexes-a-practical-primer-for-saas-engineers) and [database query performance the five patterns that hurt the most](/blog/database-query-performance-the-five-patterns-that-hurt-the-most).
+
+## Common mistakes engineers make
+
+1. Never running EXPLAIN ANALYZE.
+2. Using EXPLAIN instead of EXPLAIN ANALYZE.
+3. Ignoring the slowest node in the tree.
+4. No comparison before and after a change.
+5. No BUFFERS analysis when memory might matter.
+6. Stale statistics. ANALYZE the table.
+7. Treating the output as too complex to read.
+8. No team practice. The fluency does not spread.
+
+## A one week learning plan
+
+1. **Day one.** Read the Postgres EXPLAIN documentation.
+2. **Day two.** Run EXPLAIN ANALYZE on five queries in your codebase.
+3. **Day three.** Identify the slowest node in each. Hypothesize the fix.
+4. **Day four.** Apply fixes. Run EXPLAIN ANALYZE again. Verify improvement.
+5. **Day five.** Read about the join algorithms in detail.
+6. **Day six and seven.** Practice on more queries. Build pattern recognition.
+
+For more on the related work, read [database indexes a practical primer for SaaS engineers](/blog/database-indexes-a-practical-primer-for-saas-engineers) and [query optimization in PostgreSQL real examples from real projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects). On the broader performance side, [the slow query log a discipline every SaaS team should practice](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice) is the natural next read.

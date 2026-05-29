@@ -1,0 +1,119 @@
+---
+slug: "the-tech-debt-negotiation-how-engineers-should-talk-to-founders-about-it"
+title: "The Tech Debt Negotiation: How Engineers Should Talk to Founders About It"
+excerpt: "Working notes on the tech debt negotiation: how engineers should talk to founders about it. Written for founders, engineers, and operators who want a clear read on tech debt and refactoring from someone who has shipped the work."
+date: "2025-09-01"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-tech-debt-negotiation-how-engineers-should-talk-to-founders-about-it"
+status: "published"
+definition: "The tech debt negotiation is the conversation where an engineer explains to a founder why the team needs time to fix something that already works. Most engineers lose this conversation because they speak in technical terms to someone who thinks in business terms. I have run this negotiation dozens of times. The engineers who win it stop arguing about code quality and start arguing about cost."
+faq: [
+  {"q":"How do I convince a non-technical founder that tech debt is worth fixing right now?","a":"Translate it into money and time. Identify the two or three debt items that are costing the team the most hours per sprint, attach a dollar figure at a loaded engineering rate, and show the trend. If the cost is growing quarter over quarter, the compound argument writes itself. Founders respond to compounding costs the same way they respond to compounding interest."},
+  {"q":"What is the best framing for a tech debt conversation with a founder?","a":"Frame it as a capacity problem, not a code quality problem. The message is not that the code is bad. The message is that the team can only ship at half speed until a specific set of issues gets resolved. Capacity is a business concern. Code quality is an engineering concern. Founders will engage with one of those."},
+  {"q":"How much sprint time should engineers ask for to address tech debt?","a":"Ask for a fixed percentage rather than a block of time. Ten to fifteen percent of each sprint is defensible and sustainable. A two-week cleanup sprint is harder to sell and harder to sustain. The ongoing allocation argument also avoids the political cost of pausing feature work."},
+  {"q":"Should engineers bring tech debt up in planning or in a separate meeting?","a":"Both. Keep a running list visible in planning so it stays normalized. Request a dedicated thirty-minute review once per quarter where the top items get cost estimates and owner assignments. The quarterly review is for escalation and prioritization. The planning mention keeps it from disappearing between quarters."},
+  {"q":"What if the founder keeps deprioritizing tech debt in favor of features?","a":"Document the cost of each deferral in writing. When a bug or incident traces back to a known debt item, link it to the ledger entry. After two or three incidents with documented root causes in deferred debt, the founder's calculus changes. The evidence has to be factual and specific, not general complaints."},
+  {"q":"How do I handle a founder who says we will clean it up after the next launch?","a":"Ask them to write that down as a commitment. In my experience, the 'after the next launch' promise is rarely kept unless it is made specific: which items, how much sprint time, starting which sprint. A vague promise is a no. A specific commitment is a yes."},
+  {"q":"Is it ever the right move to accept more tech debt intentionally to hit a deadline?","a":"Yes, and the discipline is to write down the debt the moment you create it. A known debt item with an owner is manageable. Debt that gets created under deadline pressure and never catalogued is what compounds into the crises that derail teams six months later."}
+]
+---
+
+## What you actually need to know
+
+- Founders think in business outcomes. Engineers who speak in technical terms lose the negotiation before it starts.
+- The winning frame is capacity, not code quality. "We can only ship at half speed" lands. "The code is messy" does not.
+- Translate debt into dollars and hours before the conversation. Numbers end arguments.
+- Ask for a percentage of every sprint, not a cleanup block. The ongoing model is easier to approve and easier to sustain.
+- Document incidents that trace back to deferred debt. The paper trail does more work than any argument.
+- A vague promise to fix it later is a no. Push for specific items, specific sprint allocations, specific dates.
+
+| Negotiation approach | Success rate | Why it fails | When it works |
+|---|---|---|---|
+| "The code is bad and needs fixing" | Low | No business case | Almost never |
+| "This is slowing us down by X hours per sprint" | Medium | Vague without cost translation | Small teams with close founder relationships |
+| "Items A, B, C cost us $N per month and will cost $M to fix" | High | Requires ledger discipline upfront | Any team with a maintained ledger |
+| "Last three incidents were caused by this deferred debt" | High | Reactive, needs evidence | After incidents are documented |
+
+## The core argument
+
+The reason most engineers lose the tech debt negotiation is not that founders are irrational. It is that engineers make arguments that only make sense inside engineering. Phrases like "we need to decouple the service layer" or "the schema migrations are unmaintainable" are true, and they are invisible to a founder who is watching a competitor ship features and wondering when the team will catch up.
+
+Founders are not wrong to prioritize features. Features produce revenue. The engineer's job in the negotiation is not to convince the founder that features matter less than code quality. The engineer's job is to show the founder that specific debt items are already slowing down feature delivery, and that fixing them is the fastest path to shipping more features, not fewer.
+
+That reframe changes everything. The negotiation stops being about maintenance versus product. It becomes about shipping velocity. A founder who understands that three specific modules are costing the team eight hours per sprint in workarounds will do the math. Eight hours per sprint is one hundred and four hours per year. At a loaded mid-level engineer rate, that is around fifty thousand dollars in lost capacity annually. That number is not abstract.
+
+The second thing that changes the outcome is specificity. Founders kill vague requests. They approve specific ones. "We need time to clean things up" dies in planning. "We are requesting ten percent of the next six sprints to address three items that are costing us four hours per sprint each, and here are the items" gets approved because it is bounded, it has a cost, and it has an end state.
+
+## How to prepare the argument
+
+### Build the ledger first
+
+The negotiation does not work without data. Before the conversation, spend time with the engineering team identifying the five or ten debt items with the highest ongoing cost. For each item, write down the cost in hours per sprint and the fix estimate in sprint-points or days. Translate the hours into dollars using the team's loaded rate.
+
+A loaded rate for a mid-level engineer in a Western market runs somewhere between one hundred and one hundred and fifty dollars per hour when you include salary, benefits, and overhead. A debt item that costs four hours per sprint at one hundred and twenty five dollars per hour is a thousand dollars per sprint, roughly twenty-five thousand dollars per year. That number belongs in the conversation.
+
+### Pick two or three items, not twenty
+
+The instinct is to show the full ledger. Resist it. A founder who sees twenty items will either dismiss them all or feel attacked. Bring the two or three items with the highest cost and the most defensible fix estimates. The point is not to show the depth of the problem. The point is to win approval for a specific allocation.
+
+### Anticipate the counter-argument
+
+The standard counter is "can you do it alongside feature work?" The honest answer is sometimes yes, but the cost estimate needs to reflect the context switching. Research consistently puts the cost of context switching for engineers at thirty to forty percent of productive time. A two-day task done alongside feature work often takes four days. That number belongs in the estimate.
+
+## What it costs to ask for nothing
+
+| Scenario | Short term | Long term |
+|---|---|---|
+| Founder approves 10% sprint allocation | Slightly slower feature output for one quarter | Debt paid down, velocity recovers, incidents drop |
+| Founder defers for one quarter | No velocity cost yet | Debt compounds, one or two new incidents likely |
+| Founder defers for six months | Feature velocity looks good | High probability of a significant incident tracing back to deferred debt |
+| Debt never addressed | Features ship faster temporarily | Team turnover, rewrites forced by crisis, months of lost productivity |
+
+The long-term column is the one that matters. Founders who see this table stop framing the negotiation as features versus cleanup. They see it as risk management.
+
+## What to look for in a good outcome
+
+- A named allocation per sprint rather than a vague future promise.
+- Specific items approved for the coming quarter with named owners.
+- A commitment to revisit the ledger quarterly.
+- A documented definition of done for each approved item.
+- No expansion of scope mid-sprint without mutual agreement.
+- A retrospective after the first cleanup sprint to show the velocity change.
+
+## Expert opinion
+
+> Engineers who complain about tech debt without a cost estimate are asking founders to take their word for it. Founders cannot do that. They have a board, investors, and a payroll to justify decisions to. Give the founder a number they can defend in a board meeting and you will find the conversation goes differently. The engineering argument is not "this code is bad." The engineering argument is "this code is costing us fifty thousand dollars a year and will cost twenty thousand to fix."
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A startup I consulted for had a team of four engineers who had been quietly flagging the same two modules as risky for eight months. The founder kept deferring the cleanup in favor of new features. The team was frustrated. The codebase was getting worse. Then they ran a proper [two-day tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) and put real cost numbers on the problem.
+
+The numbers were stark. The two modules together were costing about six hours per sprint in workarounds. At the team's blended loaded rate, that was eight thousand dollars per month. The fix estimate was three weeks of focused work. The founder approved it in the same meeting where the numbers were presented.
+
+The pattern I have seen across multiple engagements is that the same work, presented as "we need to clean up the code," gets deferred. Presented as "these two modules are costing us eight thousand dollars a month and three weeks will fix it," it gets approved. The work is identical. The frame is everything.
+
+For structuring the actual cleanup work once you have approval, [the refactor sprint post](/blog/the-refactor-sprint-when-a-quarter-of-the-roadmap-becomes-cleanup) covers how to run a productive cleanup sprint without losing team momentum. And if the negotiation includes questions about whether to refactor or rewrite entirely, [when to refactor and when to rewrite](/blog/when-to-refactor-and-when-to-rewrite) gives a structured framework for that decision.
+
+## Common mistakes
+
+1. Making a technical argument to a non-technical audience. The audience determines the frame.
+2. Asking for a big cleanup sprint instead of an ongoing allocation. The cleanup sprint sounds like you want to stop shipping. The ongoing allocation sounds like you want to ship better.
+3. Showing up without cost estimates. A request without numbers is a complaint.
+4. Trying to address every debt item at once. Pick the two or three that justify the allocation on their own.
+5. Accepting a vague promise without pushing for specifics. "After the launch" is not a commitment.
+6. Failing to follow up after incidents with root cause links to the debt ledger. The evidence trail builds the case over time.
+7. Framing it as a quality issue. Quality is an engineering value. Velocity is a business value. Use the right frame.
+8. Not involving the founder in the ledger review. Debt that founders never see does not get funded.
+
+## A four-sprint negotiation plan
+
+1. **Sprint one.** Run a focused audit and seed the ledger. Identify the five items with the highest ongoing cost. Get cost estimates from the team.
+2. **Sprint two.** Bring the top two items to the founder meeting with translated dollar costs. Request ten percent allocation starting next quarter.
+3. **Sprint three.** After approval, execute on the first item and document the velocity change. Show the before and after in the sprint retro.
+4. **Sprint four.** Present the velocity data to the founder. Use it to make the case for continuing the allocation as a permanent practice.
+
+The companion post on how to track this work over time is [the tech debt ledger post](/blog/the-tech-debt-ledger-a-discipline-worth-keeping), which covers the specific columns and review cadence that makes the negotiation repeatable.

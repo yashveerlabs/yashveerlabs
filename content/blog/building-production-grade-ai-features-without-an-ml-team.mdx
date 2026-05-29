@@ -1,0 +1,127 @@
+---
+slug: "building-production-grade-ai-features-without-an-ml-team"
+title: "Building Production Grade AI Features Without an ML Team"
+excerpt: "You do not need ML engineers to ship great AI features in 2026. You need application engineers who treat AI like any other production system. Here is what that actually looks like."
+date: "2026-05-20"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","production","application-engineering","evals"]
+readingMinutes: 13
+ogImage: "/api/og/blog/building-production-grade-ai-features-without-an-ml-team"
+status: "published"
+definition: "Production grade AI features in 2026 are built by application engineers, not ML researchers. The model is a managed service. The work is prompt engineering, evals, caching, observability, and integration with the rest of the product. The teams that recognize this ship faster and cheaper than the teams that wait for an ML hire. The teams that miss this hire an ML engineer and discover the bottleneck was not the model."
+faq: [
+  {"q":"Do I really not need ML engineers?","a":"For features that use managed model APIs from OpenAI, Anthropic, or open source vendors, you almost never need ML engineers. The skills you need are application engineering, prompt design, eval discipline, and product judgment. For features that require custom model training or research, you do need ML engineers. Most product features do not."},
+  {"q":"What is prompt engineering really?","a":"Designing the system prompt and the user message format so the model produces the output you want with high reliability. It is a discipline like SQL query optimization. It rewards iteration. The teams that take it seriously produce dramatically better outputs than the teams that copy prompts from the internet."},
+  {"q":"What are evals and why do they matter?","a":"Evaluation suites are sets of representative inputs with expected output characteristics. You run them against your AI features after every change. Without evals, every change is a coin flip. With evals, you can measure quality changes objectively."},
+  {"q":"How do I handle the cost?","a":"Cache aggressively. Route to smaller models when possible. Use the expensive model only when needed. Cap per request cost. The teams that treat cost as an engineering problem keep the bill in line. The teams that treat it as someone else's problem get surprised by it."},
+  {"q":"What about observability?","a":"Every AI call should be logged with input, output, latency, cost, and any safety flags. The logs are how you debug bad outputs and find drift. AI without observability is a black box that you cannot improve."},
+  {"q":"How do I evaluate model upgrades?","a":"Run the eval suite on the new model. Compare metrics. The new model is not automatically better. Sometimes a model upgrade improves general capability but regresses on your specific task. The eval suite is what catches this."},
+  {"q":"Should I fine tune?","a":"Rarely. Fine tuning is expensive and brittle. Prompt engineering and retrieval cover most cases better. Fine tune only when you have exhausted prompting and retrieval and have a clear specific use case with enough training data."}
+]
+---
+
+## What you actually need to know
+
+- Application engineers, not ML researchers, build production AI features in 2026.
+- Prompt engineering, evals, caching, and observability are the work.
+- Cache aggressively. Route to smaller models. Cap per request cost.
+- Every AI call is logged. Drift is detected.
+- Fine tuning is rare. Prompting and retrieval cover most cases.
+
+| Skill | Build production AI features? |
+|---|---|
+| Application engineering | Yes, primary |
+| Prompt engineering | Yes, primary |
+| Eval design | Yes, primary |
+| Observability discipline | Yes, primary |
+| Vector store ops | Often |
+| Model training | Rarely needed |
+| Fine tuning | Rarely needed |
+| Custom architecture research | Almost never |
+
+## The core argument
+
+The default assumption in many teams is that AI features require ML engineers. The assumption is outdated for 2026. Most AI features in production today are built by application engineers using managed model APIs from OpenAI, Anthropic, or open source providers. The ML work has been mostly absorbed by the API. The remaining work is application engineering with new tools.
+
+The skills that matter are familiar. Application engineering for the integration. Prompt design for the model interaction. Eval discipline for quality control. Observability for production debugging. Caching for cost control. The skills are not specific to AI. They are the skills of senior application engineers applied to a new substrate.
+
+The teams that miss this delay AI features waiting for an ML hire. The ML hire often turns out not to be the bottleneck. The team needed application engineers who could think about evals and prompts. The ML engineer ends up doing application work or leaving because the role does not match the work.
+
+The teams that get this right move quickly. They pick a managed API. They build the integration. They invest in evals from day one. They iterate on prompts the way teams iterate on UI. They measure and improve. The features land in months instead of quarters.
+
+## The shape of production grade AI work
+
+| Layer | What it requires |
+|---|---|
+| Integration with the model API | Application engineering |
+| Prompt design | Iteration and evals |
+| Retrieval if needed | Vector store engineering |
+| Function calling | Schema design and execution wiring |
+| Streaming | Server sent events or websockets |
+| Caching | Application engineering |
+| Cost control | Routing logic |
+| Safety | Refusal paths and content filters |
+| Observability | Structured logging |
+| Evals | Application engineering plus product judgment |
+| Iteration | Engineering discipline |
+
+## How much does this cost
+
+| Cost | Modest scale | High scale |
+|---|---|---|
+| Model fees | 200 to 1500 USD per month | Thousands |
+| Vector store | 50 to 500 USD | 500 to 5000 USD |
+| Telemetry | 50 to 200 USD | 500 to 2000 USD |
+| Eval infrastructure | Engineering time | Dedicated headcount |
+| Caching | Negligible if built in | Significant savings if not |
+
+The numbers come from projects I have shipped. The cost is much lower than the cost of an ML engineer hire that the team usually does not need.
+
+## Features the production AI stack must have
+
+- A managed model provider with enterprise terms.
+- Structured logging for every model call.
+- Eval suite with representative inputs.
+- Caching with appropriate invalidation.
+- Routing between cheaper and more expensive models.
+- Safety boundary at the right places.
+- A clear separation between prompt and product code.
+- A migration path between model providers.
+
+## Expert opinion
+
+> The teams that ship production AI features in 2026 do so by treating AI as application engineering with new tools. The teams that wait for an ML hire delay the work by quarters without addressing the actual constraints. The skills that matter are familiar. Prompt design replaces query design. Eval discipline replaces test discipline. The engineers you have can do this work if they accept the new tools.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client wanted to ship an AI feature in their product. The founder had been advised to hire an ML engineer first. The hire would take six months. The feature would land twelve months out.
+
+We ran the project with the existing senior engineer leading. The integration with Claude shipped in two weeks. The retrieval layer in three more. The function calling in two more. The eval suite in another two. The full feature shipped in two months.
+
+The feature has run for fourteen months with the same senior engineer maintaining it. The team has improved the prompts twice and migrated between models once. The ML engineer hire never happened. The product manager and the senior engineer have produced a feature that customers love, with no machine learning research required.
+
+For more on the related work, see [the difference between an AI wrapper and an AI product](/blog/the-difference-between-an-ai-wrapper-and-an-ai-product) and [AI evals how to test your AI features like software](/blog/ai-evals-how-to-test-your-ai-features-like-software).
+
+## Common mistakes teams make
+
+1. Waiting for an ML hire to start the work.
+2. No evals. Quality drifts silently.
+3. No caching. The bill grows fast.
+4. Treating prompts as a one shot decision.
+5. Picking the most powerful model for every call.
+6. No observability. Debugging is impossible.
+7. Fine tuning prematurely. Prompts and retrieval would have worked.
+8. No migration path. Vendor lock is real.
+
+## A 90 day plan to ship a production AI feature
+
+1. **Weeks one and two.** Pick the feature. Define done. Pick the model provider.
+2. **Weeks three and four.** Build the integration. Wire observability.
+3. **Weeks five and six.** Add retrieval if needed. Add function calling if needed.
+4. **Weeks seven and eight.** Build the eval suite. Get the baseline.
+5. **Weeks nine and ten.** Iterate on prompts. Improve the eval numbers.
+6. **Weeks eleven and twelve.** Caching, cost control, safety. Ship.
+
+For more on the related work, read [AI evals how to test your AI features like software](/blog/ai-evals-how-to-test-your-ai-features-like-software) and [token economics why your AI bill surprised you and how to fix it](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it). On the broader AI strategy, [the senior engineers job in an AI coding world](/blog/the-senior-engineers-job-in-an-ai-coding-world) is the natural next read.

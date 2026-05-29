@@ -1,0 +1,120 @@
+---
+slug: "choosing-a-cache-redis-vs-memcached-vs-in-memory"
+title: "Choosing a Cache: Redis vs Memcached vs In Memory"
+excerpt: "In memory for the smallest scope. Memcached for pure key value at scale. Redis for almost everything else. The three cover different shapes of problem and they are not interchangeable."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["caching","redis","memcached","architecture"]
+readingMinutes: 12
+ogImage: "/api/og/blog/choosing-a-cache-redis-vs-memcached-vs-in-memory"
+status: "published"
+definition: "In memory cache lives inside your application process. It is the fastest and simplest cache but does not share across processes. Memcached is a distributed key value cache with simple semantics and extreme performance. Redis is a distributed cache and data structure server with richer features. Most modern SaaS picks Redis for the breadth. Memcached and in memory each win in specific cases that justify their constraints."
+faq: [
+  {"q":"When is in memory cache enough?","a":"When the data is small, changes rarely, and applies per process. Configuration loaded at startup. Feature flags refreshed every minute. Lookup tables. In memory cache for these is free and instant. Adding Redis would be overkill."},
+  {"q":"When does Memcached win over Redis?","a":"Memcached wins when you need pure key value at extreme scale with simple semantics. The throughput per node is often higher than Redis for that narrow workload. The trade off is that Memcached has no data structures beyond strings and no persistence. Most teams do not need that specialization."},
+  {"q":"Why does Redis dominate?","a":"Redis offers strings, hashes, lists, sets, sorted sets, streams, pub or sub, geospatial, and more. The data structure depth makes it useful for queues, rate limiting, leaderboards, session storage, and caching. One server, many use cases. Operational simplicity dominates the specialization advantage of Memcached for most teams."},
+  {"q":"Should I use managed Redis?","a":"Yes for most teams. Upstash, Redis Cloud, ElastiCache, MemoryDB. The operational overhead of self managed Redis is real and unnecessary for most products. Managed Redis is a few hundred dollars per month at moderate scale, which is much less than the engineering time to run it yourself."},
+  {"q":"What about Redis persistence?","a":"Redis can persist to disk with snapshots or append only files. Use persistence when the cache is also a source of truth for some data. Skip it when the cache is pure cache and can be rebuilt from the database. Persistence adds cost and complexity."},
+  {"q":"What is the eviction policy and why does it matter?","a":"When the cache is full, the cache must decide what to evict. LRU evicts least recently used. LFU evicts least frequently used. Random is random. Pick the policy that matches your access pattern. The default is often not what you want."},
+  {"q":"How do I monitor cache health?","a":"Hit rate, evictions per second, memory usage, latency, and connection pool saturation. A cache with low hit rate is misconfigured or too small. A cache with high eviction rate is undersized. The metrics surface both issues."}
+]
+---
+
+## What you actually need to know
+
+- In memory cache wins for small per process data that rarely changes.
+- Memcached wins for pure key value at extreme scale.
+- Redis wins for almost every other case.
+- Managed Redis is the right starting point for most teams.
+- Eviction policy and hit rate are the two metrics that matter most.
+
+| Cache type | Scope | Best fit |
+|---|---|---|
+| In memory | Per process | Config, feature flags, lookups |
+| Memcached | Distributed key value | Extreme throughput pure KV |
+| Redis | Distributed multi structure | Caching, queues, rate limit, leaderboards |
+| Hybrid in memory plus Redis | Per process plus shared | Common in mature SaaS |
+
+## The core argument
+
+The cache choice is one of those infrastructure decisions that founders treat as solved by default. The team picks Redis because Redis is what they have heard of. The choice is often right, but the team rarely understands why. The wrong choice in specific cases produces real problems that the right understanding would have avoided.
+
+In memory cache is underused. The pattern of loading configuration at process startup and refreshing every minute or two from the database is excellent. The cache is free. The cache is fast. The cache shares nothing across processes, which is fine because the data does not change often and brief inconsistency between processes is acceptable. The team that uses in memory cache for the right data saves Redis traffic and gets the lowest latency possible.
+
+Memcached is the right call when the workload is pure key value at extreme scale and the team values throughput over features. The narrow specialization makes Memcached faster than Redis for that specific workload. Most teams do not have that workload. Most teams use Redis for everything and benefit from the operational simplicity of one cache server.
+
+Redis is the right call when the cache also serves as a queue, a rate limiter, a session store, or any of the other roles Redis can play. The team gets one server that handles many use cases. The operational footprint is smaller than running multiple specialized systems.
+
+The pattern that mature SaaS converges on is in memory cache for per process configuration plus Redis for shared cache and other Redis use cases. Memcached shows up in specific high throughput workloads. The combination covers most needs efficiently.
+
+## The decision by use case
+
+| Use case | Best cache |
+|---|---|
+| Configuration loaded at startup | In memory |
+| Feature flags refreshed every minute | In memory |
+| User session storage | Redis |
+| API response caching | Redis or CDN |
+| Rate limiting | Redis |
+| Job queue | Redis |
+| Leaderboard | Redis sorted set |
+| Pure key value at high throughput | Memcached |
+| Pub or sub messaging | Redis |
+| Distributed lock | Redis |
+
+## How much does this cost
+
+| Option | Monthly cost at moderate scale |
+|---|---|
+| In memory cache | Free |
+| Managed Memcached on AWS ElastiCache | 50 to 300 USD |
+| Managed Redis on Upstash | Free to 200 USD |
+| Managed Redis on Redis Cloud | 100 to 500 USD |
+| Managed Redis on ElastiCache | 100 to 500 USD |
+| Self managed Redis | Free to run, real to operate |
+
+## Features the cache choice must have
+
+- Appropriate eviction policy for the access pattern.
+- Monitoring on hit rate, eviction rate, memory, latency.
+- Connection pooling tuned to the application.
+- TLS for connections that cross the network.
+- Authentication enabled.
+- Backup strategy if persistence is enabled.
+- Capacity planning that anticipates growth.
+
+## Expert opinion
+
+> Most teams over rotate to Redis for everything and miss the cases where in memory cache would have been faster and free. The pattern of in memory for per process plus Redis for shared is the mature default. The teams that adopt it get the latency of in memory where it matters and the consistency of Redis where it matters. The choice is not Redis or nothing.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had Redis for every cache, including configuration loaded at startup. The Redis read traffic was significant. The latency on configuration reads was higher than it needed to be. The Redis bill was modest but real.
+
+We moved the configuration cache in memory with a one minute refresh. The Redis traffic dropped meaningfully. The application latency on configuration reads went from a few milliseconds to nanoseconds. The Redis bill dropped slightly. The application got slightly simpler because the configuration access path no longer required network calls.
+
+We kept Redis for everything that genuinely needed shared state. Session storage, rate limiting, job queue, certain cached API responses. The hybrid pattern fit the application better than the pure Redis pattern that had been in place.
+
+For more on the related work, see [caching strategies for growing SaaS from none to multi layer](/blog/caching-strategies-for-growing-saas-from-none-to-multi-layer) and [the caching hierarchy browser CDN edge application database](/blog/the-caching-hierarchy-browser-cdn-edge-application-database).
+
+## Common mistakes teams make
+
+1. Using Redis for data that should be in memory.
+2. Using in memory for data that needs to be shared across processes.
+3. Default eviction policy that does not match the workload.
+4. No monitoring. The cache silently fails.
+5. Self hosting Redis without the operational appetite.
+6. No connection pooling. Saturation at scale.
+7. Mixing tenant data in the cache without tenant scoped keys.
+8. Picking Memcached when Redis would have done.
+
+## A 30 day plan to pick the right cache
+
+1. **Week one.** Inventory the data being cached. Classify each as per process or shared.
+2. **Week two.** Move per process data to in memory cache. Keep shared on Redis.
+3. **Week three.** Tune eviction policies. Set up monitoring.
+4. **Week four.** Measure the impact. Tune connection pooling.
+
+For more on the related work, read [caching strategies for growing SaaS from none to multi layer](/blog/caching-strategies-for-growing-saas-from-none-to-multi-layer) and [connection pooling the quiet killer of SaaS performance](/blog/connection-pooling-the-quiet-killer-of-saas-performance). On the broader infrastructure side, [the database you did not think you needed when to add Redis Elasticsearch or ClickHouse](/blog/the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse) is the natural next read.

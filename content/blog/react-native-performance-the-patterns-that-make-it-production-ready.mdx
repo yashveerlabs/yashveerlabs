@@ -1,0 +1,62 @@
+---
+slug: "react-native-performance-the-patterns-that-make-it-production-ready"
+title: "React Native Performance: The Patterns That Make It Production Ready"
+excerpt: "React Native apps that feel slow usually have fixable causes: excessive re-renders, large JavaScript bundles, synchronous work on the main thread. Here are the patterns that produce apps users do not notice are cross-platform."
+date: "2026-05-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter"]
+readingMinutes: 6
+ogImage: "/api/og/blog/react-native-performance-the-patterns-that-make-it-production-ready"
+status: "published"
+definition: "React Native performance optimization involves identifying and eliminating the specific causes of frame drops, slow navigation, and janky animations in React Native apps. The main performance categories are JavaScript thread work (heavy computation, excessive re-renders), main thread contention (synchronous native calls, layout-triggering operations), network and data loading patterns (waterfall requests, missing loading states), and bundle size (large JavaScript payloads that increase startup time and parse time)."
+faq: [
+  {"q":"What is the React Native JavaScript thread and why does blocking it cause jank?","a":"React Native runs JavaScript on a separate thread from the main UI thread. The JavaScript thread handles React rendering, application logic, and (in the old architecture) bridge communication. The main thread handles UI updates and touch events. When the JavaScript thread is blocked by heavy computation, it cannot process new rendering updates or respond to touch events, which causes the UI to appear frozen or janky. Long-running JavaScript operations should be moved off the JavaScript thread using Web Workers (via libraries like react-native-worker) or, for computation-heavy work, a native module."},
+  {"q":"What causes excessive re-renders in React Native and how do you fix them?","a":"Excessive re-renders happen when components re-render without their props or state actually changing. Common causes: passing new object or function references on every render (creating new objects inline in JSX), parent components re-rendering and causing all children to re-render without memoization, and context providers updating and causing all consumers to re-render. Fixes: React.memo for components that should not re-render when parent re-renders, useMemo for expensive computed values, useCallback for function references passed to child components, and splitting context into smaller providers so updates only affect relevant consumers."},
+  {"q":"What is Reanimated and why is it better than the built-in Animated library?","a":"React Native Animated library runs animations by sending animation updates over the JavaScript bridge to the native side, which means animations can drop frames when the JavaScript thread is busy. Reanimated 2+ runs animation logic directly on the UI thread using Worklets (small JavaScript functions that execute on the native thread). This means animations continue at 60fps even when the JavaScript thread is processing other work. Reanimated is the standard choice for any animation that needs to be frame-perfect: gesture-driven animations, scroll-linked animations, and navigation transitions."},
+  {"q":"How does image handling affect React Native performance?","a":"Unoptimized images are a common cause of memory pressure and slow scroll performance in React Native apps. Images loaded at their full resolution and displayed at a smaller size waste memory and decoding time. Large image lists without virtualization load all images into memory simultaneously. Solutions: use a caching image library (expo-image or react-native-fast-image) that handles disk and memory caching, resize images to display dimensions on the server before sending to the client, and use FlatList with appropriate getItemLayout and windowSize props to virtualize long image lists."},
+  {"q":"What is InteractionManager and when should you use it?","a":"InteractionManager.runAfterInteractions defers expensive work until after animations and interactions have completed. This is useful for work that should happen after navigation transitions: loading data for a new screen should not start while the navigation animation is still running, because the JavaScript thread work competes with the animation. Using InteractionManager.runAfterInteractions to start data fetching ensures the navigation animation runs smoothly before the JavaScript thread takes on additional work. It is a targeted fix for specific jank around navigation, not a general-purpose performance tool."}
+]
+---
+
+## What you need to know
+
+- Excessive re-renders are the most common source of React Native performance problems. Use React DevTools Profiler to identify components that re-render unnecessarily.
+- Animations must run on the native thread to be frame-perfect. Use Reanimated 2+ for any animation that needs to be smooth regardless of JavaScript thread load.
+- Virtualize long lists. FlatList with windowSize and removeClippedSubviews is not optional for lists with more than 50 items.
+- Image optimization is disproportionately impactful. Memory pressure from large images causes the OS to kill background processes and slows the entire app.
+- Measure before optimizing. React Native has good profiling tooling (Hermes Profiler, React DevTools). Fix the measured bottleneck, not the suspected one.
+
+## The core argument
+
+React Native apps that feel slow rarely have architectural problems. They have accumulated a set of specific, fixable patterns: components that re-render on every keystroke because a function reference is recreated inline, lists that render 500 items simultaneously instead of the 20 that are visible, images loaded at 4x display resolution because the API returns originals, and animations that run on the JavaScript thread and drop frames when network requests are in flight.
+
+The diagnostic process matters more than the fix library. I have seen teams add memoization everywhere after reading a blog post about re-renders, without measuring which re-renders were actually expensive. Memoization has a cost: the useMemo and useCallback overhead is real, and memoizing components that re-render cheaply adds overhead without benefit. The correct approach is: measure which components render most frequently and most expensively using React DevTools Profiler, then apply memoization to those specific components with concrete measurements of improvement.
+
+The patterns that consistently move performance metrics in my experience across React Native projects: moving navigation transition animations to Reanimated (eliminates frame drops during navigation), adding getItemLayout to FlatList for fixed-height items (eliminates the layout calculation overhead on scroll), and deferring data fetching with InteractionManager.runAfterInteractions until navigation transitions complete. These three changes together have produced the most consistent improvement across different React Native projects.
+
+## Common mistakes
+
+1. **Rendering all items in a list without virtualization.** A ScrollView with 200 items renders all 200 components simultaneously, regardless of how many are visible. FlatList virtualizes rendering, keeping only visible items (plus a configurable buffer) in memory. Any list with more than 30 to 50 items should use FlatList, not ScrollView with mapped items.
+
+2. **Creating new object and function references on every render.** `onPress={() => handlePress(item.id)}` creates a new function on every render. `style={{ marginTop: 10 }}` creates a new object on every render. Both defeat React.memo and cause unnecessary child re-renders. Use useCallback for event handlers passed to components and StyleSheet.create for styles.
+
+3. **Running synchronous storage reads on the main thread.** AsyncStorage and SecureStore operations are asynchronous for a reason. Synchronous storage reads block the JavaScript thread. Initialize state from storage in a useEffect and show a loading state during initialization rather than blocking render on storage reads.
+
+4. **Not using Hermes as the JavaScript engine.** Hermes is the optimized JavaScript engine for React Native, with faster startup time and lower memory usage than V8. New React Native apps use Hermes by default. Older projects that have not migrated to Hermes are leaving significant startup performance on the table, particularly on Android.
+
+5. **Debugging performance in the simulator instead of on a real device.** The iOS simulator and Android emulator run on the Mac's CPU and do not reflect the memory constraints, CPU performance, or GPU limitations of physical devices. Performance that looks acceptable in the simulator may be unacceptable on a mid-range Android device. Always validate performance on physical hardware, and specifically on a mid-range Android device if Android is in the target market.
+
+## Where to start
+
+1. **Profile with React DevTools Profiler to find re-render hotspots.** Enable the profiler, perform the interaction that feels slow, and review the flame chart for components that rendered multiple times or took more than a few milliseconds. These are the optimization targets. Apply React.memo, useMemo, or useCallback to the specific components with measurable re-render cost.
+
+2. **Audit image loading.** Check the images displayed in the app and confirm they are sized appropriately for the display dimensions. Install expo-image or react-native-fast-image if not already in use. Verify that FlatList-rendered images are properly dequeued when scrolled out of view.
+
+3. **Check FlatList configuration for long lists.** For fixed-height list items, add getItemLayout to eliminate per-item height calculation. Set windowSize to 5 to 7 (items to render above and below the viewport). Add removeClippedSubviews={true} to unmount items outside the viewport on Android. These three FlatList props together have a significant impact on scroll performance for long lists.
+
+## Related reading
+
+- [React Native New Architecture: What Founders Should Know](/blog/react-native-new-architecture-what-founders-should-know)
+- [Native Android Development in 2026: Compose, KMP, and Where It Is Going](/blog/native-android-development-in-2026-compose-kmp-and-where-it-is-going)
+- [Push Notifications: The Architecture Most Apps Get Wrong](/blog/push-notifications-the-architecture-most-apps-get-wrong)
+- [Offline First Mobile Apps: A Reality Check](/blog/offline-first-mobile-apps-a-reality-check)

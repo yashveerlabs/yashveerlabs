@@ -1,0 +1,116 @@
+---
+slug: "the-over-engineering-trap-how-founders-kill-their-own-products"
+title: "The Over Engineering Trap: How Founders Kill Their Own Products"
+excerpt: "Over engineering is not a technical problem. It is a founder decision that shows up as a technical problem six weeks into the build. Here is how I recognize it early and what I do about it."
+date: "2024-06-12"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-over-engineering-trap-how-founders-kill-their-own-products"
+status: "published"
+definition: "Over engineering happens when the system being built is more complex than the problem being solved. On an MVP, it usually shows up as microservices before product fit, abstractions before real use cases, or infrastructure that assumes ten thousand users when there are ten. I have seen it slow projects by months and bankrupt one startup before a single customer signed up."
+faq: [
+  {"q":"What is over engineering in software development?","a":"Over engineering means building more complexity than the current problem requires. On an early startup, that usually looks like microservices architecture before you have customers, custom auth infrastructure before you have logins, or a caching layer before you have traffic. The extra work costs time and money and rarely survives contact with the real product."},
+  {"q":"How do I know if my MVP is being over engineered?","a":"The clearest signal is when your developer is solving problems you do not have yet. If the architecture discussion in week two is about horizontal scaling, you are over engineering. If the feature being built requires three new abstractions to support one user action, you are over engineering. The test is simple: does this solve a real problem you have today?"},
+  {"q":"Is over engineering always the developer's fault?","a":"No. Founders cause over engineering too, often more than developers do. Founders who ask for enterprise grade security before they have enterprise customers, or demand a full admin portal before a single user has signed up, are asking for unnecessary complexity. The founder sets the direction. The developer builds what the direction requires."},
+  {"q":"Can you fix over engineering after the build?","a":"Yes, but it is expensive. Fixing over engineered code is a partial rewrite. The architecture choices made early are load bearing. Changing them means touching every layer that built on top of them. It is better to catch over engineering in week one than to refactor it in month six."},
+  {"q":"What is the simplest architecture for an MVP?","a":"A single deployable application, a single database, a third party auth provider, and a third party payment processor. That covers most SaaS MVPs. Add complexity only when a real problem appears that the simple architecture cannot solve. Most MVPs never need to go beyond this baseline."},
+  {"q":"How do I convince my developer to stop over engineering?","a":"Make scope explicit in writing. A brief that names what the MVP needs to do and what it does not need to do is the best tool. When a developer proposes something not on that list, the brief is the reference. The question becomes: where in the brief does this appear? If it does not, it waits."},
+  {"q":"Does over engineering affect the cost of an MVP?","a":"Directly. Over engineered systems take longer to build, longer to test, and longer to change. Every abstraction that did not need to exist costs real hours. On a fixed budget, over engineering means fewer features shipped. On a time budget, it means a later launch. Usually both."}
+]
+---
+
+## What you actually need to know
+
+- Over engineering is not ambition. It is scope without a forcing function. The fix is not a better developer. It is a clearer brief.
+- The most over engineered MVPs I have seen came from founders who admired large systems and wanted to start from that end.
+- A simple architecture that ships beats a perfect architecture that does not. Always.
+- The signs of over engineering appear in week two. By week six they are structural and expensive to reverse.
+- Every abstraction on an MVP is a bet that the product will survive long enough to need it. Most bets of that kind lose.
+
+| Approach | Time to first working product | Maintenance cost | Risk |
+|---|---|---|---|
+| Monolith with simple database | 4 to 8 weeks | Low at MVP stage | Refactoring needed if scale exceeds expectations |
+| Microservices from day one | 12 to 24 weeks | High, multiple services to run | Most services never justified by actual traffic |
+| No code with glue scripts | 1 to 3 weeks | Medium, brittle under load | Breaks when logic grows past the tool's limits |
+
+## The core argument
+
+I have worked on enough MVPs to have a pattern recognition for the moment over engineering sets in. It almost always happens in the first two weeks. The developer is excited about the technology. The founder has been reading about how Airbnb or Stripe scales. The brief is loose. The first architecture decision gets made in a whiteboard session rather than in a document, and the decision is optimistic about a future the product has not earned yet.
+
+That decision is the root of the problem. Every subsequent decision builds on it. By week six, the codebase reflects an imagined future rather than a present reality. The founder starts noticing that features take longer than expected. The developer is spending half their time on infrastructure that has no users yet. The budget is tracking ahead of schedule for all the wrong reasons.
+
+Over engineering is not malicious. The developer is usually trying to do right by the project. The founder is usually trying to future proof the investment. Both instincts are reasonable in isolation. Together, on an MVP with a fixed budget and a real deadline, they produce a codebase that is more expensive to change than a simple one would have been.
+
+The good news is that it is entirely preventable. The mechanism is a one page brief that says, in plain language, what the MVP needs to do and what it explicitly does not need to do. The second list is the important one. The list of things the MVP does not need to do is the list of things that will over engineer it if you let them in.
+
+## The patterns that signal it early
+
+### Microservices before product fit
+
+Splitting a system into microservices is a solution to a coordination problem that appears when a team has grown past the point where a single codebase is manageable. On a two person team building version one, microservices add deployment complexity, inter service communication overhead, and a debugging surface that is three times larger than a monolith. The coordination problem they solve does not exist yet.
+
+I see this pattern most often when the founder came from a large company where microservices were standard practice. The architecture feels professional. It looks like the kind of thing that serious engineers build. The problem is that serious engineers at large companies inherited those architectures after years of growth. They did not start with them.
+
+### Custom abstractions before real use cases
+
+The second pattern is over abstraction. A developer builds a generic system to handle a problem before the problem has appeared in a real form. The generic system takes three times as long to build as a specific solution would, and when the real problem finally appears, it turns out to be slightly different from what the abstraction assumed.
+
+Abstractions on an MVP are bets. The bet is that the shape of the problem you are solving today is the shape it will have in six months. That bet is almost never correct in the first version of a product. Build for the problem in front of you. Refactor when the shape is clear.
+
+### Infrastructure for users you do not have
+
+The third pattern is premature scaling infrastructure. Load balancers, read replicas, caching layers, CDN configurations for global traffic. All of these are the right answer for a product with real load. They are expensive distractions for a product with ten users. The cost is not just time and money. It is cognitive load. Every extra layer the developer is managing is a layer they are not using to build features your first users need.
+
+## What it requires to avoid it
+
+| Discipline | How it prevents over engineering |
+|---|---|
+| Written brief before any code | Creates an explicit scope wall. If it is not in the brief, it requires a conversation before it enters the build. |
+| Architecture decision review in week one | Catches over complex choices before they become load bearing. Easier to change a diagram than a deployed service. |
+| Weekly scope check against the brief | Lets the founder catch drift in real time rather than at launch. |
+| Explicit "not in scope" list | Gives the developer permission to defer complexity. Most developers will over build if not given explicit permission to under build. |
+| No new abstractions without a real use case | Forces specificity. Abstract after you have seen the same problem twice, not before. |
+
+## What to look for in the build
+
+- Does the architecture diagram have more boxes than the product has features? A warning sign.
+- Is the developer spending more than twenty percent of their time on infrastructure rather than product features? Worth a conversation.
+- Can you deploy the full system to a fresh server in under an hour? If not, the ops surface is already too wide.
+- Does every feature require touching more than two files? The abstraction layer may be too thick.
+- Is there a test suite for systems that have no users yet? Misallocated effort.
+
+## Expert opinion
+
+> The founders who avoid this trap are the ones who ask a simple question at every architecture decision: what problem does this solve today? Not next year. Not at ten thousand users. Today. If the answer is 'none yet but we will need it eventually,' the answer is to defer. Eventual needs get solved when they are actual needs.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I was brought into a rescue project where the first developer had split an MVP booking system into seven services. There was a user service, an auth service, a booking service, a notification service, a payment service, a search service, and a reporting service. The product had twelve users. The deployment took three hours and required four separate environment configs to get right. Every bug crossed at least two service boundaries.
+
+We consolidated to a single application over four weeks. The twelve users did not notice. The founder noticed because feature velocity tripled. The developer I brought in to help finish the project told me on day three that the original architecture was the kind of thing you see at companies with a hundred engineers, not at a startup with one product and twelve users. He was right.
+
+For the flip side of this, see [when to refactor an MVP and when to throw it away](/blog/when-to-refactor-an-mvp-and-when-to-throw-it-away). The decision to consolidate rather than rewrite saved roughly six weeks. The other relevant read is [why most MVPs never launch](/blog/why-most-mvps-never-launch-the-real-reasons), which covers what happens when the over engineering trap is not caught in time.
+
+## Common mistakes
+
+1. Admiring a large company's architecture and starting from it rather than growing toward it.
+2. Using over engineering as a proxy for quality. Complexity and quality are not the same thing.
+3. Building auth infrastructure from scratch when Clerk, Auth0, or Supabase Auth would cover the need in a day.
+4. Creating a data layer abstraction before you know what queries the product actually needs.
+5. Running three separate environments (dev, staging, production) before you have a single paying customer.
+6. Writing a full test suite for infrastructure that has never been used by a real user.
+7. Splitting a team across services before the team is large enough to split across features.
+8. Treating the architecture as permanent. An MVP architecture is a draft, not a contract.
+
+## A 30 day plan
+
+1. **Day one to three.** Write the brief. Include an explicit "not in scope" list. Anything that appears on that list cannot enter the architecture without a documented reason.
+2. **Day four.** Have the architecture conversation. Draw the simplest diagram that solves today's problem. One application, one database, third party services for auth and payments.
+3. **Day five to seven.** Agree on the technology choices. Default to the boring option. The boring option has better documentation and fewer surprises.
+4. **Day eight to twenty-one.** Build. Review the brief at every weekly demo. Any architecture addition that was not in the brief gets discussed before it gets built.
+5. **Day twenty-two to thirty.** First working version deployed to a real URL. Real users trying it. Architecture changes only driven by real problems they surface.
+
+For the scoping work that prevents over engineering, [the two week MVP sprint plan](/blog/the-two-week-mvp-a-workable-sprint-plan) covers how to structure the first build. For the broader cost picture, [why cost always doubles](/blog/why-cost-always-doubles-a-realistic-founder-framework) explains why over engineering is one of the top three budget killers in a startup build.

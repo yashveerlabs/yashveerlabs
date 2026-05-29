@@ -1,0 +1,67 @@
+---
+slug: "kotlin-multiplatform-vs-flutter-vs-react-native-a-real-comparison"
+title: "Kotlin Multiplatform vs Flutter vs React Native: A Real Comparison"
+excerpt: "Three serious cross-platform options for mobile in 2026. Here is how to choose between them without guessing."
+date: "2026-05-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","kotlin-multiplatform","cross-platform"]
+readingMinutes: 8
+ogImage: "/api/og/blog/kotlin-multiplatform-vs-flutter-vs-react-native-a-real-comparison"
+status: "published"
+faq: [
+  {"q":"Is React Native production-ready in 2026?","a":"Yes. Companies like Shopify, Meta, and Microsoft ship production apps on React Native. The new architecture addressed most of the legacy performance issues. It is production-ready for the vast majority of use cases."},
+  {"q":"Does Flutter hurt app store ratings?","a":"Not inherently. Flutter apps that perform well get good ratings. The rendering engine adds some app size and can feel slightly different to experienced iOS users, but most users do not notice. Performance is determined more by implementation than framework choice."},
+  {"q":"What is Kotlin Multiplatform best suited for?","a":"Apps where the business logic is complex and shared, but the UI experience needs to be genuinely native on each platform. Finance apps, health apps, enterprise tools where iOS and Android users have different design expectations. KMP lets you share the hard logic without compromising the experience."},
+  {"q":"Can I use React Native with TypeScript?","a":"Yes, and it is the standard now. Expo and React Native both have first-class TypeScript support. Most production React Native codebases run on TypeScript."},
+  {"q":"Which one has the best performance?","a":"Flutter and KMP both outperform React Native for complex animations and heavily interactive UIs. For most app categories (forms, lists, navigation, data display), React Native's performance is indistinguishable from native to end users."}
+]
+---
+
+# Kotlin Multiplatform vs Flutter vs React Native: A Real Comparison
+
+**Kotlin Multiplatform, Flutter, and React Native each solve the cross-platform mobile problem with different philosophies. KMP shares business logic while using native UI on each platform. Flutter renders everything with its own engine. React Native bridges JavaScript to native components. The right choice depends on your team's language background, how much you care about UI fidelity, and whether you are building a new app or adding mobile to an existing backend.**
+
+## What you need to know
+
+- React Native has the largest ecosystem and the most available engineers, but its bridge architecture creates performance ceilings for UI-heavy apps
+- Flutter delivers consistent pixel-perfect UI across platforms but adds app size and forces you into Dart, a language most teams need to learn
+- Kotlin Multiplatform is the most surgical option: share logic, keep native UI, but you are maintaining two UI codebases
+- None of these are "write once, run anywhere" in practice; expect 70-85% shared code at best
+- The correct choice is almost always the one your current team can actually ship with, not the theoretically best architecture
+
+## The core argument
+
+The cross-platform mobile question sounds like a technical decision. It is mostly a team decision. I have watched founders agonize for weeks over Flutter vs React Native while their actual problem was that neither they nor their developers had shipped a mobile app before. The framework matters less than the experience.
+
+That said, here is my read on each. React Native is the safe default for web-first teams. If your developers already write JavaScript or TypeScript, the learning curve is manageable. The ecosystem is mature, the hiring pool is deep, and Expo has removed most of the setup friction. The new architecture (JSI and Fabric) has addressed many of the performance complaints that plagued older versions. It is not perfect, but it works. For the Expert Tutorials mobile app I consulted on, React Native was the call because the entire team already lived in TypeScript.
+
+Flutter is the right call when you want pixel-perfect UI that looks identical on both platforms and you are willing to invest in Dart. The rendering engine bypasses native components entirely, which means your app looks the same on iOS and Android but also means it will never look quite like a native app. Google maintains it seriously and the tooling is excellent. For apps where visual differentiation is a competitive advantage, Flutter earns its place.
+
+Kotlin Multiplatform is the one most teams are sleeping on. It does not try to replace native UI. It shares your data layer, domain logic, and network calls while leaving the actual screens in SwiftUI and Jetpack Compose. If you have a strong iOS engineer and a strong Android engineer, KMP is arguably the most architecturally sound approach. You are not fighting the platform's design language and you are not shipping a custom rendering engine. The tradeoff is that you are maintaining more code overall.
+
+## Common mistakes
+
+1. **Choosing Flutter for its performance without accounting for the Dart learning curve.** Dart is not difficult, but it is a language your team does not know. Factor in ramp-up time honestly.
+
+2. **Choosing React Native based on web team familiarity and ignoring the native knowledge gap.** Debugging native crash reports, handling Xcode signing, dealing with Gradle build issues, all of that still requires native knowledge even with React Native.
+
+3. **Treating "cross-platform" as "one codebase."** Every cross-platform framework has platform-specific escape hatches. You will write platform-specific code. Plan for it.
+
+4. **Picking KMP without native mobile engineers.** KMP's advantage is keeping native UI. If your team cannot write SwiftUI and Compose competently, you are paying KMP's complexity cost without getting its benefit.
+
+5. **Starting with cross-platform when native would ship faster.** If you only need to ship one platform first, native is often faster than any cross-platform option. Cross-platform pays off over time, not immediately.
+
+## Where to start
+
+1. **Audit your team's actual skills.** Survey who has shipped mobile before, in what framework, and how recently. That is your starting point. The best framework is the one your team can ship.
+
+2. **Define your fidelity requirements.** Does your app need to feel completely native on each platform, or is a consistent cross-platform look acceptable? That question alone eliminates one or two options.
+
+3. **Run a two-week spike.** Build one real screen in your shortlisted framework with production data. Not a tutorial. Not a demo app. A real screen from your actual product. What you learn will be worth more than any comparison article.
+
+## Related reading
+
+- [Flutter vs React Native vs Native in 2026: A Founder Decision Matrix](/blog/flutter-vs-react-native-vs-native-in-2026-a-founder-decision-matrix)
+- [The Hidden Cost of Write Once Run Anywhere](/blog/the-hidden-cost-of-write-once-run-anywhere)
+- [React Native Performance: The Patterns That Make It Production Ready](/blog/react-native-performance-the-patterns-that-make-it-production-ready)
+- [Should You Build for iOS or Android First as a Startup?](/blog/should-you-build-for-ios-or-android-first-as-a-startup)

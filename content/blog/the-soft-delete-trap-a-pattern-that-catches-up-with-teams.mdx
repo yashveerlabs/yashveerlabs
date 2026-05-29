@@ -1,0 +1,125 @@
+---
+slug: "the-soft-delete-trap-a-pattern-that-catches-up-with-teams"
+title: "The Soft Delete Trap: A Pattern That Catches Up With Teams"
+excerpt: "Working notes on the soft delete trap: a pattern that catches up with teams. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-04-26"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-soft-delete-trap-a-pattern-that-catches-up-with-teams"
+status: "published"
+definition: "Soft deletes mark a record as deleted with a flag or timestamp instead of removing it from the database. The pattern is popular because it feels safe and recoverable. In my experience it is safe at first and expensive later, as the deleted rows accumulate, queries get slower, and the team discovers that every feature touching that table needs to filter out the deleted rows or it shows deleted data."
+faq: [
+  {"q":"What is the main problem with using a soft delete pattern in a relational database?","a":"The main problem is that every query on that table must now filter out deleted rows explicitly. If a single join or subquery forgets the filter, deleted data surfaces in the UI. As the number of features grows, the number of places where the filter must be applied grows with it. Teams eventually ship a bug where a deleted user sees their data, or a deleted record appears in a report, because one query was written without the filter."},
+  {"q":"When does soft delete actually make sense as a database pattern?","a":"When genuine recovery is a product requirement. If your product promises customers the ability to restore deleted items, soft delete is the right implementation. Trash or recycle bin features, regulatory retention requirements, and audit log use cases are legitimate. The mistake is using soft delete as a default for everything, including data that will never need recovery and just accumulates as noise in the table."},
+  {"q":"What is the performance impact of soft deletes on a large PostgreSQL table?","a":"Soft deleted rows stay in the table and are scanned by queries unless the index includes the deleted filter. On tables with high delete rates, a large percentage of rows may be soft deleted but never cleaned up. Indexes grow to cover rows that are never returned. Queries slow down proportionally. Partial indexes that exclude deleted rows can recover some of the performance, but the underlying problem remains if old rows are never purged."},
+  {"q":"How do you migrate away from soft deletes once the pattern is in production?","a":"Carefully and in stages. First, identify which deleted rows are genuinely needed for recovery or compliance. Archive those to a separate table. Then hard delete the rest. Update the application code to remove the deleted-filter clauses for the tables that have been cleaned. This is a multi-sprint effort for a mature codebase, because every query touching the affected tables needs review. The migration is worth doing, but it is not a weekend project."},
+  {"q":"What is a better alternative to soft deletes for audit trail requirements?","a":"An append-only audit log table that records every state change as a separate row. The main record is hard deleted when the user deletes it. The audit log retains the history. This separates the transactional data from the audit data, keeps the main table clean, and makes the audit trail easier to query because it is not mixed with live data."},
+  {"q":"How do soft deletes interact with unique constraints in PostgreSQL?","a":"Badly. If you soft delete a record and a user tries to create a new record with the same unique value, the constraint will fail because the deleted row still occupies the unique slot. Teams typically handle this by including the deleted flag in the unique index, which makes the constraint partial. This works but introduces inconsistency: the same email address can exist twice, once active and once deleted, which causes its own category of bugs."},
+  {"q":"Should a SaaS team use a library like Paranoia or django-safedelete to manage soft deletes?","a":"Libraries reduce the risk of forgetting the filter on individual queries, but they do not eliminate the performance and schema complexity problems. If you are going to use soft deletes, a library is better than manual filtering. If you are choosing the pattern fresh, the library is not a reason to choose it. The question is whether the workload actually needs recovery semantics, not whether a library makes the implementation less painful."}
+]
+---
+
+## What you actually need to know
+
+- Soft deletes are appropriate when genuine record recovery is a product feature. They are not a safe default for everything.
+- The hidden cost is filter discipline. Every query on a soft-deleted table must explicitly exclude deleted rows. One missed filter shows deleted data to users.
+- Unique constraints, foreign keys, and indexes all behave unexpectedly when deleted rows stay in the table.
+- The pattern accumulates technical debt proportional to the number of queries that touch the affected tables.
+- In my experience, teams that default to soft deletes on every model eventually spend a sprint cleaning up the mess. The ones who scope it to specific models never have that sprint.
+
+| Approach | Recovery possible | Table stays clean | Query complexity | Unique constraint behavior |
+|---|---|---|---|---|
+| Hard delete | No | Yes | Normal | Normal |
+| Soft delete (deleted_at flag) | Yes | No | Every query needs filter | Requires partial index workaround |
+| Archive table on delete | Yes, with effort | Yes | Normal on main table | Normal |
+| Append-only event log | Yes, full history | N/A | Separate from main table | Normal |
+
+## The core argument
+
+Soft delete is one of those patterns that looks like a good idea on the first day and a bad idea on the five hundredth. The first day, the logic is sound. Never lose data. Give the user a way to recover. Stay safe. It feels responsible.
+
+The five hundredth day, the table has forty thousand deleted rows mixed in with twelve thousand active rows. Every query has a `WHERE deleted_at IS NULL` clause. The one query that is missing it is the one that powered the export feature that a customer used in a compliance audit and saw data from a user they had removed six months ago. That is the soft delete trap. The pattern does not fail immediately. It fails at the worst possible time.
+
+The question to ask before using soft deletes is: does this record need to be recoverable, and by whom, and for how long? If the answer is "the user can restore deleted items from a trash folder for thirty days," soft delete is correct. If the answer is "we might need it someday" or "it feels safer," those are not recovery requirements. They are anxiety about hard deletes.
+
+Hard deletes are not dangerous if the schema is designed correctly and the application is tested. They are often safer than soft deletes because the data model stays clean, unique constraints work as expected, and there is no class of bugs where a deleted record surfaces in a read.
+
+## Where soft delete belongs and where it does not
+
+### Where it belongs
+
+A recycle bin feature where users can restore deleted items for up to thirty days. A regulatory retention requirement that mandates keeping records for a compliance period. An audit use case where the history of a deletion event must be traceable. These are real recovery requirements.
+
+### Where it does not belong
+
+Everywhere else. A team that defaults to soft delete on every model because it is the pattern in the ORM template, or because a past incident made someone nervous about hard deletes, is accumulating a cost they have not measured yet.
+
+The proxy indicator is simple. If nobody on the team can name a user workflow that requires restoring the deleted record, the soft delete is not serving a product need. It is serving anxiety. That is a reasonable emotion, but a bad schema policy.
+
+## The specific failure modes
+
+### The missing filter
+
+A developer writes a new query to count records for a billing metric. They join the accounts table. They do not add `WHERE deleted_at IS NULL`. The metric includes deleted accounts. The billing calculation is wrong. Nobody notices for two months because the error is small. This is not a hypothetical.
+
+### The unique constraint problem
+
+A user deletes their account with the email address alice@example.com. The soft delete sets deleted_at. A new user signs up with the same email. The unique constraint on the email column fires because the deleted row still occupies the slot. The workaround is a partial unique index that excludes deleted rows. Now the same email can exist twice in the table, once deleted and once active, which creates a new category of join bugs.
+
+### The index bloat problem
+
+On a table that grows to ten million rows with forty percent soft deleted, the primary index covers all ten million rows. Queries that filter by `deleted_at IS NULL` cannot use a standard index efficiently unless you add a partial index. Two indexes now cover the same table. Vacuum runs longer. Storage grows. The ORM does not tell you any of this.
+
+## What it actually costs
+
+| Scenario | Ongoing engineering cost | Risk |
+|---|---|---|
+| Soft delete on 1 core table | Low, manageable | Medium, filter discipline required |
+| Soft delete on 5 to 10 tables | Medium, regular filter audits | High, one missed filter per year is likely |
+| Soft delete as default on all models | High, growing with codebase | Very high, filter errors are routine |
+| Archive table pattern | Low after initial setup | Low |
+| Append-only audit log | Low after initial setup | Very low |
+
+## What to look for before adopting the pattern
+
+- A named product feature that requires record recovery, not a general feeling that deletes are scary.
+- A plan for how long soft-deleted rows will be retained and a purge job to clean them up after retention expires.
+- Partial indexes on the deleted_at column for every query plan that filters on it.
+- A team convention or ORM scope that enforces the filter so queries cannot accidentally omit it.
+- A decision on unique constraints before the schema ships, not after the first signup collision.
+
+## Expert opinion
+
+> The teams that get burned by soft deletes are not careless. They are careful about the wrong thing. They are careful about never losing a row when they should be careful about what their queries return. The row-in-the-database safety net only helps if every query that can see that row is written to ignore it. That is a discipline that scales badly with team size and codebase age.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client with a B2B SaaS product had used soft deletes as the default pattern across all twelve of their core models for three years. The problem surfaced during a data export feature they were building for GDPR compliance. The export was supposed to return only the user's active data. A developer wrote the export query against five tables, correctly filtering deleted rows on four of them and missing the filter on the fifth. The export included a deleted payment method. A customer noticed.
+
+The immediate fix was a one-line WHERE clause. The remediation was a two-sprint audit of every query across the codebase. We found eleven additional places where the deleted filter was absent or incorrect, none of which had caused a visible bug yet. We then migrated four of the twelve models from soft delete to an archive table pattern, specifically the models where no user-facing recovery feature existed. The other eight kept their soft deletes because they backed a genuine recycle bin feature.
+
+The audit also revealed that two tables had accumulated more soft-deleted rows than active rows, and that their indexes were oversized because of it. We added partial indexes and scheduled a cleanup job. Query times on those tables dropped by about sixty percent. The cost of the audit was two sprints. The cost of skipping it would have been at least one more compliance incident.
+
+For more on how delete patterns interact with database design choices, see [why logical deletes are almost always a mistake](/blog/why-logical-deletes-are-almost-always-a-mistake). For the broader data integrity topic, see [ACID vs BASE: when each belongs in your architecture](/blog/acid-vs-base-when-each-belongs-in-your-architecture).
+
+## Common mistakes
+
+1. Using soft delete as the default on every model without a named recovery requirement for each one.
+2. Not adding a default ORM scope or query helper that enforces the deleted filter. One missed filter is a when question, not an if question.
+3. Ignoring unique constraint behavior until a signup collision occurs in production.
+4. No purge job. Deleted rows accumulate indefinitely and the table grows without bound.
+5. Not adding partial indexes on `deleted_at IS NULL`. The query planner cannot use a standard index efficiently for this filter on large tables.
+6. Treating soft delete as equivalent to an audit log. It is not. It tells you something was deleted. It does not tell you who deleted it, when, or what the record looked like before deletion.
+7. Starting a migration away from soft deletes without first archiving the rows that genuinely need retention. A hard delete of everything in one step will remove records that a compliance requirement mandates keeping.
+
+## A 30-day plan
+
+1. **Week one.** Inventory every model in your schema that uses soft delete. For each, write one sentence on whether there is a named product feature that requires restoring deleted records of that type.
+2. **Week two.** For models with no recovery requirement, plan the migration to hard delete with an archive table for any rows that need retention.
+3. **Week three.** For models that keep soft delete, add or verify a partial index on `deleted_at IS NULL` and confirm that every query filtering on that column uses the index.
+4. **Week four.** Add a purge job that hard deletes soft-deleted rows older than your defined retention window. Schedule it weekly. Add a count metric so you can see how many rows are in the deleted state at any given time.
+
+For the operational discipline that makes schema changes like this safe to run in production, see [zero-downtime database migrations: a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide). For how the state machine pattern handles similar lifecycle management without the delete complexity, see [the state machine pattern: a backend engineer's quiet hero](/blog/the-state-machine-pattern-a-backend-engineers-quiet-hero).

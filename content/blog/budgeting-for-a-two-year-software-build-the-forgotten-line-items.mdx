@@ -1,0 +1,130 @@
+---
+slug: "budgeting-for-a-two-year-software-build-the-forgotten-line-items"
+title: "Budgeting for a Two Year Software Build: The Forgotten Line Items"
+excerpt: "Most software budgets cover development. They forget infrastructure, security, compliance, monitoring, maintenance, and the operational tax of running a real system. The forgotten line items are usually fifty percent of the real cost."
+date: "2026-05-19"
+category: "Software Costs and Budgeting"
+tags: ["budgeting","cost","planning","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/budgeting-for-a-two-year-software-build-the-forgotten-line-items"
+status: "published"
+definition: "A two year software build budget that only covers development is the budget for half the project. The forgotten line items are infrastructure, monitoring, security, compliance, third party services, maintenance, design, content, and the operational tax of running the system once it ships. The combined cost of these line items is often equal to the development cost. Founders who plan for them ship products that survive. Founders who do not run out of money in month fourteen."
+faq: [
+  {"q":"What is the typical split between development and everything else?","a":"On a well planned two year build, development is roughly fifty to sixty percent of the total cost. Infrastructure, monitoring, and third party services are fifteen to twenty percent. Security and compliance are five to fifteen percent. Design and content are five to ten percent. Maintenance and operations are ongoing."},
+  {"q":"How much should I budget for infrastructure?","a":"For a B2B SaaS at modest scale, 500 to 3000 USD per month in cloud bills is normal in year one, growing to 2000 to 10000 USD per month by year two. Add observability, secrets management, and CDN costs. The total is usually 10 to 20 percent of the development budget."},
+  {"q":"What about third party services?","a":"Auth, email, payments, analytics, error monitoring, customer support tooling. Expect 500 to 3000 USD per month for the basic stack. Enterprise versions cost more. The cost grows with usage."},
+  {"q":"How much should I budget for security and compliance?","a":"SOC 2 Type I is typically 15000 to 30000 USD for the first audit including platform fees. Type II is similar to higher. Add the engineering time to implement controls, which is often 200 to 400 engineering hours."},
+  {"q":"What is the maintenance budget after launch?","a":"Roughly 15 to 25 percent of the development cost annually for ongoing maintenance. Bug fixes, dependency updates, security patches, minor features. The number is higher in the first year after launch because the product is least stable then."},
+  {"q":"What about hiring and onboarding?","a":"Recruiter fees are 20 to 25 percent of first year salary. Onboarding takes a senior engineer 60 to 90 days to ramp. Both are real costs that founders often skip in budget projections."},
+  {"q":"How do I model unknown unknowns?","a":"Add a 20 to 30 percent contingency to the total. The contingency is real money. It funds the work that nobody anticipated. Without it the project runs over and shipping suffers."}
+]
+---
+
+## What you actually need to know
+
+- Development is roughly half the real cost over two years.
+- Infrastructure, security, compliance, third party services, and maintenance are the other half.
+- A 20 to 30 percent contingency is not optional.
+- Maintenance is highest in the first year after launch.
+- Founders who skip these line items run out of money in month fourteen.
+
+| Line item | Typical share of two year budget |
+|---|---|
+| Development | 50 to 60 percent |
+| Infrastructure and observability | 10 to 15 percent |
+| Third party services | 5 to 10 percent |
+| Security and compliance | 5 to 15 percent |
+| Design and content | 5 to 10 percent |
+| Hiring and onboarding | 5 to 10 percent |
+| Contingency | 20 to 30 percent on top |
+
+## The core argument
+
+The pattern that ruins software projects is consistent enough to be predictable. The founder gets a development quote. The development quote is honest. The founder funds the development quote and assumes the rest is rounding error. Twelve to fourteen months later, the development is mostly done but the project is out of runway because nobody budgeted for the operational reality of running a real product.
+
+The fix is mechanical. Build the budget around the full system, not around the development cost. Infrastructure costs money. Observability costs money. Security and compliance cost money. Third party services cost money. Design and content cost money. Maintenance costs money. Each is small compared to development. Together they often equal it.
+
+The other piece is the contingency. A two year software build has unknown unknowns. The customer asks for a feature that requires unexpected integration work. A third party vendor changes their pricing. A new compliance requirement lands. A senior engineer leaves and onboarding the replacement burns a quarter. The contingency funds the response. Without it, the project either compromises on quality or runs out of money.
+
+The discipline I have seen actually work is to budget conservatively, track honestly, and review monthly. The honest tracking is the part most founders skip. A budget that does not get reviewed is a wish. A budget that gets reviewed monthly is a tool.
+
+## The forgotten line items, with numbers
+
+| Line item | Year one cost estimate | Year two cost estimate |
+|---|---|---|
+| Cloud infrastructure | 6000 to 36000 USD | 24000 to 120000 USD |
+| Observability stack | 2400 to 12000 USD | 6000 to 30000 USD |
+| Auth provider | 3000 to 15000 USD | 9000 to 35000 USD |
+| Email provider | 1200 to 6000 USD | 3000 to 18000 USD |
+| Payment processing | Percentage of revenue | Percentage of revenue |
+| Error monitoring | 1200 to 6000 USD | 3000 to 15000 USD |
+| SOC 2 Type I or II audit | 15000 to 35000 USD | 12000 to 25000 USD annual |
+| Penetration testing | 8000 to 20000 USD | Same |
+| Design and brand | 10000 to 50000 USD | 5000 to 25000 USD |
+| Content and marketing site | 5000 to 25000 USD | 5000 to 25000 USD |
+| Recruiter fees | Variable per hire | Variable |
+| Maintenance | 20 to 25 percent of dev budget | Same |
+| Contingency | 20 to 30 percent on top | Same |
+
+The numbers are realistic ranges from projects I have shipped or worked on. The high end is for products with serious compliance scope. The low end is for early stage products with light requirements.
+
+## Where founders most often go wrong
+
+The cheapest sounding cloud bill estimate. The estimate from a developer who has not run production infrastructure is usually a fraction of the real cost. Egress, NAT gateways, snapshot storage, and idle resources add up.
+
+The single quote for the SOC 2 audit. The audit itself is one cost. The implementation engineering, the platform like Vanta or Drata, the security tooling, and the ongoing operations all add up. The audit is the last fifteen percent of the cost.
+
+The maintenance projection. Founders project that maintenance will be ten percent of the development cost. The reality is twenty to twenty five percent in the first year after launch, fifteen to twenty percent in steady state. The gap is real money.
+
+The hiring projection. The team can do everything is a common assumption. The reality is that a two year build typically requires at least one hire and often two or three. Each one has recruiter cost, equity dilution, and onboarding time.
+
+The contingency. Most budgets do not have one. The unknown unknowns get charged against scope. Quality suffers. Schedule slips. The contingency is the thing that allows the project to absorb the unknown.
+
+## Features the budget must have
+
+- A monthly review with the executive sponsor.
+- A category breakdown that distinguishes development from operations.
+- A contingency line that is not allowed to fund scope creep.
+- An infrastructure line that scales with usage, not a flat estimate.
+- A maintenance line that activates the day after launch.
+- A compliance line if the product has any regulated component.
+- A communications plan when the budget shifts.
+
+## Expert opinion
+
+> The founders who run out of money in month fourteen are not bad at planning. They are good at the development plan and missing on everything else. The development quote is a real number. It is also half the story. The other half is the operational reality of running a real product. A budget that names the second half is a budget that survives.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client building a B2B SaaS had a 280k USD development budget for an eighteen month build. The development was honest. The product shipped at month sixteen with two months of runway left.
+
+The first month after launch revealed the missing line items. Cloud infrastructure was 2800 USD per month against a budget of 800. SOC 2 was needed for their first enterprise customer and added 32000 USD. Observability added 1500 USD per month. The team needed a second engineer hire that added 130k USD annual cost plus recruiter fees.
+
+The project survived because the team raised a small bridge round. The honest version of the budget at the start would have shown the full picture and changed the fundraise size from the beginning. The painful version was learning it under pressure.
+
+For more on the related work, see [the honest cost of building an app in 2026 global breakdown](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown) and [maintenance budgets what to expect after launch](/blog/maintenance-budgets-what-to-expect-after-launch).
+
+## Common mistakes founders make
+
+1. Budgeting only for development. The other half disappears.
+2. Underestimating cloud and infrastructure costs.
+3. Skipping the contingency.
+4. No monthly budget review. The numbers drift.
+5. Confusing the development quote with the project budget.
+6. Skipping compliance until customers ask. The retrofit is expensive.
+7. Skipping the hiring line. The team grows. The budget needs to know.
+8. No reserve for the post launch maintenance year.
+
+## A pre fundraise budget exercise
+
+1. **Day one.** Get the honest development quote.
+2. **Day two.** Map the third party services you will use. Estimate them at two scale points.
+3. **Day three.** Model infrastructure at two scale points.
+4. **Day four.** Add security and compliance. The honest version, not the cheapest version.
+5. **Day five.** Add design, content, hiring, and maintenance.
+6. **Day six.** Add the contingency.
+7. **Day seven.** Compare to fundraise size. Adjust scope or raise more.
+
+For more on the related work, read [the honest cost of building an app in 2026 global breakdown](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown) and [why your software quote is different from mine a pricing postmortem](/blog/why-your-software-quote-is-different-from-mine-a-pricing-postmortem). On the maintenance side, [maintenance budgets what to expect after launch](/blog/maintenance-budgets-what-to-expect-after-launch) is the natural next read.

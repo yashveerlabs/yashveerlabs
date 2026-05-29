@@ -1,0 +1,198 @@
+---
+slug: "the-mobile-app-tech-stack-founders-underrate"
+title: "The Mobile App Tech Stack Founders Underrate"
+excerpt: "The infrastructure decisions founders skip when planning a mobile app -- crash reporting, OTA updates, CI/CD, and deep linking -- and what they cost when missed."
+date: "2025-02-28"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","founders","devops","infrastructure"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-app-tech-stack-founders-underrate"
+status: "published"
+definition: "The underrated mobile tech stack is the set of infrastructure components that are not part of the visible product but that determine whether the mobile app can be operated, maintained, and improved reliably. These components -- crash reporting, over-the-air update delivery, automated build and distribution pipelines, deep link handling, and push notification infrastructure -- are frequently omitted from early-stage mobile project plans and are subsequently discovered to be necessary, typically at the worst possible time."
+faq: [
+  {"q":"What is over-the-air (OTA) updating for mobile apps, and why does it matter?","a":"OTA updates allow the JavaScript/Dart layer of a React Native or Flutter app to be updated without submitting a new App Store build. Expo's EAS Update (for React Native) and similar tools for Flutter push code updates directly to installed apps. This matters because bug fixes and feature changes in the JavaScript layer can ship in minutes instead of the 1-7 days required for App Store review. OTA updates are limited to the non-native layer -- changes to native modules, permissions, or the native shell still require a full App Store submission."},
+  {"q":"What is the minimum CI/CD setup for a mobile app?","a":"At minimum: a CI pipeline that runs on every pull request and performs the following steps: lint and type check, unit test suite, and a TestFlight or Play Store internal track build. This pipeline prevents broken code from reaching production and gives the team a distributable build without manual intervention. Fastlane or Expo EAS Build handles the iOS and Android build complexity (code signing, provisioning, build artifact generation). The pipeline should run in under 20 minutes to preserve the pull request review cycle."},
+  {"q":"What is deep linking and what breaks when it is not implemented correctly?","a":"Deep linking is the ability to open the app to a specific screen from an external URL (a website link, a push notification, an email). Without deep linking, tapping a link that should open the app to a specific piece of content opens the app to the home screen instead, requiring the user to navigate manually. This matters for: push notification navigation (tapping a notification should navigate to the relevant content), marketing links (a campaign URL should open the app to a specific product or offer), and shared content (a user-shared link should open the app to the shared item). Broken deep linking is a common source of App Store reviews citing 'the app does not work with links.'"},
+  {"q":"Why is certificate and provisioning management a common source of build failures?","a":"iOS app distribution requires a code signing certificate and a provisioning profile that authorizes the app to run on specific devices or to be distributed on the App Store. These artifacts expire (certificates: 1 year, provisioning profiles: 1 year), must be renewed, and must be distributed to every developer who builds the app. Teams that manage certificates manually through the Apple Developer portal frequently encounter build failures when certificates expire, when a new developer needs access, or when the provisioning profile does not include a new test device. Fastlane's `match` tool manages all certificates and provisioning profiles in a shared Git repository, eliminating most certificate-related build failures."},
+  {"q":"How do push notifications work at the infrastructure level and what is required to set them up?","a":"iOS push notifications require: an Apple Push Notification service (APNs) authentication key or certificate from the Apple Developer portal, a push notification service provider (Firebase Cloud Messaging is the most common, as it handles both iOS and Android), and a backend that sends push notification payloads to the provider's API. The flow: the app registers for push notifications and receives a device token, the app sends the token to the backend, the backend stores the token associated with the user, and when a notification should be sent, the backend calls the Firebase Cloud Messaging API with the device token and payload. Firebase handles delivery to APNs (iOS) and Google Play Services (Android)."}
+]
+---
+
+## What you actually need to know
+
+- Crash reporting (Sentry) must be configured before the first beta distribution. Flying blind to production crashes is not acceptable for a product with real users.
+- Fastlane or EAS Build for CI/CD eliminates the manual certificate and provisioning management that consumes engineering time in every mobile project that does not automate it.
+- Deep linking must be implemented before launch. Marketing campaigns, push notifications, and shared content all depend on links opening the correct screen in the app.
+- OTA updates (Expo EAS Update for React Native) allow bug fixes to ship in minutes without App Store review. For JavaScript-layer bugs, this is the difference between a 15-minute fix and a 5-day wait.
+- Push notification infrastructure (Firebase Cloud Messaging) must be set up before the notification feature is needed. It cannot be added quickly when the feature is requested.
+
+| Infrastructure Component | Cost of Missing | Setup Time | Tool |
+|---|---|---|---|
+| Crash reporting | Crashes invisible to team | 2-4 hours | Sentry |
+| CI/CD pipeline | Manual builds, slow feedback | 1-2 days | Fastlane / EAS Build |
+| Deep linking | Broken notification nav, broken marketing links | 1-2 days | Universal Links / App Links |
+| OTA updates | Bug fixes require App Store review (5-7 days) | 4-8 hours | Expo EAS Update |
+| Push notifications | Cannot send notifications | 1-2 days | Firebase Cloud Messaging |
+| Certificate management | Build failures when certs expire | 4-8 hours | Fastlane match |
+
+## The core argument
+
+Founders who plan a mobile app project typically account for the visible features: the screens, the user flows, the API integrations. They often do not account for the infrastructure that makes the app operable: crash reporting, automated builds, deep linking, OTA updates, and push notification delivery. These components are not visible to users when they work; they are acutely visible when they do not.
+
+The team that launches without crash reporting discovers production crashes when users report them in App Store reviews -- days after they started. The team that launches without deep linking discovers the broken push notification navigation the first time a notification campaign sends traffic to the wrong screen. The team that launches without OTA update capability discovers, when the first critical bug is found in production, that the fix takes five days to reach users through the App Store review process.
+
+None of these are rare events. All of them happen to teams that have not set up the infrastructure. The setup time for the full stack -- crash reporting, CI/CD, deep linking, OTA updates, push notifications -- is approximately one week. The ongoing cost of not having it is measured in weeks and months of engineering time spent firefighting problems that infrastructure would have prevented or accelerated fixing.
+
+## Crash reporting: Sentry for mobile
+
+Sentry's mobile SDK (React Native and Flutter) captures crashes and provides stack traces, user context, and error trends. Configuration takes 2-4 hours:
+
+```typescript
+// React Native: index.js
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://your-sentry-dsn',
+  environment: __DEV__ ? 'development' : 'production',
+  tracesSampleRate: 0.2,
+  beforeSend(event) {
+    if (__DEV__) return null;
+    return event;
+  },
+});
+```
+
+The critical configuration beyond the basic setup: upload source maps in the CI/CD pipeline so production stack traces resolve to readable source code. Without source maps, crash traces show minified code that is not useful for debugging.
+
+Set up three Sentry alerts: any new error (immediate Slack notification), error rate above 1 percent (immediate), and crashes on a specific screen above 0.5 percent (daily digest). These three alerts catch the majority of production reliability issues.
+
+## Automated CI/CD with EAS Build
+
+Expo Application Services (EAS) Build provides managed iOS and Android builds without requiring a Mac for the iOS build. The EAS configuration file (`eas.json`) defines the build profiles:
+
+```json
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  }
+}
+```
+
+A GitHub Actions workflow that triggers on pull requests:
+
+```yaml
+name: EAS Build Preview
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm install
+      - run: eas build --platform all --profile preview --non-interactive
+```
+
+This workflow builds both iOS and Android on every push to main and distributes to internal testers. The team receives a new build without anyone manually running a build or managing certificates.
+
+For non-Expo React Native projects, Fastlane provides equivalent automation with more configuration overhead. For Flutter, `flutter build` combined with Fastlane handles both platforms.
+
+## Deep linking implementation
+
+Deep linking connects URLs to specific screens in the app. For iOS, Universal Links connect web URLs (e.g., `https://app.example.com/matches/123`) to in-app navigation. For Android, App Links provide the same functionality.
+
+The implementation requires two components: a hosted verification file (the `apple-app-site-association` file for iOS, the `.well-known/assetlinks.json` for Android) that verifies the app's ownership of the domain, and a link handling function in the app that parses the URL and navigates to the correct screen:
+
+```typescript
+// React Native with react-navigation
+function useLinkHandling() {
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const handleUrl = ({ url }: { url: string }) => {
+      const parsed = new URL(url);
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+      if (pathParts[0] === 'matches' && pathParts[1]) {
+        navigation.navigate('MatchDetail', { matchId: pathParts[1] });
+      } else if (pathParts[0] === 'profile') {
+        navigation.navigate('Profile');
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleUrl);
+
+    // Handle the link that launched the app (cold launch)
+    Linking.getInitialURL().then(url => {
+      if (url) handleUrl({ url });
+    });
+
+    return () => subscription.remove();
+  }, []);
+}
+```
+
+Testing deep links during development: `npx uri-scheme open "yourapp://matches/123" --ios` or `adb shell am start -d "yourapp://matches/123"` for Android.
+
+## OTA updates with EAS Update
+
+Expo EAS Update pushes JavaScript bundle updates to installed apps without App Store review. Configuration:
+
+```bash
+eas update:configure
+eas channel:create production
+```
+
+After configuration, deploying an update to production users:
+
+```bash
+eas update --channel production --message "Fix match schedule crash"
+```
+
+Apps configured with EAS Update check for updates on launch (or on a schedule) and download new bundles in the background. The next launch uses the updated bundle.
+
+The update appears for users within minutes of the push -- not 5-7 days. For a critical bug that is affecting 10 percent of sessions, this is the difference between a 15-minute fix deployment and a nearly week-long user experience problem.
+
+OTA updates are limited to the JavaScript layer. Native module changes, permission additions, and native library updates require a full App Store build and review.
+
+## Common mistakes founders make with mobile infrastructure
+
+1. Treating the infrastructure as something to add after launch. By launch, the infrastructure should already be running in the TestFlight/beta environment. Adding crash reporting after launch means the first production crashes are discovered through App Store reviews, not through Sentry alerts.
+2. Not automating certificate management before the team grows. A two-person team managing iOS certificates manually may be fine. A five-person team with manual certificate management will have build failures every time a certificate expires or a new developer needs access. Automate before the team grows, not after the first failure.
+3. Not testing deep links on both platforms before launch. Deep link behavior is different on iOS and Android. Universal Links require HTTPS and a hosted verification file. App Links require a SHA-256 certificate fingerprint in the verification file. Test both independently.
+4. Not setting up push notification infrastructure until a feature requires it. Push notification setup takes 1-2 days; it does not need to wait until a specific feature. Set up Firebase Cloud Messaging, register device tokens at app launch, and store them in the database. When the notification feature is eventually needed, the infrastructure is already in place.
+5. Underestimating OTA update value by not calculating the alternative cost. For a bug affecting 5 percent of sessions, the cost is 5 percent of session value per day for as many days as the App Store review takes. OTA update for a JavaScript bug takes 30 minutes to deploy. That comparison makes the OTA infrastructure investment clearly worthwhile.
+
+## Where to start: a 3-step mobile infrastructure setup
+
+**Step 1: Set up Sentry and configure source map upload in the build pipeline before the first TestFlight.** Crash reporting must be running before users touch the app. Every day without it is a day where production crashes are invisible to the engineering team.
+
+**Step 2: Configure EAS Build and the CI/CD pipeline to produce builds automatically on every push to main.** Manual builds are eliminated; every merged PR produces a distributable build. Set up internal distribution for the team and TestFlight for external beta testers.
+
+**Step 3: Implement deep linking for the three most important navigation destinations.** The notification-opened destination, the shared content destination, and the marketing campaign destination are the three cases that matter before launch. Test both the cold launch and background-to-foreground cases for each.
+
+## The Infrastructure That Makes the App Operable
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app launched with the full infrastructure stack in place: Sentry for crash reporting, EAS Build for CI/CD, Universal Links for deep linking, EAS Update for OTA, and Firebase Cloud Messaging for push notifications. In the first two weeks of public access, Sentry caught four crashes that affected fewer than 0.5 percent of sessions each -- small enough that users might not have reported them in reviews, but visible in Sentry immediately. Two were fixed with OTA updates (JavaScript layer) within hours. Two required App Store builds. The OTA fixes reached users in under 30 minutes; the App Store fixes took four days. The infrastructure difference between the two categories is the thing founders do not plan for -- until they need it.
+
+## Related reading
+
+- [The Mobile Build Pipeline: Fastlane, EAS, and the Path of Least Pain](/blog/the-mobile-build-pipeline-fastlane-eas-and-the-path-of-least-pain)
+- [The Mobile App Analytics Stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026)
+- [The Mobile App Lifecycle Hooks Founders Should Know](/blog/the-mobile-app-lifecycle-hooks-founders-should-know)
+- [The Hybrid Mobile Architecture: WebView Heavy Apps in 2026](/blog/the-hybrid-mobile-architecture-webview-heavy-apps-in-2026)

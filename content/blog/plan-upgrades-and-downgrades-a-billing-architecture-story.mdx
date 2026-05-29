@@ -1,0 +1,62 @@
+---
+slug: "plan-upgrades-and-downgrades-a-billing-architecture-story"
+title: "Plan Upgrades and Downgrades: A Billing Architecture Story"
+excerpt: "Handling plan changes mid-billing-period is one of the most underestimated engineering problems in SaaS billing. Here is how to architect upgrade and downgrade flows that are correct, predictable, and fair to customers."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/plan-upgrades-and-downgrades-a-billing-architecture-story"
+status: "published"
+definition: "Plan upgrade and downgrade handling is the billing system behavior that determines what happens when a customer changes their subscription plan mid-billing-period. An upgrade typically grants immediate access to higher-plan features with prorated credit for unused time on the old plan. A downgrade may be effective immediately or at the end of the current period depending on the product's policy. The complexity comes from proration calculations, feature gating enforcement at the correct time, and the downstream effects on usage limits, seat counts, and billing cycles."
+faq: [
+  {"q":"What is proration and how is it calculated for mid-period plan changes?","a":"Proration is the calculation of credit or charges for a partial billing period. When a customer upgrades mid-period, the customer receives credit for the unused portion of their current plan (the fraction of the month remaining times the current plan price) and is charged for the same fraction of the new plan price. If a customer on a $50/month plan upgrades to $100/month halfway through the month, they receive $25 credit and owe $50 for the remaining half month, netting $25 additional charge. Stripe and other payment processors can handle proration automatically when subscriptions are updated."},
+  {"q":"Should downgrades take effect immediately or at period end?","a":"Most SaaS products apply downgrades at the end of the current billing period. The customer paid for the current period's higher plan; letting them use it until the period ends is fair and consistent with what they paid for. Immediate downgrade with proration refund for unused time is also acceptable but creates more complexity: the refund, the immediate feature loss, and the billing cycle change all happen at once. The period-end approach is simpler to implement and produces fewer customer support interactions about feature loss."},
+  {"q":"What is the difference between a billing plan change and a feature gating change?","a":"A billing plan change updates the subscription in the payment processor (Stripe, Chargebee). A feature gating change updates what features the user has access to in the application. These two changes must be kept in sync but they can happen at different times depending on the policy. For upgrades: the feature gating should change immediately (the customer paid for the upgrade). For downgrades at period end: the billing plan change can be scheduled for the period end while the feature gating remains at the current level until that date."},
+  {"q":"What is seat-based billing and how do plan changes interact with seat counts?","a":"Seat-based billing charges per user account that can access the product. A plan change that moves from 5 seats to 10 seats needs to handle the proration for the additional seats from the date of upgrade. A plan change that reduces seats from 10 to 5 needs to determine which users retain access (typically the account owner's choice) and when the access reduction takes effect. Seat count changes are more complex than plan tier changes because they affect specific user accounts rather than account-wide permissions."},
+  {"q":"How do you handle plan changes when usage is near or above the new plan's limits?","a":"A downgrade to a plan with lower limits (fewer API calls, less storage, fewer team members) requires the customer to reduce usage before or at the time the downgrade takes effect. The application should: warn the customer during the downgrade flow that their current usage exceeds the new plan's limits, require acknowledgment that excess usage will be affected, and either enforce the limits immediately at the effective date or provide a grace period. Silently enforcing limits without warning is a poor customer experience."}
+]
+---
+
+## What you need to know
+
+- Upgrades should take effect immediately; downgrades should typically take effect at period end. This policy is fair to customers and simpler to implement than immediate downgrade with refund.
+- Proration calculations should be delegated to the payment processor (Stripe, Chargebee) rather than calculated manually. Manual proration introduces edge cases around billing cycles, free trials, and discounts that processors already handle.
+- Feature gating and billing must be kept in sync. A customer who upgraded must get feature access immediately; a customer whose downgrade is scheduled for period end must retain current feature access until then.
+- Seat-based plan changes are more complex than tier changes because they affect individual user accounts. Design the seat management flow before implementing seat-based billing.
+- Usage limits at the new plan level must be communicated before a downgrade takes effect. Silently restricting access after a downgrade generates support tickets and churn.
+
+## The core argument
+
+Plan changes are a neglected area of SaaS billing architecture because they feel like an edge case compared to the initial subscription setup. The reality is that every growing SaaS product processes plan changes frequently: customers upgrade as their needs grow, downgrade when they are not using features they are paying for, and change seat counts as their teams change. The billing logic for these changes, implemented correctly, is invisible to customers. Implemented poorly, it produces incorrect charges, unexpected feature access loss, and customer support volume.
+
+The most common mistake is implementing plan changes as a cancel-and-resubscribe operation rather than as a subscription modification. Cancel and resubscribe loses the billing history association, resets the billing cycle to the current date, and may trigger webhook events that other parts of the system react to incorrectly. Payment processors provide subscription update APIs specifically for plan changes that maintain billing continuity and calculate proration correctly. Using the update API is the correct implementation.
+
+The feature gating complexity is the second most common mistake. A plan upgrade processed in the payment processor does not automatically update the application's feature gate unless the billing system publishes a webhook event and the application subscribes to it. Teams that implement billing without a webhook-driven feature gate update mechanism discover the problem when a customer upgrades and then reports that the new features are not accessible. The fix is a billing event bus: every plan change event from the payment processor is consumed by the application and updates the customer's entitlement record immediately.
+
+## Common mistakes
+
+1. **Calculating proration manually instead of using the processor's proration API.** Manual proration calculations are correct in the simple case and wrong in every edge case: free trial periods, coupons, multiple subscriptions, annual plans with monthly add-ons. Stripe's proration handling is tested against all of these edge cases.
+
+2. **Not scheduling downgrade effective dates separately from billing effective dates.** A downgrade scheduled in Stripe takes effect on the billing cycle in Stripe. The feature gating for the downgrade should be scheduled separately based on the product's downgrade policy (immediate vs. period end). These are two different state changes that may happen at different times.
+
+3. **Not communicating usage limit changes before a downgrade.** A customer who downgrades to a plan with a 10 GB storage limit when they currently have 25 GB needs to know this before the downgrade takes effect. Surface the current usage and the new plan's limits during the downgrade confirmation flow.
+
+4. **Not handling failed payment processor webhook events.** Plan change webhooks from payment processors can fail to deliver due to network issues. The application must have a reconciliation mechanism: periodically check the payment processor's subscription state and update the application's entitlement record if it is out of sync.
+
+5. **Not testing plan changes with active promotions.** Customers on promotional pricing who upgrade or downgrade have complex proration edge cases. Test the plan change flow for customers with active discounts, coupons, and trial credits before launching the billing system.
+
+## Where to start
+
+1. **Map all plan change scenarios before implementation.** Write out: upgrade (immediate), downgrade (end of period), upgrade with proration, downgrade from annual to monthly, seat addition mid-period, seat removal at period end. For each scenario, define what the billing processor event looks like, what the feature gating change should be, and when each change takes effect.
+
+2. **Implement a billing event consumer that updates entitlements.** The application should subscribe to billing processor webhooks (customer.subscription.updated, customer.subscription.deleted) and update the customer's entitlement record in the application database when these events are received. This is the foundation of billing-driven feature gating.
+
+3. **Write integration tests for plan change scenarios.** Use the payment processor's test mode to simulate upgrades, downgrades, and proration scenarios. Verify that the application's feature gating updates correctly for each scenario. These tests catch regressions when the billing logic changes.
+
+## Related reading
+
+- [Invoicing Automation: Stripe Invoicing, Chargebee, Custom](/blog/invoicing-automation-stripe-invoicing-chargebee-custom)
+- [Multi-Tenant Background Jobs: Fair Scheduling and Noisy Neighbors](/blog/multi-tenant-background-jobs-fair-scheduling-and-noisy-neighbors)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)

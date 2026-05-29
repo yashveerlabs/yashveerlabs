@@ -1,0 +1,109 @@
+---
+slug: "database-query-performance-the-five-patterns-that-hurt-the-most"
+title: "Database Query Performance: The Five Patterns That Hurt the Most"
+excerpt: "Most database performance problems come from a handful of patterns. The N plus one. The sequential scan. The unbounded result. The cross join. The lock contention. Fix these five and most performance work is done."
+date: "2026-05-22"
+category: "Performance Optimization"
+tags: ["database","performance","queries","postgres"]
+readingMinutes: 12
+ogImage: "/api/og/blog/database-query-performance-the-five-patterns-that-hurt-the-most"
+status: "published"
+definition: "Database query performance problems usually come from a small set of recurring patterns. The N plus one query that issues many queries instead of one. The sequential scan that ignores indexes. The unbounded result set that grows with the database. The cross join that produces a cartesian product. The lock contention that serializes work that could have been concurrent. Fix these five and most database performance work is done."
+faq: [
+  {"q":"What is the N plus one query?","a":"A loop that fetches related data with one query per item instead of one query for all items. The pattern is invisible until it shows up in production with many items. The fix is to fetch the related data in one query with a JOIN or to use eager loading patterns in the ORM."},
+  {"q":"How do I detect N plus one?","a":"Query log analysis. APM tools. Many ORMs have built in detection. The pattern shows up as a burst of similar queries in a tight time window. The cure is straightforward once detected."},
+  {"q":"What is a sequential scan and when does it hurt?","a":"The database reads every row in the table to satisfy the query. The scan is fine on small tables. The scan is brutal on large tables. The fix is the right index. EXPLAIN ANALYZE will show you whether the query is using an index or scanning."},
+  {"q":"What is an unbounded result?","a":"A query that returns all rows matching a condition with no LIMIT clause. The result set is fine when small. The result set crashes the application when the database grows. The fix is to add LIMIT, paginate, or filter more tightly."},
+  {"q":"What is a cross join and how do I avoid it?","a":"A JOIN without a proper join condition produces every combination of rows from the two tables. With a million rows in each, the result is a trillion rows. The cure is to ensure every JOIN has an explicit join condition with the right columns."},
+  {"q":"What is lock contention?","a":"Two or more transactions trying to access the same rows in conflicting ways. One waits. The wait can cascade. The cure is shorter transactions, advisory locks for known hot paths, and queries that touch rows in a consistent order."},
+  {"q":"What is the right priority for fixing these?","a":"Fix the ones that show up in your slow query log first. Most teams have one or two of the five patterns dominating their performance issues. The pareto applies. The fixes pay back fast."}
+]
+---
+
+## What you actually need to know
+
+- N plus one queries, sequential scans, unbounded results, cross joins, and lock contention.
+- These five patterns dominate database performance issues.
+- EXPLAIN ANALYZE reveals which pattern is hurting any given query.
+- Each pattern has a known fix.
+- Most teams have one or two of these dominating their issues.
+
+| Pattern | Symptom | Fix |
+|---|---|---|
+| N plus one | Burst of similar queries | Eager load or JOIN |
+| Sequential scan | Slow query, EXPLAIN shows seq scan | Add the right index |
+| Unbounded result | Memory blow up, slow response | LIMIT or paginate |
+| Cross join | Query never finishes | Explicit join conditions |
+| Lock contention | Intermittent slowness, deadlocks | Shorter transactions, ordered access |
+
+## The core argument
+
+Database performance problems look diverse in symptoms but reduce to a small set of patterns in cause. The slow page that the team has been debugging for weeks is usually one of five things. The N plus one. The missing index. The unbounded result. The bad join. The lock contention. The fix is mechanical once the pattern is identified.
+
+The discipline is to recognize the pattern from the symptom. Burst of similar queries in the log is N plus one. EXPLAIN showing sequential scan on a large table is a missing index. Memory spike on a specific endpoint is an unbounded result. Query that never returns is a cross join. Intermittent slowness with deadlock messages is lock contention.
+
+The teams that learn these five patterns recognize most performance problems in minutes. The teams that do not spend weeks investigating each new symptom. The investment in learning the patterns is hours. The savings on debugging time compound across every performance problem the team ever faces.
+
+The other discipline is to catch the patterns in code review. Each of the five has tells in the code. A query inside a loop that does not look batched. A WHERE clause without an indexed column. A query without LIMIT. A JOIN that is missing the ON clause. A transaction that holds the lock for too long. The reviewer who knows the patterns catches them before they reach production.
+
+## The five patterns in detail
+
+The N plus one. A loop calls the ORM to fetch related data for each item. The total query count is one for the outer query plus N for the inner queries. The fix is to use the ORM's eager loading capability or to write a JOIN that fetches everything in one query.
+
+The sequential scan. The query has a WHERE clause on a column without an index. The database reads every row. EXPLAIN shows the seq scan. The fix is to add the right index. The query usually drops from seconds to milliseconds.
+
+The unbounded result. The query returns all matching rows without a LIMIT. At small data size the result is fine. At large data size the result is megabytes or gigabytes. The application slows. The memory grows. The fix is LIMIT plus pagination, or a tighter filter.
+
+The cross join. A JOIN written without a proper ON clause, often as a typo or a misunderstanding of the data model. The result is the cartesian product of the two tables. The query never returns. The fix is to add the explicit join condition with the right columns.
+
+The lock contention. Two transactions want the same row. One blocks the other. Under load the contention cascades. The fix is shorter transactions, accessing rows in a consistent order, and advisory locks for known hot paths.
+
+## How much does this cost
+
+The cost of learning the patterns is hours. The cost of fixing them when found is minutes to hours per occurrence. The savings on customer facing performance is significant. The math is favorable.
+
+## Features the performance discipline must have
+
+- Slow query log enabled with a reasonable threshold.
+- pg_stat_statements or equivalent for query analysis.
+- APM tool that captures query timing per endpoint.
+- Code review that catches the patterns.
+- A practice of running EXPLAIN ANALYZE on suspect queries.
+- Performance regression tests for the critical paths.
+- An owner for query performance.
+
+## Expert opinion
+
+> The teams that own database performance well learn the five patterns and recognize them quickly. The teams that do not own it spend weeks on each new performance investigation. The patterns are stable across databases and across years. The investment in learning them is hours. The return compounds across every performance investigation the team ever runs.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS reported that their dashboard was slow. The team had spent two weeks investigating. We ran EXPLAIN ANALYZE on the dashboard's main query and the burst of follow up queries.
+
+The main query was fine. The follow up queries were a classic N plus one. The dashboard fetched twenty items and then fetched related data for each item one at a time. Twenty one queries per dashboard load. We rewrote it with eager loading. The dashboard latency dropped from 1800 milliseconds to 140.
+
+The same investigation found a missing index on a frequently used filter. Adding the index dropped another slow query from 400 milliseconds to 5. The two fixes took half a day. The dashboard felt fast for the first time in months.
+
+For more on the related work, see [the N+1 query problem detection prevention and refactoring](/blog/the-n-1-query-problem-detection-prevention-and-refactoring) and [EXPLAIN ANALYZE a tour of PostgreSQLs best diagnostic tool](/blog/explain-analyze-a-tour-of-postgresqls-best-diagnostic-tool).
+
+## Common mistakes teams make
+
+1. Ignoring the slow query log.
+2. Not running EXPLAIN ANALYZE on suspect queries.
+3. Pagination only on user facing lists, not on internal queries.
+4. JOIN syntax mistakes that produce cross joins.
+5. Long transactions that produce contention.
+6. No code review for the patterns.
+7. Treating performance as solved after the first fix.
+8. Treating database scaling as the answer when the patterns are the cause.
+
+## A 30 day query performance plan
+
+1. **Week one.** Enable the slow query log. Identify the top offenders.
+2. **Week two.** Run EXPLAIN ANALYZE on each. Categorize by pattern.
+3. **Week three.** Fix the top five. Measure.
+4. **Week four.** Establish the weekly review cadence.
+
+For more on the related work, read [the N+1 query problem detection prevention and refactoring](/blog/the-n-1-query-problem-detection-prevention-and-refactoring) and [database indexes a practical primer for SaaS engineers](/blog/database-indexes-a-practical-primer-for-saas-engineers). On the broader performance side, [backend performance budgets how to set them](/blog/backend-performance-budgets-how-to-set-them) is the natural next read.

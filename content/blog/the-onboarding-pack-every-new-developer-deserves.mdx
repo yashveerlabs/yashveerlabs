@@ -1,0 +1,120 @@
+---
+slug: "the-onboarding-pack-every-new-developer-deserves"
+title: "The Onboarding Pack Every New Developer Deserves"
+excerpt: "The documents, access credentials, and context a new developer needs on day one to be useful by day five. A practical checklist for founders who want the relationship to start right."
+date: "2024-09-22"
+category: "Hiring Developers, Freelancers, and Agencies"
+tags: ["hiring","engineering-teams","freelance"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-onboarding-pack-every-new-developer-deserves"
+status: "published"
+definition: "A good developer onboarding pack is the set of documents, access credentials, and context that lets a new engineer stop asking questions and start contributing within the first week. I have been the new developer more times than I can count, and the single clearest signal of a well run company is how prepared the onboarding pack is on day one. It takes about four hours to build and saves weeks of lost time."
+faq: [
+  {"q":"What should be in a developer onboarding document?","a":"At minimum: a local development setup guide, the architecture overview, where the production accounts are and who has access, the deployment process, and the communication norms of the team. The goal is that a developer can get a working local environment running on their first day without asking anyone a question."},
+  {"q":"How long should onboarding a new developer take?","a":"A developer should be able to run the project locally within two hours of receiving the onboarding pack. They should be committing real code within the first week. If onboarding takes longer than that, the documentation is missing something or the codebase has an undocumented dependency that no one has cleaned up."},
+  {"q":"What access does a new developer need on day one?","a":"Repository access, the staging environment credentials, a way to run the project locally, and a clear contact for who to ask when something is broken. Production access can follow after the first week once you know the person. Never give production write access on day one regardless of how senior the engineer is."},
+  {"q":"Should I write the onboarding docs before hiring or after?","a":"Before. The process of writing the onboarding documentation reveals every undocumented assumption in your codebase. If you cannot explain how to set up the local environment in writing, that is a codebase problem, not a documentation problem. Fix the problem as you write the doc."},
+  {"q":"What is the most commonly missing piece in developer onboarding?","a":"The 'why' behind architectural decisions. Every codebase has choices that look wrong until you understand the context. A decision log, even a simple one in a README, explains why the database is Postgres and not MongoDB, why authentication is handled the way it is, and why the folder structure looks the way it does. Without it, the new developer will reverse engineer those decisions over and over."},
+  {"q":"How do I onboard a developer when I am non technical?","a":"You write the business side of the onboarding pack and ask your current developer or a technical advisor to write the technical side. Your contribution is the product brief, the user personas, the business logic that the code is implementing, and the context about why certain features matter. That context is often more valuable to a new developer than the architecture doc."},
+  {"q":"What is a developer runbook and do I need one?","a":"A runbook is a set of step by step instructions for the most painful operational tasks: deploying a new version, rolling back a bad deploy, restarting a crashed service, running a database migration. You need one. Runbooks turn two hour emergencies into fifteen minute recoveries, and they let a less experienced developer handle an incident without escalating to the most senior person on the team."}
+]
+---
+
+## What you actually need to know
+
+- A developer who cannot get the project running on day one is not behind because they are slow. They are behind because the onboarding materials are missing.
+- The onboarding pack is not a nice to have. It is the first test of whether the working relationship will function.
+- Writing the onboarding docs forces you to document things that have never been written down. That process always reveals problems in the codebase.
+- A new developer should be committing real code in the first week. If that is not happening, something in the setup is broken.
+- The pack you hand to a contractor is slightly different from the one you hand to a full time hire, but the core documents are the same.
+
+| Developer type | Minimum pack needed | What to add for full time hires |
+|---|---|---|
+| Freelance contractor | Repo access, setup guide, staging creds, project brief | Nothing more needed |
+| Early employee | All of above plus architecture doc, decision log, team norms | Payroll setup, benefits, communication tools |
+| Agency team | Repo access, API keys, staging environment, product brief | A named point of contact and a weekly demo schedule |
+| Junior developer | Full pack plus a list of who to ask for what | Code review pairing schedule for the first month |
+
+## The core argument
+
+The worst day one experience I ever had as a developer was also the most common type. No one had written down how to set up the environment. There was a README file that had not been updated in eleven months. Two of the environment variables it referenced no longer existed. The database required a seed script that lived on the previous developer's laptop. By noon I had spent four hours asking the same person the same questions about setup steps they had memorized because no one had ever written them down.
+
+That was not a junior team. That was a company that had been building software for three years. The problem was not that they were careless. The problem was that the developer who built the system had internalized everything that a new developer needs in written form. When they left, the knowledge left with them.
+
+The founder's job in that situation is not to be a developer. It is to create the conditions where a developer can start being useful within the first few days. The onboarding pack is how you do that. Four hours of writing saves forty hours of questions, rework, and frustrated back and forth in the first two weeks.
+
+I now build this pack as part of every engagement I take. Before I hand anything off or before a new contributor joins, the pack exists. Not because I am unusually organized. Because I have watched the alternative enough times to know exactly what it costs.
+
+## The documents every pack needs
+
+**The setup guide.** A numbered list of every step required to get the project running locally. Operating system version. Node version or language version. Environment variables with descriptions of what they are. Where to get them. How to seed the database. How to run the tests. And a line at the bottom that says "if this does not work, tell me and I will fix the doc."
+
+**The architecture overview.** A one page description of the system. What it is. What the main services are. Where the data lives. What the external dependencies are. Not a diagram. Diagrams go out of date in a week. A plain paragraph that tells someone what they are walking into.
+
+**The decision log.** A short document explaining the three to five biggest technical choices in the codebase and why they were made. Why this database. Why this authentication method. Why this folder structure. The new developer will ask these questions in their head on day one. Answer them in writing before they have to ask.
+
+**The deployment guide.** Step by step. How to push a change to staging. How to push to production. How to roll back if something breaks. What monitoring looks like and where alerts go.
+
+**The access map.** A list of every system, credential, and account the developer will need, with instructions for how to get access to each one. Repository. Staging environment. Error monitoring. Log aggregation. Third party APIs. Nothing should live only in someone's memory.
+
+### What founders can write versus what the technical lead writes
+
+A non technical founder can write the product brief, the user personas, the business logic behind each major feature, and the company context that explains why things exist the way they do. A senior developer or technical lead writes the architecture overview, the setup guide, and the deployment runbook. The combination is the full pack. Both halves matter.
+
+## What it requires
+
+| Document | Time to write | Who writes it |
+|---|---|---|
+| Setup guide | 90 minutes | Technical lead or current developer |
+| Architecture overview | 60 minutes | Technical lead |
+| Decision log | 30 minutes | Whoever made the decisions |
+| Product brief and user personas | 60 minutes | Founder or product owner |
+| Deployment guide | 45 minutes | Technical lead |
+| Access map | 30 minutes | Founder or ops lead |
+
+The table above is not aspirational. It is a morning's work for someone who knows the system. If any of those documents take dramatically longer, the codebase or the operations have a problem that the writing is surfacing.
+
+## What to look for in your own onboarding pack
+
+- A setup guide a stranger could follow without asking a single question.
+- All environment variables documented with descriptions, not just names.
+- A clear statement of where production access lives and who controls it.
+- A decision log that explains the three biggest architectural choices.
+- A deployment guide that includes a rollback procedure.
+- A named contact for every external system dependency.
+- A "what to do if this breaks" note for the most fragile parts of the system.
+
+## Expert opinion
+
+> The developers who become long term partners almost always tell me the same thing about their first day. The access was ready, the docs made sense, and they had real code running by noon. The ones who leave in the first month almost always have a different story. The environment was broken, nobody answered questions until the afternoon, and they spent the first week feeling like a burden. The onboarding pack is not a nice gesture. It is the foundation of the relationship.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder I worked with had gone through three contractors in nine months on the same project. Each one started, got stuck on setup, lost momentum, and faded out. The code was not complicated. The onboarding was. There was no setup guide. The environment variables were scattered across three Slack messages from nine months earlier. Production credentials lived in the founder's password manager and were shared in a DM.
+
+We spent two days building the onboarding pack before hiring the next person. Setup guide, architecture overview, decision log, access map. The next contractor got the full pack on day one. They had the project running in ninety minutes. They committed their first real change on day three. They are still working on the project now, eight months later.
+
+The pack was not the only change we made. We also improved the hiring process, which is covered in [the vetting framework post](/blog/the-vetting-framework-how-to-verify-a-developers-real-experience). And the communication structure that keeps the relationship healthy afterward is covered in [the founder developer communication loop](/blog/the-founder-developer-communication-loop-a-weekly-cadence). Both are worth reading after you have the pack ready.
+
+## Common mistakes in developer onboarding
+
+1. Assuming the new developer can figure out the setup by reading the code. They cannot. Write the guide.
+2. Writing a setup guide once and never updating it. Every dependency change breaks the guide. Build in a rule that whoever finds a broken step fixes it.
+3. Giving production access on day one. Staging access is enough to start. Production access follows when you know the person.
+4. Not writing the decision log because you think the decisions are obvious. They are only obvious to the person who made them.
+5. Sending credentials over Slack messages that disappear. Use a proper secrets manager or at minimum a password manager with shared vault access.
+6. Assuming the developer knows what the product does. Write the user journey in plain English. Developers make better technical decisions when they understand the user.
+7. Not having a rollback procedure in the deployment guide. The first time something breaks in production is not the moment to improvise.
+8. Treating the onboarding pack as finished. It is a living document. Every new hire should be asked to improve it as part of their first week.
+
+## A 30 day plan
+
+1. **Days one to three.** Have your current developer or technical advisor write the setup guide and deployment guide. Test it on a fresh machine. If it fails anywhere, fix it.
+2. **Days four to seven.** Write the architecture overview and decision log. If you are non technical, interview your developer for thirty minutes and write what they tell you.
+3. **Week two.** Build the access map. List every system. Document every credential. Move them into a shared vault.
+4. **Week three.** Write the product brief if you do not already have one. A page on the problem, the user, the key workflows, and what good looks like.
+5. **Week four.** Give the full pack to a developer who has never seen the project. Ask them to follow it cold. Note every step where they had to stop and ask.
+
+For the hiring process that brings someone to the onboarding pack, [the 10 questions every non technical founder must ask before hiring](/blog/10-questions-every-non-technical-founder-must-ask-before-hiring-a-developer) covers what to ask before the relationship starts. For the three documents the founder should prepare before any developer engagement, [the three document pack every founder owes their developer](/blog/the-three-document-pack-every-founder-owes-their-developer) is the companion read.

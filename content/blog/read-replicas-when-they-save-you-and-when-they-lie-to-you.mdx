@@ -1,0 +1,62 @@
+---
+slug: "read-replicas-when-they-save-you-and-when-they-lie-to-you"
+title: "Read Replicas: When They Save You and When They Lie to You"
+excerpt: "Read replicas distribute database read load and improve availability, but replication lag creates consistency hazards that catch teams off guard. Here is when read replicas help and when they introduce subtle bugs."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/read-replicas-when-they-save-you-and-when-they-lie-to-you"
+status: "published"
+definition: "A read replica is a copy of the primary database that receives a continuous stream of write operations from the primary and applies them to stay in sync. Read replicas are used to distribute read traffic: queries that do not need the absolute latest data are routed to replicas, reducing load on the primary. The critical constraint is replication lag: replicas are always slightly behind the primary (milliseconds to seconds depending on load), so reads from replicas may return data that is slightly stale."
+faq: [
+  {"q":"What is replication lag and how much does it matter?","a":"Replication lag is the delay between a write completing on the primary and that write becoming visible on replicas. In a lightly loaded PostgreSQL replication setup, lag is typically under 100 milliseconds. Under heavy write load, lag can grow to seconds. The impact depends on the use case: a dashboard that aggregates hourly data is unaffected by 100ms lag; a user who just submitted a form and is redirected to a confirmation page that reads from a replica may see their own submission missing if the replica has not yet applied the write. The 'read your own writes' consistency pattern is the most common source of replication lag bugs."},
+  {"q":"What is the 'read your own writes' problem?","a":"Read your own writes (RYOW) is the consistency expectation that after a user performs a write operation, their subsequent reads should reflect that write. When reads are routed to replicas and writes go to the primary, a user who writes data and immediately reads it back may hit a replica that has not yet applied the write. The fix is routing reads that must see recent writes back to the primary: after a user creates a resource, redirect them to a page that reads from the primary, or add a version check that retries on the replica until the expected version appears."},
+  {"q":"Which read queries are safe to route to replicas?","a":"Safe for replicas: analytics queries, dashboard aggregations, search index population, report generation, and any read that does not need to see data written in the last few seconds. Not safe for replicas: reads immediately following a write (read your own writes), reads that determine whether a write is safe (checking inventory before decrementing), and reads that enforce uniqueness constraints (checking if a username is taken). The general rule: route to replica when the read is decoupled from recent writes in the same user session."},
+  {"q":"How do you configure read replica routing in a Node.js application?","a":"The most common approach is a database client that supports read/write splitting. Knex.js and Sequelize support read/write splitting through connection pool configuration. PgBouncer or pgpool-II can handle routing at the connection pool layer without application code changes. The application-level approach requires annotating queries or using a separate client for replica reads. The proxy-level approach (PgBouncer in routing mode) is simpler to maintain because routing logic lives in infrastructure configuration rather than application code."},
+  {"q":"When should you not use read replicas and use caching instead?","a":"Read replicas add infrastructure complexity (replica management, monitoring, failover handling) and introduce consistency risks. For read-heavy workloads where the same data is read repeatedly by many users, application-level caching (Redis with appropriate TTL) may be a simpler and more effective solution than read replicas. A product listing page read by hundreds of users per minute benefits more from a Redis cache with a 30-second TTL than from a read replica, because caching eliminates the database query entirely. Use replicas when data is too dynamic or too unique per user for caching to be practical."}
+]
+---
+
+## What you need to know
+
+- Read replicas solve read load scalability problems. They are not the right solution for write load problems, connection limit problems, or query performance problems.
+- Replication lag is always nonzero. Any code path that writes and then reads expecting the write to be visible must account for lag.
+- The read your own writes problem is the most common bug introduced by read replica routing. Test this specific scenario explicitly.
+- Read replicas provide availability benefits: if the primary fails, a replica can be promoted. This is separate from the read load distribution benefit.
+- Route analytics, reporting, and background job queries to replicas. Keep user-facing transactional reads that follow writes on the primary.
+
+## The core argument
+
+Read replicas are presented as a straightforward scaling solution: add a replica, route reads to it, halve the load on the primary. In practice, the routing decision is more nuanced, and teams that route all reads to replicas without thinking through the consistency implications introduce bugs that are difficult to reproduce because they depend on replication timing.
+
+The right model for thinking about read replica routing is: separate reads by whether they need to see data from the current user session's most recent writes. Analytics queries that aggregate across all users do not need to see writes from the last 100 milliseconds. A user profile page shown immediately after the user updated their profile does need to see the write. The former is safe for a replica. The latter must go to the primary.
+
+The architectural pattern I find most reliable is: writes always go to the primary, reads that immediately follow writes in the same request or user session go to the primary, everything else goes to the replica. This routing can be expressed in the data access layer: a request context that tracks whether any writes have occurred in the session, and a database client that routes based on that flag. On an e-commerce project, this pattern eliminated the stale product inventory bugs we were seeing when a purchase was completed and the confirmation page showed the pre-purchase stock level from a lagged replica.
+
+## Common mistakes
+
+1. **Routing all reads to replicas without considering the write-then-read pattern.** The most common manifestation: a user submits a form, is redirected to a success page, and the success page shows the old data because the replica has not caught up. The fix is routing the success page's read to the primary, or adding a short delay or retry before reading from the replica.
+
+2. **Not monitoring replication lag.** Replication lag that is normally negligible can spike under high write load. Without monitoring, a sudden lag increase is invisible until users start reporting stale data. Monitor replica lag as a standard infrastructure metric and alert on sustained lag above a threshold.
+
+3. **Using read replicas to fix query performance problems.** If a query is slow, moving it to a replica makes it slow on the replica instead of the primary. The performance problem (missing index, inefficient query plan) still exists. Fix the query first. Use replicas for distributing load, not for avoiding query optimization.
+
+4. **Not testing replica failover.** If the primary fails and a replica is promoted, the new primary starts accepting writes. Untested failover paths may have configuration issues (replica not configured for writes, application connection strings not updated) that are only discovered during an actual failure. Test failover in a staging environment before relying on it.
+
+5. **Opening too many connections to the replica.** The connection limit problem that read replicas are sometimes used to solve (the primary has too many connections) reappears on the replica. Read replicas have the same connection limits as the primary. PgBouncer connection pooling should be deployed in front of replicas just as it should be in front of the primary.
+
+## Where to start
+
+1. **Identify the actual load pattern before adding replicas.** Check whether the primary's bottleneck is read load (high query count, high CPU from read queries) or something else (write load, connection limits, missing indexes). Read replicas only help with read load. A slow query profile on the primary shows whether optimization would reduce load more than replication.
+
+2. **Start by routing only analytics and reporting queries to the replica.** These queries are write-decoupled by nature, high-impact on primary load, and safe if the replica is slightly stale. Add the replica client, route reporting queries to it, and monitor the primary load reduction and replica lag. This validates the replica setup without risking read-your-own-writes bugs in user-facing flows.
+
+3. **Instrument read routing in the data access layer, not in individual queries.** A readable abstraction that identifies the appropriate connection (primary vs replica) based on request context is more maintainable than adding .useReplica() calls to every individual query. The routing logic belongs in one place.
+
+## Related reading
+
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- [Point-in-Time Recovery: A Founder's Insurance Policy](/blog/point-in-time-recovery-a-founders-insurance-policy)
+- [PlanetScale vs Supabase vs Neon vs Aurora Serverless](/blog/planetscale-vs-supabase-vs-neon-vs-aurora-serverless)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)

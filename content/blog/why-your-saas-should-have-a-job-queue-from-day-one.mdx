@@ -1,0 +1,124 @@
+---
+slug: "why-your-saas-should-have-a-job-queue-from-day-one"
+title: "Why Your SaaS Should Have a Job Queue From Day One"
+excerpt: "Most SaaS products process too much work synchronously. The fix is simple and cheap at the start. It becomes expensive and painful if you wait."
+date: "2024-11-13"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-your-saas-should-have-a-job-queue-from-day-one"
+status: "published"
+definition: "A job queue decouples work that does not belong in the request thread from the moment the user triggers it. Email, file processing, third party API calls, reports, and scheduled tasks all belong in a queue. Starting without one is a choice that costs you twice: first in reliability incidents, then in the refactor. Starting with one costs almost nothing on a modern stack."
+faq: [
+  {"q":"why does every saas need a background job queue from the very beginning","a":"Because request threads are not the right place for slow or failure prone work. If you send email synchronously, a slow SMTP server delays your user. If you call a third party API in the request, a timeout fails your user. A queue absorbs that work and keeps the response fast. Starting from day one means you never have to retrofit it under pressure."},
+  {"q":"what is the simplest job queue setup for an early stage saas product","a":"A Postgres backed queue using Graphile Worker, pg-boss, or River. It runs on your existing database, costs nothing extra, gives you transactional job insertion, and handles retries and dead letter queuing. You can be running background jobs in half a day. No new infrastructure required."},
+  {"q":"how do I make background jobs idempotent in a saas application","a":"Design each job so running it twice produces the same result as running it once. Use a unique job key or deduplicate before side effects. Check whether the work has already been done before doing it. For email, check a sent flag. For external API calls, use an idempotency key. Idempotency is what makes retries safe."},
+  {"q":"when should I move from a postgres queue to redis for background jobs","a":"When your queue volume exceeds roughly five thousand jobs per minute and you see the database under real strain. Postgres queues are efficient but share resources with the application database. At that volume, move the highest throughput job classes to a Redis backed queue like BullMQ. Lower volume jobs can stay on Postgres indefinitely."},
+  {"q":"what is the difference between a job queue and a workflow engine for saas","a":"A job queue runs individual discrete tasks. A workflow engine runs multi step processes with durable state, per step retries, and the ability to resume after a crash. Use a queue for send email, process file, call webhook. Use a workflow engine like Temporal or Inngest for onboarding flows, billing reconciliation, or anything that spans hours with branching logic."},
+  {"q":"how do I monitor background jobs in a saas application","a":"Track four metrics: queue depth, job throughput, failure rate, and latency from enqueue to start. Alert on queue depth above a threshold and on failure rate above a threshold. A queue that is silent is not necessarily healthy. Wire the dead letter queue to an alert. Build a simple internal dashboard showing the last hundred failures with their error messages."},
+  {"q":"what are the most common background job queue mistakes in early stage saas","a":"Running long work synchronously in the request thread. Not making jobs idempotent, so retries produce duplicates. Skipping dead letter handling so failed jobs disappear silently. No observability on queue depth or failure rate. Picking a queue with high operational overhead before the team is ready for it. Mixing job priorities so low priority work blocks high priority work."}
+]
+---
+
+## What you actually need to know
+
+- A job queue costs almost nothing to add at the start. It costs significant engineering time to retrofit later.
+- Postgres backed queues are the right default for early stage teams. No new infrastructure, transactional guarantees, good enough for the first several thousand customers.
+- Every job must be idempotent. Retries are not optional. Your queue will retry jobs.
+- Dead letter handling and observability are not optional additions. They are the reason the queue is manageable.
+- The workload shape changes the tool. Simple discrete tasks want a queue. Multi step stateful processes want a workflow engine.
+
+| Tool | Best for | Scale ceiling | Operational overhead |
+|---|---|---|---|
+| Postgres queue (Graphile Worker, pg-boss, River) | Early SaaS, small teams | 5k to 10k jobs per minute | Negligible |
+| Redis queue (BullMQ, Sidekiq) | Growing SaaS, burst workloads | 50k to 100k jobs per minute | Low |
+| SQS or RabbitMQ | High volume, routing complexity | Hundreds of thousands per minute | Medium |
+| Inngest or Trigger.dev | Teams that want managed infrastructure | Vendor scales | Lowest |
+| Temporal or Step Functions | Multi step stateful workflows | High | Higher |
+
+## The core argument
+
+I have worked on SaaS products at every stage, from pre-launch to post-series B. The ones that skipped the queue at the start had the same failure mode every time. Some variant of: welcome emails going out slowly or not at all, a file processing step timing out user requests, a third party integration call blocking the thread, or a scheduled task running inside a cron job with no retry logic and no observability.
+
+The fix in every case was the same: add a queue, move the work into it, wire up retries and dead letters, and add observability. The migration took between one and three weeks depending on how deeply the synchronous work was embedded. That is three weeks of engineering time that could have been avoided by spending half a day at the start.
+
+The counterargument is usually "we do not need it yet." And technically, that is true at fifty users. The welcome email takes a second, the file upload is small, the third party call is fast. But the team builds habits around the synchronous approach. Business logic grows inside those habits. By the time the workload grows and the incidents start, unwinding those habits is expensive.
+
+The modern default for early stage teams is a Postgres backed queue. It runs on the same database the application already uses. The operational overhead is near zero. It handles ten to fifty thousand jobs per day without any database tuning. The migration path to a Redis based queue is well understood when you eventually need it.
+
+## Designing jobs that survive the real world
+
+Three things make a job production grade: idempotency, retry semantics, and dead letter handling.
+
+Idempotency means running the job twice produces the same result as running it once. This is non negotiable. Queues retry jobs. Networks fail. Workers restart. The job will run more than once during the lifetime of your product. A welcome email that sends twice is annoying. A billing charge that runs twice is a support incident. Design idempotency in from the start.
+
+Retry semantics means exponential backoff with a maximum attempt count. Do not retry a failed job immediately. If it failed because a third party API was down, hammering it again in one second makes everything worse. Backoff to ten seconds, then a minute, then five minutes, then give up. The maximum attempt count prevents a broken job from running forever.
+
+Dead letter handling means a job that exhausts its retries goes somewhere visible. Not into the void. A dead letter queue or table where you can inspect the failure, understand the cause, and decide whether to requeue or discard. A queue without dead letter handling is a black box. You find out jobs are failing when customers complain.
+
+### What belongs in the queue
+
+Email of every type. Welcome, transactional, notification. File processing. Image resizing, document parsing, data imports. Third party API calls where a failure should not fail the user request. Report generation for any report that takes more than a second. Scheduled tasks of any kind. Webhook delivery.
+
+What does not belong in the queue: anything that the user needs to see immediately in the response. That work stays synchronous. The rule is simple. If the user can get a response before the work is done, put the work in the queue.
+
+## What it requires
+
+| Requirement | Effort | Notes |
+|---|---|---|
+| Postgres queue setup | Half a day | Library installation, table creation, worker startup |
+| First job migration (welcome email) | A few hours | Extract, make idempotent, test retries |
+| Full job migration | Two to four days | Depends on volume of synchronous work |
+| Observability wiring | Half a day | Queue depth, failure rate, latency |
+| Dead letter handling | A few hours | Alert on failures, inspection tooling |
+| Redis queue migration (if needed) | One to two days | Add Redis, migrate high volume job classes |
+
+## Features the queue implementation must have
+
+- Transactional job insertion. The job and the database write that triggers it commit together or not at all.
+- Idempotent job design enforced by convention or tooling.
+- Exponential backoff with configurable maximum retry count.
+- Dead letter destination with alerting.
+- Queue depth monitoring with alerting on threshold breach.
+- Job throughput and latency tracking.
+- Worker concurrency controls to prevent resource exhaustion.
+- Scheduled job support for cron style recurring work.
+
+## Expert opinion
+
+> The teams that add a queue from day one barely notice it. It is just how background work is done. The teams that wait treat the migration as a major project. They are right to treat it that way, because it is. The code is coupled to synchronous execution, the tests assume synchronous execution, and the habits of the team assume synchronous execution. That is a significant thing to unwind. The half day you spend adding a Postgres queue on day one is one of the best investments in the codebase.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client came to me after their welcome email delivery rate had dropped to around sixty percent. The emails were sent synchronously in the sign up handler. The SMTP provider had intermittent latency spikes that caused the handler to time out. When the handler timed out, the sign up response failed. Some users got a welcome email but no account. Some got an account but no welcome email. Some got neither. The team had been patching the symptom for two months.
+
+We migrated the welcome email to a Postgres backed queue in one day. The sign up handler inserted the job and returned. The worker sent the email with exponential backoff retry. Delivery rate went to ninety nine percent within a week. The sign up error rate dropped to near zero. The change was four files and a database migration.
+
+We extended the queue to cover file processing, report generation, and third party data sync over the next two weeks. Each migration followed the same pattern: extract the work, make it idempotent, move it to the queue, wire up observability. The team was faster at each one because the pattern was established.
+
+For more on adjacent architecture decisions, [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip) covers the queue selection decision in depth, and [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) covers the related pattern for guaranteed event delivery.
+
+## Common mistakes
+
+1. Skipping the queue entirely. Long running work blocks the request thread and eventually causes timeouts at scale.
+2. Jobs that are not idempotent. The first retry produces duplicate side effects and a support ticket.
+3. No dead letter handling. Failed jobs disappear silently. You find out from customers.
+4. No observability. The queue depth grows and nobody notices until it becomes an incident.
+5. Synchronous job dispatch without transactional guarantees. The database write commits but the job insertion fails. The work never happens.
+6. Using the queue as a workflow engine. Multi step stateful processes need a different tool.
+7. Mixing priorities in one queue. A bulk data import blocks a time sensitive notification.
+8. Adding complex queue infrastructure before the team is ready to operate it. A Postgres queue handled with a library is the right starting point.
+
+## A two week plan
+
+1. **Day one.** Inventory all background work currently running synchronously. Email, file processing, external API calls, scheduled tasks.
+2. **Days two and three.** Install a Postgres backed queue library. Configure the worker. Write the first job: welcome email. Make it idempotent.
+3. **Days four to seven.** Migrate remaining synchronous work to queue jobs. One job at a time. Test each one.
+4. **Day eight.** Wire observability. Queue depth, failure rate, latency. Add alerts.
+5. **Day nine.** Set up dead letter handling. Alert on failures. Document the runbook.
+6. **Days ten to twelve.** Load test the queue. Confirm it handles expected peak volume with headroom.
+7. **Days thirteen and fourteen.** Document the queue conventions. Idempotency pattern, retry policy, dead letter process. New jobs follow the pattern.
+
+For related reading, [workflow engines when you need Temporal when you need Cron](/blog/workflow-engines-when-you-need-temporal-when-you-need-cron) covers when to graduate from a simple queue, and [async job failure recovery patterns that actually work](/blog/async-job-failure-recovery-patterns-that-actually-work) covers what to do when jobs fail at scale.

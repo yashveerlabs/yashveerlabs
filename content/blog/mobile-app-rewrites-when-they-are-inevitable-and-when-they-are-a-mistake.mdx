@@ -1,0 +1,62 @@
+---
+slug: "mobile-app-rewrites-when-they-are-inevitable-and-when-they-are-a-mistake"
+title: "Mobile App Rewrites: When They Are Inevitable and When They Are a Mistake"
+excerpt: "A mobile app rewrite feels like a fresh start. Often it is a six-month detour that reproduces the same problems in a new codebase. Here is how to decide whether you actually need a rewrite or whether targeted refactoring will solve the problem."
+date: "2026-05-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter"]
+readingMinutes: 6
+ogImage: "/api/og/blog/mobile-app-rewrites-when-they-are-inevitable-and-when-they-are-a-mistake"
+status: "published"
+definition: "A mobile app rewrite is the decision to replace an existing mobile application with a new one built from scratch, rather than incrementally improving the existing application. Rewrites are sometimes necessary: when the platform has changed fundamentally, when the app has accumulated technical debt that makes incremental improvement slower than rebuilding, or when the technology choice (WebView, outdated React Native version) can no longer meet performance requirements. They are frequently a mistake when the underlying problems are process issues, not code issues."
+faq: [
+  {"q":"What are the legitimate reasons to rewrite a mobile app?","a":"Platform-forced rewrites are the clearest case: an app built on a deprecated SDK or technology that Apple or Google no longer supports. Technology ceiling rewrites are the second case: an app where the performance or capability limitations of the current technology (an old Cordova wrapper, a severely outdated React Native version) prevent the product from meeting user expectations. Business logic rewrites are the third case: an app where the domain model changed fundamentally enough that the existing codebase cannot be incrementally updated to reflect it."},
+  {"q":"What are the most common mistakes that lead to unnecessary rewrites?","a":"The desire for a clean slate is the most common driver of rewrites that should not happen. Engineers frustrated with technical debt convince themselves that the problems are in the code rather than in the process. A new codebase built by the same team with the same processes will reproduce the same problems. The second common mistake is changing frameworks as the primary motivation: rewriting from React Native to Flutter, or from native iOS to React Native, to access perceived advantages without a clear capability gap in the current approach."},
+  {"q":"How do you evaluate whether to rewrite or refactor?","a":"Compare the estimated effort to bring the current codebase to the required state versus building the equivalent features in a new codebase. If targeted refactoring of the three to five most problematic areas requires less than sixty percent of a full rewrite, refactor incrementally. If the rewrite would need to touch more than seventy percent of the existing code anyway, a clean build may be justified. The analysis requires honest estimation from engineers who know the codebase."},
+  {"q":"How do you maintain a live app while rewriting it?","a":"The strangler fig pattern: build the new app in parallel, migrate features one by one from the old app to the new one, and continue releasing updates to the old app while the new one is developed. This avoids the dark period where neither app is being improved and allows features to be validated in the new codebase before the old app is retired. It requires more discipline than a big-bang rewrite but reduces the risk significantly."},
+  {"q":"What is the realistic timeline for a mobile app rewrite?","a":"For a moderately complex app, a complete rewrite takes three to six months for the core functionality, plus additional time to reach feature parity with the existing app. Feature parity is frequently underestimated because the existing app contains edge case handling and small features that were added over years and are not in any specification document. Budget for discovering and re-implementing this invisible feature surface."}
+]
+---
+
+## What you need to know
+
+- Most mobile app rewrites are driven by frustration with the process that created the current codebase, not by genuine technical limitations. A new codebase built by the same team with the same process will reproduce the same problems.
+- The strangler fig pattern is the correct approach for rewrites that are genuinely necessary: build the new app alongside the old one, migrate feature by feature, and retire the old app only when the new one has reached parity.
+- Feature parity is consistently underestimated. An existing app contains years of edge case handling and small features that are not in any specification. Budget for discovering them.
+- Platform-forced migrations (deprecated SDK, App Store compliance requirements) are the clearest cases where a rewrite is necessary. Business logic rewrites and framework migrations require stronger justification.
+- A thorough architectural analysis of the current codebase before deciding to rewrite often reveals that two to three targeted refactors would achieve the performance and maintainability goals at a fraction of the rewrite cost.
+
+## The core argument
+
+The mobile app rewrite proposal typically arrives in one of two forms: the performance argument ("the current app is too slow and the architecture cannot support the changes needed") and the maintainability argument ("the codebase is so difficult to work with that adding features takes twice as long as it should"). Both arguments can be legitimate. Both arguments are also frequently overstated.
+
+The performance argument requires specific measurement to evaluate honestly. An app that is too slow in specific scenarios may need targeted optimization, not a full rewrite. Profiling the current app to identify which parts are slow, what the technical cause is, and whether it is addressable in the current codebase takes two to three days. If the profiling reveals that the performance bottleneck is in the core rendering approach (for example, a Cordova WebView that cannot achieve 60fps for the animation-heavy feature the product needs), the rewrite argument is substantiated. If it reveals that three expensive re-renders and an unoptimized list view are the cause, those can be fixed without a rewrite.
+
+The maintainability argument is harder to evaluate honestly because it is more subjective. Engineers who find a codebase difficult to work with often have valid reasons and often have process reasons that would persist in a new codebase. The diagnostic question is: what specific changes in the codebase would make it significantly easier to maintain? If the answer is "refactor the navigation structure," "add proper state management," and "fix the API layer," those are targeted improvements that can be made incrementally. If the answer is "rebuild it from scratch because the entire architecture is wrong," that is a signal to get a second opinion on whether the architecture is actually the problem.
+
+## Common mistakes
+
+1. **Not doing a formal technical assessment before deciding to rewrite.** An engineering team's intuition about whether to rewrite is often colored by frustration. A structured assessment that compares refactoring cost to rewrite cost, documents specific technical limitations, and identifies which parts of the codebase are actually the source of friction produces a more reliable recommendation.
+
+2. **Underestimating hidden feature parity requirements.** Existing apps contain behavior that no one documented: error message copy, edge case handling, specific animation timing, offline behavior. Discovering and re-implementing these features adds twenty to thirty percent to rewrite timelines consistently.
+
+3. **Stopping new feature development during the rewrite.** A six-month period where the existing app receives no improvements while the rewrite is in progress means user needs go unmet and competitor gaps widen. The strangler fig pattern prevents this by allowing both the old and new app to be improved simultaneously.
+
+4. **Changing too many variables at once.** Rewriting from one framework to another while also redesigning the product, changing the state management approach, and adopting a new testing strategy creates a large number of unknowns. Isolate the variables: keep the product design the same as the existing app in the first version of the rewrite to reduce the risk of conflating product decisions with technical decisions.
+
+5. **Not defining completion criteria for the rewrite before starting.** A rewrite without a clear definition of "done" can expand indefinitely as new improvements and refactors are added. Define the feature set required for the new app to replace the old one before writing the first line.
+
+## Where to start
+
+1. **Profile the current app's performance before concluding that a rewrite is necessary.** Use the profiling tools available for the current framework to identify specific bottlenecks. Determine whether the performance problems are addressable in the current architecture before committing to a rewrite.
+
+2. **List the three features or areas that would require the most refactoring to improve in the current codebase.** For each, estimate the refactoring effort versus the effort to build the equivalent in a new codebase. This comparison forms the basis of a justified rewrite decision.
+
+3. **If a rewrite is justified, begin with the strangler fig pattern.** Set up the new codebase, migrate the authentication and navigation infrastructure, and implement the first end-to-end feature. Ship it to a small beta group before committing to migrating the full feature set.
+
+## Related reading
+
+- React Native vs Flutter in 2026: A Production Comparison
+- [iOS TestFlight vs Internal Testing: A Comparison](/blog/ios-testflight-vs-internal-testing-a-comparison)
+- Tech Debt: The Real Cost and When to Pay It Down
+- [Mobile App Development Costs: Native, Cross Platform, and Hybrid Compared](/blog/mobile-app-development-costs-native-cross-platform-and-hybrid-compared)

@@ -1,0 +1,119 @@
+---
+slug: "vercel-vs-netlify-vs-cloudflare-pages"
+title: "Vercel vs Netlify vs Cloudflare Pages"
+excerpt: "Three serious platforms, three different bets. The decision is not about which is best. It is about which one's bet matches what you are actually building."
+date: "2026-04-16"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026"]
+readingMinutes: 12
+ogImage: "/api/og/blog/vercel-vs-netlify-vs-cloudflare-pages"
+status: "published"
+definition: "Vercel is the best Next.js host with the best developer experience and the highest bill at scale. Netlify is the broadest static-plus-functions platform with a friendlier free tier. Cloudflare Pages is the cheapest at scale and the most edge-native, with the steepest learning curve for backend work. Pick by stack alignment, cost trajectory, and tolerance for platform constraints."
+faq: [
+  {"q":"Which platform has the best developer experience?","a":"Vercel, by a comfortable margin, especially for Next.js. The git-to-preview flow, the dashboard, the analytics, and the framework integration are all polished. Netlify is close. Cloudflare Pages is functional but less polished. For pure DX, Vercel wins. The cost of that DX shows up in the bill at scale."},
+  {"q":"Which is cheapest?","a":"Cloudflare Pages, often dramatically. Cloudflare's bandwidth is essentially free at the Pages tier and their compute is among the cheapest in the industry. Netlify is in the middle. Vercel is the most expensive at scale, especially as function invocation volume grows. For a high-traffic marketing site, Cloudflare can be tenths of the cost."},
+  {"q":"Which is best for Next.js?","a":"Vercel, because Next.js is theirs. The features ship first, integrate cleanest, and just work. Netlify supports Next.js but you will hit edges. Cloudflare runs Next.js via their adapter but the support is less complete. If you are heavy Next.js, the answer is Vercel unless cost forces otherwise."},
+  {"q":"Which is best for static sites?","a":"Any of the three works. Netlify built its reputation on this and has the most generous free tier for it. Cloudflare is the cheapest at scale. Vercel is fine but overkill for a pure static site. For a pure marketing site that does not need framework integration, Cloudflare or Netlify is the safer bet."},
+  {"q":"Which platform has the best free tier?","a":"Netlify and Cloudflare both have generous free tiers. Cloudflare's is hard to beat once you cross the threshold where Netlify charges. Vercel's free tier is fine for personal projects but tightens fast for anything commercial. If you are sensitive to free-tier limits, lean Cloudflare."},
+  {"q":"Which is best for serverless functions?","a":"Vercel for ease, Cloudflare for cost, Netlify for the middle. Vercel functions are the most polished. Cloudflare Workers are the cheapest and run on the edge by default. Netlify Functions are competent and integrate with their site builds. The choice depends on whether you want polish, cost, or balance."},
+  {"q":"Can I move between them later?","a":"For static sites, yes, trivially. For frameworks like Next.js with vendor-specific features, migration is painful because each platform has its own quirks for routing, image optimization, and middleware. Pick the platform that aligns with your stack and your cost trajectory, not the one you can leave cheaply."}
+]
+---
+
+## What you actually need to know
+
+- Vercel: best DX, best Next.js support, highest bill at scale.
+- Netlify: balanced, generous free tier, good for static and modest functions.
+- Cloudflare Pages: cheapest, edge-native, steepest learning curve for backend work.
+- For Next.js heavy projects, Vercel is the default unless cost forces a change.
+- For high-bandwidth static sites, Cloudflare can be tenths of the cost of the others.
+
+| Concern | Vercel | Netlify | Cloudflare Pages |
+|---|---|---|---|
+| Next.js support | Native, first-class | Solid, occasional edges | Adapter-based, less complete |
+| Free tier generosity | Modest | Generous | Most generous |
+| Cost at scale | Highest | Middle | Lowest |
+| Edge runtime | Capable | Capable | Native, broadest |
+| Developer experience | Best | Good | Functional |
+| Bandwidth | Charged after free tier | Charged after free tier | Effectively free |
+
+## The core argument
+
+Choosing between Vercel, Netlify, and Cloudflare Pages in 2026 is not about which one is the best platform. All three are serious. It is about which one's bet aligns with what you are actually building, how much traffic you expect, and how much polish you are willing to pay for.
+
+Vercel built its product around Next.js and around developer experience. The bet pays off when you are deep in Next.js and want the smoothest possible flow from git push to production. It is the same bet that makes Vercel expensive at scale: the polish has a price.
+
+Netlify spread its bet across many frameworks and many use cases. It does most things well without being clearly the best at any one of them. The bet pays off for teams that want a single platform for everything from static sites to API endpoints without committing to a single framework's ecosystem.
+
+Cloudflare took a different bet entirely. They own the network and they price compute to encourage you to put it on the edge. The bet pays off for teams that can work within the edge runtime's constraints, and the cost advantage is so large that for some workloads it is the only reasonable answer.
+
+The mistake I see most often is choosing the platform that someone famous on Twitter uses. The right way to choose is to look at your stack, your traffic profile, and your team's tolerance for platform-specific patterns, then pick the platform whose tradeoffs match.
+
+## How they handle the workloads that matter
+
+### Frontend hosting and CDN
+
+All three are competent here. The differences are at the margins. Cloudflare has the largest network and the cheapest bandwidth. Vercel and Netlify both serve content fast enough that for most projects you will not notice the difference.
+
+### Framework integration
+
+Vercel for Next.js, no contest. Netlify for a broader set of frameworks with reasonable depth. Cloudflare for whatever you can run on their Workers runtime, with the caveat that some Node APIs are missing and you have to design around that.
+
+### Serverless functions
+
+Vercel functions are the most polished and the easiest to reason about. Cloudflare Workers are the most performant and the cheapest, but you have to fit your code into the edge runtime, which is V8 isolates rather than Node. Netlify Functions sit in the middle: regular Node-compatible serverless functions with reasonable tooling.
+
+### Long-running backend work
+
+None of the three is the right home for this. Vercel and Netlify functions have time limits. Cloudflare Workers have even shorter limits. For long-running workloads you want a different platform regardless of which of these three you use for the frontend. See [why Vercel cannot be your entire backend](/blog/why-vercel-cannot-be-your-entire-backend) for the longer version.
+
+## How much does it cost
+
+| Use case | Vercel | Netlify | Cloudflare Pages |
+|---|---|---|---|
+| Personal site, low traffic | Free | Free | Free |
+| Small startup, modest traffic | 20-50 USD | 20-40 USD | Often free |
+| Growing SaaS, high traffic | Hundreds to thousands monthly | Hundreds monthly | Tens to low hundreds monthly |
+| High-bandwidth marketing site | Thousands monthly | Hundreds to thousands | Low hundreds monthly |
+| Heavy serverless invocation | Most expensive | Middle | Cheapest |
+
+The pattern is consistent: as you scale, the cost spread widens. For a high-traffic site, the difference between Vercel and Cloudflare can be a 5x or 10x bill.
+
+## What to weigh before picking
+
+- How committed are you to a specific framework? If Next.js, Vercel is the safer bet despite the cost.
+- How much traffic and bandwidth do you expect? Cloudflare wins decisively at high volume.
+- How important is the developer experience to your team's velocity? Vercel is best, Netlify is close, Cloudflare is behind.
+- How willing are you to design around edge-runtime constraints? Cloudflare requires this.
+- Do you need rich integrations? Vercel and Netlify both have ecosystems; Cloudflare has its own.
+
+## Expert opinion
+
+> I have shipped sites on all three. The decision should follow the workload, not the brand. For a Next.js SaaS, I default to Vercel and budget for the cost. For a high-traffic marketing site with mostly static content, I default to Cloudflare. For projects that need a balanced platform without committing to a single ecosystem, Netlify is a sensible middle. The wrong answer is picking the platform someone you respect on Twitter is using, then trying to make your workload fit. Start from the workload, end at the platform.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder asked me to evaluate hosting for a content-heavy site projecting 5 million page views a month at growth. They had defaulted to Vercel because they had used it on a side project. The estimated Vercel bill at projected scale was several thousand dollars a month, dominated by bandwidth.
+
+We moved to Cloudflare Pages. The site was nearly static with a few small Workers for personalization. The bill at the same traffic projection was under 100 dollars a month, almost entirely the small amount of compute. The developer experience was a step down from Vercel but not painful. The savings funded six months of additional engineering. The pattern is the same one I cover in [why Vercel cannot be your entire backend](/blog/why-vercel-cannot-be-your-entire-backend) and informs the broader [workers vs lambda vs cloud functions vs edge functions](/blog/workers-vs-lambda-vs-cloud-functions-vs-edge-functions) tradeoff.
+
+## Common mistakes
+
+1. Picking the platform that is popular instead of the one that fits the workload.
+2. Defaulting to Vercel for non-Next.js projects because of brand familiarity.
+3. Underestimating Cloudflare's bandwidth advantage on high-traffic sites.
+4. Choosing the cheapest tier without considering platform-specific limits.
+5. Trying to run long-running backend work on any of these. None of them are designed for it.
+6. Migrating later because the cost surprised you. Pick with the cost trajectory in mind.
+7. Ignoring developer experience differences. Velocity matters and DX affects velocity.
+
+## A two week plan to decide and migrate
+
+1. **Day one.** Document your workload. Page views, function invocations, bandwidth, framework.
+2. **Day two.** Get cost estimates from all three at projected scale. Use the pricing calculators honestly.
+3. **Days three to five.** Build a prototype on the leading candidate. Confirm the framework integration works.
+4. **Week two.** Migrate. For a static site this is half a day. For a Next.js app it is a few days.
+5. **Week two ongoing.** Set up alerts for cost so the bill does not surprise you. Compare against your estimate.
+6. **Long term.** Revisit the choice when your traffic profile changes. The right platform at 10k users may not be the right one at a million.

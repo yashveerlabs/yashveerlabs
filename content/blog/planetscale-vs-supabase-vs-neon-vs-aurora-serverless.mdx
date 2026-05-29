@@ -1,0 +1,62 @@
+---
+slug: "planetscale-vs-supabase-vs-neon-vs-aurora-serverless"
+title: "PlanetScale vs Supabase vs Neon vs Aurora Serverless"
+excerpt: "Serverless database platforms promise to eliminate database operations. PlanetScale, Supabase, Neon, and Aurora Serverless each make different architectural bets. Here is how they compare and which fits which type of project."
+date: "2026-05-23"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026"]
+readingMinutes: 6
+ogImage: "/api/og/blog/planetscale-vs-supabase-vs-neon-vs-aurora-serverless"
+status: "published"
+definition: "PlanetScale, Supabase, Neon, and Aurora Serverless are managed database platforms that eliminate or reduce the operational overhead of running a database server. Each uses a different underlying technology: PlanetScale is MySQL with Vitess and branch-based schema deployments; Supabase is Postgres with REST and realtime APIs; Neon is Postgres with serverless connection pooling and branch-based development; Aurora Serverless is AWS's auto-scaling MySQL or Postgres offering. The right choice depends on the database technology, the connection pattern (serverless functions vs. persistent servers), and the development workflow preferences."
+faq: [
+  {"q":"What is PlanetScale and what makes it different?","a":"PlanetScale is a MySQL-compatible database platform built on the Vitess sharding infrastructure used by YouTube. Its distinguishing features are: database branching (create a branch of the database for development or testing, merge schema changes like a git branch), non-blocking schema changes (ALTER TABLE runs without locking the table), and horizontal sharding support for very large datasets. PlanetScale removed its free tier in 2024 and now starts at $39/month. It is the right choice for teams that specifically need MySQL compatibility, branch-based schema workflows, or horizontal sharding."},
+  {"q":"What is Supabase and when does it make the most sense?","a":"Supabase is an open source Firebase alternative built on Postgres. It provides a Postgres database, REST API (via PostgREST), realtime subscriptions, authentication, and storage in a single platform. The integrated realtime subscriptions and auto-generated REST APIs make it particularly useful for frontend-heavy applications where the backend developer wants to move quickly without building a separate API server. Supabase is a strong choice for applications that need realtime features, built-in auth, and a Postgres database as a single subscription."},
+  {"q":"What is Neon and how does its serverless model work?","a":"Neon is a serverless Postgres platform that separates compute from storage and allows compute to scale to zero when not in use. This architecture eliminates the cost of idle Postgres instances, which is significant for development environments and low-traffic staging environments. Neon also provides database branching for development workflows and instant branching for preview deployments. It is well-suited for serverless function environments (Vercel, Cloudflare Workers) where connection pooling is critical because each function invocation creates a new connection."},
+  {"q":"When is Aurora Serverless the right choice?","a":"Aurora Serverless v2 is the right choice when the workload is on AWS, the team is comfortable with AWS infrastructure, and the application needs auto-scaling capacity that can handle highly variable traffic without manual database instance management. Aurora Serverless v2 scales in 0.5 ACU increments (compared to v1's cold start behavior) and can scale rapidly during traffic spikes. It is more expensive than self-managed RDS for consistent high-traffic workloads but more cost-effective for spiky, unpredictable workloads where over-provisioning a fixed instance is the alternative."},
+  {"q":"What is the connection pooling problem in serverless environments and how do these platforms address it?","a":"Each serverless function invocation typically creates a new database connection. Postgres has a connection limit (typically 100 to 500 per instance depending on configuration). An application with 100 concurrent serverless function invocations can exhaust the connection pool, causing new connections to be rejected. Neon's HTTP driver and PgBouncer-based pooling handle this. Supabase provides connection pooling via Supavisor. Aurora Serverless with RDS Proxy provides connection pooling as a managed service. Teams using serverless functions must use a connection pooling mechanism rather than direct Postgres connections."}
+]
+---
+
+## What you need to know
+
+- PlanetScale is MySQL-based with database branching for schema workflows. It is not interchangeable with Postgres platforms.
+- Supabase provides the most complete platform: Postgres database, realtime subscriptions, auth, and storage as a single subscription. It is the right choice when you want to build quickly without a separate backend.
+- Neon is the best Postgres option for serverless function environments due to its connection pooler and scale-to-zero for development environments.
+- Aurora Serverless v2 on AWS is the most scalable option for high-traffic, variable-workload applications already in the AWS ecosystem.
+- The connection pooling problem is critical in serverless environments. Any platform used with serverless functions must provide a connection pooler; direct Postgres connections will exhaust the connection limit under load.
+
+## The core argument
+
+The serverless database platform market has consolidated significantly since 2022. PlanetScale's free tier removal reduced its attractiveness for early-stage projects. Neon emerged as the strongest pure-Postgres serverless option for developers on Vercel. Supabase doubled down on its platform play, adding more features to the integrated offering. Aurora Serverless v2 improved its scaling behavior to be practical for production use.
+
+For most new SaaS projects, the decision comes down to two questions: which database technology (Postgres or MySQL) and which deployment environment (Vercel/Cloudflare Workers versus a persistent server environment). If the answer is Postgres and Vercel, Neon is the most technically appropriate choice for its connection pooling and branching. If the answer is Postgres and you want an integrated platform, Supabase is compelling. If the answer is MySQL and you need branch-based schema deployments, PlanetScale is the only option in this comparison. If the answer is AWS with autoscaling requirements, Aurora Serverless v2 is the obvious choice.
+
+The Supabase platform play deserves specific attention for early-stage builders. A developer who chooses Supabase gets a Postgres database with REST and realtime APIs auto-generated from the schema, authentication with multiple providers, file storage, and Postgres edge functions, without configuring separate services for each. For a solo founder or small team building quickly, this bundled offering eliminates significant infrastructure configuration time. The tradeoff is vendor dependency: extracting from Supabase's realtime and auth later requires replacing those features with standalone services.
+
+## Common mistakes
+
+1. **Choosing PlanetScale when the application requires foreign key constraints.** PlanetScale's Vitess layer historically had limitations on foreign key constraint enforcement. Teams with data models that depend heavily on foreign keys for consistency should verify PlanetScale's current foreign key support before adopting it.
+
+2. **Using direct Postgres connections from serverless functions on Neon or Supabase.** Direct connections without a pooler exhaust the connection limit under any meaningful serverless concurrency. Use the Neon HTTP driver or Supabase's Supavisor pooler for serverless function workloads.
+
+3. **Assuming all platforms provide the same Postgres compatibility.** Supabase, Neon, and Aurora Serverless all run standard Postgres and are highly compatible. Extension support varies: Supabase has the broadest extension marketplace, Neon supports common extensions, Aurora Serverless has AWS-specific extension support. Verify that required extensions are supported before committing.
+
+4. **Not planning for platform egress costs.** Managed database platforms charge for compute, storage, and data transfer. Data egress (data transferred out of the platform to the application) is often a significant cost driver at scale. Evaluate the egress pricing alongside the compute and storage pricing.
+
+5. **Choosing based on free tier availability alone.** Platform free tiers change. PlanetScale removed its free tier; other platforms have modified their free tiers. A production application should be evaluated on paid tier pricing, not free tier availability.
+
+## Where to start
+
+1. **Identify the deployment environment first.** If deploying on Vercel or Cloudflare Workers, Neon or Supabase are the most compatible choices. If deploying on AWS with variable traffic, Aurora Serverless v2 is the natural choice. If self-hosting or deploying on bare metal, a managed platform may be less relevant than a self-managed Postgres instance.
+
+2. **Evaluate extension requirements against platform support.** List the Postgres extensions the application requires (pgvector for vector search, PostGIS for geographic data, TimescaleDB for time series). Check which platforms support them in their managed offering.
+
+3. **Run a load test on the connection pooling behavior.** Before selecting a platform for production, simulate the expected concurrent connection count from the application tier. Verify that the platform's connection pooling handles the load without connection errors.
+
+## Related reading
+
+- [PostgreSQL vs MySQL vs MongoDB for a New SaaS in 2026](/blog/postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026)
+- [PostgreSQL vs Supabase vs Neon vs Planetscale](/blog/postgresql-vs-supabase-vs-neon-vs-planetscale)
+- [JSON Columns in Postgres: When They Make Sense](/blog/json-columns-in-postgres-when-they-make-sense)
+- [Lambda Cold Starts: Why They Still Matter in 2026](/blog/lambda-cold-starts-why-they-still-matter-in-2026)

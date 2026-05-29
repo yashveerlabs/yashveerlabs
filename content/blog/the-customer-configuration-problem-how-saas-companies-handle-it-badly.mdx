@@ -1,0 +1,73 @@
+---
+slug: "the-customer-configuration-problem-how-saas-companies-handle-it-badly"
+title: "The Customer Configuration Problem: How SaaS Companies Handle It Badly"
+excerpt: "Why customer configuration in SaaS is harder than it looks, the patterns that scale, and the ones that become a maintenance nightmare by year two."
+date: "2024-11-27"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","configuration","engineering"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-customer-configuration-problem-how-saas-companies-handle-it-badly"
+status: "published"
+definition: "Customer configuration is the set of settings, preferences, and customizations that make a SaaS product behave differently for each customer. The naive approach is a settings table with key-value pairs. The production-ready approach is a structured configuration schema with validation, versioning, and a clear model for how configuration changes propagate. Most SaaS companies start with the naive approach and pay for it at scale."
+faq: [
+  {"q":"What is the simplest way to start with customer configuration?","a":"A JSON column in your tenants or organizations table, with a defined schema. JSON columns let you add new configuration keys without schema migrations. The trade-off is that validation and querying are harder. Define the schema in your application code and enforce it there."},
+  {"q":"When should configuration move to dedicated tables?","a":"When you start querying on configuration values regularly, or when individual configuration keys need their own access control, versioning, or audit history. If you find yourself doing JSON path queries in WHERE clauses, it is time to extract the relevant fields."},
+  {"q":"How do you handle configuration that has changed since a customer last touched it?","a":"Versioned defaults with migration logic. When you add a new configuration key, define a default value. For existing customers, the default is applied on their next session or at migration time. Document every default change in a changelog. Customers who care about configuration changes want the changelog."},
+  {"q":"Should I let customers edit configuration directly or only through the UI?","a":"Through the UI or a well-documented API with validation. Direct database access is not a support option. Customers who edit configuration outside of validated paths break their own setups and then blame the product."},
+  {"q":"How do I handle configuration that affects billing?","a":"Treat it like financial data. Every change is logged. Every change has an actor. Configuration that affects plan features, usage limits, or pricing calculations needs an audit trail that satisfies a billing dispute or a compliance review."}
+]
+---
+
+## What you actually need to know
+
+- Customer configuration is not a settings table. It is a contract between your product and each customer about how their instance behaves.
+- The naive approach (key-value pairs with no schema) becomes unmaintainable when you have 50+ configuration options and 1000+ customers.
+- Versioned configuration with documented defaults is the pattern that scales.
+- Configuration that affects billing, compliance, or security needs an audit trail.
+- Configuration changes should be testable in isolation before applying to production tenants.
+
+| Configuration Pattern | Scalability | Query Flexibility | Migration Difficulty |
+|---|---|---|---|
+| Key-value pairs (unstructured) | Low | Very low | High |
+| JSON column with defined schema | Medium | Medium | Medium |
+| Dedicated configuration tables | High | High | Low after initial setup |
+
+## The core argument
+
+Every B2B SaaS I have worked with has had a customer configuration problem. It usually surfaces at the same time: somewhere between 50 and 500 customers, when the support team starts making manual configuration changes for customers who cannot figure out the settings UI, and the engineering team realizes that the settings table has 87 columns with names like `enable_legacy_api_v2_fallback_mode`.
+
+The configuration problem is a design problem that looks like an operations problem. Teams add settings as they add features. Each setting is a column, or a key in a JSON blob, or a row in a key-value store. Nobody defines the schema. Nobody documents the defaults. Nobody writes the migration logic for customers who existed before the setting was introduced. After three years of this, you have a configuration surface that nobody fully understands, and changing any part of it risks breaking a customer who is using a combination of settings that nobody thought to test.
+
+The fix is not to delete everything and start over. It is to introduce schema discipline, versioned defaults, and a documented model for how new settings are introduced. These disciplines are cheap to implement when the customer count is under 100 and expensive to retrofit when it is over 1000.
+
+## The configuration patterns that scale
+
+**Structured JSON with schema enforcement.** Store configuration as JSON, but define and validate the schema in the application layer. When a customer's configuration is loaded, validate it against the current schema and log any fields that no longer match. This approach allows flexible extension without schema migrations while still enforcing structure.
+
+**Versioned defaults.** Every configuration setting has a version, a default value, and a migration function. When a setting is introduced, its default is defined. When the default changes, a new version is created. Customers who have not explicitly set the value use the default for their account creation date. Customers who have set a value keep their value until they change it.
+
+**Configuration audit logging.** Every change to customer configuration is logged with an actor, a timestamp, and the previous and new values. This log is the answer to "what changed and when did it change" in every billing dispute, compliance audit, and customer support call.
+
+**Staged rollout of configuration changes.** When a new configuration option is introduced, it is first applied to internal accounts, then to a 5 percent canary of external accounts, then to all accounts. This catches unexpected behavior in production before it affects the full customer base.
+
+## Common mistakes SaaS companies make
+
+1. Adding configuration keys without defining what the default means for existing customers. Existing customers who get an undefined default exhibit undefined behavior.
+2. Letting support engineers edit configuration in the database directly. Every direct database edit is an unlogged, unvalidated change that bypasses the application's invariants.
+3. Making configuration changes synchronous in the request path. A customer editing their configuration should not wait for all their tenant data to be recomputed before the UI updates.
+4. Not testing configuration combinations. With 30 configuration options, there are millions of combinations. Test the common combinations and the ones that interact.
+5. Treating configuration as a product problem when it is also an engineering architecture problem. The schema decisions belong in the architecture review, not just the product design.
+
+## Where to start: a 3-step configuration cleanup plan
+
+**Step 1: Audit the existing configuration surface.** List every configuration key in the system, its default value, its allowed values, and which features depend on it. For most teams this audit reveals dead configuration keys that were never removed, conflicting defaults, and settings that are named inconsistently.
+
+**Step 2: Define the schema.** Write the JSON schema or database schema for customer configuration. For each key, document the default, the allowed values, the validation rules, and the migration function for customers who were created before the key existed.
+
+**Step 3: Add audit logging.** For every configuration change endpoint in the API and UI, add a log entry that captures the actor, the timestamp, and the before and after state. This logging is cheap to add and expensive to retrofit.
+## Related reading
+
+- [Multi Tenant Background Jobs: Fair Scheduling and Noisy Neighbors](/blog/multi-tenant-background-jobs-fair-scheduling-and-noisy-neighbors)
+- [The Permission System That Scales With Your B2B Customers](/blog/the-permission-system-that-scales-with-your-b2b-customers)
+- [Audit Logs for SaaS: A Compliance and Trust Tool](/blog/audit-logs-for-saas-a-compliance-and-trust-tool)
+- [SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)

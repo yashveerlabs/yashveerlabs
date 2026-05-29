@@ -1,0 +1,111 @@
+---
+slug: "why-your-service-should-have-two-health-checks-not-one"
+title: "Why Your Service Should Have Two Health Checks Not One"
+excerpt: "A single /health endpoint is doing two jobs that contradict each other. One health check is for the load balancer. A different one is for the orchestrator. Conflating them is how a healthy service gets restarted into an outage."
+date: "2025-05-05"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-your-service-should-have-two-health-checks-not-one"
+status: "published"
+definition: "A service needs two health checks because liveness and readiness answer different questions. Liveness asks should this process be killed and restarted. Readiness asks should this process receive new traffic. A single endpoint that mixes the two will cause unnecessary restarts during transient dependency failures and is one of the most common quiet sources of self-inflicted outages."
+faq: [
+  {"q":"What is the difference between liveness and readiness?","a":"Liveness is about whether the process is alive enough to keep running. Readiness is about whether the process is ready to accept new requests. A service can be alive but not ready, for example during startup while it warms a cache. The two checks need different answers because they trigger different actions: restart versus stop sending traffic."},
+  {"q":"What goes wrong with a single combined health check?","a":"The load balancer and the orchestrator make decisions based on the same signal. If your check returns unhealthy because the database is briefly slow, the orchestrator may kill the pod even though restarting it will not fix the database. You end up with cascading restarts during a transient issue and a real outage caused by your own platform."},
+  {"q":"Should the health check call the database?","a":"Readiness can. Liveness should not. If liveness depends on the database, every database hiccup looks like every pod being dead, and the orchestrator restarts everything in a thundering herd. Liveness should reflect only whether the process itself is functioning. Readiness reflects whether the process can serve traffic right now."},
+  {"q":"How should I handle dependencies that are slow but not down?","a":"Readiness should return unhealthy so the load balancer stops sending traffic to that instance. Liveness should still return healthy so the orchestrator does not restart the pod. The orchestrator restarting will not bring the slow dependency back. It will just make the situation worse by adding cold pods to the mix."},
+  {"q":"What about startup probes?","a":"Use them for slow-starting services. A startup probe runs only at boot, gives the process time to warm up, and gates the readiness and liveness checks until the service is initialized. Without it, an orchestrator can kill a slow-starting pod for failing liveness before it ever became ready."},
+  {"q":"What status code should health checks return?","a":"200 for healthy and either 503 or a non-2xx code for unhealthy. Avoid 500 because it conflates application errors with health signals. Some load balancers treat any non-2xx as unhealthy, which is fine. Be explicit. The body of the response can include detail for humans but should not be required for the decision."},
+  {"q":"How often should health checks run?","a":"Liveness can run every 5 to 10 seconds with several allowed failures. Readiness should run more frequently, every 1 to 5 seconds, because it controls traffic routing and the cost of being wrong is just a few dropped requests. The exact numbers depend on your platform defaults, but the principle is liveness is patient, readiness is aggressive."}
+]
+---
+
+## What you actually need to know
+
+- One health check is doing two jobs and the jobs contradict each other.
+- Liveness answers "should I kill this process," readiness answers "should I send it traffic."
+- A combined check that depends on the database will trigger cascading restarts during a transient database issue.
+- Readiness can call dependencies. Liveness cannot.
+- Add a startup probe for any service that takes more than a few seconds to warm up.
+
+| Check type | Purpose | What it should check | What action it triggers |
+|---|---|---|---|
+| Liveness | Process alive? | Process responding, event loop alive | Kill and restart |
+| Readiness | Ready for traffic? | Process initialized, dependencies reachable | Stop or start routing traffic |
+| Startup | Finished booting? | Process completed its startup sequence | Delays liveness and readiness checks |
+
+## The core argument
+
+The single /health endpoint pattern is a habit that comes from an era before container orchestration. When a service ran on a fixed VM behind a load balancer, you only had to answer one question: is this thing okay. The platform did not restart processes. It just stopped sending traffic.
+
+Now we have orchestrators that kill pods aggressively, and we have load balancers that route traffic conditionally, and these two systems need different answers. The orchestrator wants to know if it should give up on this process. The load balancer wants to know if this process can take traffic right now. They are different questions with different consequences if you get them wrong.
+
+I have walked into several incidents where the root cause was a single health check that returned unhealthy because a database connection was briefly slow. The orchestrator killed the pod. The new pod started, hit the same slow database, returned unhealthy, got killed. The team had built itself a restart storm that took the whole service down during a five-second database blip that the database had already recovered from.
+
+The fix is structural. Two endpoints. Different rules. Different consumers.
+
+## What each check should actually do
+
+### Liveness
+
+Liveness is the simplest possible check that confirms the process is running and capable of responding. It does not touch the database. It does not call other services. It does not do anything that could fail because of something outside this process.
+
+A liveness check that returns 200 means "I am here and answering." A liveness check that fails means "I am stuck or crashed, please restart me." It is the cheapest possible signal because the action it triggers, restarting the process, is destructive and you do not want false positives.
+
+### Readiness
+
+Readiness is more expensive. It can check the database connection, the cache, the message queue, anything the service genuinely needs to handle a request. If readiness returns unhealthy, the load balancer stops sending new traffic. Existing connections drain. The pod is not killed. It just sits there waiting until it can serve again.
+
+This is the right behavior when a dependency is slow. Stop sending traffic to instances that cannot handle it. Do not kill those instances, because killing them does not fix the dependency.
+
+### Startup
+
+Startup is the trickiest because it only runs at boot. Use it for services that take significant time to initialize, like ones that load a large model or warm a sizable cache. Without it, you risk the orchestrator killing a slow-starting pod for failing liveness before it ever finished starting.
+
+## How long does it take to add
+
+| Service type | Effort | Risk if you skip |
+|---|---|---|
+| New service | An hour | Adopt the right pattern from day one |
+| Existing simple service | Half a day | Restart storms during dependency issues |
+| Existing complex service | A day | Cascading failures across pods |
+| Legacy service in maintenance | A day plus testing | Hard to add later but worth it |
+
+## What each check must include
+
+- Liveness: only checks internal to the process. No network calls. Fast and cheap.
+- Readiness: checks dependencies the service actually needs to serve requests.
+- Startup: tracks initialization progress.
+- All three: return explicit status codes and minimal bodies. Detail goes in logs, not response bodies.
+- Consistent paths: /healthz/live, /healthz/ready, /healthz/startup is a common convention.
+
+## Expert opinion
+
+> The first time I separated liveness from readiness in production, the team was skeptical. It felt like over-engineering for a problem we had not had. Three months later a Redis instance had a slow minute and our combined check would have restarted every pod in the fleet. Instead, readiness flipped to false for the duration, the load balancer stopped sending traffic, the pods stayed alive, and when Redis came back the fleet resumed without a single restart. That is the day the pattern earned its keep.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS platform I worked on had a single /health endpoint that called the database. During business hours the database had occasional 200ms spikes from a long-running report query. Each spike caused the health check to time out. The orchestrator restarted pods. The new pods hit the same database, timed out, got restarted. The error rate during these spikes was much worse than the database issue would have caused on its own.
+
+We split the check into liveness and readiness. Liveness became a trivial in-process check. Readiness kept the database call but with a generous timeout and a small failure tolerance. The next time the database spiked, readiness briefly returned false on a few instances, the load balancer rerouted, and not a single pod was restarted. The platform's self-inflicted outage pattern disappeared. The discipline of separating concerns showed up again in [the resilience patterns of circuit breakers and retries](/blog/resilience-patterns-circuit-breakers-retries-bulkheads), which addresses related failure modes.
+
+## Common mistakes
+
+1. Using a single /health endpoint for both consumers.
+2. Calling the database from the liveness check.
+3. Returning 500 instead of 503 for unhealthy, which mixes application errors with health signals.
+4. Setting liveness probes too aggressively, causing healthy slow-starting pods to be killed.
+5. Setting readiness probes too leniently, so traffic continues to a broken instance.
+6. Not adding a startup probe for slow-starting services.
+7. Putting expensive logic in a readiness check that fires every second. The check becomes a load source of its own.
+
+## A two week plan to fix it
+
+1. **Day one.** Audit your current health check. What does it actually check? Who consumes it?
+2. **Days two and three.** Split into three endpoints. Liveness, readiness, startup.
+3. **Days four and five.** Update the orchestrator and load balancer configs to use the new endpoints with sane intervals and thresholds.
+4. **Week two.** Roll out across one service first. Watch the behavior during the next minor dependency hiccup.
+5. **Week two ongoing.** Roll out to the rest of the fleet. Document the pattern in your [architecture decision records](/blog/the-architecture-decision-record-a-lightweight-discipline) so the next service inherits it.
+6. **Long term.** Make the three-endpoint pattern part of the new service template so this is never a question again.

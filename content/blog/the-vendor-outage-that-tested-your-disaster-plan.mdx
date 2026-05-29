@@ -1,0 +1,121 @@
+---
+slug: "the-vendor-outage-that-tested-your-disaster-plan"
+title: "The Vendor Outage That Tested Your Disaster Plan"
+excerpt: "A postmortem on a third-party vendor failure that exposed a startup's missing disaster recovery plan. What broke, who owned nothing, and how the business relationship with customers changed permanently."
+date: "2026-03-14"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","failure","incidents"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-vendor-outage-that-tested-your-disaster-plan"
+status: "published"
+definition: "A vendor outage is when a third-party service your product depends on fails, and your disaster recovery plan is tested for the first time. Most startups discover their disaster plan is a document nobody read, a Slack message nobody acted on, and a runbook that was last updated when the vendor was first integrated. The postmortem almost always says the same thing: we had no fallback."
+faq: [
+  {"q":"What should a startup disaster recovery plan cover for third-party vendor dependencies?","a":"A complete plan names each critical vendor, defines what failure looks like for that vendor, lists the fallback behavior for each failure mode, and assigns a human owner for the response. The plan should also specify customer communication templates, because the communication gap during an outage damages trust as much as the outage itself."},
+  {"q":"How do I identify which vendor dependencies are most dangerous to my startup?","a":"Map every vendor to a single question: if this service returned a 503 for four hours, would the core product still function? Any vendor whose failure would take down core functionality is critical. Payment processors, authentication providers, email delivery services, and cloud storage are almost always critical."},
+  {"q":"Should startups build fallback systems for third-party vendor failures?","a":"For critical vendors, yes. A fallback does not need to be a full replacement. A queue that stores operations during outage and replays them when the vendor recovers is often enough. The goal is to degrade gracefully rather than fail catastrophically."},
+  {"q":"How often do real startups have their disaster recovery plan actually fail during a vendor outage?","a":"Very often. Most disaster plans are written once, approved, and never tested. The first real test is the actual outage. By that point, the runbooks are outdated, the owners have changed, and the system has drifted from what the plan described."},
+  {"q":"What is the difference between a disaster recovery plan and a business continuity plan for a startup?","a":"A disaster recovery plan focuses on restoring technical systems after a failure. A business continuity plan covers how the business operates while those systems are being restored. Startups usually write only the technical plan and discover during an incident that they had no plan for what the support team should tell customers."},
+  {"q":"How should a startup communicate with customers during a vendor-caused outage?","a":"Honestly and quickly. The first message should go out within 30 minutes of a confirmed outage, even if the cause is still unknown. Customers do not expect perfection. They do expect to be told what is happening. A status page update is the minimum. A direct email to affected users is better for anything lasting more than two hours."},
+  {"q":"What questions should a startup ask a vendor before becoming dependent on their service?","a":"Ask for their SLA uptime guarantee, their historical uptime record, their incident communication process, and whether they offer status webhooks or a status page API. Also ask what the data portability story is if you need to leave. The vendor that cannot answer these questions is the vendor you should think twice about."}
+]
+---
+
+## What you actually need to know
+
+- A vendor outage exposes whether your disaster recovery plan is real or decorative. Most plans are decorative.
+- Critical vendor dependencies should have a named owner, a documented fallback behavior, and a tested runbook, not just a mention in a Notion doc.
+- Customer communication during an outage is a separate discipline from technical recovery. Startups that handle the technical recovery but stay silent lose customer trust anyway.
+- The first time most startups test their disaster plan is during the actual disaster. That is too late.
+- A vendor SLA is not a disaster plan. It is a refund policy with a long claims process.
+
+| Vendor Dependency Type | Failure Impact | Fallback Difficulty | Most Common Failure Mode |
+|---|---|---|---|
+| Authentication provider | Total product failure | High | Token service unavailable |
+| Payment processor | Revenue collection stopped | Medium | Webhook delivery failure |
+| Email delivery service | Notifications and receipts stopped | Low | Rate limiting or IP block |
+| Cloud storage | File access broken | Medium | Regional outage or bucket misconfiguration |
+| Third-party API | Feature disabled | Low to high depending on integration depth | Rate limit or deprecation |
+
+## The core argument
+
+I have been in the room during vendor outages. Not every one of them, but enough to know what the room looks like. The monitoring alert fires at 2am. Someone wakes up the on-call engineer. The on-call engineer pulls up the status page for the vendor. It says "investigating." Nobody knows what that means. The runbook says "contact vendor support." Vendor support has a ticket queue.
+
+The startup's product is down. Customers are emailing. The support team has no information. The disaster recovery plan, if one exists, is a Confluence page that was last edited ten months ago when the vendor was first integrated. Half the steps reference infrastructure that has since changed. The engineer who wrote it left four months ago.
+
+This is not a hypothetical. It is what I have watched play out at companies that were otherwise well-run. The vendor outage is the incident most startups are least prepared for because it feels like someone else's problem until it becomes entirely yours.
+
+The part that compounds the damage is the communication gap. Technical teams focus on the technical problem. Nobody is handling customer communication. By the time the outage resolves, customers have been silent for three hours wondering if their data is safe, their orders went through, or the product is just gone. Some of them canceled before the service came back. Some of them wrote reviews. None of that was necessary if someone had written a status page update in the first thirty minutes.
+
+## When the plan met reality
+
+Disaster recovery plans fail in predictable ways. The most common: the plan exists but was never tested, so the runbooks describe infrastructure that no longer exists. The second most common: the plan exists but has no owner, so when the outage happens, everyone assumes someone else is executing the plan.
+
+### The runbook that described the wrong system
+
+A team I know had a well-structured runbook for their email delivery vendor. It described how to switch to a backup sender, which domains to use, and what DNS changes to make. The runbook was eighteen months old. In those eighteen months, the team had moved to a different DNS provider, changed their domain structure, and rotated their backup sender credentials. The runbook was technically accurate for a system that no longer existed.
+
+During the actual outage, they spent forty minutes figuring out why the runbook steps were failing before someone thought to check whether the runbook was current. It was not. The fallback that should have taken ten minutes took ninety.
+
+### The fallback that was never wired up
+
+Another common failure: the team had a fallback, but it was never integrated into the application. The plan said "switch to vendor B if vendor A fails." The application had only ever called vendor A. Switching to vendor B meant a code change, a deployment, and a staging test. None of that happens quickly at 2am with customers down.
+
+A fallback that exists in a document but not in the codebase is not a fallback. It is a plan to start building a fallback during the incident.
+
+## What it requires
+
+| Preparation Activity | Time to Build | Time to Test | Owner |
+|---|---|---|---|
+| Vendor dependency map | 2-4 hours | N/A | Tech lead |
+| Runbook per critical vendor | 1-2 hours per vendor | 30 minutes per vendor | On-call rotation |
+| Customer communication templates | 1 hour | N/A | Founder or head of support |
+| Status page configuration | 2-3 hours | N/A | DevOps or tech lead |
+| Quarterly runbook review | 30 minutes | N/A | Tech lead |
+| Annual disaster recovery drill | Half day | Continuous | Entire team |
+
+## What a real disaster recovery plan needs
+
+- A current list of every critical vendor dependency, with a definition of "critical" agreed on by the team
+- A named human owner for each critical dependency who is responsible for the runbook and the response
+- A tested fallback for each critical vendor, meaning the fallback has been executed in a staging environment at least once
+- Customer communication templates written in advance, approved by whoever owns the customer relationship, and accessible during an incident without requiring a login to a system that might also be down
+- A status page that the team controls independently of the vendors it is monitoring
+- A quarterly runbook review on the engineering calendar, not just a good intention
+
+## Expert opinion
+
+> Vendor outages reveal the gap between the disaster plan you think you have and the one your team can actually execute at 2am under pressure. I have seen teams with beautiful documentation fall apart because the documentation described a system they had stopped running. The plan is only as good as the last time someone tested it against the real environment. Disaster recovery is not a document. It is a drill.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS team I worked with had a four-vendor dependency chain: their authentication provider called an identity service, which called a third-party KYC vendor, which wrote results to a cloud storage bucket. When the KYC vendor had a regional outage, new user signups failed. Existing users were fine. The monitoring alert did not fire because the team was only monitoring existing user sessions, not signup completion rates.
+
+The outage ran for six hours before a customer email triggered investigation. By that point, approximately forty new signups had failed silently. Users had received no error message, just a spinner that eventually timed out. The [incident response playbook](/blog/incident-response-for-startups-a-playbook) the team had documented covered infrastructure failures but had nothing for third-party API degradation. They wrote the postmortem in two days and discovered they had no runbook for any of their five critical vendor dependencies.
+
+The fix was structural. They built a [vendor dependency audit](/blog/the-vendor-audit-every-funded-startup-should-run-once-a-year) process, wrote runbooks for each critical vendor, wired up a fallback queue for the KYC step that allowed signups to complete with a pending verification state, and added signup completion rate to their monitoring dashboard. The next vendor incident six months later lasted twenty minutes. The team knew what to do. The customers did not notice.
+
+## Common mistakes
+
+1. Writing the disaster recovery plan once and never reviewing it. The system changes. The plan does not. They diverge until the plan describes a different product.
+2. Assuming vendor SLA guarantees mean vendor outages will not happen. They happen. The SLA determines whether you get a credit afterward, not whether the outage occurs.
+3. Testing fallbacks only in documentation, not in code. A fallback that has never been deployed is not a fallback.
+4. Having no named owner for the vendor response. Shared ownership is no ownership. When the outage happens, someone needs to be responsible for executing the runbook.
+5. Focusing only on technical recovery and ignoring customer communication. The silence during an outage is often more damaging than the outage itself.
+6. Not monitoring vendor health as a separate signal from application health. If the vendor is slow, your application will be slow. That signal should appear in your dashboards before customers notice it.
+7. Building vendor dependencies too deeply into the application. Abstractions that isolate the vendor from the core logic make switching and fallback much faster.
+8. Not practicing the runbook. A runbook that has never been executed is a hypothesis. Run it against staging once a quarter.
+
+## A 90-day disaster recovery plan
+
+1. Spend day one mapping every vendor dependency in the product. Name the vendor, the function it serves, and what happens to users if it goes to zero for four hours.
+2. Identify the three vendors whose failure would cause the most customer-visible damage. These are the critical ones.
+3. For each critical vendor, write a runbook: what failure looks like, who is responsible, what the fallback steps are, and what the customer communication is.
+4. Execute each runbook against a staging environment. Note every step that fails or requires a decision the runbook does not cover. Revise.
+5. Configure a status page your team controls. Add the critical vendors to it as monitored dependencies.
+6. Write three customer communication templates: one for the first thirty minutes of a confirmed outage, one for an extended outage update, and one for resolution. Get them approved and stored somewhere accessible without internet.
+7. Put a quarterly runbook review on the engineering calendar. The review checks whether the runbook steps still match the actual system.
+8. Run a full disaster drill once before the 90-day mark. Pick a non-critical vendor, simulate its failure, and execute the runbook end to end including the customer communication. The [post-mortem culture](/blog/the-post-mortem-culture-that-improves-security) you build from this drill will pay back during the real incident.
+
+The goal is not a perfect plan. It is a plan the team can actually execute, in the dark, under pressure, while customers are emailing. That is a very different document from the one most teams write.

@@ -1,0 +1,120 @@
+---
+slug: "the-saas-status-page-build-buy-or-both"
+title: "The SaaS Status Page: Build, Buy, or Both"
+excerpt: "A status page is the first thing customers open when something goes wrong. Whether you build it yourself, buy a hosted service, or layer both, the decision has real consequences for trust, cost, and incident response."
+date: "2024-12-14"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-saas-status-page-build-buy-or-both"
+status: "published"
+definition: "A SaaS status page is the public-facing surface that tells customers whether your product is up, degraded, or down, with a record of recent incidents. It is also an internal coordination tool during outages. Done well, it reduces support volume, shortens incident communication loops, and signals operational maturity to enterprise buyers who will check it before signing."
+faq: [
+  {"q":"what is the best status page tool for a small saas startup with limited budget","a":"Betterstack and Freshstatus both have free or near-free tiers that cover the basics: a hosted public page, uptime monitors, and incident posting. For most early-stage SaaS these are more than sufficient. Building your own only makes sense once you need deep integration with your own monitoring or a fully custom domain experience."},
+  {"q":"should a saas status page be hosted on a separate domain or subdomain","a":"Separate domain or at least a separate hosting provider from your main app. The failure scenario you are preparing for is your main infrastructure going down. If the status page is on the same infrastructure, it goes down too. Betterstack, Instatus, and Atlassian Statuspage all solve this by hosting the page on their own infrastructure."},
+  {"q":"how do I update a status page automatically without manual posting during an incident","a":"Connect your monitoring alerts to the status page API. Most hosted services expose a webhook or API endpoint you can call from your alerting system. When a monitor fails, the incident opens automatically. When it recovers, the incident resolves. Manual posting is the failure mode, not the happy path."},
+  {"q":"what should a saas incident update say and how often should I post updates","a":"Post every thirty minutes during an active incident even if the update is only that you are still investigating. Silence is the worst outcome because customers fill the silence with their own assumptions. A good update has three parts: what is affected, what the current status is, and when the next update will arrive."},
+  {"q":"can I build a custom status page instead of using a third party service","a":"Yes, and it is not technically complex. The hard part is reliability: the page must stay up when your main app is down, which means separate hosting, separate database, and ideally a separate CDN. The engineering cost is two to four weeks for a solid build. The question is whether that is better use of time than a thirty dollar per month hosted service."},
+  {"q":"what uptime monitors should I set up alongside a status page","a":"At minimum: HTTP check on your main app, HTTP check on your API, and a check on any third-party dependency that would affect customers. Add synthetic transaction monitors for critical user paths like login and checkout. Monitor from at least two geographic regions so you can distinguish a regional outage from a full outage."},
+  {"q":"how does a status page help with enterprise sales and soc 2 compliance","a":"Enterprise buyers check your status page before and after signing. A history of well-managed incidents with clear communication is a trust signal. For SOC 2 it demonstrates incident communication controls. A page with no history is neutral. A page with poorly managed incidents with gaps in communication is a liability."}
+]
+---
+
+## What you actually need to know
+
+- A status page is not optional once you have enterprise customers or SLAs. It is the first thing support teams and buyers check during an incident.
+- Hosted services handle the hard part: staying up when you are down. Building your own requires solving that problem yourself.
+- Automated updates from monitoring are better than manual posting. Manual posting fails exactly when you need it most.
+- The page is also an internal tool. Subscribers get notified. Support load drops. The incident team can focus on fixing instead of answering the same question in five channels.
+- In my experience, the teams that invest in a clean status page with incident history close enterprise deals more smoothly than the teams that have to explain their incident process from scratch every time.
+
+| Option | Best fit | Automation | Hosting reliability | Monthly cost |
+|---|---|---|---|---|
+| Betterstack (Uptime) | Most SaaS | Yes, via API | External | Free to 20 USD |
+| Atlassian Statuspage | Mid-market and enterprise | Yes | External | 29 to 499 USD |
+| Instatus | Budget-conscious teams | Yes | External | Free to 20 USD |
+| Freshstatus | Teams in the Freshworks ecosystem | Partial | External | Free tier available |
+| Custom built | Teams with specific integration needs | Full control | Your problem | Engineering cost |
+
+## The core argument
+
+Every SaaS will have an outage. The question is not whether the outage happens but how customers find out about it and how the team communicates through it. The teams that handle this well have a public status page, automated monitoring that updates it, and a clear internal process for posting updates. The teams that handle it badly let customers find out through Twitter and then scramble to explain what happened.
+
+I have seen both play out. The scramble version is expensive in a specific way: support tickets spike, customer success gets pulled into firefighting, and the post-incident conversation shifts from "what happened" to "why didn't you tell us." The status page does not prevent the outage. It prevents the communication failure that makes the outage worse.
+
+The build-versus-buy question is real but it tilts strongly toward buy for most teams. The technical problem a status page has to solve is availability independent of your main infrastructure. If your app goes down and your status page is on the same servers, both go down together. Hosted services solve this by definition. Building your own requires standing up a completely separate hosting environment with its own pipeline and failover, which is a legitimate investment for a team with specific requirements but an expensive distraction for everyone else.
+
+The "both" answer applies when a team uses a hosted service for the public page but builds internal tooling that feeds it. Your monitoring stack triggers incidents via the Betterstack or Statuspage API. Your internal dashboards link to it. Your on-call runbook includes a step to post an update within the first fifteen minutes. This combination gives you the reliability of a hosted service with the integration depth of something custom.
+
+## The anatomy of a useful status page
+
+### The public components
+
+The page needs at minimum: current status per component, active incident banner if anything is wrong, incident history for the last ninety days, and a subscribe option. The component list should map to what customers actually experience, not to internal service names. "API" is a component. "k8s-worker-pool-3" is not.
+
+Current status should be one of three or four states: operational, degraded, partial outage, major outage. Do not invent more granular states. Customers do not need nine severity levels. They need to know whether the thing they are trying to use is working.
+
+### The incident timeline
+
+Every incident should have a timeline visible on the page. The timeline shows when the incident was detected, when investigation began, when a cause was identified, when a fix was applied, and when the incident was resolved. Customers and enterprise buyers both look at this. A timeline that shows fifteen-minute update cadence communicates operational maturity. A timeline that shows a three-hour gap communicates the opposite.
+
+### The subscriber notifications
+
+Email and webhook subscriptions matter. Individual users subscribe to get notified. Enterprise customers often wire the webhook into their own monitoring. Setting up the subscription correctly means customers are not polling the page; they are getting pushed notifications. This reduces repeat page views during an incident and reduces the support volume because customers already know you are aware of the issue.
+
+## How much does it cost
+
+| Option | Engineering setup time | Monthly cost | Notes |
+|---|---|---|---|
+| Betterstack free tier | A few hours | 0 USD | Limited monitors and history |
+| Betterstack paid | A few hours | 20 to 80 USD | More monitors, longer history, API access |
+| Instatus | A few hours | 0 to 20 USD | Good feature set at low cost |
+| Atlassian Statuspage | Half a day | 29 to 499 USD | Enterprise features, audit trail, SLA tracking |
+| Custom built (basic) | Two to four weeks | Infrastructure cost, 20 to 100 USD/month | Requires separate hosting |
+| Custom built (full) | Six to eight weeks | Infrastructure cost plus maintenance | Only justified at scale or with specific requirements |
+
+## What to look for when picking a hosted service
+
+- Hosting that is completely independent of your own infrastructure. Check that the vendor does not use the same cloud region you do.
+- An API or webhook that your monitoring system can call to open and update incidents automatically.
+- Component grouping so you can model your product as customers experience it, not as your infrastructure is organized.
+- Subscriber notifications via email, SMS, and webhook.
+- Incident history retention for at least ninety days. Twelve months is better.
+- Custom domain support so the page lives at status.yourproduct.com.
+- A maintenance window feature for planned downtime.
+
+## Expert opinion
+
+> The status page is one of those infrastructure decisions that looks administrative but is actually a trust decision. Enterprise customers check it in the sales process. Existing customers check it the moment something feels slow. The teams that have a clean page with real incident history communicate something specific: that they run their product deliberately. The teams that do not have one communicate that they are surprised by their own outages.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client was six months into their enterprise push when their biggest prospect asked, during a security review, for a link to their status page. They did not have one. The team spent two days standing up a Statuspage instance, back-filling fake historical data, and hoping the prospect would not look too closely. The prospect noticed the history started two days before the meeting.
+
+The deal did not fall apart, but the trust conversation reset. The team spent the next six months building proper incident records, connecting their PagerDuty alerts to the Statuspage API, and documenting their incident process. The second enterprise prospect who asked got a real answer. The difference in the conversation was noticeable.
+
+For the ongoing infrastructure picture, [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) covers related reliability architecture, and [why your service should have two health checks not one](/blog/why-your-service-should-have-two-health-checks-not-one) covers the monitoring side that feeds a status page well.
+
+## Common mistakes teams make
+
+1. Hosting the status page on the same infrastructure as the main app. It goes down when the app goes down.
+2. Only posting updates when the incident is resolved. Customers need updates during the incident, not just a post-mortem.
+3. Component names that map to internal service names rather than what customers experience.
+4. No subscriber notifications. Customers are polling the page during an outage instead of receiving pushes.
+5. No incident history. A page with no history looks like it was set up this morning.
+6. Manual-only updates during incidents. The engineer who should be fixing the outage is writing status updates instead.
+7. No maintenance window feature, so planned downtime looks like an unplanned incident.
+8. Ignoring the page between incidents. Status pages that are only updated during emergencies read as reactive rather than deliberate.
+
+## A 30 day plan to get this right
+
+1. **Day one.** Pick a hosted service. Betterstack or Instatus for most teams. Statuspage if you have enterprise buyers already asking.
+2. **Days two and three.** Set up the page. Define components that map to customer-facing experience. Publish the URL at status.yourdomain.com.
+3. **Days four to seven.** Connect your monitoring. Wire at least three uptime checks: main app, API, and a critical user flow.
+4. **Week two.** Configure automatic incident creation from monitoring alerts. Test the flow end to end.
+5. **Week three.** Write the incident communication runbook. Who posts updates. How often. What the template says.
+6. **Week four.** Share the page URL in your product, your support documentation, and your email footer. Run a tabletop exercise of an incident to test the process.
+
+For related reliability reading, [the error budget SRE for small teams](/blog/the-error-budget-sre-for-small-teams) covers how to think about uptime targets, and [the on-call rotation that engineers can actually sustain](/blog/the-on-call-rotation-that-engineers-can-actually-sustain) covers the human side of incident response that a status page is part of.

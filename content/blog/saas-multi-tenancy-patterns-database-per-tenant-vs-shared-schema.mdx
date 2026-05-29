@@ -1,0 +1,62 @@
+---
+slug: "saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema"
+title: "SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema"
+excerpt: "Multi-tenancy is the architectural decision that determines how customers share infrastructure. The wrong choice creates migration pain later. Here is how database-per-tenant and shared schema compare and when each is appropriate."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema"
+status: "published"
+definition: "SaaS multi-tenancy is the architecture that allows multiple customers (tenants) to share the same application infrastructure while keeping their data isolated from other customers. The three common patterns are: database per tenant (each customer has a separate database, providing the strongest isolation), schema per tenant (each customer has a separate schema in a shared database), and shared schema (all customers share the same tables with a tenant_id column for isolation). Each pattern has different trade-offs for isolation strength, operational complexity, and cost at scale."
+faq: [
+  {"q":"What is the simplest multi-tenancy architecture for an early-stage SaaS?","a":"Shared schema is the simplest architecture: all customers share the same tables, and every row has a tenant_id column that identifies which customer it belongs to. Every query includes a WHERE tenant_id = ? clause (enforced via row-level security or application-layer filtering). This is the simplest to implement and operate: one database, one migration process, one backup. The risk is that application-layer bugs (missing WHERE tenant_id clause) can expose one customer's data to another. Row-level security in PostgreSQL mitigates this risk by enforcing tenant isolation at the database level."},
+  {"q":"When does database-per-tenant isolation become necessary?","a":"Database-per-tenant isolation is necessary when enterprise customers contractually require data isolation (data cannot coexist in the same database as other customers' data), when compliance certifications require it (some financial regulations specify separate storage), or when customer data volume is large enough that per-tenant resources are needed (a single customer's data would affect database performance for all customers on a shared database). Database-per-tenant is operationally expensive: migrations must run on every tenant database, backups multiply by tenant count, and connection pooling must handle the multiplied connection count."},
+  {"q":"What is row-level security in PostgreSQL and how does it enforce tenant isolation?","a":"Row-level security (RLS) in PostgreSQL allows defining policies that restrict which rows a database user can see. For multi-tenancy, a policy like 'USING (tenant_id = current_setting(\"app.current_tenant_id\")::uuid)' ensures that every query automatically filters to the current tenant's rows, regardless of whether the application query includes the WHERE clause. The application sets the current_tenant_id at the start of each request. RLS provides database-level enforcement that prevents application-layer bugs from causing cross-tenant data exposure."},
+  {"q":"What is the schema-per-tenant pattern and when is it useful?","a":"Schema per tenant creates a separate PostgreSQL schema for each customer within the same database. Each schema has identical table structures, but data is isolated by schema ownership. This pattern provides stronger isolation than shared schema (a query in schema A cannot accidentally access schema B's data) without the operational overhead of separate databases. Schema per tenant works well for hundreds of tenants but becomes operationally complex at thousands because schema creation, migration deployment, and connection routing all require per-tenant operations."},
+  {"q":"How do you migrate from shared schema to database-per-tenant?","a":"Migration from shared schema to database-per-tenant is one of the highest-effort architectural changes in a SaaS product. The process: create the new database for the tenant, run all migrations on the new database, copy the tenant's data, verify the data is complete and consistent, update the routing layer to point the tenant's requests to the new database, then delete the tenant's data from the shared database. This process must be done for every tenant and requires application-level routing based on tenant identity. Teams considering this migration should evaluate whether schema per tenant provides sufficient isolation with lower migration complexity."}
+]
+---
+
+## What you need to know
+
+- Shared schema with row-level security is the correct starting point for most SaaS products. It is the simplest to operate and easiest to evolve.
+- Database-per-tenant provides the strongest isolation but multiplies operational complexity by the number of tenants. Adopt it only when contractually or compliance-required.
+- Row-level security in PostgreSQL is the technical mechanism that makes shared schema safe. Configure it from the start.
+- Migrating from shared schema to database-per-tenant later is painful. Make the right choice for the next two to three years of scale, not just for today.
+- Schema-per-tenant is the useful middle ground when enterprise isolation requirements exist but database-per-tenant operational complexity is too high.
+
+## The core argument
+
+The multi-tenancy decision is made once and affects the system for years. Most teams make it wrong in one of two directions: they start with database-per-tenant because "enterprise customers need isolation," before they have enterprise customers, and then spend months managing migration complexity for a dozen customers who did not require it. Or they start with shared schema without row-level security and discover that a missing WHERE clause caused a data leak in production.
+
+The right decision depends on the current customer base and the next 12 months of expected enterprise requirements. For SMB-focused SaaS where no customer has contractual isolation requirements: shared schema with PostgreSQL row-level security. Simple to implement, simple to operate, safe with proper RLS configuration. For SaaS actively selling to enterprises who are asking about data isolation: evaluate whether schema-per-tenant satisfies the requirement before committing to database-per-tenant. Many enterprise security teams accept schema-per-tenant with appropriate access controls.
+
+The Velmora team made this call early in the product's architecture phase. Shared schema with row-level security for the first 18 months while we were serving SMB customers. When the first enterprise customer appeared with explicit database-level isolation requirements, we migrated that customer to a dedicated database using the routing layer. The ability to mix isolation levels, routing some customers to shared infrastructure and others to dedicated databases, was the architecture decision that let us start with simplicity and scale to enterprise requirements incrementally.
+
+## Common mistakes
+
+1. **Implementing shared schema without row-level security.** Shared schema without RLS relies entirely on application-layer WHERE clauses for isolation. A query that forgets the tenant filter returns all tenants' data. PostgreSQL's RLS makes tenant isolation mandatory at the database level, independent of application code. This is not optional if the application handles sensitive data.
+
+2. **Using database-per-tenant from day one without enterprise customers.** Database-per-tenant before enterprise customers creates operational overhead (multiple databases, multiple migration processes, multiple backup jobs) without the business justification that enterprise contracts provide. Start simple and add isolation when customers require and pay for it.
+
+3. **Not including tenant_id in every table's primary index.** In a shared schema, queries that filter by tenant_id are the most common query pattern. A composite index on (tenant_id, id) for every major table ensures these queries are fast. Tables without tenant_id in the index produce sequential scans for tenant-filtered queries as data volume grows.
+
+4. **Building the tenant routing layer as an afterthought.** The routing layer (which database or schema serves which tenant) needs to exist from the first day you have more than one isolation level, even if it starts simple. Routing logic embedded in application code rather than a proper routing layer becomes impossible to maintain as the number of tenants across different isolation levels grows.
+
+5. **Not testing cross-tenant isolation in the test suite.** Write tests that verify that tenant A cannot read tenant B's data. These tests run against every release and catch regressions in the tenant isolation logic before they reach production. Without these tests, isolation correctness is verified only by code review, which is insufficient.
+
+## Where to start
+
+1. **Start with PostgreSQL row-level security configured before any tenant data enters the database.** Enable RLS on every table that contains tenant-specific data. Write the policy before writing application code. Test the policy by connecting with the application user and verifying that queries without setting the tenant context return zero rows.
+
+2. **Build the tenant resolution middleware from day one.** Every request needs to resolve the tenant identity (from JWT claims, domain, or API key), set the tenant context for row-level security, and pass the tenant ID to the application layer. This middleware is simple to write but important to have as a first-class concern before any multi-tenant data exists.
+
+3. **Document the isolation level offered in the pricing and terms.** Different customers will want different isolation guarantees. Define the isolation levels (shared schema, schema per tenant, database per tenant) and which pricing tiers they correspond to before a customer asks. Being able to answer "what does your data isolation look like?" with a specific, documented answer is a sales advantage in enterprise deals.
+
+## Related reading
+
+- [Plan Upgrades and Downgrades: A Billing Architecture Story](/blog/plan-upgrades-and-downgrades-a-billing-architecture-story)
+- [Schema Design Decisions That Haunt You at Million User Scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale)
+- [SCIM Provisioning: The Feature Enterprise Customers Will Demand](/blog/scim-provisioning-the-feature-enterprise-customers-will-demand)
+- [Single Sign-On for Enterprise SaaS: SAML and OIDC Compared](/blog/single-sign-on-for-enterprise-saas-saml-and-oidc-compared)

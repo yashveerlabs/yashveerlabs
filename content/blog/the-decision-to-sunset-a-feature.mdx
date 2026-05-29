@@ -1,0 +1,97 @@
+---
+slug: "the-decision-to-sunset-a-feature"
+title: "The Decision to Sunset a Feature"
+excerpt: "How to remove a feature customers are actively using without breaking trust, creating churn, or leaving the codebase worse than before."
+date: "2025-10-30"
+category: "Founder Decision Frameworks"
+tags: ["founders","product","engineering","decision-frameworks","technical-debt"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-decision-to-sunset-a-feature"
+status: "published"
+definition: "Sunsetting a feature means removing functionality that currently exists and that at least some users depend on. Every feature removal creates a migration problem for those users and a trust question about whether the product will continue to evolve in ways that disrupt established workflows. Done well, feature sunsets reduce maintenance burden and sharpen product focus. Done poorly, they generate churn and damage the product's reputation for reliability."
+faq: [
+  {"q":"How do I know if a feature should be sunset?","a":"When usage is under 5 percent of active users, the feature creates disproportionate maintenance burden, the feature is architecturally incompatible with the product's direction, or supporting the feature prevents shipping improvements the majority of users need. At least two of these conditions should be true before a removal decision is made."},
+  {"q":"How much notice should I give before removing a feature?","a":"90 days for features with low usage and simple migration paths. Six months for features with significant usage or complex migration requirements. Enterprise customers with contractual commitments to specific features may require longer notice or individual negotiation."},
+  {"q":"What should I provide to help affected users migrate?","a":"A specific migration path (how to replicate the workflow using remaining features or an alternative tool), a data export of any data stored in the feature being removed, documentation of the change timeline, and a direct communication channel for questions about the migration."},
+  {"q":"What if some users refuse to migrate?","a":"For a small number of highly vocal users, the refusal to migrate is often about the disruption to their workflow rather than the feature itself. Schedule a call, understand the specific workflow, and identify whether the migration path addresses it. Often the concern can be resolved with additional guidance rather than by keeping the feature."},
+  {"q":"Should I grandfather enterprise customers on features being sunset?","a":"For features that are covered by active contracts, yes. Review the contracts before announcing the sunset. If the feature is covered by a contractual commitment, the sunset requires either a contract amendment or waiting until contract renewal. Do not sunset features that are contractually guaranteed without advance negotiation."}
+]
+---
+
+## What you actually need to know
+
+- Under 5 percent active usage is the typical threshold for considering a feature sunset. Combine this with the maintenance cost to make the case.
+- Give 90 days notice minimum. More for features with complex migration paths or enterprise users.
+- Provide a migration path that is specific and actionable. "Use this other feature instead" is not sufficient.
+- The users who complain loudest about a removal are not always the users most affected by it. Understand actual usage before responding to vocal feedback.
+- Remove the code cleanly after the sunset date. Dead code with no users is technical debt without the offsetting value.
+
+| Feature Category | Usage | Maintenance Burden | Action |
+|---|---|---|---|
+| Low usage, low burden | Under 5% | Low | Optional: remove if it creates code complexity |
+| Low usage, high burden | Under 5% | High | Remove with 90-day notice |
+| Medium usage, high burden | 5 to 20% | High | Remove with 6-month notice and migration path |
+| High usage, any burden | Over 20% | Any | Do not remove without a full replacement strategy |
+
+## The core argument
+
+Every feature in a product is a maintenance commitment. When it was built, the trade was clear: the development time produces a capability that justifies the ongoing maintenance cost. Some features hold up that trade indefinitely. Others do not. Usage drops. The codebase evolves in ways that make the feature harder to maintain. The feature was built for a use case that most current users do not have.
+
+The fear of removing features comes from the belief that users will interpret removal as reduction in value. That fear is valid when the feature has significant active usage. It is not valid when the feature is used by 3 percent of users and has not been improved in two years. The 97 percent of users who do not use the feature are paying a maintenance tax in the form of slower overall product improvement, because engineering time is being spent keeping the feature running.
+
+The discipline of removing features is part of keeping the product healthy. A product with fifty features that all work reliably is better than a product with a hundred features where twenty percent of them are half-maintained and occasionally broken. Feature removal is product quality work.
+
+## How to identify features worth sunsetting
+
+Usage data is the primary input. For every feature, track the percentage of active users who used it in the last 30 days. This is the adoption metric. Features with under 5 percent adoption are candidates for review.
+
+The secondary input is maintenance cost. Some low-usage features are architecturally simple and cost almost nothing to maintain. Others depend on third-party integrations that change, have complex edge cases, or are built on older code that creates technical debt. The combination of low usage and high maintenance cost makes the strongest case for removal.
+
+The third input is roadmap conflict. A feature that is architecturally incompatible with the direction the product is taking will become an increasing problem as the product evolves. Removing it proactively is cheaper than working around it on every subsequent change.
+
+When the usage data, maintenance cost, and roadmap alignment all point in the same direction, the case for sunset is clear. When only one condition is present, the decision requires more judgment.
+
+## Communicating the sunset
+
+The announcement email should be specific about four things: which feature is being removed, why, when, and what users should do instead.
+
+"Why" is the hardest part. Founders are tempted to be vague: "we are focusing on our core experience" or "this feature does not meet the standard we want for the product." These explanations generate more confusion and suspicion than honest explanations. An honest explanation is: "This feature is used by 4 percent of active users and requires significant maintenance that slows down improvements for the majority. We are removing it to focus that capacity on the features that serve you better."
+
+The migration path must be actionable. Do not just say what is being removed. Say what users should do instead. If the replacement is a different feature in the product, provide a guide. If the replacement is a third-party tool, identify the tool and provide context on the transition. If there is no equivalent replacement, be honest about that.
+
+## Handling the response
+
+Expect two types of response to a feature sunset announcement.
+
+The first type is the user who actually depended on the feature and whose workflow is genuinely disrupted. This user needs help with the migration. Schedule a call. Understand the specific workflow. Often there is a way to replicate the workflow using remaining features that the announcement email did not make clear. Resolving these cases builds trust rather than eroding it.
+
+The second type is the user who is not significantly affected but who objects to the principle of removal. This user often has not used the feature recently but is concerned about the precedent. The response here is factual: the feature had X percent usage, and the maintenance cost was being paid by all users through slower product improvement. The removal serves the majority.
+
+Distinguish between these two types before responding. Responding to the principle objector as if they have a workflow problem creates a conversation that cannot be resolved. Responding to the workflow-disrupted user as if they are making a principle objection fails to help someone who needed help.
+
+## Common mistakes teams make when sunsetting features
+
+1. Removing the feature without advance notice. Even low-usage features have users who depend on them. Surprise removals generate disproportionate backlash relative to planned removals with notice.
+2. Not providing a migration path. "This feature is being removed" without "and here is what you should do instead" leaves users stranded.
+3. Not exporting data stored in the removed feature. Users who lose access to data they created in the product will not forgive it.
+4. Keeping the code after the sunset date. Dead code that is no longer maintained becomes technical debt. Remove it completely when the feature is removed.
+5. Not communicating to affected users directly. A blog post is not sufficient. Email the users who have used the feature in the past 90 days directly.
+
+## Where to start: a 3-step feature sunset plan
+
+**Step 1: Run the usage audit.** Pull the percentage of active users who used each feature in the last 30 days. Identify the candidates: under 5 percent usage. For each candidate, assess the maintenance burden. Flag the ones with both low usage and meaningful maintenance cost.
+
+**Step 2: Draft the migration path before announcing.** For each feature being sunset, identify what users will do instead. Write the migration guide. Test it with one or two affected users before the announcement. Confirm the guide actually helps.
+
+**Step 3: Send the announcement directly to affected users 90 days before removal.** Personalized email to users who have used the feature in the last 90 days. General announcement to all users. Clear date, clear migration path, clear offer to help. Follow up at 60 days and 30 days.
+
+## The Engineering Cost of Keeping Features Alive
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The maintenance burden of low-usage features is a real engineering cost that shows up as slower shipping speed and more complex refactoring. Every system I build is designed with removal in mind: features that are not sustainable should be removable without cascading dependencies. If your codebase has features that are costing more to maintain than they are returning in user value, that is an architecture and prioritization conversation I can have specifically.
+
+## Related reading
+
+- [The Decision to Sunset a Product](/blog/the-decision-to-sunset-a-product)
+- [The Boy Scout Rule in Practice: Leaving Code Better Than You Found It](/blog/the-boy-scout-rule-in-practice-leaving-code-better-than-you-found-it)
+- Tech Debt: When to Pay and When to Wait
+- [The Decision to Change Pricing](/blog/the-decision-to-change-pricing)

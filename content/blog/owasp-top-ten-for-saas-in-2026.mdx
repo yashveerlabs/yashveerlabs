@@ -1,0 +1,62 @@
+---
+slug: "owasp-top-ten-for-saas-in-2026"
+title: "OWASP Top Ten for SaaS in 2026"
+excerpt: "The OWASP Top Ten is the standard list of critical web application security risks. Here is what each risk means in practice for a SaaS product, which ones are still commonly exploited in 2026, and how to address each without over-engineering the fix."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/owasp-top-ten-for-saas-in-2026"
+status: "published"
+definition: "The OWASP Top Ten is a periodically updated list of the ten most critical web application security risks, maintained by the Open Web Application Security Project. Each item represents a category of vulnerability that is both common and impactful. For SaaS products in 2026, the relevant categories include broken access control, cryptographic failures, injection attacks, insecure design, security misconfigurations, and three others that have increased in relevance due to the adoption of APIs, microservices, and AI features."
+faq: [
+  {"q":"What is broken access control and why is it the top OWASP risk?","a":"Broken access control means the application does not correctly enforce what actions authenticated users are permitted to take. A user who can access another user's data by changing an ID in a URL, a user who can perform admin actions because the admin check was not implemented on the API endpoint, or a user who can access a tenant's data because tenant isolation was not enforced in the database query are all broken access control vulnerabilities. It is the top risk because it appears in every category of application and the consequences (data exposure, unauthorized modification, privilege escalation) are severe."},
+  {"q":"What is a cryptographic failure and what are common examples?","a":"A cryptographic failure is the use of weak, deprecated, or incorrectly implemented cryptography to protect sensitive data. Common examples: storing passwords with MD5 or SHA-1 (instead of bcrypt or Argon2), transmitting sensitive data over HTTP rather than HTTPS, using ECB mode for symmetric encryption (which reveals patterns in encrypted data), or using a predictable random number generator for token generation. Cryptographic failures often result in data that appears protected but can be decrypted by an attacker with reasonable effort."},
+  {"q":"What is injection and does SQL injection still happen in 2026?","a":"Injection vulnerabilities occur when untrusted data is sent to an interpreter (SQL engine, shell, XML parser) as part of a command rather than as data. SQL injection still happens in 2026, primarily in codebases that use raw SQL string concatenation instead of parameterized queries, in legacy code with manual query construction, and in dynamic SQL generation for complex queries. ORMs prevent SQL injection for standard queries but SQL injection can still appear in raw query methods. Also in this category: command injection, LDAP injection, and prompt injection in AI features."},
+  {"q":"What is security misconfiguration and how does it manifest in SaaS?","a":"Security misconfiguration is the use of insecure default configurations, incomplete configurations, or missing security hardening. Common SaaS examples: S3 buckets configured for public access that should be private, database instances without authentication exposed to the internet, API endpoints with verbose error messages that reveal implementation details, admin interfaces exposed on public ports, and unnecessary services enabled in production environments. Security misconfiguration is consistently in the OWASP Top Ten because cloud infrastructure defaults often prioritize convenience over security."},
+  {"q":"What is server-side request forgery (SSRF) and why has it become more prominent?","a":"Server-side request forgery is an attack where the attacker causes the server to make HTTP requests to internal systems that the attacker cannot reach directly. If the application fetches a URL provided by the user (webhook testing, URL preview, image loading from user-supplied URLs), an attacker can supply an internal URL (the EC2 metadata endpoint, an internal API, a database admin interface) and receive the response through the application. SSRF has become more prominent in cloud environments because the EC2/cloud metadata API is accessible at a well-known URL and contains credentials that grant broad cloud access."}
+]
+---
+
+## What you need to know
+
+- Broken access control is the most common and consequential vulnerability in SaaS applications. Every data access in the application should verify that the requesting user has permission to access that specific resource.
+- SQL injection is preventable with parameterized queries and prevented by default by most ORMs. It still appears in code that uses string concatenation for SQL construction. Audit every raw SQL call in the codebase.
+- Security misconfiguration in cloud infrastructure is responsible for a significant portion of publicly reported data breaches. S3 bucket access policies, security group rules, and API key permissions should be reviewed at least quarterly.
+- Cryptographic failures are preventable with modern library defaults: bcrypt or Argon2 for passwords, TLS 1.2+ for transport, and AES-256 for symmetric encryption. Using outdated cryptography is almost always a legacy decision that persists through negligence.
+- The OWASP Top Ten should be a checklist in every security review, not a document that gets read once and filed. Each category should have a concrete answer for how the application addresses it.
+
+## The core argument
+
+The OWASP Top Ten is valuable because it gives a non-security engineer a vocabulary for the category of security problem that produced most of the major breaches in recent history. A developer who understands what broken access control means, what injection means, and what security misconfiguration means can identify these patterns when writing code and ask the right questions during code review. Security expertise helps, but the OWASP categories are broad enough that any engineer can use them as a checklist.
+
+Broken access control deserves special attention because it is architecturally pervasive and easy to introduce through a single missed check. The pattern appears in multi-tenant SaaS constantly: the API endpoint that fetches a resource by ID does not verify that the ID belongs to the requesting tenant, allowing one tenant to access another's data by guessing or enumerating IDs. This is the insecure direct object reference vulnerability, and it is preventable with one filter on every database query. In my experience reviewing SaaS codebases, the most common form is: the user ID is in the JWT, the resource ID is in the URL, and the query joins them. But when the developer is moving fast, the tenant check is occasionally left out. One missed check creates a data exposure vulnerability that is indistinguishable from the correct implementation until an attacker finds it.
+
+The 2023 OWASP update added two categories that are particularly relevant for modern SaaS: insecure design and software and data integrity failures. Insecure design addresses the gaps that static analysis and code review miss: architectural decisions that make it structurally impossible to enforce security correctly. A multi-tenant architecture that shares database schema without tenant isolation in every query is an insecure design. No amount of code review will catch every missing tenant filter if the design does not enforce it. Addressing insecure design requires security thinking at the architecture stage, not just during implementation.
+
+## Common mistakes
+
+1. **Only enforcing authorization at the route level, not the data level.** Checking that a user is authenticated before accessing a route is necessary but not sufficient. The application must also verify that the specific resource being accessed belongs to the requesting user or tenant. Route-level authorization prevents unauthenticated access; object-level authorization prevents authenticated users from accessing each other's data.
+
+2. **Using string concatenation for SQL queries in any part of the codebase.** Even when 99 percent of queries use an ORM, a single raw query built with string concatenation is a potential SQL injection vulnerability. Audit the codebase for raw query calls and replace string concatenation with parameterized queries.
+
+3. **Leaving verbose error messages in production responses.** Stack traces, database error messages, and framework internals exposed in API error responses reveal implementation details that help attackers understand the system. Production error responses should return generic error messages with a request ID for support purposes; the detailed error should be logged server-side.
+
+4. **Not rotating secrets after a suspected exposure.** When a secret (API key, database password, signing key) may have been exposed through logs, repository commits, or error messages, the response is immediate rotation, not investigation first. Rotate first, investigate second. A secret that might be compromised should be treated as compromised.
+
+5. **Skipping the OWASP checklist for new features.** New features introduce new attack surface. Each new feature should be evaluated against the OWASP Top Ten categories during design review, not after launch. Features that involve user-supplied URLs (SSRF risk), file uploads (path traversal, malware execution risk), or new data access patterns (broken access control risk) should receive specific security attention.
+
+## Where to start
+
+1. **Audit every API endpoint for object-level authorization.** For each endpoint that returns or modifies a resource identified by an ID, verify that the query includes a filter on the user or tenant that owns the resource. Document the authorization check for each endpoint. Missing checks are the most common source of data exposure in SaaS.
+
+2. **Search the codebase for raw SQL construction.** Grep for string concatenation in SQL queries. Every instance of query building with string interpolation should be replaced with parameterized queries. This is a one-time exercise that eliminates the SQL injection surface permanently.
+
+3. **Review cloud infrastructure permissions quarterly.** For each S3 bucket, security group, IAM role, and API key: who can access it, from where, and is that the minimum permission required for the application to function? Permissions that expand over time without review create the security misconfiguration exposure that causes preventable incidents.
+
+## Related reading
+
+- [Insecure Direct Object References: The Bug Founders Underestimate](/blog/insecure-direct-object-references-the-bug-founders-underestimate)
+- [OAuth 2.0 Without Tears: A Founder Engineer's Guide](/blog/oauth-2-0-without-tears-a-founder-engineers-guide)
+- [JWT Best Practices in 2026: What Has Changed](/blog/jwt-best-practices-in-2026-what-has-changed)
+- [ISO 27001 for Engineering Founders: A Practical Reading](/blog/iso-27001-for-engineering-founders-a-practical-reading)

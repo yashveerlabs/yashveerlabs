@@ -1,0 +1,139 @@
+---
+slug: "building-ai-agents-that-do-real-work-beyond-the-demo"
+title: "Building AI Agents That Do Real Work: Beyond the Demo"
+excerpt: "Most AI agents look impressive in a demo and fail in production. The agents that survive are scoped, bounded, observable, and integrated with the user's workflow. Here is the playbook."
+date: "2026-05-20"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","agents","llm","production"]
+readingMinutes: 13
+ogImage: "/api/og/blog/building-ai-agents-that-do-real-work-beyond-the-demo"
+status: "published"
+definition: "An AI agent that does real work is a constrained, observable, evaluable system that performs a defined task on behalf of a user. It is not an open ended autonomous worker. The agents that survive production share a few traits. Narrow scope. Clear tool inventory. Human approval at the right moments. Evaluation suite. Cost ceiling. The agents that fail share the opposite traits."
+faq: [
+  {"q":"What is the difference between an agent and a chat interface?","a":"A chat interface answers questions. An agent takes actions. The agent has tools it can invoke, decisions it makes about which tool to use, and a loop that runs until the task is complete. The complexity is real. The value is also real when the task fits."},
+  {"q":"What tasks are right for agents?","a":"Tasks with a clear definition of done, a bounded set of actions, and an asymmetric cost where the agent saves time on the common case and humans handle the edge cases. Email triage, customer support routing, document summarization with action extraction, scheduled workflow automation."},
+  {"q":"What tasks are wrong for agents?","a":"Tasks where the cost of being wrong is high and hard to detect. Financial transactions without human review. Customer facing communications without approval. Anything where the user has not signed up to be the editor of AI output."},
+  {"q":"How do I bound the agent?","a":"Limit the tool inventory. Limit the loop iterations. Limit the cost per task. Require approval for high impact actions. The bounding is what keeps the agent from going off track when the model misjudges."},
+  {"q":"How do I evaluate an agent?","a":"Build a representative task set. Define success criteria for each. Run the agent on the set after every change. Measure correctness, completeness, and cost. The eval suite is the difference between an agent that improves and one that drifts."},
+  {"q":"What is the cost structure?","a":"Agents are expensive because each task often involves multiple model calls. A simple task might cost cents. A complex task might cost dollars. The cost ceiling per task is a hard constraint. Without it the bill grows silently."},
+  {"q":"What about agent frameworks like LangChain or CrewAI?","a":"Frameworks help with the orchestration but the production grade work is in the application layer. The framework is the easy part. The hard parts are scoping, tool design, evals, and observability. Pick a framework that is not in the way."}
+]
+---
+
+## What you actually need to know
+
+- The agent has a narrow scope, a clear tool inventory, and a hard cost ceiling.
+- Human approval is required at high impact moments.
+- The eval suite is what keeps the agent from drifting.
+- Cost per task is a real constraint. Budget for it.
+- Frameworks help with orchestration but the production work is application layer.
+
+| Property | Demo agent | Production agent |
+|---|---|---|
+| Scope | Open ended | Narrow |
+| Tool inventory | Anything | Bounded |
+| Loop limit | None | Hard cap |
+| Cost ceiling | None | Per task limit |
+| Evaluation | None | Representative task set |
+| Observability | Print statements | Structured telemetry |
+| Human approval | None | Required for high impact actions |
+
+## The core argument
+
+The gap between an agent demo and an agent in production is enormous and not visible from the outside. The demo shows the agent doing impressive work on a sympathetic example. The production deployment exposes the agent to the long tail of real inputs, the cost reality of running it at scale, and the failure modes that the demo never surfaced.
+
+The teams that ship production agents do so by accepting constraints. The scope is narrow on purpose. The tool inventory is limited on purpose. The agent stops after a bounded number of iterations on purpose. Every one of these constraints is a way to keep the agent useful when the underlying model misjudges. Without the constraints, the agent eventually goes off track and the cost is visible.
+
+The teams that fail to ship production agents share the opposite pattern. They try to build an agent that can do anything. They give it broad tool access. They let the loop run forever. They skip the evals. The first month looks great. The third month is a slow degradation. The sixth month is when the team realizes the agent is unreliable enough that they cannot stop watching it, which defeats the purpose.
+
+The right framing is to treat the agent as a feature that does specific work for specific users in specific moments. Not as an autonomous worker. The feature framing keeps the scope honest and the success criteria clear.
+
+## How to scope the agent
+
+Start with the task. What exactly is the agent doing. Write it in one sentence. If the sentence is more than twenty words, the scope is too broad.
+
+Define done. The agent stops when this specific condition is true. Document it. The condition should be testable.
+
+Inventory the tools. Three to seven tools is the sweet spot. Each tool has a clear purpose. Each tool returns structured output the agent can use.
+
+Set the loop limit. Five to fifteen iterations is usually enough for a focused task. Past that the agent is usually stuck or off track. Stop and ask for help.
+
+Set the cost ceiling. The agent can spend at most X tokens per task. Past that the task fails gracefully and the user is informed.
+
+Define the approval points. Which actions require explicit human approval before execution. Sending an email. Writing to a customer record. Triggering a payment. The approval is a feature.
+
+## The architecture
+
+The agent runs server side. It exposes a start endpoint, a status endpoint, and a stream endpoint for live progress. The client triggers the agent and observes the progress.
+
+The agent has a planner that decides the next action. The planner is usually the LLM with a system prompt that describes the tools and the task. The planner outputs a function call.
+
+The agent has an executor that runs the chosen function. The executor returns the result to the planner. The planner decides the next action based on the result.
+
+The agent has a memory of the task so far. The memory is structured. It contains the original task, the actions taken, the results, and any human approvals.
+
+The agent has telemetry on every step. The planner's decision. The function called. The arguments. The result. The cost. The latency. The telemetry is the basis for debugging and improvement.
+
+## How much does this cost
+
+| Cost layer | Modest scale | High scale |
+|---|---|---|
+| Model calls | 100 to 1000 USD per month per agent type | Thousands |
+| Vector store for context | 50 to 500 USD | 500 to 5000 USD |
+| Tool API calls | Variable | Variable |
+| Telemetry and logging | 50 to 200 USD | 500 to 2000 USD |
+| Eval infrastructure | A few hours of engineering per week | Dedicated headcount |
+| Caching | Negligible if implemented | Significant savings if not |
+
+The numbers come from projects I have worked on. Caching is the biggest lever. Caching the planner's decisions for repeat tasks cuts the cost dramatically.
+
+## Features the agent must have
+
+- A clear task definition with a testable done condition.
+- A bounded tool inventory.
+- A loop limit and a cost ceiling.
+- Approval points for high impact actions.
+- Telemetry on every step.
+- An eval suite with representative tasks.
+- A graceful failure path.
+- A way for the user to interrupt or override.
+
+## Expert opinion
+
+> The agents that work in production are the ones that the team treats as features, not as autonomous workers. The scope is narrow. The constraints are real. The evaluation is rigorous. The agents that fail are the ones that the team built as autonomous workers and then could not stop monitoring because they were unreliable. The discipline is unglamorous and decisive.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client wanted an agent that triaged inbound customer support emails. The first version was an open ended agent with broad access to the support system. It worked on most emails and produced wrong outcomes on a meaningful minority. The team could not trust it.
+
+We rebuilt the agent with constraints. Narrow scope of supported request types. Bounded tool inventory of seven actions. Approval point on any action that touched a paid customer. Eval suite of two hundred representative emails.
+
+The new agent handled roughly seventy percent of inbound emails without escalation, with a quality bar that the support team accepted. The other thirty percent escalated to humans with full context. The support team's load dropped by half. The team trusts the agent because the constraints make the failure modes visible and contained.
+
+For more on the related work, see [multi agent systems for SaaS a practical architecture](/blog/multi-agent-systems-for-saas-a-practical-architecture) and [human in the loop design the pattern behind trustworthy AI features](/blog/human-in-the-loop-design-the-pattern-behind-trustworthy-ai-features).
+
+## Common mistakes teams make
+
+1. Building an autonomous agent. The scope kills it.
+2. Broad tool access. The agent does damaging things.
+3. No loop limit. The agent loops forever.
+4. No cost ceiling. The bill grows silently.
+5. No approval points. High impact actions execute without human review.
+6. No evals. Quality drifts.
+7. No telemetry. Debugging is a fishing expedition.
+8. Treating the framework as the architecture. The application work is harder than the framework.
+
+## A 60 day plan to ship a real agent
+
+1. **Weeks one and two.** Scope the task. Write the one sentence. Define done. Inventory the tools.
+2. **Weeks three and four.** Build the planner and executor. Wire the telemetry.
+3. **Week five.** Build the eval suite. Get the baseline numbers.
+4. **Week six.** Add the loop limit, cost ceiling, and approval points.
+5. **Week seven.** Run the eval suite. Iterate on prompts and tools.
+6. **Week eight.** Pilot with a small set of users. Measure real outcomes.
+7. **Week nine.** Expand the pilot. Add caching.
+8. **Week ten.** Ship to all users. Continue the eval cadence.
+
+For more on the related work, read [the failure modes of autonomous AI workflows](/blog/the-failure-modes-of-autonomous-ai-workflows) and [AI function calling the pattern that changes product surface area](/blog/ai-function-calling-the-pattern-that-changes-product-surface-area). On the cost side, [token economics why your AI bill surprised you and how to fix it](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it) is the natural next read.

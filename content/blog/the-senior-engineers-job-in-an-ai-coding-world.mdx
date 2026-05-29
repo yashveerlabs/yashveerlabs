@@ -1,0 +1,113 @@
+---
+slug: "the-senior-engineers-job-in-an-ai-coding-world"
+title: "The Senior Engineer's Job in an AI Coding World"
+excerpt: "AI coding tools do not replace senior engineers. They replace the part of a senior engineer's job that was never really the valuable part. What remains is harder, more visible, and more consequential than before."
+date: "2025-02-01"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-senior-engineers-job-in-an-ai-coding-world"
+status: "published"
+definition: "The senior engineer's job in an AI coding world is to own the decisions that a language model cannot make. Architecture. Tradeoffs. Context about the business. The threat model. The reason a particular pattern exists in this codebase. These are judgment calls, not code generation tasks. AI tools accelerate the code writing. They have not changed who is responsible for whether the code was the right code to write."
+faq: [
+  {"q":"Are senior engineers going to be replaced by AI?","a":"The tasks being automated are the ones a senior engineer was doing on autopilot. Writing boilerplate, generating test fixtures, translating requirements into CRUD endpoints. The tasks that are not being automated are the ones that required judgment. Architecture decisions, security tradeoffs, understanding why a particular approach was chosen three years ago. The job is changing shape, not disappearing."},
+  {"q":"What does a senior engineer actually do differently now that AI coding tools exist?","a":"They spend less time writing obvious code and more time reviewing code they did not write. The review function has expanded significantly. A senior engineer now reviews AI generated output from multiple engineers simultaneously, which means the judgment calls per day have increased even as the keystroke count has decreased. The job is more conceptual and more distributed than before."},
+  {"q":"How should a senior engineer evaluate AI generated code differently from human written code?","a":"With the same checklist, plus one additional question: did the AI introduce anything the author does not understand? AI code can look correct and clean while containing assumptions that do not hold for the specific codebase or data. The author needs to be able to explain every significant line. If they cannot, the PR should not merge regardless of test coverage."},
+  {"q":"What skills matter more for senior engineers now because of AI tools?","a":"Specification writing, architectural documentation, and codebase communication. If the AI is going to generate code effectively, someone needs to write clear context for it. That context is also the context a new human engineer needs. The skills that make AI prompts good are the same skills that make codebases navigable. Senior engineers who invest in those skills find both loops improve."},
+  {"q":"How do senior engineers prevent AI coding tools from degrading code quality across a team?","a":"By setting the standard for what acceptable AI output looks like and enforcing it in review. This means defining what the team's prompt spec format looks like, what review checklist applies to AI generated PRs, and what architectural patterns the AI should and should not follow. Without that standard, each engineer uses the tool differently and the codebase accumulates inconsistent patterns."},
+  {"q":"Is there a risk that junior engineers skip learning fundamentals because AI does the work?","a":"Yes, and it is a real concern. Junior engineers who generate code without understanding it are building on a foundation that will crack under pressure. The senior engineer's responsibility here is to ask juniors to explain the code they submitted, not just whether it passes tests. Understanding is the requirement. The AI wrote the code. The engineer is responsible for it."},
+  {"q":"What is the senior engineer's role in AI feature development, not just AI assisted coding?","a":"Significantly expanded. Building AI features requires judgment about model selection, prompt design, evaluation strategy, fallback behavior, cost modeling, and privacy boundaries. None of those are tasks a language model handles. A senior engineer building an AI feature is making architectural decisions in a domain that changes quickly and has few established patterns. That requires more judgment, not less."}
+]
+---
+
+## What you actually need to know
+
+- AI coding tools automate the least valuable part of a senior engineer's day. The valuable part, judgment about what to build and how to build it soundly, has not been automated.
+- The review surface area for a senior engineer has expanded, not contracted. When junior engineers generate code faster, more code arrives for architectural review.
+- The senior engineer who can write a tight specification, explain a tradeoff clearly, and evaluate output critically is more valuable than before, not less.
+- The engineers most at risk are mid-level engineers who were valuable primarily for speed of implementation. That speed advantage is now compressible by a tool.
+- Every team that adopts AI coding tools without senior engineering oversight accumulates the same class of problems: inconsistent patterns, missed edge cases, and architecture that grew without anyone steering it.
+
+| Work type | Before AI coding tools | After AI coding tools |
+|---|---|---|
+| Boilerplate and CRUD code | 30 to 40% of senior time | Mostly delegated to AI |
+| Code review | 20 to 30% of senior time | Expanded: more PRs, more AI output |
+| Architecture and design | 20 to 30% of senior time | Unchanged or increased |
+| Mentoring and specification | 10 to 20% of senior time | Increased: prompts need context |
+| Debugging production issues | 10 to 20% of senior time | Unchanged |
+
+## The core argument
+
+The narrative that AI is going to eliminate software engineering jobs is structurally wrong about what software engineering is. Writing code was never the scarce resource. Understanding the system well enough to make the right decision about what code to write has always been the scarce resource. AI coding tools address the first constraint, not the second.
+
+What has changed is the ratio. Before these tools, a senior engineer writing code was also incidentally doing architectural work with every line. The act of writing the implementation forced consideration of the design. Now the implementation can be generated in seconds. The design work is still there, but it has to be done explicitly rather than emerging from the act of writing.
+
+This is, in my view, a net positive for the discipline of software engineering. It separates the craft of system design from the mechanical act of translating design into code. A senior engineer who is good at design and bad at typing fast now has a tool that handles the typing. A junior engineer who is fast at typing but not yet good at design now has a tool that generates plausible code. The question is who is responsible for whether the design was sound.
+
+The answer has not changed. The senior engineer is responsible. The tool does not bear accountability. The engineer who reviewed the PR bears accountability. That accountability has always been the job. It is just more visible now because the code volume has increased and the number of decisions embedded in that code has grown proportionally.
+
+## What the job actually looks like now
+
+### The specification function
+
+Before a junior engineer on my teams opens an AI coding tool, I expect them to have a written specification for the task. That specification is the context the AI needs to generate useful output. It is also the context I need to review the output. Writing the spec is a junior task that a senior architect shapes. The senior's contribution is defining what an acceptable spec looks like for this codebase, this feature, and this set of constraints.
+
+This is new work. Before AI coding tools, the specification was often implicit. The senior would pair with a junior, explain the approach, and watch them implement it. Now the senior writes or reviews a document that the junior uses to prompt the tool. The outcome is a more explicit record of intent, which is actually better for the codebase in the long run.
+
+### The architectural guardrail function
+
+AI tools will follow patterns that exist in a codebase. If the codebase has good patterns, the AI tends to extend them. If the codebase has inconsistent patterns, the AI amplifies the inconsistency. The senior engineer's job is to make the codebase a good teacher. Good naming conventions. Clear module boundaries. Consistent error handling. When the codebase teaches well, the AI generated code tends to fit. When it teaches poorly, every PR is a new source of architectural drift.
+
+### The review function at scale
+
+On a team of five engineers all using AI coding tools aggressively, the PR volume can triple. The senior engineer reviewing those PRs cannot use the same line-by-line review process that worked when a junior engineer produced twenty lines a day. The review has to be more architectural and less syntactic. Does this PR make sense as a unit? Does it introduce anything the author cannot explain? Does it fit the pattern we established for this module? Those are the questions that matter at scale.
+
+## How long does it take
+
+| Senior engineering investment | Timeline | Impact |
+|---|---|---|
+| Define team prompt spec template | 1 to 2 days | Consistent AI output quality across team |
+| Establish AI PR review checklist | Half day | Reduced rework on AI generated PRs |
+| Audit codebase for AI amplified inconsistencies | 1 to 3 days | Identifies patterns the AI is spreading wrongly |
+| Mentor juniors on spec-first AI use | Ongoing, 30 min per week | Builds junior judgment about AI output |
+| Document architectural decisions explicitly | 2 to 4 hours per decision | Gives AI better context for future work |
+
+## What to watch for in a team using AI coding tools
+
+- Junior engineers who cannot explain code they submitted. Explanability is required even if the code was generated.
+- Duplicate implementations. AI generates code that already exists in the codebase when the prompt does not mention the existing implementation.
+- Dependency creep. AI tools suggest well-known libraries for tasks that could be handled by existing project dependencies.
+- Pattern fragmentation. Three different approaches to the same type of problem in the same codebase, each generated by a different engineer from a slightly different prompt.
+- Tests that pass but do not test anything meaningful. AI generates tests that mirror the implementation rather than testing the contract.
+- Security assumptions baked into generated code that were not in the specification, usually assuming input validation happens elsewhere.
+
+## Expert opinion
+
+> The senior engineer's value did not decrease when AI coding tools arrived. It became more visible. Before, a senior could coast on implementation speed and deep codebase familiarity. Now the implementation is fast for everyone. What you are left with is pure judgment. The engineers who built their careers on judgment find the environment significantly in their favor.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I worked with a team of four engineers, two senior and two junior, who had adopted Cursor aggressively. After three months, the junior engineers were producing three to four times as many PRs as before. The senior engineers were drowning. They had not changed their review process. Each PR was still getting a full line by line review, which now took twice as long per week in total.
+
+The fix was architectural. We defined two things. First, a prompt spec template that each PR had to reference. The spec covered what the feature was, what pattern to follow, and what edge cases mattered. The senior reviewed the spec before the code was generated, not after. Second, a tiered review process. PRs with a clean spec and AI output that matched the pattern got a fast architectural review. PRs without a spec or with clear pattern deviations got the full review. Review time stabilized. Output quality went up because the spec step caught design problems before they became code problems. For the code quality side of this, see [AI assisted code review](/blog/ai-assisted-code-review-a-process-that-actually-helps). For the architectural failure patterns that accumulate when there is no senior oversight, see [the top five architectural failures in AI assisted codebases](/blog/the-top-five-architectural-failures-in-ai-assisted-codebases).
+
+## Common mistakes
+
+1. Treating AI coding tool adoption as an engineering process question rather than an organizational design question. It changes who does what, not just how fast code is written.
+2. Not updating the code review process when PR volume triples. The same review depth at higher volume burns out senior engineers.
+3. Letting junior engineers skip the specification step because generating code is faster without it. Speed without spec is how vibe coded codebases start.
+4. Not documenting the architectural decisions that the AI is now being asked to follow. If the reasoning is not written down, the AI cannot access it and neither can new team members.
+5. Using AI output volume as a proxy for team productivity. More PRs is not better if the architectural debt per PR is also higher.
+6. Skipping the explainability check in review. If the author cannot explain a block of generated code, it should not merge.
+7. Neglecting the mentoring function. Junior engineers using AI tools without senior guidance skip the learning that comes from struggling with implementation. The gap shows up later.
+
+## A 30 day plan
+
+1. **Week one.** Observe. Watch how your team currently uses AI coding tools. Note the inconsistencies in output, the review problems that keep appearing, and the questions juniors are not asking because they are using the AI as a shortcut to an answer.
+2. **Week two.** Write the specification template for your codebase. It should be specific to your stack and conventions, not generic. Review it with the team. Make it a PR requirement.
+3. **Week three.** Revise the code review checklist to include the explainability check and the pattern conformance check as explicit steps. Drop the line-by-line check for PRs with clean specs and matching patterns.
+4. **Week four.** Schedule a short architectural review with each junior engineer. Walk through one recent PR together, focusing on whether the specification captured the right constraints and whether the generated code matched the intent.
+
+For the broader picture of what happens when AI coding tools run without senior oversight, see [vibe coding rescue](/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt) for what the cleanup looks like, and [the prompt as a spec](/blog/the-prompt-as-a-spec-how-to-build-software-with-ai-tools-responsibly) for the discipline that prevents it in the first place.

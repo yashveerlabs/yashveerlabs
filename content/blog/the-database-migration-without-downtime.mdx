@@ -1,0 +1,92 @@
+---
+slug: "the-database-migration-without-downtime"
+title: "The Database Migration Without Downtime"
+excerpt: "How to run a schema migration on a live production database without taking the application offline or losing a single row of data."
+date: "2025-09-21"
+category: "Tech Debt and Refactoring"
+tags: ["database","migration","postgresql","devops","zero-downtime"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-database-migration-without-downtime"
+status: "published"
+definition: "A zero-downtime database migration changes a live production schema without taking the application offline. It requires running old and new code simultaneously during the transition, writing carefully sequenced SQL that does not lock tables, and deploying in stages rather than in a single cutover. Most teams learn this the hard way after their first failed maintenance window."
+faq: [
+  {"q":"Why do database migrations cause downtime in the first place?","a":"Because the default approach is to stop the application, run the migration, restart the application. Any migration that requires a lock on a large table while the application is stopped blocks user requests. Zero-downtime migrations avoid this by separating schema changes from application deployment."},
+  {"q":"What is the expand-contract pattern?","a":"Expand: add the new column or table while keeping the old one. Contract: remove the old column or table after all code has migrated to the new one. These are two separate deployments with a period where both old and new code run against the same database. This pattern eliminates the downtime window."},
+  {"q":"How do I rename a column without downtime?","a":"Add the new column. Write to both old and new columns in the application. Backfill old data to the new column. Switch reads to the new column. Remove writes to the old column. Drop the old column. This takes five deployments but each deployment is safe and reversible."},
+  {"q":"What database operations are dangerous on large tables?","a":"Adding a NOT NULL column without a default, adding an index without CONCURRENTLY, renaming a column, changing a column type that requires a table rewrite. Any of these can lock the table for seconds to minutes on a large production dataset."},
+  {"q":"How do I add an index to a large table without blocking reads?","a":"Use CREATE INDEX CONCURRENTLY in PostgreSQL. This builds the index without holding a lock on the table. It takes longer but does not block production traffic. Never run a standard CREATE INDEX on a large table without CONCURRENTLY."}
+]
+---
+
+## What you actually need to know
+
+- The expand-contract pattern is the foundation of zero-downtime migrations. Add first, remove later, never do both at once.
+- Every table lock during a migration is a potential user-facing outage. Understand which SQL operations lock and which do not.
+- `CREATE INDEX CONCURRENTLY` in PostgreSQL is your friend. Standard index creation locks the table. Concurrent does not.
+- Migrations that take more than a few seconds on large tables need to be batched or run outside of a single transaction.
+- Test your migration against a production-size dataset before running it in production. Row counts change everything.
+
+| Migration Type | Risk on Large Tables | Safe Approach |
+|---|---|---|
+| Add nullable column | Low | Standard ALTER TABLE |
+| Add NOT NULL column without default | High | Add nullable, backfill, add constraint |
+| Add index | High without CONCURRENTLY | CREATE INDEX CONCURRENTLY |
+| Rename column | High | Expand-contract: add new, migrate, drop old |
+| Change column type | Very high | Expand-contract with application-level transform |
+
+## The core argument
+
+Most teams discover that their migration strategy is broken during the first time they need to change a column on a table with ten million rows. The migration that worked fine in staging against ten thousand rows takes forty minutes in production. The application is unavailable for that entire window. Customers are locked out. The on-call engineer is watching a progress bar in a terminal.
+
+The solution is not to get faster at running migrations. It is to stop treating migrations as a single-step operation that requires the application to be offline. Production-grade migration strategy separates schema changes from data changes from application code changes. Each piece can be deployed and rolled back independently. No single step requires downtime.
+
+I learned this building systems where downtime was genuinely not acceptable. The pattern is transferable. Whether you are on PostgreSQL, MySQL, or any other relational database, the principles are the same: never remove what the old code depends on until the old code is gone, never require what the new code expects until the new code is deployed. The migration is a sequence of safe steps, not a single risky cutover.
+
+## The expand-contract pattern in detail
+
+The expand-contract pattern works because it separates the two things that normally happen at the same time: adding the new thing and removing the old thing.
+
+**Expand phase: add without removing.** Add the new column alongside the old one. Write to both in the application code. The old column still exists, so old deployments of the application continue to work. The new column exists, so the new deployment of the application can start writing to it.
+
+**Backfill phase: migrate existing data.** Write a background job that copies data from the old column to the new one for all existing rows. Do this in batches to avoid locking the table. A batch size of 1,000 to 10,000 rows per transaction is a reasonable starting point. Monitor for lock contention.
+
+**Contract phase: remove the old.** Once all application code is reading from the new column and no code is writing to the old one, drop the old column. This is safe because nothing depends on it anymore.
+
+Each phase is a separate deployment. Each deployment is independently rollback-safe. If the expand deployment has a bug, roll it back. The old column still exists. Nothing is broken.
+
+## Handling the specific cases that cause problems
+
+**Adding a NOT NULL column.** Never add a NOT NULL column with no default on a large table. PostgreSQL will rewrite the entire table. Instead: add the column as nullable, backfill existing rows with the default value using batched updates, then add the NOT NULL constraint with `ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` which in PostgreSQL 12+ validates without a table rewrite if the column has no nulls.
+
+**Renaming a column.** Do not use `ALTER TABLE RENAME COLUMN` on a live system. Instead, add the new column name. Write to both names in the application. Backfill. Switch reads to the new name. Remove writes to the old name. Drop the old name. Five deployments, no downtime.
+
+**Adding a foreign key.** Add the constraint as `NOT VALID` first. This skips validation of existing rows. Then run `VALIDATE CONSTRAINT` separately to validate existing rows without holding a full table lock. Two steps, no blocking.
+
+**Large table indexes.** Always `CREATE INDEX CONCURRENTLY`. Always. For any table that receives production traffic, standard index creation is unsafe. The CONCURRENTLY flag takes longer but does not block reads or writes.
+
+## Common mistakes teams make
+
+1. Running migrations in the same deployment step as the application restart. Split these. Run the schema migration first. Let it complete. Then deploy the application code.
+2. Adding a NOT NULL column without a default on a large table. This rewrites the table and blocks all access during the rewrite.
+3. Running unbatched backfills. A single UPDATE that modifies ten million rows will hold locks for the duration. Batch your backfills.
+4. Not testing with production-scale data. A migration that takes two seconds on 100,000 rows can take 20 minutes on 10,000,000 rows. Test at the right scale.
+5. Not having a rollback plan. Every migration step needs a defined rollback. If you cannot answer "how do I undo this?" before running it, you are not ready to run it.
+
+## Where to start: a 3-step zero-downtime migration plan
+
+**Step 1: Audit your current migration approach.** Look at your last five migrations. Did any of them lock the table? Did any require the application to be offline? These are the risk points. For each one, identify which expand-contract approach would have made it safe.
+
+**Step 2: Add CONCURRENTLY to all index creation in your migration files.** This is the single highest-impact change you can make today. Every index creation that runs without CONCURRENTLY on a large table is a latent outage risk. Search your migration history for CREATE INDEX without CONCURRENTLY and flag each one for review.
+
+**Step 3: Build the expand-contract habit for the next schema change.** When the next column rename or type change comes up, refuse to use the single-step approach. Map out the expand phase, the backfill phase, and the contract phase. Deploy them separately. This is uncomfortable the first time and automatic by the fifth.
+
+## The Work Behind the Writing
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I have run these migrations on live production systems. The patterns in this post are not theoretical. They are what I reach for when a migration is too risky to run with the standard approach. The projects on the homepage have real databases. The migrations happened. The applications stayed up. If that track record is relevant to your project, the contact page is the next step.
+
+## Related reading
+
+- The Tech Debt Payoff: When to Pay and When to Wait
+- Refactoring Without Breaking the Product
+- [The Database You Did Not Think You Needed](/blog/the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse)
+- Zero Downtime Deployments: How to Ship Without Outages

@@ -1,0 +1,100 @@
+---
+slug: "the-engineering-migration-patterns-that-work"
+title: "The Engineering Migration: Patterns That Work"
+excerpt: "The patterns that make database migrations, infrastructure migrations, and system rewrites survivable in production without downtime or data loss."
+date: "2025-09-13"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","databases","infrastructure"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-migration-patterns-that-work"
+status: "published"
+definition: "Engineering migrations -- moving from one database schema, one service architecture, or one infrastructure platform to another -- fail most often because they are treated as one-time events rather than incremental processes. The patterns that work share a common structure: make the old and new systems coexist, move traffic incrementally, validate at each step before proceeding, and maintain the ability to roll back until confidence is high. The pattern is applicable to schema changes, service extraction, and platform migrations."
+faq: [
+  {"q":"What is the expand-contract pattern and when do I use it?","a":"Expand-contract is the pattern for zero-downtime database schema changes. In the expand phase, you add the new column or table while keeping the old one, and update code to write to both. In the contract phase, after all data is migrated and reads are confirmed working from the new structure, you remove the old column or table. It is the correct pattern for any schema change that cannot be done in a single atomic operation."},
+  {"q":"How do I migrate from a monolith to services without a big bang cutover?","a":"Extract one service at a time using the strangler fig pattern. Identify the component to extract, build the new service alongside the monolith, route traffic for that component's functionality to the new service, and remove the monolith code for that component after validation. Each extraction is a separate migration with its own validation step."},
+  {"q":"How do I validate that the migration is working before completing the cutover?","a":"Shadow traffic. During the migration period, run both the old and new systems simultaneously and compare their outputs for the same inputs. When the outputs match consistently, confidence in the new system is high. This is the validation technique for database migrations, service extractions, and algorithm replacements."},
+  {"q":"How long should a migration take?","a":"Longer than you estimate, shorter than a rewrite. Database schema migrations for large tables can take days when running incrementally with the database under production load. Service extractions can take months when done component by component. The timeline should be planned in phases with explicit checkpoints, not as a single continuous effort."},
+  {"q":"What is the most common migration failure and how do I avoid it?","a":"Cutting over before validation is complete. The pressure to remove the old system before it is confirmed safe creates situations where problems in the new system have no fallback. Hold the old system and maintain rollback capability until at least two weeks of production traffic has run through the new system without issues."}
+]
+---
+
+## What you actually need to know
+
+- Every migration should be designed to be incremental and reversible. A migration that requires a cutover moment with no rollback is a deployment risk that does not need to exist.
+- The expand-contract pattern handles database schema changes. Shadow traffic handles service and algorithm replacements. The strangler fig handles monolith-to-service migrations. These three patterns cover most migration scenarios.
+- Migrations are not one-time events. They are extended periods of operating two systems in parallel. Plan for the operational cost of running both.
+- Validation before cutover is not optional. Moving traffic to the new system before it has been validated produces incidents that were entirely preventable.
+- The rollback plan should be defined before the migration starts, not after something breaks.
+
+| Migration Type | Primary Pattern | Key Risk | Validation Approach |
+|---|---|---|---|
+| Database schema change | Expand-contract | Data loss during transition | Dual-write and query both |
+| Service extraction | Strangler fig | Request routing failures | Shadow traffic comparison |
+| Platform migration | Blue-green deployment | DNS propagation, connection pooling | Traffic percentage rollout |
+| Algorithm replacement | Feature flag rollout | Behavioral divergence | Output comparison, A/B metrics |
+| Data model migration | Backfill + dual-write | Backfill performance, consistency | Reconciliation reports |
+
+## The core argument
+
+Most migration failures share a structure: the team underestimates the complexity of running two systems in parallel, rushes the validation phase, and performs the cutover before the new system has been sufficiently exercised under production load. When the new system fails, the old system has been decommissioned or degraded, and the rollback is either impossible or expensive.
+
+The migrations that succeed are the ones designed around the assumption that the cutover will reveal problems. They maintain the old system in full operational capacity throughout the migration period. They route a small percentage of traffic to the new system first, validate it thoroughly, and increase the traffic percentage incrementally. They define the criteria for rollback before they start and maintain the ability to execute the rollback throughout.
+
+This pattern is more work than a big-bang cutover. It requires running two systems simultaneously, which has operational costs. It requires validation logic that compares the behavior of both systems. It requires patience to proceed incrementally when the pressure is to move faster. The reason experienced engineers insist on this discipline is that they have seen what happens when it is skipped. The production incident that results from an unvalidated cutover is more expensive in time and reputation than the patient incremental migration.
+
+I applied this discipline in infrastructure work for Velmora and Nexli -- systems where a migration failure would have directly affected users and revenue. The expand-contract pattern for schema changes and the incremental traffic shift for infrastructure migrations added weeks to the schedule and prevented incidents that would have added more.
+
+## The expand-contract pattern in detail
+
+The expand-contract pattern applies to any schema change where the old and new schemas need to coexist during the transition period. It has three phases.
+
+Expand: add the new column, table, or structure. Update application code to write to both the old and the new structure. The reads still come from the old structure. At this point, any deployment can be rolled back by reverting the code change, because the old structure still exists.
+
+Migrate: run a backfill job that populates the new structure with data from the old structure for all existing records. Monitor the backfill carefully. For large tables, this runs in batches with rate limiting to avoid degrading production performance. After the backfill is complete, verify that the new structure has all the records it should have.
+
+Contract: update application code to read from the new structure. Monitor in production with the old structure still present. After a validation period (typically one to two weeks), remove the old column or table. The deployment that removes the old structure is the final step, and at this point rollback would require a new migration.
+
+The most common mistake in this pattern is rushing the validation period. The pressure to clean up the old structure is real but the risk of moving too fast is higher. Wait until you are confident.
+
+## The strangler fig for service extraction
+
+The strangler fig pattern comes from Martin Fowler's description of how a strangler fig tree grows around a host tree and eventually replaces it. Applied to service extraction: the new service grows alongside the monolith, handling an increasing portion of the monolith's responsibilities, until the monolith functionality the service covers can be removed.
+
+The practical application: identify a component to extract. Build the new service with a well-defined interface. Route requests for that component's functionality to the new service via a routing layer (an API gateway, a feature flag, or an application-level routing decision). Validate that the new service handles the requests correctly. After validation, remove the corresponding code from the monolith.
+
+Each extraction is a complete cycle: build, route, validate, remove. The team ships features throughout because the monolith still runs for all components that have not been extracted. The migration is incremental: each extracted component is a win, and the team is never in a state where nothing works.
+
+## Planning the rollback before you need it
+
+The rollback plan is the document that exists before the migration starts that describes: under what conditions will we roll back, and exactly how will we execute the rollback within the required time window?
+
+The conditions for rollback should be specific and measurable. Error rate above X percent for more than Y minutes. P99 latency above Z milliseconds. A specific failure mode that is detected. Not "if things look bad" -- specific metrics with specific thresholds.
+
+The rollback procedure should be executable by an engineer who is under stress. It should be documented step-by-step, should be practiced in staging before the migration, and should be executable within the time window defined by the incident SLA. A rollback plan that requires 30 minutes to execute is not useful if users experience problems within five minutes of the cutover.
+
+## Common mistakes engineers make with migrations
+
+1. Not defining the rollback plan before starting. "We'll figure it out if something goes wrong" is not a plan. The rollback procedure should be documented, tested, and ready.
+2. Decommissioning the old system before the new one is validated. The old system is insurance. Do not cancel the insurance before you are confident you will not need it.
+3. Running backfills at full speed without monitoring database performance. A backfill that consumes all database I/O degrades production performance. Run backfills at a controlled rate with monitoring.
+4. Treating the migration as a background task. Migrations need dedicated attention. An engineer who is responsible for monitoring a migration cannot also be shipping features. Plan for the migration to consume engineering capacity for its duration.
+5. Not communicating the migration timeline to stakeholders. A database migration running for three weeks with no communication to non-engineering stakeholders produces unnecessary anxiety. Weekly status updates keep stakeholders informed without requiring their involvement.
+
+## Where to start: a 3-step migration plan
+
+**Step 1: Define the migration as a sequence of independently deployable steps.** Each step should be completable in a single deployment, should not require downtime, and should leave the system in a valid state if subsequent steps are abandoned. Write the sequence before writing any code.
+
+**Step 2: Define the validation criteria and rollback triggers for each step.** For each step, what signals confirm it is working? What signals trigger a rollback? These criteria should be defined before the step is deployed, not after.
+
+**Step 3: Execute the migration one step at a time with validation between steps.** Do not proceed to the next step until the validation for the current step is complete and stable. The patience to proceed incrementally is the primary determinant of migration success.
+
+## Migrations Done Without Drama
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The migrations I have executed for production systems -- database schema changes under live traffic, infrastructure platform moves, service extractions -- have been uneventful not because they were easy, but because they were designed to be incremental from the start. The patterns above are not theory. They are what works in practice.
+
+## Related reading
+
+- [The Database Migration Without Downtime](/blog/the-database-migration-without-downtime)
+- [The Decision to Switch Tech Stack](/blog/the-decision-to-switch-tech-stack)
+- The Tech Debt That Actually Matters
+- [The Engineering Decision That Killed the Company](/blog/the-engineering-decision-that-killed-the-company)

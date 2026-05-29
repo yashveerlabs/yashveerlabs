@@ -1,0 +1,62 @@
+---
+slug: "serverless-vs-containers-vs-bare-metal-a-cost-and-flexibility-map"
+title: "Serverless vs Containers vs Bare Metal: A Cost and Flexibility Map"
+excerpt: "The compute model you choose determines cost structure, operational overhead, and scalability ceiling. Here is how serverless, containers, and bare metal compare across the dimensions that actually matter for a product decision."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","ai"]
+readingMinutes: 6
+ogImage: "/api/og/blog/serverless-vs-containers-vs-bare-metal-a-cost-and-flexibility-map"
+status: "published"
+definition: "Compute models for web applications describe how application code is executed and billed. Serverless functions (AWS Lambda, Vercel Functions, Cloudflare Workers) execute code on-demand and bill per invocation and execution time, with no always-running infrastructure to manage. Containers (Docker on ECS, Kubernetes, Railway, Render) package application code with its runtime and run as always-on or auto-scaled processes. Bare metal or VPS hosting runs application code on dedicated or virtual machines where the team manages the operating system and runtime environment."
+faq: [
+  {"q":"What are the cost characteristics of serverless at different traffic levels?","a":"Serverless billing is pay-per-invocation, which makes it very cost-effective at low traffic (a side project with 1,000 requests per day costs essentially nothing on Lambda's free tier) and potentially expensive at high traffic with long execution times. The break-even versus always-on containers depends on request rate, execution duration, and memory allocation. In my experience, serverless becomes more expensive than a single container instance when average traffic is over 10 to 20 requests per second with execution times over 100ms. Spiky traffic (low baseline with short high-traffic windows) is where serverless provides the strongest cost advantage."},
+  {"q":"What operational overhead does each compute model require?","a":"Serverless has the lowest operational overhead: no server patching, no capacity planning, automatic scaling to zero, and platform-managed infrastructure. The team writes functions and deploys them; the platform handles everything else. Containers require: container image builds, a container registry, an orchestration layer (ECS, Kubernetes, or a managed container PaaS), and capacity planning for the number of running instances. Bare metal or VPS requires the most overhead: OS patching, security updates, monitoring agents, capacity planning, and manual scaling operations. Each step up in operational control comes with a corresponding increase in operational responsibility."},
+  {"q":"When do containers provide a better fit than serverless?","a":"Containers are better than serverless for: applications with consistently high traffic where the per-invocation cost of serverless exceeds a reserved container cost; applications that require stateful connections (WebSockets, long-polling, persistent database connection pools); applications that use native binaries or platform-specific dependencies incompatible with the serverless runtime; background workers that run continuously rather than on demand; and applications where cold start latency is unacceptable for user-facing operations. AI inference workloads are a clear case where containers (often with GPU access) are necessary, since serverless runtimes do not provide GPU access."},
+  {"q":"When does bare metal or a dedicated VPS produce better cost efficiency than managed compute?","a":"Bare metal or VPS produces better cost efficiency when: the workload is CPU or memory intensive and runs continuously (database servers, ML training, game servers); the team has DevOps expertise to manage the infrastructure; the application requires hardware-level access (specific CPU features, GPU, high I/O throughput); or the price difference is large enough to justify the operational overhead (Hetzner dedicated vs AWS EC2 is typically a 10x cost difference for equivalent specs). Bare metal is the wrong choice for teams without DevOps capacity, regardless of the theoretical cost savings."},
+  {"q":"How does cold start affect the serverless vs container decision?","a":"Serverless cold start is the latency added when a function executes after a period of inactivity (the runtime environment must be initialized). For Node.js Lambda functions, cold start is typically 100 to 500ms. For functions with large dependencies or container-based Lambda, cold start can be 1 to 3 seconds. Cold start affects user experience when it occurs in the critical path of a user action. Mitigation options: provisioned concurrency (keep a fixed number of warm Lambda instances, adds cost), container-based compute with no cold start, or architecture that accepts occasional cold starts on non-critical paths. For user-facing APIs with consistent traffic, containers with no cold start are often preferable."}
+]
+---
+
+## What you need to know
+
+- Serverless is cost-effective for spiky or low-baseline traffic. It becomes expensive at consistently high request rates with meaningful execution duration.
+- Containers provide predictable cost at consistent traffic levels and are appropriate for stateful connections, continuous workloads, and AI inference.
+- Bare metal or VPS is the most cost-efficient for CPU/memory-intensive continuous workloads when the team has DevOps capacity to manage the infrastructure.
+- Cold start latency is a real trade-off for serverless. Use provisioned concurrency or containers for latency-sensitive user-facing operations.
+- The operational overhead increases from serverless to containers to bare metal. Match the compute model to the team's operational capacity.
+
+## The core argument
+
+The compute model decision is inseparable from the team's operational capacity. Serverless provides the lowest operational overhead at the cost of flexibility and potentially higher cost at scale. Bare metal provides the highest flexibility and lowest cost-per-compute-unit at the cost of significant operational overhead. Containers sit in the middle: more flexibility than serverless, less operational overhead than bare metal.
+
+The mistake is choosing a compute model based on performance or cost in isolation without accounting for the operational capacity required to run it. A team of two engineers without a DevOps background running their application on bare metal spends a disproportionate fraction of their time on infrastructure management rather than product work. A team of 15 engineers with a dedicated DevOps function running everything on Lambda at high traffic volumes pays three times the container cost without clear benefit.
+
+The decision framework: start with what the team can operate reliably today, and migrate toward more cost-efficient models as operational capacity grows. For most early-stage SaaS products, a managed container platform (Railway, Render, or Fly.io) provides the right balance: more control than pure serverless, less operational overhead than self-managed Kubernetes or bare metal. Migrate to AWS ECS or self-managed infrastructure when the cost savings justify the operational investment.
+
+## Common mistakes
+
+1. **Choosing serverless for a product that requires persistent connections.** WebSocket-based real-time features, long-polling, and streaming responses are difficult or impossible to implement correctly in serverless functions, which have execution time limits and no persistent process state. If the product requires real-time bidirectional communication, containers with a persistent process are the appropriate compute model.
+
+2. **Not modeling cold start impact on the user experience.** Teams choosing serverless for user-facing APIs without analyzing cold start frequency and impact may discover the problem only in production, when users report intermittent slowness. Use AWS X-Ray or Datadog Lambda tracing to measure cold start frequency and duration. If cold starts occur regularly in the user-facing critical path, configure provisioned concurrency or migrate the affected functions to containers.
+
+3. **Running databases on serverless-scaled containers without connection pooling.** A serverless function that opens a new database connection for every invocation can exhaust the database's connection limit at high concurrency. Each Lambda invocation creates a new connection; 100 concurrent invocations create 100 connections. Use PgBouncer, RDS Proxy, or a database with a serverless-compatible connection model (PlanetScale, Neon) when running database-connected code in serverless functions.
+
+4. **Over-provisioning bare metal for variable workloads.** Bare metal servers are always-on; they do not scale down when traffic is low. Provisioning bare metal for peak traffic means paying for peak capacity continuously. Variable workloads (products with daily or weekly traffic cycles) should use auto-scaling containers or serverless, not bare metal. Bare metal is efficient for workloads with consistently high and predictable resource utilization.
+
+5. **Not accounting for egress costs in the compute model comparison.** Cloud provider egress (data transferred out of the cloud) can be a significant cost line, especially for products that return large payloads or serve media. Egress costs are roughly similar across serverless, containers, and VMs on the same cloud provider. Switching to Hetzner reduces compute cost dramatically but does not reduce egress cost for European regions to the same extent.
+
+## Where to start
+
+1. **Categorize workloads by traffic pattern and execution characteristics.** List the main workload types in the product: user-facing API requests (traffic pattern, average execution time, memory needs), background jobs (continuous vs triggered, execution duration), and heavy processing tasks (ML inference, document processing, report generation). Each category may warrant a different compute model.
+
+2. **Compare the monthly cost of the current compute model against alternatives for the primary API workload.** Pull the current monthly compute cost per request for the main API. Calculate the equivalent cost on Lambda (invocation cost + execution time cost), on a container platform (hourly or monthly rate divided by expected request capacity), and on a Hetzner VPS (monthly instance cost divided by expected capacity). The comparison reveals whether the current model is cost-optimal at current scale.
+
+3. **Migrate one low-risk workload to test operational requirements of the target model.** Before migrating the main application, migrate one background job or side service. This pilot reveals the operational challenges of the new compute model in a low-risk context and builds the team's experience before the main migration.
+
+## Related reading
+
+- [Self Hosting on Hetzner vs AWS: The Real Tradeoffs](/blog/self-hosting-on-hetzner-vs-aws-the-real-tradeoffs)
+- [Render vs Fly.io vs Railway vs Heroku in 2026](/blog/render-vs-fly-io-vs-railway-vs-heroku-in-2026)
+- [Reserved Instances and Cost Math: When They Pay Off](/blog/reserved-instances-and-cost-math-when-they-pay-off)
+- [Server Actions, Edge Functions, and the Modern Backend Surface](/blog/server-actions-edge-functions-and-the-modern-backend-surface)

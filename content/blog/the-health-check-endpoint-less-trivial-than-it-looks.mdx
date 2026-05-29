@@ -1,0 +1,136 @@
+---
+slug: "the-health-check-endpoint-less-trivial-than-it-looks"
+title: "The Health Check Endpoint: Less Trivial Than It Looks"
+excerpt: "Why health check endpoints are more complex than returning 200 OK -- and how to design them to actually tell you whether your service is healthy."
+date: "2025-05-04"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","reliability","devops"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-health-check-endpoint-less-trivial-than-it-looks"
+status: "published"
+definition: "A health check endpoint is an API route that load balancers, orchestrators, and monitoring systems call to determine whether a service instance is ready to receive traffic. The trivial implementation -- returning 200 OK immediately -- is nearly useless for detecting real service failures. The correct implementation tests the dependencies that the service needs to function (database connectivity, cache availability, critical external APIs) and returns a structured response that distinguishes between healthy, degraded, and unhealthy states."
+faq: [
+  {"q":"What is the difference between a liveness check and a readiness check?","a":"Liveness checks determine whether the service process is running and should be restarted if not. They should be fast and test only basic process health -- not dependencies. Readiness checks determine whether the service is ready to receive traffic: it must test that all required dependencies are reachable. Kubernetes and most orchestrators support both. A service that is alive but not ready (dependencies unavailable) should receive no traffic but should not be restarted."},
+  {"q":"Should health checks test external API dependencies?","a":"Only if the service cannot function without them. If the service's critical path requires a database, test the database. If it requires a payment processor, test the payment processor only if the service cannot serve any requests without it. Avoid adding too many dependency checks -- a health check that fails because a non-critical dependency is slow will cause the load balancer to remove a healthy instance from rotation."},
+  {"q":"What should a health check response body look like?","a":"A structured JSON body that includes the overall status (healthy, degraded, unhealthy), the check duration in milliseconds, and the individual status of each checked dependency. This structure allows monitoring systems to understand which specific dependency is causing a health failure without requiring access to application logs."},
+  {"q":"How often should health checks be called?","a":"Most load balancers call health checks every 10-30 seconds. Kubernetes liveness probes default to every 10 seconds. Health checks must complete within the configured timeout (typically 2-5 seconds) or be considered failed. This means the database connectivity test in the health check must complete in under 2 seconds, which requires a dedicated health check connection or a fast timeout on the check query."},
+  {"q":"What is a cascading health failure and how do I prevent it?","a":"A cascading health failure occurs when a temporary dependency slowdown causes health checks to fail, causing load balancers to remove instances from rotation, increasing load on the remaining instances, causing those instances' health checks to also fail. Prevention: use separate connection pools for health checks vs. production traffic, configure health check timeouts that are realistic but not so tight that normal variance triggers failures, and implement circuit breakers that mark a dependency as degraded before marking the service as unhealthy."}
+]
+---
+
+## What you actually need to know
+
+- A health check that returns 200 OK without testing dependencies is not a health check -- it is a process check. It only detects failures where the process has crashed, not failures where the service is running but cannot serve requests.
+- Separate liveness and readiness checks serve different purposes. Liveness triggers restart; readiness gates traffic. Mix them up and you restart healthy instances or route traffic to unhealthy ones.
+- Health checks must complete fast -- under 2 seconds for most configurations. Test dependencies with timeouts; do not let a slow database query cause every health check to timeout and remove the instance from rotation.
+- The health check response should be structured and include per-dependency status. A single "unhealthy" status without detail requires log access to diagnose.
+- Health check connection pools should be isolated from production connection pools. A health check that exhausts the database connection pool is worse than no health check.
+
+| Check Type | What It Tests | Failure Response | Timeout |
+|---|---|---|---|
+| Liveness | Process is running | Restart the container | 1-2 sec |
+| Readiness | Dependencies are reachable | Remove from load balancer | 2-5 sec |
+| Startup | Initial readiness after deploy | Delay traffic until ready | 30-60 sec |
+| Deep health | Full functionality test | Alert only, do not remove | 10-30 sec |
+
+## The core argument
+
+The health check endpoint is one of the most important APIs in a service, and one of the most commonly implemented incorrectly. The trivial implementation -- `return res.json({ status: 'ok' })` -- tells the load balancer that the process has not crashed. It does not tell the load balancer that the service can actually serve requests.
+
+A service whose database connection pool is exhausted will return 200 from a trivial health check while every database-dependent request fails. A service whose cache is unavailable will return 200 while requests that depend on the cache time out. These are exactly the failures that health checks are supposed to detect -- and the trivial implementation lets them through.
+
+The correct health check tests the dependencies that the service needs to function, returns a response within the configured timeout, and communicates its result in a structured format that monitoring systems can parse. Implementing this correctly takes about an hour. The trivial implementation takes 2 minutes. The hour is worth it.
+
+## Liveness vs. readiness: the Kubernetes context
+
+Kubernetes (and most modern container orchestrators) distinguish between liveness and readiness probes, and the distinction matters.
+
+The liveness probe answers: "is this process alive?" If the liveness probe fails, Kubernetes restarts the container. The liveness probe should be fast, test only basic process health, and never fail due to dependency unavailability. A liveness probe that checks the database will restart healthy instances whenever the database is slow -- this makes database issues significantly worse by adding container restart churn to the problem.
+
+The readiness probe answers: "is this service ready to receive traffic?" If the readiness probe fails, Kubernetes removes the pod from the Service's endpoints -- traffic stops being routed to it. The readiness probe should check that all dependencies required to serve requests are reachable. A pod that is alive but not ready (because the database is temporarily unreachable) receives no traffic until the database recovers.
+
+The startup probe is a third type, used to give containers with long startup times enough time to initialize before liveness probes start failing them. It runs until it succeeds, then the liveness and readiness probes take over.
+
+## The structured health check implementation
+
+A well-implemented health check endpoint:
+
+1. Tests each critical dependency with a timeout
+2. Aggregates results into an overall status
+3. Returns the result in a structured JSON format
+4. Completes within the configured timeout budget
+
+A Node.js example:
+
+```typescript
+async function healthCheck(req, res) {
+  const start = Date.now();
+  const checks = await Promise.allSettled([
+    checkDatabase(),
+    checkCache(),
+  ]);
+  
+  const results = {
+    database: checks[0].status === 'fulfilled' ? 'healthy' : 'unhealthy',
+    cache: checks[1].status === 'fulfilled' ? 'healthy' : 'unhealthy',
+  };
+  
+  const overall = Object.values(results).every(v => v === 'healthy')
+    ? 'healthy'
+    : Object.values(results).some(v => v === 'healthy')
+    ? 'degraded'
+    : 'unhealthy';
+  
+  const statusCode = overall === 'healthy' ? 200 : overall === 'degraded' ? 200 : 503;
+  
+  res.status(statusCode).json({
+    status: overall,
+    duration: Date.now() - start,
+    checks: results,
+    timestamp: new Date().toISOString(),
+  });
+}
+```
+
+The `checkDatabase()` function should use a dedicated health check connection (not from the production pool) and issue a lightweight query (`SELECT 1`) with a 1-second timeout. Similarly for cache and other dependencies.
+
+## The degraded state
+
+The three-state health model (healthy, degraded, unhealthy) is more useful than the two-state model (healthy, unhealthy) because it distinguishes between "critical dependencies are unavailable" and "some non-critical dependencies are unavailable."
+
+A service that returns 503 when any dependency is unhealthy will be removed from load balancer rotation when a non-critical feature's backing service is slow. A service that returns 200 with status "degraded" when a non-critical dependency is slow stays in rotation (it can still serve most requests) while signaling to monitoring that something needs attention.
+
+The rule: return 503 only when the service cannot serve any useful requests. Return 200 with `status: 'degraded'` when the service can serve most requests but with reduced functionality.
+
+## Avoiding the cascading failure
+
+The most dangerous health check implementation mistake is using the production database connection pool for health checks. Under high load, the production pool may have no available connections. A health check that waits for a connection from the production pool will timeout, the load balancer will mark the instance unhealthy, the instance will be removed from rotation, the remaining instances will receive more traffic, their pools will be more contended, and their health checks will also fail. The cascade is self-reinforcing.
+
+The prevention: health checks use a dedicated connection pool of one or two connections. These connections are not shared with production traffic and are always available for health check queries. The health check connection pool should also have a very short timeout (1 second) so that a slow database does not cause health checks to hang.
+
+## Common mistakes engineers make with health checks
+
+1. Returning 200 without testing dependencies. The most common mistake. Catches only process crashes, misses all dependency failures.
+2. Using the production connection pool for health checks. Creates the cascading failure described above.
+3. Not setting timeouts on dependency checks. A slow database that causes health checks to hang for 30 seconds will be treated as a health check failure by load balancers with shorter timeouts.
+4. Making the readiness check too strict. A readiness check that fails when any dependency is slow (including non-critical ones) causes unnecessary instance removal and cascading load.
+5. Not logging health check failures. When health checks fail in production, the logs should record which specific check failed and why. Without this logging, diagnosing a production health failure requires guesswork.
+
+## Where to start: a 3-step health check upgrade
+
+**Step 1: Audit your current health check implementation.** Does it test the database? Does it test other critical dependencies? Does it return a structured response? If the answer to any of these is no, the health check is providing false assurance.
+
+**Step 2: Implement separate liveness and readiness endpoints.** The liveness endpoint returns 200 immediately (process is alive). The readiness endpoint tests dependencies with dedicated connections and timeouts. Configure Kubernetes (or your orchestrator) to use both.
+
+**Step 3: Add monitoring on the health check response body.** Set up an alert that fires when the status is "degraded" or "unhealthy." The alert should include the specific check that failed so the on-call engineer knows immediately which dependency is causing the issue.
+
+## The Endpoint That Earns Its Simplicity
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The health check endpoints I implement on client services follow the pattern described here: structured JSON response, separate liveness and readiness endpoints, dedicated health check connection pool for database checks, and monitoring alerts on degraded status. The implementation takes less than a day and has caught three production failures in the past year that the trivial implementation would have missed -- failures where the process was running but dependencies were unavailable and the service was silently failing every request it received.
+
+## Related reading
+
+- The Observability Stack That Pays for Itself
+- [The Game Day: How to Run a Failure Simulation](/blog/the-game-day-how-to-run-a-failure-simulation)
+- [The Deployment Pipeline That Survives Real-World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- [The HTTP Caching Strategy That Most Teams Get Wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong)

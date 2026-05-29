@@ -1,0 +1,62 @@
+---
+slug: "lazy-loading-the-patterns-that-work-and-the-ones-that-backfire"
+title: "Lazy Loading: The Patterns That Work and the Ones That Backfire"
+excerpt: "Lazy loading reduces initial page weight when done correctly. When done incorrectly, it delays the content users actually need and hurts Core Web Vitals. Here is how to apply it with precision."
+date: "2026-05-23"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 6
+ogImage: "/api/og/blog/lazy-loading-the-patterns-that-work-and-the-ones-that-backfire"
+status: "published"
+definition: "Lazy loading is the practice of deferring the loading of non-critical resources until they are needed or near the viewport. For images, it means the browser does not fetch them until the user scrolls near them. For JavaScript modules, it means code is not downloaded until the feature that requires it is used. When applied correctly, lazy loading reduces initial page weight and improves time to interactive. When applied incorrectly, it delays the content users need immediately."
+faq: [
+  {"q":"Which images should be lazy loaded and which should not?","a":"Lazy load all images that are below the fold, meaning not visible in the initial viewport. Do not lazy load the Largest Contentful Paint candidate, which is usually the hero image or main product image. Do not lazy load images in the first screen of any above-the-fold content. The rule is simple: if the user sees it immediately on page load, do not lazy load it. If it requires scrolling to see, lazy load it."},
+  {"q":"How does React.lazy work for code splitting?","a":"React.lazy allows dynamic imports of React components, deferring their JavaScript download until the component is first rendered. Combined with Suspense, it shows a fallback while the component loads. This is most valuable for route-level code splitting, where different pages load their own JavaScript bundles only when visited, rather than loading all page code in the initial bundle."},
+  {"q":"What is the relationship between lazy loading and Core Web Vitals?","a":"Lazy loading the wrong elements directly harms Core Web Vitals. LCP measures the time to render the largest visible element; lazy loading that element delays LCP. INP measures interaction responsiveness; lazy loading JavaScript that handles interactions can cause delayed responses. Lazy loading increases CLS if image dimensions are not set and images jump as they load. Correct lazy loading improves performance; incorrect lazy loading creates measurable regressions."},
+  {"q":"What is the loading=lazy attribute and what browsers support it?","a":"The loading=lazy attribute on img elements is a native browser feature that defers image fetching until the image is near the viewport. It is supported by all modern browsers as of 2023. It does not require JavaScript. For images where lazy loading is appropriate, the native attribute is the correct implementation, not a JavaScript-based intersection observer polyfill."},
+  {"q":"When does lazy loading JavaScript hurt more than it helps?","a":"When the lazy-loaded code is needed immediately after a user interaction. If a user clicks a button and the click handler triggers a lazy import that downloads 500KB of JavaScript before responding, the interaction latency is significant. Lazy load JavaScript for features that are genuinely optional or infrequently used. For core interactive features, include them in the initial bundle."}
+]
+---
+
+## What you need to know
+
+- Never lazy load the LCP image. The LCP element should load as fast as possible. Adding `loading="lazy"` to it directly delays the metric that most affects perceived performance.
+- Lazy load all below-fold images. The native `loading="lazy"` attribute is the correct implementation, not an intersection observer library.
+- Route-level code splitting is the highest-impact JavaScript lazy loading pattern. Loading page-specific code only when that page is visited reduces the initial bundle significantly.
+- Setting explicit width and height on lazy-loaded images prevents layout shift (CLS). Without dimensions, the browser cannot reserve space and the layout jumps as images load.
+- Lazy loading JavaScript for features that users interact with immediately creates noticeable response delays. Lazy load only features that are optional or infrequently accessed.
+
+## The core argument
+
+The two lazy loading patterns that create the most damage are lazy loading the hero image and lazy loading the JavaScript for core interactive features. Both feel like performance optimizations because they defer loading. Both produce the opposite result: the hero image with `loading="lazy"` directly delays the Largest Contentful Paint metric, and the lazy-loaded interaction handler produces a noticeable click delay the first time the feature is used. These patterns appear in production codebases regularly because the downside is not visible in development on a fast machine with a warm cache.
+
+The correct frame for lazy loading is "defer what users do not need immediately." Below-fold images are the clearest case: the user cannot see them on initial page load, so loading them before the page is interactive wastes bandwidth and computation that could go toward the content the user actually sees. The native `loading="lazy"` attribute handles this correctly and efficiently without JavaScript overhead. Route-level code splitting is the correct frame for JavaScript lazy loading: the code for the settings page, the reporting dashboard, and the admin panel should not be in the initial bundle that every user downloads on landing, because most users never visit those pages.
+
+The dangerous pattern is lazy loading components that are critical to the page's interactive functionality but happen to be below a Suspense boundary or a dynamic import. If a user lands on a product page and the "Add to cart" button requires a lazy-loaded module to function, the first click after the page loads will have a delay while that module downloads. The user perceives a broken or slow button. This is worse than including the module in the initial bundle would have been. The rule I apply is: lazy load for route boundaries and for features that require explicit user navigation to reach. Do not lazy load for components that are part of the core interaction flow of any given page.
+
+## Common mistakes
+
+1. **Lazy loading the hero image.** The most common and highest-impact lazy loading mistake. If `loading="lazy"` is on the largest above-fold image on any page, remove it. Add `fetchpriority="high"` in its place to tell the browser to prioritize it.
+
+2. **Not setting width and height on lazy-loaded images.** An img element without explicit dimensions causes Cumulative Layout Shift when it loads. Set width and height on every img, including lazy-loaded ones, so the browser can reserve the correct space before the image loads.
+
+3. **Lazy loading JavaScript for interactive features that users access immediately.** If clicking a button triggers a lazy import, the first click has additional latency from the download. Only lazy load features that users navigate to, not features that respond to immediate user actions.
+
+4. **Using a JavaScript intersection observer library for native-supported lazy loading.** The `loading="lazy"` attribute has full modern browser support. A JavaScript library that implements the same behavior adds bundle weight and complexity for no benefit over the native attribute.
+
+5. **Not auditing which components are behind a lazy boundary in production.** As codebases grow, it is easy to lose track of which components are lazy-loaded and which are not. Periodically audit the lazy boundaries in the codebase and verify that the right components are deferred and the right ones are included eagerly.
+
+## Where to start
+
+1. **Audit every img element on your three most-trafficked pages.** Verify that the LCP image has no `loading` attribute or explicitly has `loading="eager"`. Verify that all below-fold images have `loading="lazy"`. Check that all images have explicit width and height attributes.
+
+2. **Check your JavaScript bundle for route-level code splitting.** Use your bundler's bundle analyzer (webpack-bundle-analyzer or Vite's rollup-plugin-visualizer) to see which modules are in the initial bundle. Identify route-specific code that could be split into separate chunks.
+
+3. **Run Lighthouse before and after each lazy loading change.** Measure LCP, CLS, and INP before applying lazy loading to any element. Verify that the change improves the relevant metric before shipping it.
+
+## Related reading
+
+- [Largest Contentful Paint: The Metric That Changes Conversions](/blog/largest-contentful-paint-the-metric-that-changes-conversions)
+- [INP: The New Core Web Vital Most Teams Are Failing](/blog/inp-the-new-core-web-vital-most-teams-are-failing)
+- [Image Optimization at Scale: AVIF, WebP, Responsive Images](/blog/image-optimization-at-scale-avif-webp-responsive-images)
+- [Frontend Performance Budgets: A Pattern That Sticks](/blog/frontend-performance-budgets-a-pattern-that-sticks)

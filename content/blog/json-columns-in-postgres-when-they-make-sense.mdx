@@ -1,0 +1,62 @@
+---
+slug: "json-columns-in-postgres-when-they-make-sense"
+title: "JSON Columns in Postgres: When They Make Sense"
+excerpt: "JSON columns in Postgres are genuinely useful for flexible, semi-structured data. They are also frequently misused as a shortcut to avoid schema design. Here is when to use them and when to use normalized tables instead."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/json-columns-in-postgres-when-they-make-sense"
+status: "published"
+definition: "JSON columns in Postgres (using the jsonb type) store semi-structured data alongside relational data in the same table. They are appropriate when data has variable or unpredictable structure, when the fields inside the JSON do not need to be individually indexed or queried in SQL, and when the alternative would be a wide table with many nullable columns or a complex EAV (entity-attribute-value) schema. They are not a substitute for proper relational design."
+faq: [
+  {"q":"What is the difference between json and jsonb in Postgres?","a":"json stores the raw JSON string and parses it on every read. jsonb stores a decomposed binary representation that is faster to query, supports indexing, and allows operators like containment checks. In almost every production use case, jsonb is the right choice. The only reason to use json instead of jsonb is if you need to preserve the exact whitespace and key ordering of the original JSON input."},
+  {"q":"Can you index JSON fields in Postgres?","a":"Yes. Postgres supports GIN indexes on jsonb columns that cover all keys and values in the document. You can also create a functional index on a specific extracted path: CREATE INDEX idx_metadata_plan ON users ((metadata->>'plan')). Functional indexes on frequently queried JSON paths can make JSON column performance comparable to a dedicated column for that field."},
+  {"q":"When is a JSON column better than a separate table?","a":"When the data is truly variable across rows, where different rows have entirely different structures and the set of fields is unpredictable. Product configuration settings, user preferences, webhook payloads, and form submission data are typical examples. If the structure is consistent across rows and the fields are queried in WHERE clauses, a separate table with proper columns is almost always better."},
+  {"q":"What are the performance implications of wide JSON columns?","a":"Postgres reads entire rows when fetching data. A table where every row has a 50KB JSON column means every query that touches those rows reads 50KB per row even if only one field from the JSON is needed. This can significantly impact query performance at scale. Large JSON columns that are infrequently read are better stored in a separate table with a foreign key reference."},
+  {"q":"How do you update a single field inside a jsonb column?","a":"Use the jsonb_set function or the || operator for merging updates. jsonb_set(column, '{path,to,key}', '\"new_value\"') updates a single path. column || '{\"key\": \"new_value\"}' merges a new JSON object into the existing one. Unlike a regular column update, these operations require reading the entire JSON value, updating it in application memory or via function, and writing it back."}
+]
+---
+
+## What you need to know
+
+- Use `jsonb`, not `json`. Jsonb is faster to query, supports indexing, and is the correct choice in every production scenario except when preserving exact JSON formatting matters.
+- JSON columns are appropriate for truly variable data structures where different rows have different fields. They are not a shortcut to avoid schema design when the data structure is consistent.
+- You can index JSON fields. A functional index on a frequently queried JSON path performs comparably to a native column index.
+- Large JSON columns increase row size and affect the performance of any query that touches those rows, even when the JSON content is not used in the query.
+- The temptation to put everything in a JSON column to avoid migrations is the pattern that creates the most technical debt at scale.
+
+## The core argument
+
+The JSON column decision is fundamentally a question of how predictable your data structure is and how often you need to query individual fields within it. When the answer is "the structure varies widely across rows and I rarely need to query individual fields in SQL," a JSON column is genuinely the right tool. Event payloads, user-defined metadata, configuration blobs, and external API responses all fit this description. Trying to normalize these into relational tables produces the entity-attribute-value pattern, which is technically relational but practically worse for everything: queries are harder to write, indexes are harder to maintain, and the data is harder to inspect.
+
+The counterargument is that JSON columns are frequently used to avoid the friction of database migrations, not because the data is genuinely variable. A product table with a `metadata` jsonb column that contains `{"color": "red", "size": "large", "weight": 1.5}` for every row is a relational schema stored in JSON. The fields are consistent, they are queried in product filters, and they would be much better served as dedicated columns with proper types and indexes. The symptom is a codebase where JSON paths are scattered across queries and application code, making it harder to understand what data actually lives in the table.
+
+The practical approach I use is a hybrid: relational columns for data that is consistently present, queried in WHERE or ORDER BY clauses, or needs type safety, and a `metadata` jsonb column for the truly variable, infrequently queried attributes. This gives you the query performance of relational columns for the fields that matter most while preserving flexibility for the attributes that vary by record. When building the data model for Velmora, the pattern was to start with relational columns for the core attributes and add a metadata jsonb column for the supplementary data that varied by integration type. Six months later, the metadata column contained the kind of data that would have required five separate optional-column tables to normalize, and none of it was being queried in SQL.
+
+## Common mistakes
+
+1. **Using JSON columns as a permanent schema migration avoidance strategy.** Every time you add a field to a JSON column instead of running a migration, you accumulate debt. Fields that are consistently present on most rows belong in proper columns, not JSON.
+
+2. **Not creating indexes on frequently queried JSON paths.** A WHERE clause that filters on a JSON path without a functional index performs a full table scan. Identify the JSON fields that appear in query conditions and create functional indexes for them.
+
+3. **Storing large documents in high-frequency tables.** A user table with a 20KB preferences JSON column means every query against that table reads 20KB per row. Move large infrequently accessed JSON to a separate table with a foreign key.
+
+4. **Mutating nested JSON in application code and writing the whole document back.** Deep updates to JSON in application code bypass database atomicity. Use `jsonb_set` or `||` in SQL UPDATE statements for atomic field updates.
+
+5. **Not validating JSON structure at the application layer.** Postgres accepts any valid JSON in a jsonb column. Without application-level validation, JSON columns accumulate structural inconsistencies that break downstream code.
+
+## Where to start
+
+1. **Audit your existing JSON columns.** For each one, list the fields that appear in more than 80 percent of rows. Those fields are candidates for migration to proper columns. The remaining fields are the legitimate use case for the JSON column.
+
+2. **Check your most expensive queries that filter on JSON paths.** Use EXPLAIN ANALYZE to verify whether there is an index covering those paths. Add functional indexes for any JSON path that appears in WHERE clauses on high-traffic queries.
+
+3. **Set a team convention for when JSON columns are appropriate.** Write it in your architecture decisions document. The convention prevents individual engineers from reaching for JSON columns by default when a migration would be the right approach.
+
+## Related reading
+
+- Postgres at Scale: The Patterns That Save You at a Million Rows
+- Database Schema Design: What You Get Wrong in Year One
+- Multi-Tenant Architecture: Shared vs Isolated Data Models
+- [Building APIs That Survive Five Years of Customer Change Requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests)

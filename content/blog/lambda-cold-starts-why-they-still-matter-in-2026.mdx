@@ -1,0 +1,62 @@
+---
+slug: "lambda-cold-starts-why-they-still-matter-in-2026"
+title: "Lambda Cold Starts: Why They Still Matter in 2026"
+excerpt: "Cold starts have improved significantly but have not been eliminated. Here is the current state of cold start latency, which use cases still require mitigation, and the practical patterns that keep them from affecting users."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/lambda-cold-starts-why-they-still-matter-in-2026"
+status: "published"
+definition: "A Lambda cold start is the latency added to a function invocation when AWS must provision a new execution environment because no warm environment is available. Cold starts add anywhere from 100 milliseconds for simple Node.js functions to several seconds for large Java or .NET functions with complex initialization. Despite significant improvements in the AWS Lambda runtime, cold starts remain a meaningful performance consideration for latency-sensitive production workloads."
+faq: [
+  {"q":"How long are Lambda cold starts in 2026?","a":"For Node.js and Python runtimes with small function packages, cold starts typically range from 100 to 500 milliseconds. For Java and .NET runtimes, cold starts range from 500 milliseconds to several seconds depending on class loading and dependency initialization. Custom container runtimes have cold starts that depend heavily on image size and initialization code. SnapStart for Java reduces cold starts significantly by pre-initializing the execution environment."},
+  {"q":"What is Lambda SnapStart and when should I use it?","a":"SnapStart is an AWS Lambda feature for Java runtimes that takes a snapshot of the initialized execution environment and restores it on cold starts, reducing cold start time to under 1 second for most Java functions. It is the correct approach for Java Lambdas that serve latency-sensitive traffic and cannot migrate to Node.js or Python for the cold start improvement."},
+  {"q":"What is provisioned concurrency and when is it worth the cost?","a":"Provisioned concurrency keeps a specified number of Lambda execution environments warm at all times, effectively eliminating cold starts for the provisioned instances. It costs approximately the same as an always-on Lambda plus the invocation cost. It is worth the cost for APIs or functions serving user-facing traffic where cold start latency creates a poor user experience and the function receives consistent traffic that justifies the cost of always-on environments."},
+  {"q":"Does the deployment package size significantly affect cold start time?","a":"Yes. A function with a 100MB deployment package has a meaningfully longer cold start than one with a 5MB package because the larger package takes longer to download and extract. Tree-shaking, removing unused dependencies, and using Lambda layers for shared dependencies that change infrequently all reduce package size and improve cold start times."},
+  {"q":"How do cold starts affect API Gateway APIs backed by Lambda?","a":"A cold start on a Lambda function behind API Gateway adds its full duration to the API response time for that specific request. For a user-facing API where the target response time is under 200ms, a 500ms cold start represents a significant degradation for the first request after a period of inactivity. The mitigation is either provisioned concurrency for the functions serving user-facing endpoints or architectural changes that keep functions warm through scheduled pings or consistent traffic."}
+]
+---
+
+## What you need to know
+
+- Cold starts are not eliminated in 2026 but are significantly reduced for lightweight runtimes. Node.js and Python functions with small packages have cold starts under 500 milliseconds. Java and .NET cold starts can still reach multiple seconds without SnapStart.
+- Cold starts only matter for workloads with latency requirements. Background processing, batch jobs, and webhook handlers can tolerate cold start latency. User-facing synchronous APIs often cannot.
+- Provisioned concurrency eliminates cold starts at the cost of always-on pricing. It is appropriate for high-traffic user-facing APIs. It is not appropriate for infrequently invoked functions where the cost exceeds the value.
+- Deployment package size directly affects cold start time. Removing unused dependencies and tree-shaking bundles is one of the fastest cold start improvements available.
+- The architecture choice between Lambda and containerized services should include cold start characteristics as a factor when the workload is latency-sensitive.
+
+## The core argument
+
+Cold starts matter when the user waits. For the majority of Lambda use cases, background processing, event-driven integrations, scheduled jobs, and asynchronous webhooks, cold start latency is irrelevant. The job takes one second or five seconds and the user never knows the difference. The problem appears when Lambda functions are used for synchronous user-facing APIs, real-time data endpoints, or interactive features where the response time directly affects the user experience.
+
+The runtime choice is the first lever. Node.js and Python runtimes have substantially lower cold start times than JVM-based runtimes because they initialize faster and have smaller execution environment overhead. For functions that need to be written in Java, SnapStart brings the cold start profile much closer to Node.js by pre-initializing the environment. For teams that have a runtime choice, Node.js or Python is the correct default for latency-sensitive Lambda workloads, not because Java is inferior but because the cold start characteristics of Node.js are more predictable for user-facing traffic.
+
+The package size lever is underutilized. A Node.js Lambda that bundles the entire application with all its development dependencies, logging libraries, and unused packages arrives at cold start with a much larger environment to initialize than one that bundles only the code that runs in that function. Using bundlers like esbuild to tree-shake Lambda packages to the smallest possible size is a one-time build configuration change that reduces cold starts consistently. For functions I have worked with that started at 50 to 80MB deployment packages, tree-shaking to 3 to 5MB often reduces cold start time by 200 to 400 milliseconds.
+
+## Common mistakes
+
+1. **Using provisioned concurrency for functions that do not need it.** Provisioned concurrency is always-on pricing. Applying it to background processing functions or infrequently invoked functions wastes money without user-visible benefit. Reserve it for the specific functions that serve synchronous user-facing traffic.
+
+2. **Not measuring actual cold start frequency.** Cold starts happen when no warm environment is available. For functions that receive consistent traffic, cold starts are rare. For functions that are invoked once per hour, cold starts happen on nearly every invocation. Measure the cold start rate before deciding on mitigation.
+
+3. **Including development dependencies in the Lambda deployment package.** A function that bundles `jest`, `eslint`, `prettier`, and their transitive dependencies has a significantly larger package than one that bundles only the production runtime. Configure the build process to exclude development dependencies from Lambda deployments.
+
+4. **Connecting to databases in module initialization code.** Database connection setup that happens at module load time instead of inside the handler function runs on every cold start and adds to the cold start duration. Lazy-initialize database connections inside the handler, or use a connection pool that is managed separately.
+
+5. **Not distinguishing cold start latency from total function latency in monitoring.** CloudWatch Lambda metrics report total duration. Cold start latency is a separate component. Use the init duration metric in CloudWatch or X-Ray to separate cold start time from execution time in your monitoring, so you can identify when cold starts are contributing to latency spikes.
+
+## Where to start
+
+1. **Identify which Lambda functions serve synchronous user-facing traffic.** These are the cold start-sensitive functions. Background jobs, async processors, and batch functions are not. Focus cold start mitigation on the latency-sensitive subset.
+
+2. **Check the deployment package size for each latency-sensitive function.** Download the deployment package and inspect it with a tool like ncdu or a zip inspector. If the package is over 10MB and the function is simple, there are likely unused dependencies to remove.
+
+3. **Enable CloudWatch Lambda Insights for the latency-sensitive functions.** This enables the init duration metric, which separates cold start time from execution time and makes cold start frequency and duration visible in your monitoring.
+
+## Related reading
+
+- Serverless vs Containers: A Decision Framework for 2026
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)
+- Latency vs Throughput: The Tradeoff Engineers Get Wrong
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)

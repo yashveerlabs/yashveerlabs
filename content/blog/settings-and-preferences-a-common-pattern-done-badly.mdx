@@ -1,0 +1,65 @@
+---
+slug: "settings-and-preferences-a-common-pattern-done-badly"
+title: "Settings and Preferences: A Common Pattern Done Badly"
+excerpt: "Settings pages reveal how well an app is architected. Most of them reveal the opposite."
+date: "2026-05-23"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","ux","architecture"]
+readingMinutes: 7
+ogImage: "/api/og/blog/settings-and-preferences-a-common-pattern-done-badly"
+status: "published"
+faq: [
+  {"q":"Should settings auto-save or require a Submit button?","a":"Both patterns work if applied consistently. Auto-save with a visible saved indicator works well for display and preference settings. Explicit save with confirmation is safer for email address changes, password changes, and anything with security implications. The mistake is mixing the two without explanation."},
+  {"q":"How do you handle optimistic UI in settings forms?","a":"Update the UI immediately on change, fire the API call in the background, and roll back with a toast notification if the request fails. The key is the rollback: users need to know their change did not persist so they can try again."},
+  {"q":"Where should user preferences be stored?","a":"In your primary database, on the user record or a related preferences table. Do not store preferences in localStorage alone as they will not persist across devices. localStorage is fine as a cache, but the source of truth should be server-side."},
+  {"q":"What is the right URL structure for a settings page?","a":"A layout route at /settings with sub-routes for each section: /settings/profile, /settings/notifications, /settings/security, /settings/billing. This gives each section its own URL, makes navigation bookmarkable, and isolates each section's component state."},
+  {"q":"How do you handle settings that require a restart or reload to take effect?","a":"Show a banner or inline notice that the change will take effect on next login or page reload. Do not silently apply it in the background. Users who made the change will be confused if they do not see it, and users who did not make it will be confused when behavior changes unexpectedly."}
+]
+---
+
+# Settings and Preferences: A Common Pattern Done Badly
+
+**Settings and preferences are where application architecture gets exposed. A well-built settings system saves state reliably, reflects changes immediately, handles conflicts gracefully, and gives users clear feedback at every step. Most settings implementations do none of these things reliably. They lose state on refresh, apply changes that silently fail, and create UI patterns that contradict each other across different sections of the same app.**
+
+## What you need to know
+
+- The difference between user preferences (per-user, stored in your database) and app configuration (global or environment-level, stored in config) should be explicit from the start
+- Optimistic UI updates in settings feel fast but require careful rollback handling when the save fails
+- Settings pages are where most apps hide their worst form patterns: no validation feedback, ambiguous save states, inconsistent save-on-change vs save-on-submit behavior
+- Notification preferences in particular need their own architecture: a flag in a JSON column or a dedicated notification preferences table, not a pile of boolean columns
+- The "undo" problem in settings is underrated; users expect to be able to back out of changes they made accidentally
+
+## The core argument
+
+Settings pages are almost never planned properly. They grow one field at a time as product requirements arrive. First it is a display name. Then it is a notification toggle. Then it is a timezone selector. Then it is API key management. Then it is two-factor auth. By the time the settings page has a dozen sections, it is carrying the accumulated debt of every feature that did not have a home anywhere else.
+
+The architecture problem shows up as inconsistency. Some fields save on blur. Some require a Submit button. Some changes take effect immediately. Some require a page reload. The user has no mental model because there is no underlying model to have. This is what I fixed when I rebuilt the user settings section for Velmora. The existing implementation had three different save patterns across different settings sections, a notification preferences system stored as a flat JSON blob, and no error states whatsoever. The rebuild drew a clean line: preferences that affect display persist optimistically with a rollback toast on failure. Preferences that affect security require a confirmation step and explicit save. System configuration changes trigger a clear visual state change to signal they are in effect.
+
+The deeper issue is that settings pages are tests of your data model. If your user table has 15 boolean columns for notification preferences, your data model is the problem and the settings UI is just exposing it. A separate notification preferences table with rows keyed by notification type gives you flexibility to add new notification categories without a migration every time, and makes the UI component data-driven rather than hardcoded.
+
+## Common mistakes
+
+1. **Mixing save behaviors in the same settings page without communicating the difference.** If some settings auto-save and others require a button click, the page needs clear visual cues for each. Users will assume one pattern and break the other one constantly.
+
+2. **No loading state on save.** A settings form that goes silent after the user clicks Save is worse than one that shows an error. Users will click again, submit twice, or assume nothing happened.
+
+3. **Storing notification preferences as boolean columns.** This approach requires a schema migration every time a new notification type ships. A preferences JSON column or a dedicated table is far more maintainable.
+
+4. **No validation on the frontend for fields that have server-side constraints.** If a display name has a character limit on the backend, validate it on the frontend too. Do not make the user complete a round trip to find out the field is wrong.
+
+5. **Building settings as a single route with a single form.** Settings pages with many sections should be structured as a layout with sub-routes. It makes bookmarking, deep linking, and URL-based navigation work naturally, and it keeps each section's state isolated.
+
+## Where to start
+
+1. **Audit your current settings data model.** List every field users can change. Where is each one stored? How does it get applied? Are there fields that affect security that do not require confirmation? Identify the inconsistencies before you write a line of UI.
+
+2. **Standardize your save pattern.** Pick one: auto-save with visual feedback, or explicit save button with clear loading and error states. Then apply it consistently across the entire settings surface. One exception is security-sensitive fields, which should always require explicit confirmation.
+
+3. **Build the notification preferences as a data-driven component.** Your backend serves a list of notification categories and the user's current state for each. The frontend renders that list. When a new category is added, it appears in settings automatically.
+
+## Related reading
+
+- [Building Forms That Customers Love](/blog/building-forms-that-customers-love)
+- [The Forms Problem: React Hook Form vs Formik vs TanStack Form](/blog/the-forms-problem-react-hook-form-vs-formik-vs-tanstack-form)
+- [Loading States, Skeletons, and Optimistic UI](/blog/loading-states-skeletons-and-optimistic-ui)
+- [The Accessibility Audit Every Web App Should Pass](/blog/the-accessibility-audit-every-web-app-should-pass)

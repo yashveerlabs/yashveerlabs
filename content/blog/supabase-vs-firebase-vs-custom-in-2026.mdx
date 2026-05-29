@@ -1,0 +1,61 @@
+---
+slug: "supabase-vs-firebase-vs-custom-in-2026"
+title: "Supabase vs Firebase vs Custom in 2026"
+excerpt: "Supabase, Firebase, and custom backends each serve a different kind of team. Here is the honest comparison that helps you pick the right one."
+date: "2026-05-24"
+category: "Comparisons and Vendor Decisions"
+tags: ["supabase", "firebase", "database", "backend", "saas", "postgresql"]
+readingMinutes: 7
+ogImage: "/api/og/blog/supabase-vs-firebase-vs-custom-in-2026"
+status: "published"
+faq: [
+  {"q":"Is Supabase production-ready in 2026?","a":"Yes. Supabase has matured significantly. Major SaaS products run on it in production. The platform had early reliability issues in 2022 and 2023 that have largely been resolved. Review their current status page and incident history before committing, as you would for any infrastructure provider."},
+  {"q":"Can I self-host Supabase?","a":"Yes. Supabase is open source and can be self-hosted using Docker. Self-hosting gives you full control but removes the managed infrastructure benefit that makes Supabase valuable for small teams. Most SaaS products use Supabase's hosted platform rather than self-hosting."},
+  {"q":"Is Firebase still relevant in 2026?","a":"Firebase remains widely used, particularly for mobile apps (where the Android and iOS SDKs are mature) and real-time applications. The document model continues to work well for certain use cases. Supabase has captured significant mindshare among web developers building SaaS products, but Firebase is not going away."},
+  {"q":"How does Supabase pricing compare to Firebase?","a":"Both have generous free tiers. Supabase's Pro plan starts at $25 per month per project. Firebase pricing is consumption-based and can become expensive at high read/write volumes. For typical B2B SaaS workloads, Supabase's pricing is generally more predictable. Model your expected usage against both pricing pages before committing."},
+  {"q":"When should I choose a fully custom backend over Supabase?","a":"When your requirements genuinely exceed what Supabase provides: custom PostgreSQL extensions, specific auth flows that Supabase cannot accommodate, infrastructure in a region Supabase does not support, or data residency requirements that demand full control. For most early-stage SaaS products, these conditions do not apply."}
+]
+---
+
+# Supabase vs Firebase vs Custom in 2026
+
+**Supabase is an open-source Firebase alternative built on PostgreSQL, offering a hosted database, authentication, storage, and edge functions. Firebase is Google's managed backend platform built on document-oriented NoSQL. A custom backend means building your own stack with a framework like Express, Fastify, or NestJS connected to a database you manage. In 2026, the decision between these three approaches is primarily about team size, data complexity, and how much vendor lock-in you are willing to accept.**
+
+## What you need to know
+
+- Supabase runs on PostgreSQL, which gives you relational data modeling, complex queries, and a mature ecosystem of tooling
+- Firebase's Firestore is a document database; it scales differently and requires you to think in document hierarchies rather than relational schemas
+- Both Supabase and Firebase provide authentication, storage, and real-time subscriptions out of the box, reducing initial setup time significantly
+- A custom backend costs more time to set up but gives you full control over every layer
+- Vendor lock-in with Firebase is real; migrating from Firestore to a relational database later is a significant engineering project
+
+## The core argument
+
+Supabase and Firebase solve the same problem: they give early-stage teams a functional backend without building it from scratch. Authentication, database, file storage, real-time subscriptions. Both work. The philosophical difference is in the data model. Firebase's Firestore is a NoSQL document database. Supabase is PostgreSQL. This is not a minor implementation detail. It determines how you model your data, what queries are possible, and how painful it is to change your data model as the product evolves.
+
+For most SaaS products, relational data is the natural fit. You have users, teams, subscriptions, records that relate to each other in structured ways. PostgreSQL handles this elegantly. Firestore requires you to denormalize data, duplicate records across collections, and write complex multi-document transactions to do things that a SQL join handles in a single query. I have taken over Firestore-based codebases that looked clean at launch and were genuinely difficult to query six months later, because the data model that made sense for the first three features did not survive the fourth. Supabase does not have this problem because it is just PostgreSQL with a nice API layer on top.
+
+The case for a custom backend is strongest when you have specific requirements that neither platform covers well, or when you have senior engineers who will build something better than either platform's defaults. For Nexli, I built a custom backend because the data model required specific PostgreSQL extensions and the auth flow had requirements that Supabase's auth system would have needed heavy customization to meet. For a simpler SaaS, the custom route adds three to six weeks of setup time that is rarely worth the control gained. My default recommendation for teams of one to five engineers with a standard SaaS data model: start with Supabase. You get PostgreSQL, you can eject to a custom stack at any time by just using the database directly, and you save months of infrastructure work at the early stage when moving fast matters most.
+
+## Common mistakes
+
+1. **Choosing Firebase because it is more familiar.** Firebase was the dominant BaaS for a long time and many developers learned it first. Familiarity with Firestore is not a strong reason to choose a document database for a relational data problem. Supabase's learning curve is lower than most teams expect.
+2. **Underestimating Firebase lock-in.** Firestore queries, Firebase authentication, Firebase storage all have proprietary APIs. Migrating away from any of them is a meaningful engineering project. If you start on Firebase, plan to stay on Firebase for the duration of that product.
+3. **Using Supabase's auto-generated APIs for complex queries.** Supabase's REST and GraphQL APIs are great for simple CRUD. For complex queries involving joins, aggregations, or conditional logic, write the query directly in SQL using Supabase's database functions or connect a direct PostgreSQL client. The auto-generated API is a convenience layer, not a replacement for SQL.
+4. **Not understanding Supabase's row-level security model.** Supabase exposes your PostgreSQL database directly to the client via its API. Row-level security (RLS) policies are what prevent one user from accessing another user's data. Enabling Supabase without setting up RLS correctly is a data security issue.
+5. **Building a custom backend before validating that the product has users.** A custom backend is the right choice for scale and specific requirements. It is the wrong choice for the first three months of a product, when the biggest risk is building something nobody wants.
+
+## Where to start
+
+**Step 1: Map your data model before picking a backend.** If your data is relational (users have teams, teams have projects, projects have tasks), Supabase is the better fit. If your data is genuinely document-oriented (arbitrary nested structures, schema-per-record), Firebase may be appropriate.
+
+**Step 2: Try Supabase's quickstart with your primary framework.** Supabase has official clients for Next.js, React, Vue, Flutter, and most other frameworks. You can have a working auth and database setup in a few hours. This hands-on evaluation is more useful than theoretical comparison.
+
+**Step 3: Plan your exit path before committing.** With Supabase, you can always connect directly to the PostgreSQL database and remove the Supabase API layer. With Firebase, there is no clean exit; plan to stay or plan a significant migration. Knowing this upfront shapes how you architect your data access layer.
+
+## Related reading
+
+- [PostgreSQL vs Supabase vs Neon vs PlanetScale](/blog/postgresql-vs-supabase-vs-neon-vs-planetscale)
+- [PostgreSQL vs MySQL vs MongoDB for a New SaaS in 2026](/blog/postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026)
+- [The Database You Did Not Think You Needed](/blog/the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse)
+- [SaaS Multi-Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)

@@ -1,0 +1,110 @@
+---
+slug: "why-your-app-got-slower-after-you-added-users"
+title: "Why Your App Got Slower After You Added Users"
+excerpt: "The app was fast at a hundred users and slow at ten thousand. The code did not change. The data did. This is the technical story of where the time actually goes, and how to find it before your customers do."
+date: "2025-06-16"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-your-app-got-slower-after-you-added-users"
+status: "published"
+definition: "An app slows down as it grows because the work per request scales with the size of the data, not the number of features. Queries that scanned ten rows now scan ten million. The fix is rarely a rewrite. It is finding the three or four queries and code paths that grew with the data and fixing those."
+faq: [
+  {"q":"Why does an app get slower as it adds users when the code did not change?","a":"Because the cost of most operations scales with the amount of data, not the cleverness of the code. A query with no index is instant on a thousand rows and painful on ten million. The code is identical. The table is not. Growth exposes the operations whose cost was always linear, you just could not feel it at small scale."},
+  {"q":"How do I find the slow part of my app?","a":"Start at the database. Turn on the slow query log and look at the queries that run most often, not just the slowest single query. A query that takes 80 milliseconds and runs 500 times per request is worse than one that takes two seconds and runs once. Sort by total time, not per-call time."},
+  {"q":"What is the N+1 query problem and why does it hurt at scale?","a":"It is when you run one query to fetch a list, then one more query per item in that list. At ten items it is eleven queries and nobody notices. At a thousand items it is a thousand and one queries and the page times out. It is the single most common cause of an app that got slow after it grew."},
+  {"q":"Do I need a bigger server when my app slows down?","a":"Usually not first. A bigger server hides the problem for a few months and doubles your bill. Most slowdowns are a missing index, an N+1 query, or a connection pool that is too small. Fix those and the same server handles ten times the load. Scale the hardware after you have fixed the code, not before."},
+  {"q":"What is connection pooling and why does it matter?","a":"Each database connection costs memory and setup time. Opening a fresh one per request does not scale. A pool keeps a fixed set of connections open and reuses them. Without a pool, or with a pool sized wrong, your app spends its time waiting for connections instead of doing work. It is one of the quietest causes of slowness under load."},
+  {"q":"How do I know if the problem is the database or the application code?","a":"Measure. Add timing around the database calls and around the rest of the request. In almost every slow SaaS app I have looked at, the database is 80 percent or more of the time. The application code is rarely the bottleneck. Confirm it with numbers before you optimize the wrong layer."},
+  {"q":"Can caching fix a slow app?","a":"Caching hides a slow query behind a fast lookup, which helps, but it does not fix the underlying cost and it adds the problem of stale data. Cache after you have made the query reasonable, not as a substitute for a missing index. A cache over a broken query is a slow app with extra steps and harder bugs."}
+]
+---
+
+## What you actually need to know
+
+- The app slowed down because the cost of its work scales with the size of the data, not the number of features you shipped.
+- The database is almost always where the time goes. Measure before you guess.
+- The three usual suspects are a missing index, an N+1 query, and a connection pool that is too small.
+- A bigger server buys a few months and a bigger bill. Fixing the code buys years.
+- This is the technical version. For the business and human side of the same story, read [the failure postmortem version of an app that got slower as it grew](/blog/why-your-app-got-slower-after-you-added-users-707).
+
+| Cause | How it feels | Cost to fix | Typical impact |
+|---|---|---|---|
+| Missing index | One page gets slow, then more | One line, minutes | Often 10x to 100x on that query |
+| N+1 query | Slowness scales with list size | An hour to refactor | Removes hundreds of queries per request |
+| Small connection pool | Slow only under load | A config change | Removes connection wait time |
+| No query cache | Repeated identical work | Half a day | Cuts repeated read load |
+| Undersized server | Everything is slightly slow | Money, monthly | Hides the real cause |
+
+## The core argument
+
+The app did not get worse. The data got bigger. That is the whole story, and most teams miss it because the code review that introduced the slow query passed cleanly. The query was correct. It returned the right answer. It just happened to scan the whole table, and at a thousand rows that is free.
+
+I have been called in to rescue more than one SaaS that was fast at launch and unusable at scale. The founders assumed they needed a rewrite or a famous database. They needed neither. They needed someone to turn on the slow query log and read it.
+
+Performance at scale is not about clever code. It is about understanding which operations grow with your data and making sure those operations stay cheap. Almost everything else is noise. A function that runs in constant time stays fast forever. A query that scans a table gets slower every single day you stay in business.
+
+The reason this feels mysterious is that the slowdown is gradual. There is no single deploy that broke it. The app degrades by one millisecond a day until one Tuesday the largest customer calls and the page does not load. By then the cause is buried under six months of unrelated commits.
+
+## Where the time actually goes
+
+In every slow app I have profiled, the database is the majority of the request time. Not the framework. Not the language. Not the JSON serialization everyone loves to blame. The database.
+
+Within the database, the cost concentrates in a small number of queries. The Pareto rule holds hard here. Three or four queries account for most of the pain. Find those and you have found the problem.
+
+The fastest way to find them is the slow query log sorted by total time, which means per-call time multiplied by call frequency. A query that takes 50 milliseconds and runs 800 times per page is the real enemy, not the dramatic two second report nobody runs. Read the [discipline of keeping a slow query log](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice) and you will catch these before customers do.
+
+The second place time hides is the gap between issuing many small queries and issuing one good one. This is the [N+1 query problem](/blog/the-n-1-query-problem-detection-prevention-and-refactoring), and it is responsible for more "it got slow after we grew" tickets than any other single cause.
+
+## How long does it take to fix
+
+| Fix | Time to implement | When to reach for it |
+|---|---|---|
+| Add a missing index | Minutes | A specific query scans rows it should seek |
+| Collapse an N+1 into a join or batch | An hour or two | Query count scales with list size |
+| Tune the connection pool | A config change | Slowness appears only under concurrency |
+| Add a read replica | A day | Reads dominate and the primary is saturated |
+| Introduce a cache layer | Half a day | The same expensive read repeats constantly |
+
+The order matters. Indexes and N+1 fixes come first because they are cheap and the impact is enormous. Replicas and caches come later because they add operational weight and new failure modes.
+
+## What to measure before you change anything
+
+- The total time per request, split into database time and everything else.
+- The slowest queries by total time, not by single-call time.
+- The number of queries per request. If it grows with the data on the page, you have an N+1.
+- Connection pool wait time under peak load.
+- Cache hit rate if a cache already exists.
+
+## Expert opinion
+
+> The instinct when an app slows down is to add hardware, because hardware is a purchase order and a refactor is a conversation. I have watched teams triple their database instance and buy themselves six weeks. The query was still scanning the whole table. It just scanned it on a more expensive machine. Measure first. The fix is almost always smaller and cheaper than the panic suggests.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client came to me with a dashboard that took eleven seconds to load for their biggest account and under a second for everyone else. The team was convinced the database had hit a wall and quoted themselves a painful migration.
+
+I turned on the slow query log for an hour. The dashboard was running one query to load the customer's projects, then one query per project to count its tasks. Small accounts had five projects. The big account had nine hundred. That was nine hundred and one queries for one page load.
+
+We replaced the loop with a single grouped query and added one index. The eleven seconds became under 400 milliseconds for the big account. No migration, no bigger server. The work took an afternoon, and the same pattern, once we knew to look, appeared in four other endpoints. For the deeper database angle, the team later read up on [connection pooling as a quiet killer of performance](/blog/connection-pooling-the-quiet-killer-of-saas-performance).
+
+## Common mistakes
+
+1. Buying a bigger server before measuring. It hides the cause and doubles the bill.
+2. Optimizing the application code when the database is 80 percent of the time.
+3. Sorting the slow query log by per-call time and missing the frequent cheap query.
+4. Adding a cache over a broken query instead of fixing the query.
+5. Treating an N+1 as acceptable because it is fast in development with ten rows.
+6. Adding indexes blindly until writes slow down too. Index the queries you actually run.
+7. Assuming the slowdown needs a rewrite. It almost never does.
+
+## A first week plan to find and fix it
+
+1. **Day one.** Add request-level timing that splits database time from the rest. Confirm where the time goes.
+2. **Day two.** Turn on the slow query log. Sort by total time. Write down the top five queries.
+3. **Day three.** Find the N+1 patterns. Look for query counts that grow with the data on the page.
+4. **Day four.** Add the missing indexes for the top queries. Measure before and after with [EXPLAIN ANALYZE](/blog/explain-analyze-a-tour-of-postgresqls-best-diagnostic-tool).
+5. **Day five.** Collapse the worst N+1 into a single query. Re-measure the slow page.
+6. **Ongoing.** Set a backend performance budget so the next regression gets caught in review, not by a customer. The pattern is in [how to set backend performance budgets](/blog/backend-performance-budgets-how-to-set-them).

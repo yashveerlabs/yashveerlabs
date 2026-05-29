@@ -1,0 +1,191 @@
+---
+slug: "the-multi-tenant-database-one-schema-or-many"
+title: "The Multi Tenant Database: One Schema or Many?"
+excerpt: "The three multi-tenancy models for SaaS -- shared table, separate schema, separate database -- and when each one is worth its complexity."
+date: "2025-04-20"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","database","multi-tenancy","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-multi-tenant-database-one-schema-or-many"
+status: "published"
+definition: "Multi-tenant database design is the set of architectural patterns for storing data from multiple customers (tenants) in a shared database infrastructure. The three primary patterns are shared tables (all tenants in the same tables, distinguished by a tenant_id column), schema-per-tenant (each tenant has a separate PostgreSQL schema within the same database), and database-per-tenant (each tenant has a separate database). Each pattern has different implications for data isolation, query complexity, operational overhead, and cost."
+faq: [
+  {"q":"What is the right default multi-tenancy model for an early-stage SaaS product?","a":"Shared tables with a tenant_id column is the right default. It is the simplest to implement, the easiest to query, and the most efficient use of database resources at early stage. The primary risk -- data leakage between tenants -- is managed by consistently filtering on tenant_id in every query and enforcing this with row-level security (PostgreSQL RLS) or application-level middleware. The limitations of the shared-table model (data isolation for enterprise customers, tenant-specific customization) become relevant at scale, not at early stage."},
+  {"q":"When does schema-per-tenant make sense?","a":"When enterprise customers require data isolation as a contractual or compliance requirement, when different tenants require different schema customizations, or when the regulatory environment requires demonstrable data separation (healthcare, finance). Schema-per-tenant provides stronger isolation guarantees than row-level security and allows per-tenant schema migrations. The operational cost is significant: schema migrations must be applied to each tenant's schema (which can be thousands of schemas at scale), and connection pooling behavior differs between the shared-table and per-schema models."},
+  {"q":"How do I prevent data leakage between tenants in a shared-table model?","a":"Three layers: row-level security (RLS) at the database level -- PostgreSQL RLS policies enforce that queries automatically filter by the current user's tenant; middleware at the API level -- every API handler extracts the tenant from the authentication context and passes it to the data access layer; and query validation at the ORM level -- every data access function requires a tenant identifier parameter and throws if not provided. The defense-in-depth approach means a missing filter at the application level is caught by the database before returning cross-tenant data."},
+  {"q":"What are the database connection implications of schema-per-tenant?","a":"Connection pooling becomes more complex. In a shared-table model, all requests share the same connection pool with no per-tenant configuration. In a schema-per-tenant model, connections must be configured with the correct search_path for each tenant (so queries find the right schema). PgBouncer in transaction mode does not support SET commands (including SET search_path), which means connection pooling with schema-per-tenant requires session mode (less efficient) or a different pooling strategy. This is one of the reasons schema-per-tenant has higher operational complexity than shared tables."},
+  {"q":"What does a tenant_id RLS policy look like in PostgreSQL?","a":"A RLS policy that restricts SELECT, INSERT, UPDATE, and DELETE to rows matching the current user's tenant: `CREATE POLICY tenant_isolation ON projects USING (tenant_id = current_setting('app.current_tenant_id')::uuid);`. The application sets `app.current_tenant_id` at the beginning of each database connection session using `SET app.current_tenant_id = 'tenant-uuid'`. All subsequent queries on that connection automatically filter by the configured tenant. RLS policies are enabled per table with `ALTER TABLE projects ENABLE ROW LEVEL SECURITY;` and `ALTER TABLE projects FORCE ROW LEVEL SECURITY;`."}
+]
+---
+
+## What you actually need to know
+
+- Shared tables with tenant_id is the right default for early-stage SaaS. It is simple, efficient, and handles millions of records without architectural change.
+- PostgreSQL row-level security (RLS) is the strongest mechanism for preventing cross-tenant data leakage in a shared-table model.
+- Schema-per-tenant provides stronger isolation guarantees but significantly increases migration complexity and connection pooling overhead. Use it when enterprise contracts require demonstrable data separation.
+- Database-per-tenant provides the strongest isolation but the highest cost. Appropriate only for large enterprise customers with contractual data isolation requirements.
+- The tenant_id filter must appear on every query. Missing it is the most common source of data leakage bugs.
+
+| Model | Isolation Level | Migration Complexity | Cost Efficiency | When to Use |
+|---|---|---|---|---|
+| Shared tables (tenant_id) | Row-level | Low (one schema) | Very high | Default for most SaaS |
+| Schema-per-tenant | Schema-level | High (per-tenant) | Medium | Enterprise compliance |
+| Database-per-tenant | Full isolation | Very high (per-tenant) | Low | Large enterprise + dedicated infra |
+
+## The core argument
+
+Multi-tenancy decisions made early in a product's lifecycle have long-term architectural consequences that are expensive to change later. The team that starts with shared tables and needs schema-per-tenant isolation for an enterprise customer faces a significant migration. The team that starts with schema-per-tenant for all customers pays ongoing operational overhead for isolation they may not need for years.
+
+The principles that guide the decision: start with the simplest model that meets the current customer requirements, design with the migration path to a stronger isolation model in mind, and implement the application-level abstraction that makes the model change tractable.
+
+For most early-stage SaaS products, the current customer requirement is "data must not leak between customers" -- which shared tables with RLS meets. The enterprise customer requirement of "our data must be in a separate schema or database" appears later, when the customer base and contract values justify the implementation cost.
+
+The abstraction that makes migration tractable: isolate the multi-tenancy implementation behind a data access layer. The application code calls `getProjects({ tenantId })` rather than directly constructing queries with `WHERE tenant_id = $1`. When the model changes, the data access layer changes; the application code does not.
+
+## The shared-table model in detail
+
+Every table in the application has a `tenant_id` column:
+
+```sql
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE INDEX idx_projects_tenant_id ON projects(tenant_id);
+```
+
+The index on `tenant_id` is critical for performance. Every query filters by `tenant_id`; without the index, full table scans occur as the data grows.
+
+Row-level security enforces tenant isolation at the database level:
+
+```sql
+-- Enable RLS on all tenant-scoped tables
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects FORCE ROW LEVEL SECURITY;
+
+-- Policy: users can only see their tenant's data
+CREATE POLICY tenant_isolation ON projects
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+```
+
+The application sets `app.current_tenant_id` at the start of each request:
+
+```typescript
+// middleware/tenant.ts
+export async function setTenantContext(db: Pool, tenantId: string) {
+  await db.query(`SET app.current_tenant_id = '${tenantId}'`);
+}
+
+// In request handler
+app.use(async (req, res, next) => {
+  const { tenantId } = req.auth;  // from JWT or session
+  await setTenantContext(db, tenantId);
+  next();
+});
+```
+
+With RLS enabled, a query like `SELECT * FROM projects` automatically returns only the current tenant's projects. Cross-tenant data leakage is prevented at the database level, even if the application code omits the `tenant_id` filter.
+
+## The schema-per-tenant model
+
+Schema-per-tenant creates a separate PostgreSQL schema for each tenant:
+
+```sql
+-- For tenant "acme":
+CREATE SCHEMA acme;
+CREATE TABLE acme.projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+  -- No tenant_id needed -- isolation is at schema level
+);
+```
+
+The application sets the `search_path` at connection time:
+
+```typescript
+// For a request from the "acme" tenant:
+await db.query(`SET search_path TO acme, public`);
+
+// Now queries automatically target acme's tables
+const projects = await db.query('SELECT * FROM projects');
+```
+
+Schema migrations must be applied to every tenant's schema. With 100 tenants, a migration must run 100 times. This requires a migration orchestration tool (or a custom script) that iterates tenant schemas:
+
+```typescript
+async function applyMigration(sql: string) {
+  const tenants = await db.query('SELECT schema_name FROM tenant_schemas');
+  for (const tenant of tenants.rows) {
+    await db.query(`SET search_path TO ${tenant.schema_name}`);
+    await db.query(sql);
+  }
+}
+```
+
+At 10 tenants, this is manageable. At 1,000 tenants, migrations must be carefully orchestrated to run in parallel without overwhelming the database.
+
+## The database-per-tenant model
+
+Database-per-tenant is appropriate for large enterprise customers where contractual or regulatory requirements demand full data separation:
+
+- A separate PostgreSQL database (or RDS instance) per tenant
+- Separate connection pools
+- Separate backup and recovery procedures
+- Potentially separate geographic regions for data residency requirements
+
+This model is the most expensive and operationally complex. It is appropriate for contracts with SLAs that include data isolation guarantees, for regulated industries where tenant data must be in specific geographic regions, or for enterprise customers willing to pay for dedicated infrastructure.
+
+At startup scale, database-per-tenant is almost never the right answer. It is the answer for specific enterprise contracts that justify the operational overhead.
+
+## The hybrid approach for enterprise customers
+
+Many SaaS products use a hybrid model: shared tables for SMB and mid-market customers, schema-per-tenant or database-per-tenant for enterprise customers who require isolation. This allows the product to scale efficiently for most customers while offering stronger isolation to enterprise customers at a premium price.
+
+The implementation requires the data access layer to route to the correct database connection or schema based on the tenant's isolation model:
+
+```typescript
+async function getDataSource(tenantId: string): Promise<DataSource> {
+  const tenant = await getTenantConfig(tenantId);
+  
+  if (tenant.isolationModel === 'dedicated_database') {
+    return getDedicatedDatabaseConnection(tenant.databaseUrl);
+  } else if (tenant.isolationModel === 'dedicated_schema') {
+    return getSharedDatabaseConnection({ schema: tenant.schemaName });
+  } else {
+    return getSharedTableConnection({ tenantId });
+  }
+}
+```
+
+This abstraction is the reason the data access layer isolation matters: when the routing logic is centralized, adding a new isolation model does not require changing every query in the codebase.
+
+## Common mistakes teams make with multi-tenant database design
+
+1. Not adding the tenant_id index. A query that filters by tenant_id without an index does a full table scan. At 10 tenants with 100,000 rows each, this is 1,000,000 rows scanned per query. Add the index from the start.
+2. Relying solely on application-level tenant filtering without RLS. Application code that omits the tenant_id filter is a data leakage bug. RLS at the database level catches these before data is returned.
+3. Choosing schema-per-tenant before having enterprise customers who require it. Schema-per-tenant imposes ongoing operational overhead for isolation that SMB customers do not need. Start with shared tables.
+4. Not designing the data access layer abstraction early. If the tenant isolation model is woven directly into every query (raw SQL with tenant_id embedded everywhere), changing the model later requires updating every query. A data access layer that encapsulates the model makes the change tractable.
+5. Not testing cross-tenant isolation before launch. Add an explicit integration test that creates two tenants, creates data for each, and verifies that a request authenticated as tenant A cannot retrieve tenant B's data. This test should run on every CI build.
+
+## Where to start: a 3-step multi-tenancy setup
+
+**Step 1: Add tenant_id to every tenant-scoped table and create the tenant_id index.** Every table that contains tenant-specific data gets a `tenant_id` column with a NOT NULL constraint and an index. This is the shared-table model foundation.
+
+**Step 2: Implement RLS policies for all tenant-scoped tables.** The RLS policy is the safety net -- it prevents cross-tenant data leakage even when the application code has a bug. Enable FORCE ROW LEVEL SECURITY so the policy applies even to database superusers.
+
+**Step 3: Create the data access layer abstraction that passes tenant context to all queries.** Every data access function accepts a tenant identifier. The function constructs queries with the tenant_id filter (as a redundant check alongside RLS). This redundancy is intentional: defense in depth prevents the bug where RLS is accidentally bypassed by a database configuration change.
+
+## The Isolation That Customers Never Need to Think About
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. Expert Tutorials uses the shared-table model with PostgreSQL RLS. The RLS policies were configured in the first week of development and have not required changes since. In two years, there has been zero cross-tenant data exposure -- not because the application code has been perfect (it has not), but because the RLS policy at the database level prevents data leakage even when an application query is missing a filter. One instance of a missing tenant_id filter in an API route was caught in testing when the RLS policy returned zero results instead of the expected tenant data. The database rejected the query before any user saw incorrect data. That is what the database-level enforcement provides: correctness guarantees that survive application code bugs.
+
+## Related reading
+
+- [The Modular Monolith: How to Buy Yourself Two Years](/blog/the-modular-monolith-how-to-buy-yourself-two-years)
+- [The Hidden Cost of Eventual Consistency: A SaaS Postmortem](/blog/the-hidden-cost-of-eventual-consistency-a-saas-postmortem)
+- The SaaS Architecture Checklist Before You Scale
+- [The Health Check Endpoint: Less Trivial Than It Looks](/blog/the-health-check-endpoint-less-trivial-than-it-looks)

@@ -1,0 +1,122 @@
+---
+slug: "cost-of-adding-ai-features-to-an-existing-app"
+title: "Cost of Adding AI Features to an Existing App"
+excerpt: "An AI feature on top of an existing app is not a sprint of work. The integration, prompts, evals, caching, observability, and ongoing model fees add up. Here is what to budget."
+date: "2026-05-20"
+category: "Software Costs and Budgeting"
+tags: ["ai","cost","integration","budget"]
+readingMinutes: 12
+ogImage: "/api/og/blog/cost-of-adding-ai-features-to-an-existing-app"
+status: "published"
+definition: "Adding an AI feature to an existing app costs more than the demo suggests. The build is engineering time for integration, prompt engineering, eval suite, caching, observability, and safety. The ongoing cost is model fees that scale with usage. A meaningful first AI feature runs 50k to 150k USD in build and 200 to 5000 USD per month in operating cost. The numbers compound across multiple features."
+faq: [
+  {"q":"What is the typical cost to ship a first AI feature?","a":"For a senior engineer led project, 50k to 150k USD in engineering time for the first feature. The second feature is cheaper because the platform work is shared. Ongoing model fees depend on usage but typically 200 to 2000 USD per month at modest scale."},
+  {"q":"What drives the cost of building?","a":"Integration with the existing application. Prompt engineering. Eval suite. Caching layer. Observability. Safety and refusal paths. The model API call is the easy part. The rest is real application engineering work."},
+  {"q":"What drives the cost of operating?","a":"Model fees per call. Vector storage if you use retrieval. Logging and telemetry. Cache infrastructure. Eval infrastructure. The fees scale with usage. A feature with high usage costs more to operate."},
+  {"q":"How do I model the operating cost?","a":"Estimate calls per month. Estimate tokens per call. Multiply by the model price. Add caching savings of roughly 40 to 60 percent. Add observability and infrastructure. The model gives you a defensible range."},
+  {"q":"What about cheaper models?","a":"Route to cheaper models when possible. A small model for routing and intent. A larger model for the answer. The cost difference between Haiku and Opus or between gpt-4o-mini and gpt-4o is significant. The right routing cuts the bill dramatically."},
+  {"q":"What is the most common cost surprise?","a":"Usage growing faster than expected after launch. The feature gets adopted. The bill grows. The team did not implement caching aggressively at launch. The cleanup is a sprint of work and a meaningful invoice between."},
+  {"q":"How does this compare to non AI features?","a":"AI features cost similar to other features to build for the first integration. The operating cost is the difference. Non AI features cost mostly infrastructure. AI features cost infrastructure plus model fees. The model fees scale with usage in ways non AI features do not."}
+]
+---
+
+## What you actually need to know
+
+- First AI feature: 50k to 150k USD to build for a senior led team.
+- Operating: 200 to 5000 USD per month at modest scale.
+- Caching cuts the operating cost by 40 to 60 percent.
+- Routing to cheaper models cuts more.
+- Usage growth after launch is the most common cost surprise.
+
+| Build phase | Cost contribution |
+|---|---|
+| Integration with existing app | One sprint |
+| Prompt engineering | One sprint |
+| Eval suite | One sprint |
+| Caching layer | One sprint |
+| Observability | A few days |
+| Safety and refusal | A few days |
+| Total first feature | 50k to 150k USD |
+
+## The core argument
+
+Adding an AI feature looks deceptively cheap. The demo is two days of work. The actual production feature is two months of work. The gap is the work that turns the demo into a feature customers can rely on. Integration with the existing application. Prompt engineering and iteration. The eval suite. The caching layer. The observability. The safety boundary. The cost adds up.
+
+The operating cost is the other half of the story. Non AI features cost mostly infrastructure that scales sub linearly with usage. AI features cost model fees that scale roughly linearly with usage. A feature that takes off after launch produces a bill that grows with the success. Without caching, the bill grows fast.
+
+The teams that take this seriously budget honestly. Build cost in line with the work. Operating cost modeled per call with caching assumptions. Reserved budget for the second feature. Reserved budget for the model fee growth. The budget runs the project. The team is not surprised.
+
+The teams that miss this budget the demo and discover the production cost as it lands. The CFO is unhappy. The CEO is confused. The engineering team is rushed to add caching and routing under pressure. The feature ships but the cost discipline is reactive.
+
+## The build cost breakdown
+
+| Component | Senior engineer weeks |
+|---|---|
+| Application integration | 1 to 2 |
+| Prompt engineering and iteration | 1 to 2 |
+| Eval suite | 1 to 2 |
+| Caching layer | 1 |
+| Observability | 0.5 |
+| Safety and refusal paths | 0.5 |
+| Documentation and runbook | 0.5 |
+| Total | 5 to 8 weeks |
+
+## How much does this cost
+
+| Scale | Monthly operating cost |
+|---|---|
+| Pilot with internal users | Under 100 USD |
+| Limited rollout, hundreds of users | 200 to 800 USD |
+| Full rollout, thousands of active users | 1000 to 5000 USD |
+| Heavy usage feature, large user base | 5000 to 30000 USD |
+
+The numbers come from projects I have shipped. The variance depends on caching efficiency and routing strategy.
+
+## Features the AI feature must have
+
+- Integration with the existing application data and auth.
+- Prompt engineering tracked in version control.
+- Eval suite that runs on every change.
+- Caching with appropriate invalidation.
+- Routing between cheaper and more expensive models.
+- Observability on every model call.
+- Safety boundary at the right places.
+- Documentation of cost model.
+
+## Expert opinion
+
+> The AI feature cost surprise lands the same way every time. The demo is cheap. The team budgets for the demo. The feature ships. The usage grows. The bill grows. The team scrambles to add caching and routing. The pattern is consistent enough that I now build caching into the first version of every AI feature I ship for clients, even when the early usage does not justify it. The savings from caching compound. The pain of adding it late is real.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client wanted to add an AI summary feature to their B2B SaaS. The demo shipped in three days. The team budgeted six weeks for the production version.
+
+We ran the project as a full eight weeks. Integration with the application's auth and data. Prompt engineering with thirty representative inputs. Eval suite. Caching from day one. Observability. Safety boundary.
+
+The feature shipped on schedule. Usage grew faster than expected after launch. The operating cost would have run to roughly 8000 USD per month without caching. With caching it ran to roughly 2200 USD per month. The savings paid back the caching work in the first month.
+
+The team has used the same template for two more AI features since. The build cost dropped on the second feature because the platform work was shared. The operating cost stayed predictable because caching was built in.
+
+For more on the related work, see [token economics why your AI bill surprised you and how to fix it](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it) and [caching AI responses patterns that cut costs by 60 percent](/blog/caching-ai-responses-patterns-that-cut-costs-by-60-percent).
+
+## Common mistakes teams make
+
+1. Budgeting for the demo. Missing the production cost.
+2. No caching at launch. Bill grows fast with usage.
+3. One model for everything. The cheap model would have done many calls.
+4. No eval suite. Quality drifts after the first month.
+5. No observability. Debugging is a fishing expedition.
+6. No cost model. The bill is a surprise.
+7. Treating the AI feature as a sprint of work. It is a project.
+8. Not budgeting for the second and third feature. The platform work is shared but the second feature still has its own cost.
+
+## A 30 day estimation exercise
+
+1. **Week one.** Scope the feature. Define done.
+2. **Week two.** Estimate the build cost using the breakdown.
+3. **Week three.** Model the operating cost at three usage scenarios.
+4. **Week four.** Present the full budget. Get sign off.
+
+For more on the related work, read [building production grade AI features without an ml team](/blog/building-production-grade-ai-features-without-an-ml-team) and [the cost of running LLMs in production a realistic budget](/blog/the-cost-of-running-llms-in-production-a-realistic-budget). On the broader budgeting side, [budgeting for a two year software build the forgotten line items](/blog/budgeting-for-a-two-year-software-build-the-forgotten-line-items) is the natural next read.

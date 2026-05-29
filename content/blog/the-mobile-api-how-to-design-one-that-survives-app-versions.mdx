@@ -1,0 +1,136 @@
+---
+slug: "the-mobile-api-how-to-design-one-that-survives-app-versions"
+title: "The Mobile API: How to Design One That Survives App Versions"
+excerpt: "Mobile APIs must support old app versions for months after new ones ship. Here is the design pattern that prevents breaking users who have not updated."
+date: "2025-02-17"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","api-design","versioning"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-api-how-to-design-one-that-survives-app-versions"
+status: "published"
+definition: "The mobile API is a backend API designed to serve a mobile application, with the specific constraint that mobile clients cannot be force-updated the way a web application can. Old app versions remain in the wild for months after a new version is released, and the API must serve all of them correctly. This requires API versioning, backward-compatible response schemas, and a deprecation strategy that gives old app versions enough time to be replaced before their API endpoints are retired."
+faq: [
+  {"q":"What is the most important difference between a mobile API and a web API?","a":"The inability to force client updates. A web application is updated by redeploying; the user always gets the latest version. A mobile application requires user action (App Store update) and cannot be forced on users. The practical implication: API changes that would be fine in a web API (renaming a field, changing a response format) break mobile app versions that are still installed on users' phones. Mobile APIs must be designed for backward compatibility in a way that web APIs do not."},
+  {"q":"How should mobile API versioning be implemented?","a":"URL path versioning (v1, v2, v3 in the URL) is the most common and most debuggable approach for mobile APIs. Header-based versioning and query parameter versioning are alternatives, but URL path versioning is visible in logs, easy to route at the load balancer, and unambiguous to the mobile client. The version should be included in all API calls from the mobile client, and each version should be maintained independently until its usage drops below a threshold (typically less than 1 percent of active users on that version)."},
+  {"q":"How do I know when it is safe to retire an old API version?","a":"Track the app version distribution of active users, not just downloads. If version X is installed on 3 percent of your active user base, retiring the API that version uses will affect 3 percent of users -- they will get errors. Safe retirement threshold: below 0.5-1 percent of active users on the old version, and the old version is more than 6 months old (enough time for the user who does not update frequently to have had the opportunity). Send a push notification or in-app prompt to users on old versions before retiring the API."},
+  {"q":"What is the right response format for a mobile API to be backward compatible?","a":"The key principle: never remove fields from a response, only add them. Old app versions ignore fields they do not recognize; new fields do not break old clients. Removing fields breaks old clients immediately. The same applies to enum values: never remove an enum value that old clients may send; add new values and handle unknown values gracefully. For required fields that need to change semantics, introduce a new field with the new semantics and deprecate the old one, maintaining both until the old version is retired."},
+  {"q":"How should the mobile client handle API version negotiation?","a":"The client should send its version in every request (as a header: X-App-Version or X-Client-Version) so the server can log and track version distribution. If an API version is being retired, the server can return a deprecation warning header (Deprecation: true, Sunset: 2025-12-01) that the client can detect and use to prompt the user to update. The client should never silently fail on unknown response fields -- use defensive deserialization that ignores unknown fields rather than crashing."}
+]
+---
+
+## What you actually need to know
+
+- Mobile APIs must support old app versions for 6-12 months minimum. This is not optional -- it is a consequence of App Store distribution.
+- Never remove fields from API responses; only add them. Old app versions ignore new fields; removing existing fields breaks old clients immediately.
+- URL path versioning (v1, v2) is the most debuggable approach for mobile APIs. It is visible in logs, easy to route, and unambiguous.
+- Track active user app version distribution (not downloads) to know when old API versions are safe to retire.
+- Defensive deserialization on the mobile client -- ignoring unknown fields rather than throwing -- is as important as backward-compatible API design.
+
+| API Design Decision | Mobile-Safe | Mobile-Breaking | Reason |
+|---|---|---|---|
+| Add a new optional field | Yes | No | Old clients ignore it |
+| Remove an existing field | No | Yes | Old clients expect it |
+| Rename a field | No | Yes | Old clients use old name |
+| Add a new enum value | Carefully | Potentially | Old clients may not handle it |
+| Change a field's data type | No | Yes | Old clients parse with old type |
+| Add a new required parameter | No | Yes | Old clients do not send it |
+
+## The core argument
+
+The mobile API has one constraint that distinguishes it from every other API: the client cannot be updated on demand. When a web application has a bug or needs a backend change, the developer deploys a fix and every user gets it within minutes. When a mobile application needs a change, the developer ships a new version to the App Store, the App Store reviews it (1-7 days), and then users receive the update -- at which point most will not update immediately.
+
+The reality of mobile app version distribution: six months after releasing version 2.0, a typical mobile product has 60-70 percent of active users on 2.0, 20-30 percent on 1.x versions, and 5-10 percent on versions older than six months. These older users are real, they use the product, and their API calls hit the same backend as the users on the current version.
+
+Any API change that breaks old clients breaks these users immediately. If version 1.5 of the app calls `/api/v1/user/profile` and expects a `name` field in the response, and the API is changed to return `displayName` instead, every user on version 1.5 gets a broken profile screen. They see a blank name, or an error, or a crash -- depending on how defensively the client was written.
+
+The mobile API must be designed from the start with this constraint in mind. Backward compatibility is not a nice-to-have; it is the price of serving a mobile user base.
+
+## URL versioning for mobile APIs
+
+The versioning strategy I use for all mobile API work is URL path versioning: all API endpoints include a version prefix (`/api/v1/`, `/api/v2/`) and new API versions are created when breaking changes are required.
+
+The implementation at the routing layer is straightforward: the load balancer or API gateway routes `/api/v1/*` requests to the v1 handler and `/api/v2/*` requests to the v2 handler. These can be the same codebase (with version-specific logic branches) or separate deployments. For most teams at startup scale, the same codebase with version branches is simpler.
+
+The mobile client includes the version in every request. The version is configured once (in a constants file or environment configuration) and used everywhere. This means a version upgrade on the client is a single-line change -- updating the version constant -- rather than finding every URL in the codebase.
+
+```typescript
+// constants.ts
+export const API_VERSION = 'v2';
+export const API_BASE = `https://api.example.com/${API_VERSION}`;
+
+// api.ts
+const response = await fetch(`${API_BASE}/user/profile`);
+```
+
+## The backward compatibility rules
+
+**Never remove fields.** This is the most important rule. A field that is returned in the response can be deprecated (documented as deprecated, with a planned removal date) but cannot be removed until all clients that depend on it are below the retirement threshold. Old fields are kept in the response even when they are no longer used by new client versions. The response object grows over time; it does not shrink.
+
+**Never rename fields.** Renaming a field is functionally equivalent to removing the old field and adding a new one. Old clients use the old name; they will not find it after the rename. If a field name needs to change (often because the original name was unclear or incorrect), add the new name alongside the old and deprecate the old. Keep both until the old version is retired.
+
+**Never change a field's type.** A field that was a string and is now a number, or an array and is now an object, breaks any client code that assumed the original type. If the type needs to change, add a new field with the correct type and deprecate the old one.
+
+**Handle unknown enum values gracefully.** When the server introduces a new enum value (`status: 'suspended'`), old clients that parse the `status` field will encounter a value they have never seen. Old clients that throw on unknown enum values will crash; old clients written defensively will fall through to a default case. The API should be designed to minimize new enum values in fields that old clients use for control flow. The client should be written to handle unknown values gracefully -- default to a safe state rather than crashing.
+
+## Versioning the response schema explicitly
+
+For APIs with complex responses, explicit response versioning is useful. This means including the schema version in the response itself and maintaining documentation of what each version includes:
+
+```json
+{
+  "schema_version": "2.0",
+  "user": {
+    "id": "usr_123",
+    "displayName": "Yashveer Singh Rajpoot",
+    "name": "Yashveer Singh Rajpoot",  // deprecated, kept for v1 compatibility
+    "email": "yashveer@example.com"
+  }
+}
+```
+
+The `name` field is deprecated but present for v1 compatibility. The `displayName` field is the canonical field for v2+ clients. Both are served on all API versions until the v1 deprecation schedule completes.
+
+## Tracking version distribution
+
+Safe API version retirement requires knowing which app versions are still in active use. This means instrumenting every API request with the calling app version:
+
+```typescript
+// Mobile client - add to every request
+headers: {
+  'X-App-Version': APP_VERSION,
+  'X-Platform': Platform.OS,  // 'ios' or 'android'
+}
+```
+
+On the server, log this header alongside every request. In your analytics system (PostHog, Datadog, or a custom query against request logs), track the distribution of active users by app version. "Active users" means users who have made at least one API call in the last 30 days -- not total installs, which includes users who have not opened the app in months.
+
+A user on version 1.5 who opened the app last week is an active user whose experience is affected by API retirement decisions. A user on version 1.5 who last opened the app 8 months ago is unlikely to update or re-open the app; they are not counted in the active distribution.
+
+The retirement threshold: below 1 percent of active API calls coming from versions older than the one being retired. At that threshold, retiring the old API version affects fewer than 1 in 100 users -- an acceptable impact level for users who have had 6+ months to update.
+
+## Common mistakes teams make with mobile API design
+
+1. Designing the mobile API the same way as the web API. Web APIs can make breaking changes on deployment; mobile APIs cannot. The versioning and backward compatibility requirements are fundamentally different.
+2. Not tracking app version distribution before making API changes. "Most users are on version 2" is not a sufficient analysis. You need the actual percentage before making a decision that affects users on older versions.
+3. Using header-based versioning instead of URL versioning. Header-based versioning is harder to debug (headers are not visible in URLs or browser logs), harder to route at the load balancer, and more likely to be accidentally omitted by the client. URL versioning is more verbose but more debuggable.
+4. Not sending deprecation warnings to old clients. The server can send a `Deprecation: true` and `Sunset: 2025-12-01` header in responses to clients using deprecated API versions. The client can detect this header and display a prompt to update. Without this mechanism, users on old versions have no indication that their app will stop working.
+5. Crashing on unknown response fields in the mobile client. The mobile client that throws an exception on an unexpected JSON field is broken by every API addition. Use a JSON parser configuration that ignores unknown fields, and never make business logic decisions based on the absence of a field.
+
+## Where to start: a 3-step mobile API design
+
+**Step 1: Add the API version to all API URLs before shipping any client version.** Even if there is only one version, starting with `/api/v1/` in the URL costs nothing and means you can introduce `/api/v2/` later without restructuring your URL scheme.
+
+**Step 2: Add X-App-Version header to every API request from the mobile client and log it on the server.** You will not regret having this data when you need to make a retirement decision; you will regret not having it.
+
+**Step 3: Write the client's JSON deserialization to ignore unknown fields.** In React Native with TypeScript, use zod or a similar schema validator configured to strip unknown keys (`.passthrough()` in zod). In Flutter, configure `json_serializable` to ignore unknown keys. This single change makes the client robust to all future API additions.
+
+## The API That Serves Every Version in the Wild
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app went through two major API versions. The v1 API served the first version of the app for eight months while the v2 API was designed and deployed for the new client version. During those eight months, both APIs ran simultaneously. At month six, the v1 API was serving 12 percent of active sessions. At month eight, it was at 3 percent -- users on the oldest version who were not updating. We retired v1 at the 8-month mark with a push notification to the remaining v1 users. Two percent of them updated within a day; the rest we accepted as lost. The process worked because we had tracked the version distribution throughout and made the retirement decision with real data rather than a guess.
+
+## Related reading
+
+- [The Hybrid Mobile Architecture: WebView Heavy Apps in 2026](/blog/the-hybrid-mobile-architecture-webview-heavy-apps-in-2026)
+- [The First Mobile App Build: A Founder's Six Phase Plan](/blog/the-first-mobile-app-build-a-founders-six-phase-plan)
+- The App Store Submission Checklist That Actually Works
+- [The Hidden Cost of Write Once Run Anywhere](/blog/the-hidden-cost-of-write-once-run-anywhere)

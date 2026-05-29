@@ -1,0 +1,61 @@
+---
+slug: "stripe-connect-when-you-are-actually-a-marketplace"
+title: "Stripe Connect: When You Are Actually a Marketplace"
+excerpt: "Stripe Connect is the right choice when money flows through your platform to other parties. Here is what it takes to implement it correctly."
+date: "2026-05-24"
+category: "Business Automation and Ops"
+tags: ["stripe", "payments", "marketplace", "billing", "saas"]
+readingMinutes: 7
+ogImage: "/api/og/blog/stripe-connect-when-you-are-actually-a-marketplace"
+status: "published"
+faq: [
+  {"q":"Do I need Stripe Connect if I am just collecting payments for my own SaaS?","a":"No. Stripe Connect is for platforms where money flows to third parties. If you are collecting subscription revenue for your own product, standard Stripe is the right tool and Connect is unnecessary overhead."},
+  {"q":"What is the difference between Stripe Connect Express and Custom?","a":"Express accounts let Stripe handle onboarding and identity verification. Custom accounts give you full control over the connected account experience but make you responsible for the compliance and onboarding flow. Express is right for most marketplaces starting out."},
+  {"q":"How does Stripe handle tax reporting for my sellers?","a":"Stripe Connect has a Tax Forms feature that helps you generate and deliver 1099 forms to US-based connected accounts. You need to enable this, collect the required information during onboarding, and understand the $600 threshold that triggers reporting."},
+  {"q":"Can I use Stripe Connect internationally?","a":"Yes, but the supported countries and features vary. Not all payout types are available in all countries, and money transmission regulations differ by jurisdiction. Review the Stripe Connect country availability documentation before building for international markets."},
+  {"q":"How do I test Stripe Connect without using real money?","a":"Stripe provides test mode for all Connect flows, including connected account creation, onboarding, payments, and payouts. Use test mode extensively. The onboarding flow for test accounts behaves like the real flow, which makes it valuable for catching UX issues before launch."}
+]
+---
+
+# Stripe Connect: When You Are Actually a Marketplace
+
+**Stripe Connect is Stripe's infrastructure for platforms that move money between multiple parties: a marketplace where sellers receive payment, a gig platform where workers get paid, a SaaS that bills on behalf of its customers. If your business model involves money passing through your platform to someone else, you need Stripe Connect. If you are just collecting revenue for yourself, you do not.**
+
+## What you need to know
+
+- Stripe Connect has three account types: Standard, Express, and Custom, each with different tradeoffs around control and compliance responsibility
+- Express accounts are the right starting point for most marketplaces because Stripe handles onboarding and KYC verification
+- You are responsible for compliance with money transmission laws in every jurisdiction where your marketplace operates
+- Stripe takes a Connect fee on top of the standard processing fee, which affects your unit economics and needs to be in your pricing model
+- Payouts to connected accounts require both the payout timing decision and the tax reporting decision before you go live
+
+## The core argument
+
+The moment your product involves two parties in a financial transaction where you sit in the middle, you have a marketplace, even if you do not call it one. A tutoring platform where teachers get paid. A freelance marketplace where contractors receive earnings. A SaaS that collects subscription revenue on behalf of its service provider customers. All of these require the same infrastructure: a way to accept money, hold it briefly on your platform, take your cut, and send the rest to the right party. That is exactly what Stripe Connect does.
+
+The thing founders underestimate is the compliance lift. With standard Stripe, Stripe handles Know Your Customer (KYC) verification for your business. With Stripe Connect, you are now facilitating payments for other people's businesses, and depending on your account type and jurisdiction, you may be acting as a money transmitter. The Express account type offloads most of this compliance burden back to Stripe: they handle onboarding, identity verification, and the regulatory relationship with connected accounts. The Custom account type gives you full control over the user experience but puts the compliance responsibility squarely on your team. Most early-stage marketplaces should start with Express.
+
+The second thing founders underestimate is pricing impact. Stripe Connect adds fees on top of standard card processing. When I work through the economics with marketplace clients, the Connect fees often add 20 to 40 basis points on top of what founders expected, which can flip a unit economics model that looked viable on paper. Run the numbers with the real Stripe Connect fee schedule before you commit the architecture. The cost is usually worth it, but it needs to be in the model from day one, not discovered when the first Stripe invoice arrives.
+
+## Common mistakes
+
+1. **Choosing Custom accounts when Express accounts would work.** Custom accounts give you full control over the connected account UX, but they also hand you the compliance responsibility. For most marketplaces, the marginal UX control is not worth the legal and engineering overhead.
+2. **Not handling onboarding flow interruptions.** Connected account onboarding with Stripe can be paused and resumed. If you do not handle the case where a seller starts onboarding but does not finish, you end up with partially onboarded accounts that cannot receive payouts and generate support tickets.
+3. **Ignoring payout timing from day one.** Do you pay sellers immediately? After a hold period for disputes? Weekly? Monthly? This decision affects your float, your dispute management, and your seller experience. It needs to be a product decision, not a technical default.
+4. **Skipping tax form generation.** In the US, if you pay a connected account more than $600 in a calendar year, you need to generate a 1099. Stripe has built-in tax reporting features for Connect, but you need to set them up before your first tax year ends, not after.
+5. **Not testing the refund flow through the full Connect stack.** Refunds on marketplace transactions are more complex than standard refunds. The money may have already been paid out to the seller. Know your refund policy and the engineering implementation before you take your first customer payment.
+
+## Where to start
+
+**Step 1: Pick your account type based on who controls the onboarding experience.** If you want Stripe-hosted onboarding for your sellers or contractors, choose Express. If you need to own every pixel of the onboarding flow for compliance or brand reasons, choose Custom and budget for the additional compliance work.
+
+**Step 2: Build and test the full payment lifecycle before launch.** This means: buyer pays, platform takes fee, seller receives remainder, refund is initiated, payout is adjusted. Walk through all of these scenarios in Stripe's test mode with real test account flows. Do not skip the refund and dispute scenarios.
+
+**Step 3: Run the fee math with the actual Stripe Connect pricing before committing to your pricing model.** Stripe's Connect fees vary by account type and payment method. Map your expected transaction volume against the real fee schedule and make sure your take rate covers the cost and leaves the margin you need.
+
+## Related reading
+
+- [Stripe vs Paddle vs Lemonsqueezy in 2026](/blog/stripe-vs-paddle-vs-lemonsqueezy-in-2026)
+- [The Payout Engine: Marketplace Engineering at Scale](/blog/the-payout-engine-marketplace-engineering-at-scale)
+- [The Subscription Billing Stack in 2026](/blog/the-subscription-billing-stack-in-2026)
+- [The SaaS Refund Workflow: A Quiet Source of Engineering Debt](/blog/the-saas-refund-workflow-a-quiet-source-of-engineering-debt)

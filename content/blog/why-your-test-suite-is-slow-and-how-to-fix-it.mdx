@@ -1,0 +1,118 @@
+---
+slug: "why-your-test-suite-is-slow-and-how-to-fix-it"
+title: "Why Your Test Suite Is Slow and How to Fix It"
+excerpt: "A slow test suite is a quiet productivity tax. Most of the slowness is a small number of fixable causes. This is the order I work in, and the patterns I see most often when I take over a slow CI pipeline."
+date: "2025-09-24"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-your-test-suite-is-slow-and-how-to-fix-it"
+status: "published"
+definition: "A test suite gets slow because of a few specific causes: tests that hit the database when they should not, integration tests masquerading as unit tests, expensive setup repeated per test, and tests that run sequentially when they could run in parallel. Each cause has a known fix, and the wins compound. Most teams can cut their suite time in half in a week."
+faq: [
+  {"q":"Why is my test suite slow?","a":"Almost always because tests are doing more work than they need to. Real database calls in unit tests, repeated expensive setup, slow third-party calls that were not mocked, and sequential execution that could be parallel are the four most common causes. Profile the suite first, then attack the biggest contributors. The slowest tests usually account for most of the time."},
+  {"q":"What is a unit test versus an integration test?","a":"A unit test exercises one piece of code in isolation, with everything else mocked or stubbed. An integration test exercises multiple pieces together, often with real dependencies. Unit tests should be fast and numerous. Integration tests are slower and fewer. A unit test that hits the database is not a unit test, it is an integration test with the wrong label."},
+  {"q":"Should I parallelize my tests?","a":"Yes, if they are not already. Most modern test runners support parallel execution. The blocker is usually shared state, especially a single database that tests trample on. Solve that with per-worker databases or transactional isolation, and parallelization is the easiest 2x to 4x win you will get."},
+  {"q":"What are flaky tests and why do they hurt?","a":"Flaky tests pass sometimes and fail sometimes for reasons unrelated to the code change. They are corrosive because they teach the team that red CI is not always a real failure. Once people start ignoring CI, real failures slip through. Track flakes, fix them, or quarantine them. Never ignore them in place."},
+  {"q":"How fast should a test suite be?","a":"Fast enough to run on every commit without breaking flow. The thresholds I use are: under 10 seconds for unit tests, under 5 minutes for the full suite. If the full suite is longer than that, engineers will stop running it locally and start treating CI as the only feedback loop, which is too slow."},
+  {"q":"Do I need to mock the database in unit tests?","a":"Yes, or use a real database in a way that does not pay the connection and setup cost for every test. An in-memory database, a transactional rollback per test, or a real test database with per-worker isolation all work. What does not work is a global setup that wipes and reseeds the database between every test."},
+  {"q":"Should I delete slow tests?","a":"Not unless they are testing something that no longer matters. Slowness is usually fixable. Coverage is harder to rebuild than speed is to fix. Delete tests when they are testing implementation details that the implementation no longer has, not because they are slow."}
+]
+---
+
+## What you actually need to know
+
+- A slow test suite is almost always a small number of slow tests plus a fixable architectural issue. It is not a fact of life.
+- Profile the suite first. The 80/20 rule holds hard. Find the slowest 10 percent and you have found the cause.
+- Database access is the most common culprit. Either mock it or share connections across tests.
+- Parallelization is the largest single win when shared state allows it.
+- Flaky tests need a triage process, not a "we know about them" Slack channel.
+
+| Cause | How it shows up | Typical fix | Win |
+|---|---|---|---|
+| Real DB calls in unit tests | A few seconds per test | Mock the data layer or transactional rollback | 5x to 20x on those tests |
+| Expensive shared setup | Slow first test, fast rest | Module-level setup, fixtures | 2x on suite |
+| No parallelization | CPU sitting idle in CI | Worker pools, per-worker DB | 2x to 4x on suite |
+| Slow third-party calls | One test takes 30 seconds | Mock or use a recorded fixture | Eliminates the dominator |
+| Flakes triggering retries | CI takes 20% longer randomly | Fix or quarantine flakes | Steadier runs |
+
+## The core argument
+
+A slow test suite is the most underrated tax on engineering productivity I have seen. Each individual run might cost five minutes. A team running it twenty times a day across ten engineers is spending around fifteen engineer-hours a day waiting. Over a year that is real money, and that is before you count the times someone skips running tests locally because they are too slow and then breaks main.
+
+The instinct I see most often is to live with the slowness because the suite "is what it is." That is almost always wrong. In every slow test suite I have profiled, the time is concentrated. A small number of tests account for most of it. A small number of structural decisions account for the slow tests. Fix those structural decisions and the suite becomes fast.
+
+The work is not exotic. It is mostly identifying which tests are doing more than they should and changing them to do less. Mock the network call. Share the database connection. Hoist the expensive setup out of the per-test loop. Run things in parallel that have no business being sequential. None of this is hard. It just requires someone to actually look at the profile and care.
+
+The teams that let test suites grow to twenty or thirty minute runs are the ones that have not given anyone the time to do this work. Once you do, the win is permanent and the team's whole rhythm improves.
+
+## The fixes in priority order
+
+### Profile first
+
+Run the suite with timing and produce a sorted list of the slowest tests. Most runners support this. If yours does not, instrument it. The instinct to "just optimize everything" without measuring is how you spend a week and save thirty seconds.
+
+### Remove unnecessary database calls
+
+A test that needs to verify a pure function should not be hitting Postgres. Move that test to a layer where the data is in memory. For tests that genuinely need the database, use transactional rollback so the data is reset for free at the end of the test instead of by a manual DELETE statement.
+
+### Hoist expensive setup
+
+If every test in a file initializes the same expensive resource, do it once for the file. Most frameworks support module-level setup. The savings compound across hundreds of tests.
+
+### Mock external services
+
+A test that calls a real third-party API is brittle, slow, and dependent on network. Use a recorded response or a stub. The contract tests for the external service should be separate and rare.
+
+### Parallelize
+
+Once shared state is handled, the easiest 2x to 4x win on most suites is running tests in parallel. The blocker is usually a shared database. Solve that with per-worker databases or transactional isolation.
+
+## How long does it take
+
+| Suite size | Time investment | Expected speedup |
+|---|---|---|
+| Small (under 500 tests) | A day | 2x to 3x |
+| Medium (500 to 5000 tests) | A week | 3x to 5x |
+| Large (5000+ tests) | Two to three weeks | 3x to 10x |
+
+The reason the relative win grows with suite size is that bigger suites have more slow tests and more parallelization headroom. The absolute fix on each test is small. The compounding is what matters.
+
+## What a fast test suite looks like
+
+- Unit tests run in under 10 seconds locally.
+- The full suite runs in under 5 minutes in CI.
+- A failed test points at the cause within seconds of reading the failure.
+- Flakes are rare and tracked. New flakes get fixed or quarantined immediately.
+- Engineers run tests locally before pushing because the cost is low.
+
+## Expert opinion
+
+> I have walked into more than one engineering org where the test suite took 35 minutes and everyone treated it as immutable. Two weeks of focused work usually got it to under five minutes. The team's rhythm changed overnight. People started running tests locally again, broke main less often, and shipped faster. The investment is small and the return is huge. The only reason this work does not happen is that nobody is given the time, and the cost of not doing it is invisible because it is spread across everyone's calendar.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS team I worked with had a 40 minute test suite that everyone agreed was a problem but nobody was assigned to fix. I profiled it for an hour. Two facts stood out: 14 tests accounted for almost 18 minutes of the run, and the suite was running entirely sequentially because shared database state made parallelization unsafe.
+
+In a week I refactored the slow tests to mock the database where they did not need it and use transactional rollback where they did. I added per-worker database isolation and turned on parallel execution. The suite went from 40 minutes to about 7 minutes, then to under 5 after a second pass on flakes. The team's velocity changed measurably the following month. The pattern is the same one I described in [the test pyramid for SaaS](/blog/the-test-pyramid-for-saas-unit-integration-end-to-end) and reinforced by [end to end tests, when they help and when they hurt](/blog/end-to-end-tests-when-they-help-and-when-they-hurt).
+
+## Common mistakes
+
+1. Living with a slow suite because "that's just how it is."
+2. Optimizing without profiling. The slow tests are not where you think.
+3. Adding more CI parallelism without fixing shared state. The tests will trample each other.
+4. Treating flakes as a known issue instead of fixing them. They teach the team to ignore CI.
+5. Mocking too aggressively until tests prove nothing about real behavior.
+6. Running integration tests on every commit. Run them on a slower cadence if they cannot be made fast.
+7. Deleting slow tests instead of fixing them. Coverage is harder to rebuild than speed is to fix.
+
+## A two week plan to fix it
+
+1. **Day one.** Profile the suite. Produce a sorted list of slowest tests.
+2. **Days two to four.** Refactor the top 10 percent. Mock the database where appropriate, hoist setup, mock external services.
+3. **Days five to seven.** Add per-worker database isolation. Turn on parallel execution. Confirm correctness.
+4. **Week two.** Audit and fix the top flakes. Establish a process for new flakes that gets them out of the suite within a day.
+5. **Week two ongoing.** Add a CI budget rule: any test slower than 5 seconds gets a comment. Any flake gets a ticket. Treat suite performance as a feature with an owner.
+6. **Long term.** Make this part of [the tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) you run quarterly so the suite stays fast as it grows.

@@ -1,0 +1,123 @@
+---
+slug: "the-post-mortem-culture-that-improves-security"
+title: "The Post Mortem Culture That Improves Security"
+excerpt: "A post mortem is only useful if the team reads the findings and changes something. Most teams file the document and repeat the incident. Here is the pattern that actually moves the security needle."
+date: "2025-06-13"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-post-mortem-culture-that-improves-security"
+status: "published"
+definition: "A post mortem culture that improves security is one where incidents are written down without blame, root causes are traced to systems not people, and every finding maps to a concrete action with an owner and a deadline. The teams that do this consistently find the same class of vulnerability once. The teams that skip it find it repeatedly."
+faq: [
+  {"q":"How do you write a security post mortem that actually gets read and acted on?","a":"Keep it short. Timeline, root cause, contributing factors, actions. No blame language. Assign every action to a specific engineer with a specific deadline. The post mortem that sits in a doc and never gets referenced was not a post mortem. It was a ritual."},
+  {"q":"What is the difference between a blameless post mortem and a blame post mortem?","a":"A blame post mortem names the person who made the mistake and treats the incident as their fault. A blameless post mortem asks why the system allowed the mistake and what change would prevent it next time. Blameless post mortems produce systems that improve. Blame post mortems produce engineers who hide problems."},
+  {"q":"How long should a security post mortem take to write?","a":"For most incidents, two to four hours of elapsed time for the initial draft. The timeline section takes the longest because the team needs to reconstruct what actually happened from logs and memory. The rest follows quickly once the timeline is accurate."},
+  {"q":"What security incidents are worth a formal post mortem?","a":"Any incident that reached production, any near-miss that was caught by luck rather than design, any security finding from a third party audit, and any incident that repeated. For small incidents, a one-page summary is fine. For significant ones, the full format matters."},
+  {"q":"How do you track post mortem action items so they actually get done?","a":"Put them in the same system you use for engineering work. A Jira ticket, a Linear issue, whatever the team already uses. An action item that lives only in the post mortem document will not be completed. The action needs an owner, a deadline, and visibility in the regular sprint review."},
+  {"q":"Should engineers or security specialists run the post mortem process?","a":"Engineers who were involved in the incident should lead the timeline reconstruction. A security-minded engineer or a team lead should facilitate the root cause discussion. External security specialists are useful for audits but not for post mortems, where institutional knowledge of the system matters more than external credentialing."},
+  {"q":"How often should a team review completed post mortems for patterns?","a":"Quarterly is a good cadence for most teams. Pull the last three months of post mortems into a single review. Look for repeated root causes, the same control missing in multiple incidents, or the same class of mistake. The patterns are what drive systemic improvement."}
+]
+---
+
+## What you actually need to know
+
+- A post mortem without action items is a history document. Useful, but not the point.
+- Blameless does not mean consequence-free. It means the system is the target, not the person.
+- The timeline is the hardest part to write accurately. Build it from logs, not memory.
+- Security post mortems and performance post mortems share the same format. The culture transfers.
+- In my experience, the teams that improve security fastest are the ones that post mortem near-misses, not just actual breaches.
+
+| Approach | What it produces | Limitation |
+|---|---|---|
+| Blame-based post mortem | A named scapegoat, some short term caution | Engineers hide problems next time, no systemic change |
+| Blameless post mortem, no follow-up | A well-written document | Action items never close, same incident recurs |
+| Blameless post mortem with tracked actions | Systemic improvement over quarters | Requires consistent process discipline |
+| No post mortem at all | Nothing | Team repeats the same mistakes indefinitely |
+
+## The core argument
+
+Security incidents happen. The question is whether the team extracts the full value from the incident or files a document and moves on. Most teams do the latter. They write up what happened, identify the obvious fix, merge the fix, and consider the matter closed. Six months later, a variant of the same incident appears, because the root cause was never addressed.
+
+The teams that actually improve security over time treat post mortems as a system, not an event. The incident is the data point. The post mortem is the analysis. The action items are the investment. All three parts are necessary, and the third is where most teams fail.
+
+I have seen a team with a mature post mortem process surface the same missing control in four separate incidents over two years, write four separate post mortems, and assign four separate action items that all stalled in the backlog. The process looked correct. The culture was not. The action items needed an owner with the organizational authority to clear backlog space and the discipline to follow through. Without that, the post mortem is theater.
+
+The blameless frame is important, but it is overemphasized in most writing on this topic. Blameless means the system is the target of analysis. It does not mean no accountability for action items. The person who owns the action item should be held to the deadline with the same seriousness as any other engineering commitment.
+
+## How to run one that actually works
+
+### The timeline first
+
+Before the root cause conversation, build the timeline. Pull the logs. Reconstruct what happened in chronological order, from the first anomaly to the final resolution. Do not rely on memory. Memory compresses events, removes uncertainty, and adds confidence that was not present in the moment. Logs are the record.
+
+The timeline usually takes an hour or two for a significant incident. It is the investment that makes the rest of the post mortem worth doing. A post mortem built on a faulty timeline produces incorrect root causes.
+
+### Root cause, not proximate cause
+
+The proximate cause of most security incidents is a human action. Someone clicked a link. Someone committed a credential. Someone deployed without reviewing the change. The proximate cause is true but useless for systemic improvement.
+
+The root cause is the system condition that made the human action consequential. No phishing training catches every click. The root cause is that a clicked link had access to credentials it should not have had. Fix the access model, not the training frequency.
+
+### Action items with owners and deadlines
+
+Every root cause gets at least one action item. Every action item gets a named owner and a specific deadline. The deadline is a real date, not "next sprint." The owner is a specific engineer, not "the security team."
+
+Put the action items in the team's regular engineering tracker. Review open post mortem actions in the weekly engineering meeting. Close them like any other engineering task. The discipline here is what separates teams that improve from teams that repeat.
+
+## How long does it take
+
+| Phase | Elapsed time | Who |
+|---|---|---|
+| Build the timeline from logs | 1 to 3 hours | Engineers involved in incident |
+| Root cause analysis meeting | 1 to 2 hours | Whole team, facilitated |
+| Write the post mortem document | 1 to 2 hours | One lead author |
+| Action item review in sprint planning | 30 minutes | Engineering lead |
+| Quarterly pattern review across post mortems | 1 to 2 hours | Engineering lead plus security |
+
+A single post mortem is a half day of work for the involved engineers. The quarterly review is another hour or two. For most teams, this is the cheapest security investment they are not making.
+
+## What makes a post mortem process worth running
+
+- A consistent document format so that post mortems are scannable and comparable over time.
+- A log-first timeline. If the logs do not support the claim, the claim is not in the timeline.
+- Explicit blameless framing at the start of every review meeting, so the same conversation does not have to be relitigated.
+- Action items in the main engineering tracker, not in the post mortem document alone.
+- A quarterly audit of open action items and cross-incident patterns.
+- A mechanism for engineers to surface near-misses without waiting for a production incident.
+- Leadership that treats post mortem action items as real engineering work, not administrative overhead.
+
+## Expert opinion
+
+> The teams that improve security consistently are not the teams with the best security engineers. They are the teams with the most honest incident analysis. Honesty about what failed, honesty about the systemic cause, and honesty about whether the action items actually shipped. The post mortem is the mechanism. The culture is the requirement.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client came to me after their third data exposure incident in eighteen months. All three were variations of the same root cause: an internal service with overly broad database permissions. Each incident had produced a post mortem. None of the post mortems had produced a completed action item on permission scoping.
+
+We did not write a fourth post mortem. We reviewed the previous three, extracted the one recurring action item, and blocked a sprint to close it. The permission audit took four days. The fix took three more. The fourth incident did not happen. The lesson was not that the post mortem process had failed. The lesson was that the action item tracking had failed, and no one had been watching the pattern.
+
+The second story is a team I worked with that had never written a post mortem at all. Their first one, after a credential exposure, took most of a day and felt uncomfortable. The second one, three months later, took two hours. By the fourth, the format was familiar enough that the team was post morteming near-misses voluntarily. The volume of near-miss post mortems is where the security value compounds. For more on building the security baseline that makes these post mortems actionable, see [API key rotation without customer outages](/blog/api-key-rotation-without-customer-outages) and [the security gap how one missing SOC 2 control kills your enterprise deal](/blog/the-security-gap-how-one-missing-soc-2-control-kills-your-enterprise-deal).
+
+## Common mistakes
+
+1. Writing the post mortem from memory instead of from logs. The timeline will be wrong, and the root cause will follow it into wrongness.
+2. Stopping at the proximate cause. "An engineer committed a credential" is a true statement and a useless root cause.
+3. Assigning action items to a team instead of a person. Teams do not ship action items. Engineers do.
+4. Putting action items only in the post mortem document. They will not be completed.
+5. Skipping post mortems for near-misses. Near-misses are the cheapest learning available. Do not waste them.
+6. Writing post mortems that are too long. A ten-page post mortem gets less traction than a two-page one.
+7. Holding the root cause meeting before the timeline is built. The conversation becomes unfocused and memory-driven.
+8. Never reviewing post mortems for cross-incident patterns. The patterns are where the systemic improvements live.
+
+## A 90 day plan
+
+1. **Week one.** Pick one past incident that did not get a post mortem. Write a retrospective post mortem from the logs and whatever documentation exists. Use it to establish the document format the team will use going forward.
+2. **Week two.** Review any existing post mortem action items. Find the ones that are stalled. Move them into the main engineering tracker with named owners and real deadlines.
+3. **Weeks three and four.** Run a post mortem on the next incident or near-miss in real time, using the established format. The second post mortem is where the format becomes a habit.
+4. **Month two.** Add a fifteen-minute post mortem action item review to the weekly engineering standup. Not the full post mortem content, just the open actions and their status.
+5. **Month three.** Pull all post mortems from the last quarter into a single review meeting. Look for repeated root causes. Assign at least one systemic action item based on the patterns.
+
+For deeper reading, [vendor security assessments how to pass them quickly](/blog/vendor-security-assessments-how-to-pass-them-quickly) covers the external audit side of this work, and [the security incident that closed the series a](/blog/the-security-incident-that-closed-the-series-a) is the consequence story of what happens when the post mortem culture is not in place.

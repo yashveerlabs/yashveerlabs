@@ -1,0 +1,61 @@
+---
+slug: "status-pages-that-build-trust-during-outages"
+title: "Status Pages That Build Trust During Outages"
+excerpt: "A status page is your first line of communication when things break. Build one before the outage, not after."
+date: "2026-05-24"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops", "deployment", "infrastructure", "status-page", "incident-management"]
+readingMinutes: 6
+ogImage: "/api/og/blog/status-pages-that-build-trust-during-outages"
+status: "published"
+faq: [
+  {"q":"Do I need a status page before I launch?","a":"Yes. If you take money from customers, you need a status page before they give it to you. Even a simple free-tier Instatus page is better than silence. Customers notice when there is nowhere to look during an outage, and the absence communicates lack of professionalism."},
+  {"q":"Should I build my own status page or use a SaaS tool?","a":"Use a SaaS tool. Building your own is a classic over-engineering trap for something that does not differentiate your product. The SaaS tools have redundancy, monitoring integrations, and subscriber notifications built in. Your custom solution probably does not, and you will regret building it."},
+  {"q":"How often should I update the page during an incident?","a":"Every 15 to 30 minutes, minimum. If you have nothing new, say exactly that: \"Our team is still investigating. Next update in 20 minutes.\" The cadence itself communicates that you are on top of the situation, even when you cannot report progress yet."},
+  {"q":"What should I put on the status page beyond incident updates?","a":"Historical uptime data per component, past incident timelines and resolutions, and a subscription option for email or SMS alerts. Give customers the option to be notified without having to keep refreshing the page. This alone reduces the volume of support tickets during incidents."},
+  {"q":"What is the biggest status page mistake SaaS companies make?","a":"Updating the page only at the start and end of an incident with silence in between. Customers interpret that silence as confusion, denial, or both. Frequent updates, even when nothing has changed, communicate that someone is actively working on the problem."}
+]
+---
+
+# Status Pages That Build Trust During Outages
+
+**A status page is the one communication channel that stays open when everything else is breaking. Most SaaS companies treat it as an afterthought and publish it after their first major outage. The companies that build trust during incidents are the ones that had the page running before anything went wrong. This is what separates a mature product from an amateur one.**
+
+## What you need to know
+
+- A status page must be hosted separately from your main infrastructure, or it goes down exactly when you need it most
+- Real-time updates every 15 to 30 minutes during an incident are the minimum standard; silence is worse than bad news
+- Historical uptime data on the page builds long-term trust, not just incident-by-incident confidence
+- The difference between "investigating" and "we know what broke and here is what we are doing" is enormous to your customers
+- Automated component monitoring is not enough; someone needs to write the human-readable narrative during every incident
+
+## The core argument
+
+When your service goes down, your customers immediately go to two places: social media and your status page. If your status page says "All systems operational" while they are staring at a 503, you have not just failed technically. You have failed to communicate. That failure is often more damaging than the outage itself. Customers who see "All systems operational" during a real incident do not think your monitoring missed it. They think you are hiding it. That perception, once formed, is hard to undo.
+
+The companies that handle outages well all have the same pattern. The page updates before the Slack DMs arrive. The language is specific: "Payment processing is degraded in the EU-West region" is better than "We are experiencing issues." Specific means you understand the problem. Vague means you do not. Customers can read the difference in under three seconds. The specificity of the incident update is a direct proxy for how well you understand your own system.
+
+The deeper argument is that the status page is a trust infrastructure decision, not a marketing one. I built the incident communication approach for Nexli with this framing in mind: the status page had to be planned before the product shipped, not after. When I had the same conversation with clients working on Velmora, the reaction was consistent. Nobody thinks they need it until they do. Then they wish they had built it six months earlier. The cost of the tool is trivial. The cost of the first outage without it is not.
+
+## Common mistakes
+
+1. **Hosting the status page on the same infrastructure as the product.** When your cloud provider has an incident and your status page is on the same provider, you get silence. Statuspage.io, Instatus, and similar SaaS tools exist precisely because this failure mode is so common and so costly.
+2. **Using generic language during incidents.** "We are aware of an issue" communicates nothing. Customers want to know what is broken, what is not, and when they can expect the next update. Generic language reads as confusion or cover-up.
+3. **Updating only at the beginning and resolution.** The silence during the middle is where trust erodes. Set a 20-minute update cadence and keep it even when you have nothing new to report. "Still investigating, next update at 14:30 UTC" is a valid and trust-building update.
+4. **Not including component-level status.** One big "Status: Down" label loses the signal. A page that shows "API: Degraded, Dashboard: Operational, Payments: Investigating" tells customers whether their specific use case is affected. That distinction matters enormously.
+5. **Deleting incident history.** Transparency is the product. Your historical uptime, your past incidents, your resolution times are all signals customers use to decide whether to keep paying you. Hiding past incidents removes that signal and the credibility it could be building.
+
+## Where to start
+
+**Step 1: Pick a platform and deploy it today.** Instatus has a generous free tier. Better Uptime, Freshstatus, and Atlassian Statuspage are solid paid options at different price points. The tool matters less than having one running before your next incident. If you want full control, you can self-host on a different cloud provider than your main stack, but most early-stage teams do not need that complexity.
+
+**Step 2: Set up automated component monitoring.** Map your critical paths: API, authentication, payments, dashboard, webhooks. Connect your uptime monitoring tool to each component. Set the threshold for automatic status changes. This gives you the baseline state without requiring manual intervention for every degradation.
+
+**Step 3: Write your incident communication template now, before the incident.** The template has three parts: what is affected, what you know about the cause, and when you will next update. Fill it in from the template during a live incident and you will communicate three times faster than if you are writing from scratch while the CTO is fielding calls from angry customers.
+
+## Related reading
+
+- [The Disaster Recovery Plan That Fits on One Page](/blog/the-disaster-recovery-plan-that-fits-on-one-page)
+- [The On-Call Rotation That Engineers Can Actually Sustain](/blog/the-on-call-rotation-that-engineers-can-actually-sustain)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Incident Response for Startups: A Playbook](/blog/incident-response-for-startups-a-playbook)

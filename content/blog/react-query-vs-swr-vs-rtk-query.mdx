@@ -1,0 +1,62 @@
+---
+slug: "react-query-vs-swr-vs-rtk-query"
+title: "React Query vs SWR vs RTK Query"
+excerpt: "React Query, SWR, and RTK Query all manage server state in React applications, but they make different trade-offs around complexity, bundle size, and Redux integration. Here is how to choose between them."
+date: "2026-05-23"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 6
+ogImage: "/api/og/blog/react-query-vs-swr-vs-rtk-query"
+status: "published"
+definition: "React Query, SWR, and RTK Query are React libraries for managing server state: data fetched from an API that needs to be cached, synchronized, and updated in the UI. They solve the problem of manual fetch-loading-error state management, providing automatic caching, background refetching, stale-while-revalidate semantics, optimistic updates, and pagination utilities. The distinction between client state (what the user has done) and server state (what the server has) is the conceptual foundation for all three libraries."
+faq: [
+  {"q":"What problem do these libraries solve that useEffect plus useState does not?","a":"useEffect plus useState for data fetching requires manually implementing: loading states, error states, cache invalidation, deduplication of identical requests made from multiple components, background refetching when the window regains focus, automatic retry on failure, and pagination. Each of these is non-trivial to implement correctly and must be reimplemented for every data type. React Query, SWR, and RTK Query provide all of these behaviors as configurable defaults, reducing data-fetching code from dozens of lines per resource to a single hook call."},
+  {"q":"What is the difference between React Query and SWR?","a":"React Query is more feature-complete with more configuration options: fine-grained cache invalidation, optimistic updates with rollback, dependent queries, infinite scroll queries, and a devtools extension. SWR is simpler and smaller: it covers the 80% use case (fetch, cache, revalidate) with less configuration. React Query is the better choice for complex data dependencies and optimistic updates. SWR is the better choice when simplicity and bundle size matter more than advanced features. SWR is also the officially recommended data fetching approach for Next.js applications, though React Query works equally well."},
+  {"q":"When should you use RTK Query instead of React Query or SWR?","a":"RTK Query is the right choice when the application already uses Redux Toolkit for client state management. RTK Query integrates with the Redux store, meaning server state is visible in Redux DevTools alongside client state, cache invalidation can be triggered by Redux actions, and teams already familiar with Redux do not need to learn a separate mental model. If the application does not use Redux, adding RTK Query to get its data fetching features is adding Redux as a dependency, which is significant overhead for the data fetching benefit alone."},
+  {"q":"How does cache invalidation work across these libraries?","a":"React Query uses query keys to identify cached data and invalidation targets. queryClient.invalidateQueries(['users']) marks all queries with a key starting with 'users' as stale, triggering a background refetch on next mount or window focus. SWR uses mutate(key) to trigger revalidation for a specific key. RTK Query uses tags: endpoints define which cache tags they provide and which they invalidate, so a mutation automatically invalidates the relevant queries. React Query's key-based invalidation is the most flexible. RTK Query's tag-based invalidation is the most structured for REST APIs with clear resource relationships."},
+  {"q":"Does using React Query mean you do not need Redux?","a":"React Query replaces Redux for server state: data that comes from an API and needs to be cached. It does not replace Redux for client state: UI state (modal open/closed, selected tab, form wizard step) that is local to the application and not synchronized with a server. Many applications that migrate from Redux to React Query find that their remaining Redux state is small enough to manage with useState and useContext, eliminating Redux entirely. Some applications have genuine client state complexity that Redux manages well. The decision should be based on what client state actually exists, not on whether React Query can replace Redux in theory."}
+]
+---
+
+## What you need to know
+
+- React Query is the most capable of the three and the right default for new projects that do not already use Redux.
+- SWR is the right choice when bundle size is a constraint or when the data fetching requirements are straightforward.
+- RTK Query belongs in applications that already use Redux Toolkit. Adding Redux specifically for RTK Query is not worth it.
+- All three eliminate the need to manage loading, error, and cache state manually. Pick one and use it consistently rather than mixing libraries.
+- Server state (API data) and client state (UI state) are different problems. These libraries solve server state. useState and useContext are still appropriate for client state.
+
+## The core argument
+
+The pattern of fetching data in useEffect, storing it in useState, and manually managing loading and error states is one of the most commonly reimplemented patterns in React applications. Every team writes it slightly differently, with different edge cases handled or missed. React Query, SWR, and RTK Query replace this manual pattern with a consistent, well-tested implementation that handles the edge cases correctly by default: request deduplication (two components mounting simultaneously that need the same data produce one request), background refetching when the window regains focus, stale-while-revalidate semantics that show cached data immediately while fetching fresh data, and automatic retry with exponential backoff on network errors.
+
+The choice between the three is primarily about what else the application is doing. For a new Next.js application with no existing Redux, React Query is the strongest choice. The devtools are excellent, the documentation is comprehensive, and the feature set covers complex data fetching scenarios like dependent queries, optimistic updates, and infinite scroll without requiring library extensions. React Query v5 in particular cleaned up the API significantly and is the version to use for new projects.
+
+For applications already invested in Redux Toolkit, RTK Query is a natural fit. The integration with Redux DevTools, the ability to see server state alongside client state, and the tag-based cache invalidation that maps naturally to REST API resource relationships make RTK Query the coherent choice when Redux is already in the dependency graph. I used RTK Query on Nyxera where we already had significant Redux state for the workflow editor, and the ability to see API cache state in Redux DevTools alongside the client state was genuinely useful for debugging.
+
+## Common mistakes
+
+1. **Mixing React Query and custom useEffect data fetching in the same codebase.** Inconsistent data fetching patterns make caching behavior unpredictable: some data is cached and deduplicated, other data is not. Migrate all data fetching to the chosen library and delete the custom useEffect patterns.
+
+2. **Using the same query key for different data.** React Query's cache is keyed by the query key array. If two different data sources use the same key, they share cache. Query keys should be specific: ['user', userId] not ['user']. Include all variables that affect the data in the query key.
+
+3. **Not using the onSuccess and onError callbacks for side effects.** Mutations that trigger notifications, navigate to a new page, or reset form state should use the mutation's onSuccess and onError callbacks rather than manual handling after awaiting the mutation. The callbacks receive the mutation result and are the correct place for side effects.
+
+4. **Disabling React Query's background refetching without understanding the implications.** staleTime and gcTime control how long data is considered fresh and how long it stays in cache. Setting staleTime to Infinity prevents all background refetching, which improves performance but means data shown to users may be outdated until they manually trigger a refresh. Set staleTime based on how frequently the data changes, not to maximize cache hits.
+
+5. **Not invalidating queries after mutations.** A mutation that creates or updates a resource should invalidate the queries that show that resource in a list or detail view. Without invalidation, the UI shows stale data after a successful mutation. React Query's queryClient.invalidateQueries makes this explicit. RTK Query's tag invalidation handles it automatically when endpoints are tagged correctly.
+
+## Where to start
+
+1. **Install React Query v5 and wrap the application in QueryClientProvider.** Add the React Query DevTools in development mode. The devtools show all active queries, their cache status, and their data, which is essential for understanding cache behavior during development.
+
+2. **Convert one data-fetching useEffect to useQuery.** Pick a simple read-only data fetch, convert it to a useQuery call, and verify that loading, error, and success states work as expected. Verify in the DevTools that the cache shows the data and that subsequent mounts of the same component use the cache instead of refetching.
+
+3. **Convert one mutation to useMutation with query invalidation.** Pick a create or update operation. Implement it with useMutation and add queryClient.invalidateQueries in the onSuccess callback for the queries that should update after the mutation. This establishes the full read-write pattern for the rest of the application.
+
+## Related reading
+
+- [Next.js vs Remix vs Astro vs Nuxt in 2026](/blog/next-js-vs-remix-vs-astro-vs-nuxt-in-2026)
+- [Real Time Collaboration: A Web App Engineering Primer](/blog/real-time-collaboration-a-web-app-engineering-primer)
+- [Routing Patterns That Survive Real World Use](/blog/routing-patterns-that-survive-real-world-use)
+- [Performance as a Feature: A Founder's Case](/blog/performance-as-a-feature-a-founders-case)

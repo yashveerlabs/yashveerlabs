@@ -1,0 +1,119 @@
+---
+slug: "apple-app-store-account-setup-avoiding-the-common-traps"
+title: "Apple App Store Account Setup: Avoiding the Common Traps"
+excerpt: "The Apple Developer account setup looks simple. The traps that catch first time founders are not in the setup itself, they are in the decisions made during it. Here is the version with the traps marked."
+date: "2026-05-18"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","ios","app-store","founders"]
+readingMinutes: 10
+ogImage: "/api/og/blog/apple-app-store-account-setup-avoiding-the-common-traps"
+status: "published"
+definition: "Setting up an Apple Developer account looks like a paperwork task. It contains several decisions that compound for years. Account type, legal entity name, tax setup, bank routing, contract acceptance. Each one has a default that is wrong for some founders. Here is the version with the traps marked so you make the right call the first time."
+faq: [
+  {"q":"Should I sign up as an individual or organization?","a":"Organization, unless the business genuinely is one person with no plans to grow. The organization account allows multiple team members, supports business names, and is the right shape for tax and banking. The individual account locks you into your personal name and is harder to migrate from later."},
+  {"q":"What is the DUNS number requirement?","a":"Apple requires a DUNS number for organization accounts. It is the business registration ID used by Dun and Bradstreet. The number is free to obtain but the lookup takes one to two weeks. Apply for it before you start the account application."},
+  {"q":"What does the account actually cost?","a":"99 USD per year for the standard developer account. The Apple Developer Enterprise Program is 299 USD per year and is for internal distribution only. Most founders need the standard account."},
+  {"q":"What tax forms do I need to complete?","a":"Apple requires a Paid Apps agreement before you can sell paid apps or in app purchases. This includes US tax forms (W 9 for US entities, W 8 BEN or W 8 BEN E for non US) and banking details for payouts. Without these, you can publish free apps only."},
+  {"q":"How long does the full setup take?","a":"Two to six weeks for an organization account from scratch. DUNS lookup is the longest pole. The Apple side processes in two to five business days once you have the DUNS and the entity registered."},
+  {"q":"Can I change the account name later?","a":"With effort. Apple supports name changes but the process can take weeks and requires evidence of the legal entity change. The cleanest path is to set the name correctly the first time."},
+  {"q":"What about Sign In With Apple as a customer requirement?","a":"If you offer third party sign in like Google or Facebook, Apple requires you to also offer Sign In With Apple. Plan for this in the design phase. Adding it after launch is doable but disrupts the auth model."}
+]
+---
+
+## What you actually need to know
+
+- Organization account beats individual for almost every founder.
+- DUNS number is the longest pole. Apply for it first.
+- Tax and banking forms are required before you can sell anything.
+- Sign In With Apple is required if you offer other third party sign in.
+- In my experience, the founders who treat account setup as paperwork end up redoing it. The founders who treat it as engineering work get it right on the first try.
+
+| Decision | Right answer for most founders |
+|---|---|
+| Account type | Organization |
+| Legal entity name | Your registered business name, exactly as it appears on legal documents |
+| DUNS number | Apply early, before the rest of the application |
+| Tax forms | Complete before launch, supports payouts |
+| Bank account | Business account, not personal |
+| Sign In With Apple | Required if you offer other social sign in |
+
+## The core argument
+
+The Apple Developer account is not a one time setup. It is the legal and financial infrastructure of every iOS product you will ever ship. Decisions made in the first hour of setup carry forward for years. Founders who treat it as paperwork pay the cost later, in lost time and complicated migrations.
+
+The organization account is the right choice for almost any founder with business intent. It supports multiple team members, allows the business name to appear in the App Store, and matches the tax and banking setup the business already has. The individual account is faster to set up but locks the legal name and complicates everything downstream when the business actually starts to operate.
+
+The DUNS number is the longest part of the timeline. Free to obtain, but the lookup takes one to two weeks and Apple will not proceed without it. Apply for it before you start the application. The teams that wait until they are inside the application discover the dependency and lose a week.
+
+The tax and banking setup is the part founders most often skip in the rush to publish. Without it, the app can be free but cannot accept payments. The setup requires US tax forms, banking details, and acceptance of the Paid Apps agreement. Each piece takes minutes. The total time is small. The cost of waiting until launch week to do this is panic and delay.
+
+## The decisions in detail
+
+**Account type.** Organization unless you genuinely are a one person operation with no plans to ever take payments or expand. Most founders should pick organization.
+
+**Legal entity name.** The exact name on your registered business documents. Spelling and capitalization matter. Once registered with Apple, the name is hard to change.
+
+**DUNS number.** Apply through Dun and Bradstreet. Free for verification purposes. Provide your registered business address and legal entity name exactly as they appear on your business registration.
+
+**Apple ID for the account.** Use a business email, not a personal one. The Apple ID controls the account. Losing access to it means losing access to the account. Treat it as critical infrastructure.
+
+**Two factor authentication.** Required and not optional. Set it up before you do anything else. Use a phone number you control long term, not a temporary or shared one.
+
+**Tax forms.** US entities complete a W 9. Non US entities complete a W 8 BEN or W 8 BEN E depending on whether you are an individual or organization. The forms require your business tax ID.
+
+**Banking.** A business bank account. Apple deposits payouts here monthly. Personal accounts are accepted but not recommended for businesses with separate financial operations.
+
+**Paid Apps agreement.** Required before you can sell anything. Read it. Sign it. Both versions of the agreement (US and international) get refreshed periodically and require re acceptance.
+
+## What it actually costs
+
+| Item | Cost |
+|---|---|
+| Developer account annual fee | 99 USD |
+| DUNS number | Free |
+| Business registration (if not already done) | Variable, 50 to 1000 USD depending on jurisdiction |
+| Time to complete setup | 4 to 20 hours of founder time over 2 to 6 weeks |
+| Cost of redoing the setup later | Disproportionate, often weeks of delay and team coordination |
+
+The numbers are small. The opportunity cost of getting it wrong is large because every downstream operation depends on this foundation.
+
+## Features to demand from your setup
+
+- Organization account with the right legal entity name from day one.
+- DUNS number applied for before the main application.
+- Two factor authentication on the account Apple ID, on a phone number you control.
+- Tax and banking complete before launch.
+- Sign In With Apple included in the auth design if other social sign in is supported.
+- Documentation of every credential and recovery path for the account, stored securely.
+
+## Expert opinion
+
+> The Apple account setup is the kind of work that feels boring until it matters. Most founders treat it as a one time chore. The founders who treat it as critical infrastructure save themselves weeks of recovery work over the life of the business.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+I have set up Apple Developer accounts for multiple client projects. The smoothest one took eleven days total. The founder had already registered the business and had a DUNS number from an unrelated registration. We submitted the account application, completed the tax forms, and were publishing TestFlight builds inside two weeks.
+
+The opposite story is a founder who tried to set up the account a week before launch. The DUNS number had not been applied for. The bank account was personal, not business. The legal entity name on the form did not match the business registration. Each issue took days to resolve. The launch slipped by three weeks. The next time the same founder set up an account, they did it three months ahead of any launch, and the process took fewer than two weeks.
+
+For more on the broader topic, see [google play console for founders a no nonsense tour](/blog/google-play-console-for-founders-a-no-nonsense-tour) for the Android equivalent, [app store and play store costs](/blog/app-store-and-play-store-costs-fees-reviews-and-hidden-friction) for the cost frame, and [app store review hell how to survive it as a solo founder](/blog/app-store-review-hell-how-to-survive-it-as-a-solo-founder) for what happens after the account is live.
+
+## Common mistakes founders make
+
+1. Picking individual when they should pick organization.
+2. Not applying for the DUNS number first.
+3. Using a personal email as the account Apple ID.
+4. Skipping two factor authentication initially. The recovery story when something goes wrong is painful.
+5. Filling in the legal name slightly wrong. Apple does not auto correct.
+6. Doing tax and banking the week of launch instead of months before.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Register the business if not already done. Apply for the DUNS number.
+2. **Week two.** While DUNS is processing, set up a business bank account, gather tax forms, set up a business Apple ID.
+3. **Week three.** Submit the developer account application. Confirm the legal entity name and DUNS number match.
+4. **Week four.** Complete tax forms and Paid Apps agreement. Begin uploading test builds to TestFlight.
+
+For deeper reading, [the first mobile app build a founders six phase plan](/blog/the-first-mobile-app-build-a-founders-six-phase-plan) covers the broader project context, and [the mobile app privacy manifest what apple now requires](/blog/the-mobile-app-privacy-manifest-what-apple-now-requires) covers the next compliance step.

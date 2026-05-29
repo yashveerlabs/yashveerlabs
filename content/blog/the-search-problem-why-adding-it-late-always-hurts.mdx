@@ -1,0 +1,116 @@
+---
+slug: "the-search-problem-why-adding-it-late-always-hurts"
+title: "The Search Problem: Why Adding It Late Always Hurts"
+excerpt: "Search is one of the few features where retrofitting hurts more than the original build. The data model, the indexing strategy, and the query experience all need to be designed together. Teams that add search late pay for it twice."
+date: "2024-11-20"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-search-problem-why-adding-it-late-always-hurts"
+status: "published"
+definition: "Search in a SaaS product is the ability for users to find records across the product's data by entering natural-language or structured queries. It is more complex than it looks because it requires a separate data model, an indexing pipeline, relevance tuning, and a query interface that maps what users type to what the system has stored. Teams that skip the design work ship search that disappoints and then spend months fixing it."
+faq: [
+  {"q":"what is the easiest way to add full text search to a saas app without elasticsearch","a":"Postgres full-text search covers a surprising amount of ground for early-stage SaaS. The tsvector and tsquery types, combined with GIN indexes, handle basic keyword search across moderate data volumes. The limits appear when you need fuzzy matching, typo tolerance, or relevance ranking across many fields. At that point Typesense or Meilisearch are the next step up without the operational weight of Elasticsearch."},
+  {"q":"when should a saas team move from postgres full text search to a dedicated search engine","a":"When you need typo tolerance, faceted filtering, or relevance tuning that Postgres cannot express cleanly. Also when search query load is affecting your main database performance. Most teams hit this around fifty thousand to five hundred thousand indexed records, depending on query complexity and concurrency."},
+  {"q":"what is the difference between typesense and meilisearch for saas search","a":"Both are self-hosted or cloud-hosted dedicated search engines with simple APIs and good defaults. Typesense has stronger multi-tenancy primitives, which matters for B2B SaaS where each customer should only search their own data. Meilisearch has slightly simpler initial setup and good typo tolerance out of the box. Either is a solid choice. Typesense wins on multi-tenant access control."},
+  {"q":"how do I keep a search index in sync with my main database","a":"Two patterns. Synchronous writes: write to the search index in the same request that writes to the database, accepting that a failure in either leaves them inconsistent. The outbox pattern: write a change event to a log, and let a background worker update the search index from the log. The outbox pattern is more reliable and the right approach once the index is important enough to matter."},
+  {"q":"does adding search to a saas product require a separate database or service","a":"Not always. Postgres full-text search is built in. But dedicated search engines like Typesense, Meilisearch, and Elasticsearch run as separate services with their own storage. The operational cost of a separate service is real. The benefit is significantly better search quality. Most teams start with Postgres and graduate when the complaints start."},
+  {"q":"how should multi-tenant saas handle search so tenants cannot see each other's data","a":"Tenant scoping at the query level is the minimum. Every search query must include a tenant filter that the application enforces, not the user. Typesense has a scoped API key feature that bakes the tenant filter into the key itself, removing the possibility of a missing-filter bug. Build this as a first-class concern, not an afterthought."},
+  {"q":"what makes search relevance bad and how do I improve it","a":"Relevance is bad when the ranking function does not match how users think about the data. Common causes: not weighting important fields higher, no synonym handling, no typo tolerance, treating all words as equally important. Improving it requires looking at what users actually search for and tuning the ranking rules against real queries, not synthetic ones."}
+]
+---
+
+## What you actually need to know
+
+- Search is not a feature you can add cleanly after the fact. The data model, the indexing strategy, and the relevance logic all need to be designed together.
+- Postgres full-text search is the right starting point for most SaaS. It handles moderate scale and basic relevance without an extra service.
+- Move to a dedicated engine when typo tolerance, faceting, or relevance tuning becomes necessary.
+- Multi-tenant search requires tenant scoping baked in at the query or API key level. This is not optional.
+- The teams that design search early ship a feature that works. The teams that bolt it on later ship a feature that disappoints and then spend quarters fixing the data model they cannot change without a migration.
+
+| Option | Best fit | Typo tolerance | Multi-tenant support | Operational cost |
+|---|---|---|---|---|
+| Postgres full-text (tsvector/tsquery) | Early-stage SaaS, simple queries | No | Tenant filter in query | None |
+| Typesense | B2B SaaS, multi-tenant | Yes | Scoped API keys | Low |
+| Meilisearch | Teams wanting quick setup | Yes | Tenant filter in query | Low |
+| Algolia | Teams wanting zero ops | Yes | Index per tenant or filter | Medium to high |
+| Elasticsearch / OpenSearch | High scale, complex requirements | Yes | Role-based index access | High |
+
+## The core argument
+
+The problem with adding search late is not just the technical work. It is that the data model was never designed with search in mind. Fields were not normalized for indexing. Relationships were not structured for efficient denormalization. The text content users want to search is buried in JSON blobs or distributed across thirty tables with no obvious join path. Retrofitting search onto this requires a migration that touches the core schema, which is one of the most expensive things a team can do.
+
+I have worked through this with three different SaaS teams. The pattern is consistent. The team ships without search. Users ask for it. The team tries to add it. They discover that the data is not in a shape that indexes cleanly. They index what they can, ship something mediocre, and then get escalating complaints about search quality that they cannot fix without the schema migration they were trying to avoid.
+
+The right approach is to design for searchability from the start, even if you do not ship search on day one. That means keeping important text fields as proper text columns rather than JSONB. It means thinking about which fields users will want to search, filter, and sort by. It means understanding which records belong to which tenant so the index can be scoped correctly. None of this is expensive to design early. It is expensive to change late.
+
+The choice of search engine is a separate question from the design question, and it matters less than most teams think at early stage. Postgres full-text search is genuinely good enough for many products through the first fifty thousand records and moderate query complexity. The decision to graduate to a dedicated engine should be driven by real user complaints and real performance numbers, not by premature optimization.
+
+## The indexing pipeline problem
+
+### Keeping the index in sync
+
+Search indexes are always a derived view of the source data. The source data changes. The index has to change with it. Getting this sync right is where most search implementations develop their first cracks.
+
+The naive approach is a synchronous write: when you write a record to the database, also write to the search index in the same request handler. This works until it does not. The search service goes down. The write succeeds in the database and fails in the index. The record is now invisible to search. This inconsistency compounds over time.
+
+The reliable approach is the outbox pattern. Writes go to the database and to a change log. A background worker reads the change log and updates the search index. If the search service is down, the worker retries. The index eventually catches up. Consistency is guaranteed. This is meaningfully more code than the synchronous approach, and it is worth doing once the search index matters to users.
+
+### Initial indexing of existing data
+
+Adding search to an existing product means backfilling the index. The backfill is a migration job that reads records from the database in batches and writes them to the index. The migration has to be designed for restartability: if it fails halfway through, it should resume from where it stopped, not start over. It should also be designed for rate limiting so it does not overwhelm the search service or the database during the build.
+
+## How much does it cost
+
+| Option | Engineering setup | Monthly cost at modest scale | Notes |
+|---|---|---|---|
+| Postgres full-text | A few days | Negligible | Already in your database |
+| Typesense Cloud | One to two weeks | 25 to 150 USD | Includes managed hosting |
+| Meilisearch Cloud | One to two weeks | 30 to 150 USD | Includes managed hosting |
+| Self-hosted Typesense or Meilisearch | Two to three weeks | 20 to 80 USD server cost | Adds operational overhead |
+| Algolia | One to two weeks | 50 to 500 USD | Pricing scales with operations |
+| Elasticsearch on AWS | Two to four weeks | 100 to 500 USD | High baseline infrastructure cost |
+
+## What to look for in a search implementation
+
+- Tenant scoping built in. Every query must be scoped to the requesting tenant. Not enforceable only by application code.
+- An indexing pipeline that handles failures gracefully. Synchronous writes that fail silently are not acceptable.
+- Typo tolerance and basic synonym handling once the product serves users who type quickly and imprecisely.
+- Field weighting that reflects how important different fields are. A document title should rank higher than a body mention.
+- Relevance feedback loop. Real user queries should drive tuning decisions, not assumptions.
+- A re-indexing path that is tested and known to work. You will need to re-index when the schema changes.
+
+## Expert opinion
+
+> The search retrofit is one of the more expensive engineering projects I see teams take on. It is expensive not because search is technically hard but because the team is now changing a core part of the data model while the product is live and customers are using it. The teams that avoided this built with searchability in mind early, even when they did not ship search on day one. That forethought costs almost nothing at the beginning and saves weeks or months later.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A document management SaaS had been running for two years before adding search. The documents were stored as rich text in a JSONB column with metadata scattered across join tables. The initial attempt to add full-text search indexed only the title and a few metadata fields because the body content was not in a queryable shape. Users found it useless for anything but exact title matches.
+
+The proper fix required extracting the document body to a dedicated text column during a zero-downtime migration, building an outbox pipeline to keep the index in sync, and re-indexing the entire document corpus. That work took six weeks. The original design decision that caused it took about an hour to make and could have been made differently.
+
+For the migration and reliability patterns involved, [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) covers how to execute the schema changes safely, and [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) covers the indexing pipeline pattern in more depth.
+
+## Common mistakes teams make
+
+1. Indexing too many fields. Every field that changes requires a re-index. Be selective.
+2. Synchronous index writes without error handling. Failures create invisible records.
+3. No tenant scoping at the query level. A missing filter exposes data across tenants.
+4. Using the main database for full-text search when query load is affecting other operations.
+5. Ignoring relevance tuning after launch. The default ranking is never the right ranking for your data.
+6. No re-index strategy. The first schema change breaks the index and there is no plan.
+7. Building search on a data model that was not designed for it. The retrofit is the most expensive path.
+
+## A six week plan to ship search properly
+
+1. **Week one.** Audit the data model. Which fields will users search? Are they queryable? Identify the gaps.
+2. **Week two.** Start with Postgres full-text if the model supports it. Wire up basic keyword search on the most important entity type.
+3. **Week three.** Add tenant scoping. Every query goes through a scope function that is not bypassable by the caller.
+4. **Week four.** Build the outbox pipeline for index sync. Test failure and recovery.
+5. **Week five.** Ship to a limited user group. Collect real search queries. Tune field weights against actual data.
+6. **Week six.** Evaluate whether Postgres is sufficient or whether a dedicated engine is warranted. Migrate if needed.
+
+For the broader architecture context, [the write-heavy workload a different set of tradeoffs](/blog/the-write-heavy-workload-a-different-set-of-tradeoffs) covers database design decisions that interact with search indexing, and [the read-heavy workload strategies that move the needle](/blog/the-read-heavy-workload-strategies-that-move-the-needle) covers the query patterns that sit next to search in most products.

@@ -1,0 +1,288 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   COLOR SYSTEM, Midnight Plum + Tarnished Gold + Stone
+   Fashion house identity palette. Single source of truth.
+   ========================================================================= */
+:root {
+  /* Backgrounds */
+  --bg-primary: #0F0A12;          /* Void Plum */
+  --bg-surface: #17111C;          /* Black Aubergine */
+  --bg-elevated: #1F1825;         /* slight lift above surface */
+
+  /* Accents */
+  --accent-gold: #B08A52;         /* Tarnished Gold */
+  --accent-gold-hover: #C29E63;
+  --accent-gold-glow: rgba(176, 138, 82, 0.18);
+  --accent-selection: rgba(176, 138, 82, 0.25);
+  --accent-secondary: #7A5B57;    /* Dust Rose Bronze */
+
+  /* Neutrals */
+  --neutral: #2A2D31;             /* Wet Slate */
+
+  /* Text */
+  --text-primary: #ECE7E1;        /* Ivory Smoke */
+  --text-secondary: rgba(236, 231, 225, 0.70);
+  --text-muted: rgba(236, 231, 225, 0.45);
+
+  /* Borders */
+  --border-subtle: rgba(236, 231, 225, 0.08);
+  --border-strong: rgba(236, 231, 225, 0.14);
+  --border-gold: rgba(176, 138, 82, 0.35);
+
+  /* Nyxera AI exclusive (cyan, contrasts with gold) */
+  --nyxera-cyan: #00D9FF;
+  --nyxera-glow: rgba(0, 217, 255, 0.22);
+
+  /* Surface alphas (for backdrop-blur layering) */
+  --surface-60: rgba(23, 17, 28, 0.60);
+  --surface-50: rgba(23, 17, 28, 0.50);
+  --surface-40: rgba(23, 17, 28, 0.40);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* =========================================================================
+   TAILWIND v4 THEME (expose CSS variables as Tailwind utilities)
+   ========================================================================= */
+@theme inline {
+  --color-bg: var(--bg-primary);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+
+  --color-gold: var(--accent-gold);
+  --color-gold-hover: var(--accent-gold-hover);
+  --color-secondary: var(--accent-secondary);
+  --color-neutral: var(--neutral);
+
+  --color-fg: var(--text-primary);
+  --color-fg-muted: var(--text-secondary);
+  --color-fg-faint: var(--text-muted);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-border-gold: var(--border-gold);
+
+  --color-nyxera: var(--nyxera-cyan);
+
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-display), ui-serif, Georgia, serif;
+  --font-label: var(--font-label), ui-serif, Georgia, serif;
+}
+
+/* =========================================================================
+   BASE
+   ========================================================================= */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border-subtle);
+  }
+
+  html {
+    background: var(--bg-primary);
+    color-scheme: dark;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    /* Background lives on <html>. Body stays transparent so fixed page
+       backdrops (AmbientImage) are visible. */
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.7;
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+
+  @media (min-width: 768px) {
+    body {
+      font-size: 16px;
+    }
+  }
+
+  ::selection {
+    background: var(--accent-selection);
+    color: var(--text-primary);
+  }
+
+  /* Headings: editorial Bodoni, tight tracking, generous leading. */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+
+  p {
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Focus rings (keyboard navigation) */
+  :focus-visible {
+    outline: 1px solid var(--accent-gold);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  /* Custom scrollbar (subtle) */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-gold); }
+}
+
+/* =========================================================================
+   UTILITY CLASSES
+   ========================================================================= */
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  .glass {
+    background: var(--surface-60);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .glass-strong {
+    background: var(--surface-50);
+    backdrop-filter: blur(48px) saturate(160%);
+    -webkit-backdrop-filter: blur(48px) saturate(160%);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .gold-glow {
+    box-shadow: 0 20px 60px -20px var(--accent-gold-glow);
+  }
+
+  .gold-ring {
+    box-shadow: inset 0 0 0 1px var(--border-gold);
+  }
+
+  .nyxera-glow {
+    box-shadow: 0 20px 60px -20px var(--nyxera-glow);
+  }
+
+  /* Cormorant SC engraved small-caps eyebrow label. */
+  .label-eyebrow {
+    font-family: var(--font-label);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent-gold);
+  }
+
+  .label-eyebrow-muted {
+    font-family: var(--font-label);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .font-display { font-family: var(--font-display); }
+  .font-label { font-family: var(--font-label); }
+
+  .grain {
+    position: relative;
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  /* Header shell: GPU-accelerated translate-only hide-on-scroll. */
+  .header-shell {
+    will-change: transform;
+    transform: translate3d(0, 0, 0);
+    transition: transform 280ms var(--ease-out-soft), opacity 280ms var(--ease-out-soft);
+    opacity: 1;
+  }
+  .header-shell[data-visible="false"] {
+    transform: translate3d(0, -120%, 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Connect button: editorial gold pill with shine sweep. */
+  .btn-connect {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #D4B074, #B08A52 50%, #8B6A3F);
+    border: 1px solid rgba(236, 231, 225, 0.15);
+    border-radius: 999px;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 4px 12px rgba(176, 138, 82, 0.25),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+    transition: transform 200ms var(--ease-out-soft), box-shadow 200ms var(--ease-out-soft);
+  }
+  .btn-connect::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(60deg, transparent 30%, rgba(255, 255, 255, 0.4) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 600ms var(--ease-out-soft);
+    pointer-events: none;
+  }
+  .btn-connect:hover {
+    transform: scale(1.03);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+      0 8px 20px rgba(176, 138, 82, 0.4),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .btn-connect:hover::before {
+    transform: translateX(100%);
+  }
+}
+
+/* =========================================================================
+   REDUCED MOTION (respect user preference)
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

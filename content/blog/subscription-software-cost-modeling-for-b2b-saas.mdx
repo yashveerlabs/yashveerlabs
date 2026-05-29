@@ -1,0 +1,61 @@
+---
+slug: "subscription-software-cost-modeling-for-b2b-saas"
+title: "Subscription Software Cost Modeling for B2B SaaS"
+excerpt: "B2B SaaS pricing is not intuitive and most founders get the cost model wrong before they write the first line of code. Here is how to build it correctly."
+date: "2026-05-24"
+category: "Software Costs and Budgeting"
+tags: ["budget", "cost", "pricing", "saas", "b2b"]
+readingMinutes: 7
+ogImage: "/api/og/blog/subscription-software-cost-modeling-for-b2b-saas"
+status: "published"
+faq: [
+  {"q":"What is a healthy gross margin for B2B SaaS?","a":"The industry standard target is 70 to 80 percent gross margin, meaning the cost of goods sold (infrastructure, support, and direct costs) should be 20 to 30 percent of revenue. Software businesses below 60 percent gross margin have structural cost problems that compound as they grow."},
+  {"q":"Should I use per-seat or usage-based pricing?","a":"Per-seat pricing is simpler to sell and more predictable. Usage-based pricing aligns better with value delivery but requires more sophisticated billing infrastructure and creates revenue volatility. Most B2B SaaS products start with per-seat and add usage-based components for certain features once the base model is established."},
+  {"q":"How do I price when I do not know my costs yet?","a":"Start with a cost estimate from comparable products. Your infrastructure cost for 100 customers is estimable from pricing pages of AWS, Vercel, or Supabase. Your support cost is estimable from your planned team size. Use these estimates to set a floor and price above it. Collect real data in the first three months and adjust."},
+  {"q":"Is it a problem if early customers pay less than the sustainable price?","a":"It is common but not harmless. Grandfathered pricing creates a long tail of unprofitable customers that constrains your cost optimization options later. If you offer early-bird pricing, make it time-limited with explicit terms that it will increase."},
+  {"q":"When should I raise prices?","a":"When demand consistently exceeds supply at the current price (long sales cycles, customers buying without pushback, waitlists), your price is too low. When acquisition is faster than you expected and the cost model works, raise prices. Most B2B SaaS products are underpriced, not overpriced."}
+]
+---
+
+# Subscription Software Cost Modeling for B2B SaaS
+
+**B2B SaaS cost modeling is the process of mapping the full cost of building, operating, and supporting a subscription software product against the revenue it generates at different customer volumes. Most founders build a price and then discover the cost. The ones who build sustainable businesses build the cost model first and price from it. This post walks through how to construct a cost model before you write a line of code.**
+
+## What you need to know
+
+- The cost of a SaaS product at 10 customers looks nothing like the cost at 1,000 customers; model both, not just launch
+- Infrastructure costs are predictable; the support and customer success costs per customer are usually what founders underestimate
+- Per-seat pricing and per-usage pricing have different cost structures and different revenue predictability profiles
+- Your gross margin target determines how aggressively you need to optimize infrastructure versus hiring
+- The "we will optimize later" approach works for infrastructure; it rarely works for pricing architecture set at launch
+
+## The core argument
+
+Most B2B SaaS founders set a price by looking at competitors, cutting 20 percent to be competitive, and calling it done. The problem is that pricing without a cost model means you do not know whether the product is profitable at 50 customers, at 500, or at all. I have worked with founders who were growing fast and losing money per customer without realizing it, because they were looking at revenue growth instead of unit economics.
+
+The cost model for B2B SaaS has three layers. The first layer is infrastructure: hosting, database, third-party APIs, storage, email delivery. At low customer counts, this is usually negligible. At 1,000 customers it becomes meaningful. At 10,000 it can determine your margin. The second layer is the cost of labor that scales with customers: support tickets, onboarding sessions, account reviews, renewal conversations. These costs are often 3 to 5 times higher than founders estimate because they undercount the time these activities actually take. The third layer is fixed overhead: engineering time for features and maintenance, marketing, and the tools you pay for regardless of customer count. A healthy B2B SaaS has gross margins above 70 percent, which means the first two layers together should not exceed 30 percent of revenue.
+
+The pricing architecture decision is separate from the price level decision, and it matters just as much. Per-seat pricing (charge per user) scales revenue with customer size but creates friction with large teams who want to share accounts. Usage-based pricing (charge per API call, per document processed, per message sent) aligns revenue with value but makes revenue unpredictable and requires more sophisticated billing infrastructure. Tiered flat-rate pricing (three fixed plans) is the simplest to understand and sell but requires careful tier definition to avoid leaving money on the table with large customers. For Nexli, I built cost models for all three pricing architectures before committing to an approach, and the differences in gross margin at 500 users were significant enough to drive the decision.
+
+## Common mistakes
+
+1. **Not including customer success and onboarding labor in the cost model.** Every customer you add creates some amount of support burden. If that burden is five hours per customer per month and you charge $100 per month, you are underwater before you account for infrastructure. Model the support cost per customer explicitly.
+2. **Pricing for your target customer without modeling your actual early customers.** Your first 20 customers will be smaller, needier, and more price-sensitive than your eventual target segment. Price for the target but budget for the early stage reality, or you will be subsidizing early customers without knowing it.
+3. **Ignoring the cost of annual billing.** Annual contracts improve cash flow but create a year-long commitment to serve the customer regardless of your cost structure changing. Model annual versus monthly billing separately.
+4. **Not building a retention assumption into the cost model.** SaaS revenue is only as good as your churn rate. A 10 percent monthly churn rate means the average customer stays for 10 months. A cost model that assumes customers stay indefinitely significantly overstates lifetime value.
+5. **Forgetting payment processing fees.** Stripe, Paddle, or Lemon Squeezy each take a percentage of every transaction. At 10 percent gross margins, a 3 percent payment processing fee is significant. Include it in the model from the start.
+
+## Where to start
+
+**Step 1: Build a simple unit economics spreadsheet before setting your price.** Rows: revenue per customer per month, infrastructure cost per customer, support cost per customer (estimate hours times your hourly rate), payment processing fee, gross margin per customer. Start with estimates and refine them over the first six months.
+
+**Step 2: Model three scenarios: 10 customers, 100 customers, and 1,000 customers.** Infrastructure often does not scale linearly; support labor often does. The 1,000-customer scenario tells you whether you need to invest in self-serve support before you hit that number or whether the current model works.
+
+**Step 3: Set a gross margin floor and do not price below it.** Target 70 percent gross margin for a software product. If your cost model shows margins below that at 100 customers, you need to either raise the price, reduce the cost, or both before launching. Launching with broken unit economics and hoping to fix them later is the most common financial mistake early SaaS founders make.
+
+## Related reading
+
+- [The Honest Cost of Building an App in 2026: Global Breakdown](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown)
+- [The Hidden Costs of Custom Software Development](/blog/the-hidden-costs-of-custom-software-development)
+- [The Cost of Tech Debt: A Founder's Worst Bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill)
+- [Why Cost Always Doubles: A Realistic Founder Framework](/blog/why-cost-always-doubles-a-realistic-founder-framework)

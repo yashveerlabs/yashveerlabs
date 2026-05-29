@@ -1,0 +1,112 @@
+---
+slug: "ai-assisted-code-review-a-process-that-actually-helps"
+title: "AI Assisted Code Review: A Process That Actually Helps"
+excerpt: "Most AI code review tools generate noise. The teams that get value from them treat AI as a junior reviewer with specific scope, not as a senior gatekeeper. Here is the process that works."
+date: "2026-05-18"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","code-review","engineering-teams","tooling"]
+readingMinutes: 11
+ogImage: "/api/og/blog/ai-assisted-code-review-a-process-that-actually-helps"
+status: "published"
+definition: "AI assisted code review works when the AI runs first, the human runs second, and the scope is narrow. The AI catches typos, missing tests, security smells, and style drift. The human handles architecture, intent, and tradeoffs. Teams that flip the order get worse review quality and slower throughput. The discipline is using each side for what it is good at."
+faq: [
+  {"q":"Should AI replace human code review entirely?","a":"No. AI is good at surface level checks. It is not good at architectural judgment, business logic correctness, or understanding the long term direction of the codebase. Replacing human review with AI review produces a codebase that passes lint but accumulates the wrong abstractions."},
+  {"q":"Which AI code review tools are worth running in 2026?","a":"In my experience the strongest signal comes from tools that run inside the PR rather than as a separate dashboard. CodeRabbit, GitHub Copilot review, and Cursor pull request review all have honest hit rates. The bad ones leave generic comments that nobody acts on. Try two for a month, pick one."},
+  {"q":"How do I stop AI review noise from polluting PRs?","a":"Three settings change everything. Suppress style comments that conflict with your linter. Hide low confidence suggestions. Require the AI to focus on changed lines rather than the whole file. With those three filters most teams cut AI comment volume by sixty to eighty percent."},
+  {"q":"Does AI code review work for junior engineers differently?","a":"Yes, and the difference is positive. Junior engineers benefit from the AI catching obvious issues before a senior even looks at the PR. The senior then spends time on the high value comments. The junior learns faster because they are not being corrected on basic style issues in front of the team."},
+  {"q":"Can AI review catch security vulnerabilities?","a":"It catches common patterns. SQL injection, missing input validation, exposed secrets in commits, weak cryptographic choices. It does not catch business logic flaws, complex authorization bugs, or sophisticated supply chain issues. Treat it as a first line filter, not as a security audit."},
+  {"q":"How does AI review change the speed of merging PRs?","a":"On a healthy team, it cuts the time to first useful feedback by sixty to ninety percent because the AI runs in seconds. The downside is that some teams use this speed to skip the human step entirely. The fastest merge is not the goal. The right merge is."},
+  {"q":"What about cost? Is AI code review worth the API spend?","a":"For most teams over five engineers, yes. The math is the time the AI saves senior engineers from leaving low value comments. A senior who would otherwise spend two hours a week on style nitpicks now spends those hours on architecture. The API spend is usually fifty to two hundred dollars a month per engineer, easily justified at senior salaries."}
+]
+---
+
+## What you actually need to know
+
+- AI code review is a first pass, not a final pass. The human review is still where the architectural calls get made.
+- The right scope for AI is surface level checks. Typos, missing tests, style drift, security smells, obvious bugs.
+- The wrong scope for AI is intent. It does not know why you are building the feature. It cannot tell you whether the abstraction is the right one.
+- The teams that get value from AI review tune it aggressively. The teams that get noise leave the defaults on.
+- In my experience, junior engineers benefit the most. The AI catches the obvious issues before a senior wastes time on them.
+
+| Tool | Strength | Watch out for |
+|---|---|---|
+| CodeRabbit | Detailed inline comments, good defaults | Can be verbose, requires tuning |
+| GitHub Copilot review | Tight integration with GitHub PRs | Less depth than dedicated tools |
+| Cursor PR review | Strong on JavaScript and TypeScript | Newer, fewer language integrations |
+| Open source linters with AI extension | Free, deterministic | Less context aware than commercial tools |
+
+## The core argument
+
+The hardest part of code review on a small team is not the writing of the comments. It is the time cost. A senior engineer who reviews three PRs a day at ten minutes each is spending the equivalent of a half day a week on review. That time is mostly spent on the same five types of comments. Style violations. Missing tests. Inconsistent naming. Obvious off by one errors. Comments the senior leaves on autopilot, on every PR, every week.
+
+AI assisted review is good at exactly that layer. It catches the same five types of comments, before the senior opens the PR. By the time the senior arrives, the surface level issues are already flagged. The senior reviews the architectural shape of the change, leaves the high value comment, and moves on. Average review time drops by half. Average review quality goes up, because the senior is no longer fatigued by style work.
+
+The mistake teams make is reading this and concluding that AI can do the whole review. It cannot. The AI does not know your codebase well enough to understand why you do not allow a particular pattern. It does not know that the function the engineer just wrote duplicates one that already exists in another module. It cannot smell when an abstraction is being introduced one feature too early. Those are the calls that matter. Those are the calls that need the human.
+
+The process I run on client projects splits the responsibilities cleanly. The AI runs on PR open, comments on the surface layer, and either approves or flags. The human runs on AI approval, focuses on architecture and intent, and either approves or asks for changes. Two passes, each doing what they are good at. The team feels faster and better at the same time.
+
+## The process step by step
+
+**Step one. PR open.** Author pushes a branch and opens the PR. The CI runs lints, tests, and any deterministic checks first. Anything that fails at this layer blocks the PR before the AI runs.
+
+**Step two. AI review.** The AI tool runs against the diff. It leaves inline comments on style issues, missing tests, potential bugs, and security concerns. It posts a summary of what it found. The author has the chance to fix the obvious issues before a human looks at the PR.
+
+**Step three. Author responds.** The author addresses or dismisses each AI comment. Dismissals get a one line reason in the thread. The discipline of writing the reason filters out lazy dismissals.
+
+**Step four. Human review.** A senior engineer opens the PR, sees the AI summary, scans the resolved comments, and focuses attention on the architecture. The human leaves the high value comments. Approves or requests changes.
+
+**Step five. Merge.** Author handles the human comments, pushes again, the AI re reviews any changed lines, the human approves the final version. Merge.
+
+This process compresses the review cycle from one to three days to one half day on most teams I have rolled it out on. The engineers feel less interrupted because the AI catches the easy stuff at PR open, not in the middle of the senior's afternoon.
+
+## What it actually costs
+
+| Setup | Monthly cost | Notes |
+|---|---|---|
+| GitHub Copilot Business plus PR review | 19 dollars per engineer | Light integration, baseline coverage |
+| CodeRabbit Pro | 30 dollars per engineer | More detailed, slower to run |
+| Cursor for Teams plus PR review | 40 dollars per engineer | Strong JavaScript and TypeScript support |
+| Self hosted on a local model | 0 to 200 dollars total | Highest privacy, requires team to maintain it |
+
+These are 2026 published prices and what I see in client engagements. Most teams settle on one commercial tool and pay between twenty and fifty dollars per engineer per month. The ROI shows up in the senior engineer time freed for higher value work.
+
+## Features to demand from the tool
+
+- Inline comments on the diff, not summaries on a separate dashboard.
+- The ability to suppress low confidence suggestions globally.
+- Integration with your existing CI so the AI review is one of several checks, not a parallel process.
+- A way to add custom rules from a config file in the repo. Your codebase has conventions the AI does not know by default.
+- A summary message at the top of the PR so the human reviewer knows what the AI already covered.
+- A clear ownership line for comments. AI comments should be labeled, never disguised as human input.
+
+## Expert opinion
+
+> The teams that get value from AI code review treat it as a junior reviewer with very specific scope. The teams that get noise treat it as a senior reviewer with no scope. The difference is in the tuning. Spend a week pruning the rules, and the AI starts paying for itself by week three.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On one of my recent client engagements, the team had a stack of fifty open PRs that nobody had reviewed. We rolled out an AI review tool on a Wednesday afternoon. By Friday, every PR had a first pass of comments. By the following Wednesday, the human reviewers had cleared thirty of the fifty. The remaining twenty were the ones with real architectural questions. The AI did not solve those. It freed the humans to solve them.
+
+The opposite story is one I cleaned up earlier this year. A team had enabled an AI review tool and left every default on. Each PR collected forty to sixty AI comments, most of them noise. The engineers learned to ignore the comments entirely. When a real issue showed up in the noise, nobody noticed. We tuned the tool aggressively, dropped the comment volume by seventy percent, and the team started reading the comments again.
+
+For more on the broader rescue work I do on AI generated codebases, see [vibe coding rescue](/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt). For the related process question on testing AI output, [AI evals](/blog/ai-evals-how-to-test-your-ai-features-like-software) covers how to validate behavior.
+
+## Common mistakes teams make
+
+1. Treating AI review as a replacement for human review. It is a filter, not a substitute.
+2. Leaving every default rule enabled. The noise volume kills the signal.
+3. Hiding AI comments instead of suppressing them, which trains the team to ignore them.
+4. Letting the AI review the entire file instead of the diff. It produces unrelated comments that waste author time.
+5. Skipping the post merge review. AI catches things in PRs and misses things in larger architectural drift. The drift needs human pattern recognition.
+6. Not customizing the rules to the codebase conventions. The AI does not know your team standards out of the box.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Pick one AI review tool. Roll it out on one repo. Leave it on default settings. Watch the volume.
+2. **Week two.** Tune. Suppress style overlap with the linter. Hide low confidence comments. Limit to the diff.
+3. **Week three.** Train the team. Show them how to use the AI summary. Set the expectation that dismissals get a reason.
+4. **Week four.** Measure. Track average time to first useful comment, total comment volume, and percentage of comments acted on. Adjust.
+
+For deeper reading on the related AI integration patterns, see [the last twenty percent post on AI generated SaaS](/blog/the-last-20-percent-why-your-ai-generated-saas-fails-at-stripe-and-security) and [building production grade AI features without an ML team](/blog/building-production-grade-ai-features-without-an-ml-team).

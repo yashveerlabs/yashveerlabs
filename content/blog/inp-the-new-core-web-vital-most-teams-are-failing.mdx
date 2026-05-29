@@ -1,0 +1,62 @@
+---
+slug: "inp-the-new-core-web-vital-most-teams-are-failing"
+title: "INP: The New Core Web Vital Most Teams Are Failing"
+excerpt: "Interaction to Next Paint replaced First Input Delay in 2024 and it is harder to pass. Most teams have not caught up. Here is what INP measures, why it matters, and how to fix the common failure patterns."
+date: "2026-05-23"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 6
+ogImage: "/api/og/blog/inp-the-new-core-web-vital-most-teams-are-failing"
+status: "published"
+definition: "Interaction to Next Paint (INP) measures the latency between a user's interaction and the visual update that results from it. Unlike First Input Delay, which only measured the delay before the browser started processing the first input, INP measures the full interaction latency for all clicks, taps, and keypresses across the entire page session. A good INP is under 200 milliseconds. Poor is above 500 milliseconds."
+faq: [
+  {"q":"What replaced First Input Delay and why?","a":"INP replaced FID in March 2024. FID measured only the input delay of the first interaction, which meant it did not capture how sluggish a page felt after the initial load. INP measures interaction responsiveness throughout the session, which is a far better proxy for perceived performance. A page that passes FID can still feel slow to use, which is the problem INP was designed to catch."},
+  {"q":"What is the INP scoring threshold?","a":"Good is under 200 milliseconds. Needs improvement is 200 to 500 milliseconds. Poor is above 500 milliseconds. These thresholds are based on human perception research: interactions that complete within 200ms feel instantaneous, while interactions above 500ms feel noticeably sluggish. Most sites that were passing FID are finding their INP scores in the 'needs improvement' range."},
+  {"q":"Which interactions does INP measure?","a":"Click, tap, and keypress interactions. It does not measure hover, scroll, or drag. For each interaction, INP records three components: input delay (time from interaction to when the browser starts processing), processing time (time the event handlers take to run), and presentation delay (time from when handlers finish to when the browser paints the result). The total of these three is the interaction latency."},
+  {"q":"How do I find which interactions are hurting my INP score?","a":"Chrome DevTools Performance panel, the PerformanceObserver API with the event-timing entry type, and the Web Vitals library all surface interaction timing. The field data in Chrome User Experience Report (CrUX) and PageSpeed Insights shows your actual INP from real users in your region. Lab data from Lighthouse does not capture INP because it requires real interactions."},
+  {"q":"What causes high input delay in INP?","a":"Long tasks on the main thread that block the browser from processing user input. A JavaScript bundle that runs a 600ms parsing task after load means any interaction during that window has a 600ms input delay before the browser can respond. Breaking long tasks into smaller pieces with scheduler.yield() or setTimeout chunking is the primary fix for high input delay."}
+]
+---
+
+## What you need to know
+
+- INP replaced FID as a Core Web Vital in March 2024. Sites that passed FID are not automatically passing INP. The two metrics measure fundamentally different things.
+- INP measures interaction responsiveness throughout the full page session. A page can have good LCP and FID but terrible INP if the JavaScript makes the page sluggish to use after load.
+- The three components of INP are input delay, processing time, and presentation delay. Each has different root causes and different fixes.
+- Long main-thread tasks are the primary cause of high input delay. Breaking tasks with `scheduler.yield()` is the modern fix. Yielding every 50 milliseconds keeps tasks within the browser's long task threshold.
+- INP is measured from field data, not lab data. Lighthouse does not capture INP. Use CrUX data in PageSpeed Insights or the Web Vitals Chrome extension to see real user INP.
+
+## The core argument
+
+The reason most teams are failing INP is that the failure mode is invisible during development. A developer with a fast machine and no other tabs open will not notice a 400ms interaction delay because the main thread is rarely blocked during testing. Real users on mobile devices with backgrounded apps, slower CPUs, and a full JavaScript bundle running on top of each other experience a very different responsiveness profile. INP captures that real-user experience and translates it into a score, which is why so many sites that were passing FID are now failing INP.
+
+The most common INP failure pattern I see is large event handlers. A click handler that runs complex synchronous logic, updates multiple state variables, re-renders a large component tree, and queries the DOM is the pattern that produces INP scores of 400 to 800 milliseconds. The fix is to keep event handlers minimal: update the visual state immediately, then defer the heavy work. The user perceives a responsive interaction because the visual update happens within 200 milliseconds. The background work completes after, without blocking the next interaction. This pattern applies to search inputs, form submissions, dropdown menus, and any interaction that triggers significant JavaScript execution.
+
+The presentation delay component is less commonly discussed but significant on sites with complex render trees. After an event handler finishes, the browser needs to recalculate styles, perform layout, and paint the result. If the render tree is large or the CSS is complex, this phase can add 100 to 200 milliseconds to the interaction latency. Reducing render tree complexity, avoiding forced synchronous layouts, and using `content-visibility` to skip offscreen rendering all reduce presentation delay. The combination of a minimal event handler and a lean render path is the architecture that produces good INP at scale.
+
+## Common mistakes
+
+1. **Treating INP as an LCP problem.** LCP and INP are separate metrics with separate root causes. Optimizing resource loading improves LCP but does not help INP. INP is a JavaScript execution problem, not a network problem.
+
+2. **Not measuring INP from real user data.** Lighthouse lab scores do not include INP because it requires actual interaction. Use CrUX data in PageSpeed Insights, the Web Vitals library with analytics integration, or Chrome UX Report to get real INP values from production traffic.
+
+3. **Deferring third-party scripts but not auditing their event listener overhead.** Third-party scripts that attach global click listeners or intercept input events can add processing time to every interaction on the page. Audit third-party script event listener footprint separately from your own code.
+
+4. **Using `setTimeout(0)` instead of `scheduler.yield()` for task chunking.** `setTimeout(0)` yields to the event loop but does not prioritize user input. `scheduler.yield()` explicitly gives the browser a chance to respond to pending user interactions before continuing the deferred work. Use `scheduler.yield()` for any chunked work that runs during or after user interaction.
+
+5. **Not testing on mid-range mobile hardware.** INP failures are often invisible on developer machines. Test on an actual mid-range Android device or use Chrome DevTools CPU throttling at 4x to simulate the execution environment where most real users experience your product.
+
+## Where to start
+
+1. **Get your current INP score from real data.** Open PageSpeed Insights for your highest-traffic page and look for the INP score in the field data section. If it is in the "needs improvement" range (200 to 500ms), you have actionable work to do.
+
+2. **Profile your highest-traffic interactions with Chrome DevTools.** Open the Performance panel, record a session while clicking through the key interactions, and look for long tasks and large event handler execution times. The flame chart makes the bottlenecks visible.
+
+3. **Break up the largest event handlers.** Take the handler with the most JavaScript execution time and separate the immediate visual update from the deferred work. Use `scheduler.yield()` after the immediate update and before the heavy logic. Measure the interaction time before and after.
+
+## Related reading
+
+- [Largest Contentful Paint: The Metric That Changes Conversions](/blog/largest-contentful-paint-the-metric-that-changes-conversions)
+- [Frontend Performance Budgets: A Pattern That Sticks](/blog/frontend-performance-budgets-a-pattern-that-sticks)
+- [Image Optimization at Scale: AVIF, WebP, Responsive Images](/blog/image-optimization-at-scale-avif-webp-responsive-images)
+- [The Real Numbers Behind a Fast Web App in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026)

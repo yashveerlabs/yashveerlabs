@@ -1,0 +1,62 @@
+---
+slug: "real-user-monitoring-vs-synthetic-monitoring-both-not-either"
+title: "Real User Monitoring vs Synthetic Monitoring: Both, Not Either"
+excerpt: "Real user monitoring and synthetic monitoring answer different questions about application performance. Choosing one over the other leaves performance blind spots. Here is how to use both together."
+date: "2026-05-23"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 6
+ogImage: "/api/og/blog/real-user-monitoring-vs-synthetic-monitoring-both-not-either"
+status: "published"
+definition: "Real User Monitoring (RUM) collects performance data from actual users as they use the application in their real browsers, networks, and devices. Synthetic monitoring simulates user interactions from fixed locations using scripted tests that run on a schedule. RUM shows what real users actually experience, including performance on slow networks, old devices, and geographically distant locations. Synthetic monitoring provides consistent, repeatable baseline measurements for catching regressions before they reach users."
+faq: [
+  {"q":"What metrics does real user monitoring collect?","a":"RUM collects Core Web Vitals (LCP, FID/INP, CLS), Time to First Byte, First Contentful Paint, total page load time, and JavaScript errors from real user sessions. Crucially, RUM captures the distribution of these metrics across the actual user population: p50, p75, p95, and p99 values show the range of user experiences. A page with good median performance but poor p95 performance has users experiencing slow loads that synthetic tests (which run from ideal conditions) would never catch."},
+  {"q":"What does synthetic monitoring provide that real user monitoring cannot?","a":"Synthetic monitoring runs tests on a fixed schedule from controlled environments, producing consistent baselines that make regressions detectable immediately. A synthetic test that runs every 5 minutes from a Frankfurt data center will catch a performance regression introduced by a deployment within 5 minutes, regardless of whether real users from Frankfurt have visited since the deployment. RUM can only detect regressions as fast as real users visit the affected pages, which for low-traffic pages may be hours or days. Synthetic monitoring also enables pre-production performance testing in CI/CD pipelines."},
+  {"q":"Which tools provide real user monitoring?","a":"Google Analytics 4 collects Core Web Vitals as part of standard web analytics. Vercel Analytics provides RUM for Next.js applications with per-page Web Vitals breakdowns. DataDog RUM, New Relic Browser, and Sentry Performance provide detailed RUM with session replay, error correlation, and user journey analysis. The web-vitals JavaScript library allows sending performance data to any analytics backend. The choice depends on the existing observability stack and whether session replay (recording user sessions for debugging) is valuable."},
+  {"q":"How do you use synthetic monitoring in a CI/CD pipeline?","a":"Lighthouse CI is the standard tool for running automated Lighthouse performance audits in CI pipelines. Configure performance budgets (LCP under 2.5s, CLS under 0.1) and fail the pipeline if a deployment exceeds them. WebPageTest provides a more detailed synthetic testing API with filmstrip views and waterfall analysis. The workflow: after each deployment to staging, run the synthetic performance test suite, compare against the baseline from the last deployment, and block production promotion if performance regresses beyond the defined threshold."},
+  {"q":"What is session replay and when is it useful?","a":"Session replay records the user's interactions (mouse movements, clicks, scrolls, form inputs) and renders them as a video-like playback alongside performance data and errors. Session replay is useful for diagnosing performance problems that RUM identifies: if RUM shows that p95 LCP is high on the checkout page, session replays filtered to sessions with high LCP on checkout show exactly what those users experienced. It bridges the gap between knowing a performance problem exists and understanding what the user encounters when it happens."}
+]
+---
+
+## What you need to know
+
+- RUM shows what real users actually experience. Synthetic monitoring shows consistent baseline performance from controlled conditions. Both are necessary.
+- Synthetic monitoring catches regressions immediately after deployment. RUM catches them after real users are affected. Use synthetic in the deployment pipeline.
+- Core Web Vitals from RUM reflect actual Google Search ranking signals. The p75 values Google uses for ranking come from field data, not synthetic tests.
+- Slow p95 and p99 RUM values are worth investigating even if the median is good. The users in the tail are not statistical noise.
+- Session replay connected to performance data is the fastest way to understand what users experience during slow page loads.
+
+## The core argument
+
+The common pattern is teams choosing one monitoring approach and treating it as complete. Teams with synthetic monitoring know their p95 LCP from a fast London server and have no idea what their users in India on 4G see. Teams with only RUM cannot answer "did our performance regress after today's deployment?" without waiting for enough real traffic to accumulate statistical significance.
+
+The two approaches are complementary because they answer different questions. Synthetic monitoring answers: "Is performance above a minimum threshold right now?" This is the regression detection question. RUM answers: "What do our actual users experience?" This is the user impact question. Neither answer is available without both tools.
+
+The practical implementation is: synthetic monitoring in the CI/CD pipeline that runs against staging and blocks production deployments that regress performance. RUM in production that captures real user experience data and alerts when field metrics degrade below the target threshold. Synthetic catches regressions before they reach users. RUM measures the actual user experience impact of the changes that did ship. On Prominence Football Academy's web platform, adding Lighthouse CI to the deployment pipeline caught a 3x LCP regression introduced by a large unoptimized image before it reached any users. The RUM data the same week confirmed that the images that did make it to production were loading well for real users on mobile connections.
+
+## Common mistakes
+
+1. **Using only synthetic monitoring and assuming it reflects real user experience.** Synthetic tests run from high-speed data center connections on latest-generation hardware. Real users are on mobile devices with 4G connections in geographically diverse locations. A page that scores 90 on Lighthouse on a desktop from a US server may score 60 for a user on a mid-range Android phone in Southeast Asia. RUM reveals this gap; synthetic cannot.
+
+2. **Tracking only median performance and ignoring the distribution tail.** If p50 LCP is 1.5s but p95 LCP is 8s, 5% of users experience an 8-second load. For a site with 100,000 monthly visitors, that is 5,000 users seeing an unacceptably slow page. Google's Core Web Vitals ranking uses the p75 value, not the median. The tail matters.
+
+3. **Not correlating performance metrics with business outcomes.** Performance data is only actionable when connected to what it means for the business. A 500ms LCP improvement is meaningful if it correlates with a conversion rate increase. Track performance metrics alongside the business metrics they affect: bounce rate by LCP bucket, checkout completion rate by page load time percentile.
+
+4. **Running Lighthouse only on the home page.** The home page typically has the most performance attention and is not representative of the experience on product detail pages, dashboards, or checkout flows. Run synthetic monitoring on a representative set of pages including the most business-critical flows.
+
+5. **Setting performance budgets that are never enforced.** A performance budget that generates a warning in the CI output but never blocks a deployment will be ignored after a few weeks. Performance budgets must be enforced: deployment fails when the budget is exceeded. This creates the pressure to fix the regression rather than ship over it.
+
+## Where to start
+
+1. **Install the web-vitals library and send data to an analytics endpoint.** The web-vitals library measures LCP, FID/INP, CLS, TTFB, and FCP and fires a callback with the values. Connect this to an existing analytics tool (Google Analytics 4, Vercel Analytics, a custom endpoint) to start collecting field data. This is a one-time 15-minute setup that provides ongoing RUM.
+
+2. **Add Lighthouse CI to the deployment pipeline.** Install the @lhci/cli package, configure it to run against the staging deployment after each push, and set performance score thresholds (LCP under 2.5s, CLS under 0.1) that fail the check. Start with thresholds slightly below the current baseline to establish the enforcement habit before tightening the budget.
+
+3. **Review RUM data weekly and identify the pages with the largest distribution spread.** Pages where p50 is good but p95 is poor have specific user segments with a bad experience. Investigate those pages with device and connection type segmentation to understand which users are in the slow tail.
+
+## Related reading
+
+- [Performance as a Feature: A Founder's Case](/blog/performance-as-a-feature-a-founders-case)
+- [Profiling Production: How to Do It Without Causing Incidents](/blog/profiling-production-how-to-do-it-without-causing-incidents)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Memory Leaks in Long-Lived Web Apps](/blog/memory-leaks-in-long-lived-web-apps)

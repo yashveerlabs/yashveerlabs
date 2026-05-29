@@ -1,0 +1,137 @@
+---
+slug: "the-slow-query-log-a-discipline-every-saas-team-should-practice"
+title: "The Slow Query Log: A Discipline Every SaaS Team Should Practice"
+excerpt: "Most SaaS teams discover slow queries when a customer complains. The slow query log is the discipline that finds them first. Here is how to enable it, read it, and act on what it tells you."
+date: "2025-07-05"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice"
+status: "published"
+definition: "The slow query log is a database-level feature that records every query exceeding a configured threshold, typically 100 to 500 milliseconds. I treat it as a standing discipline, not a firefighting tool. Reviewed weekly, it surfaces the queries that will degrade under load before users see the effect. Teams that skip this step discover the same queries in production under pressure."
+faq: [
+  {"q":"How do I enable the slow query log in PostgreSQL without restarting the server?","a":"Set log_min_duration_statement in postgresql.conf and reload with pg_reload_conf(). In most managed databases like RDS or Cloud SQL, you can change this parameter in the console without a restart. A threshold of 200 milliseconds catches most problem queries without flooding the log."},
+  {"q":"What is a reasonable slow query threshold for a SaaS application?","a":"Start at 500 milliseconds to see only serious offenders. Once you have cleared those, drop to 200 milliseconds. For critical endpoints like authentication, 100 milliseconds is appropriate. The threshold is not a performance target. It is a filter for what to investigate first."},
+  {"q":"How often should a SaaS team review the slow query log?","a":"Weekly at minimum. The best teams build a dashboard that surfaces the top ten slowest queries by total time, not just by individual execution time. A query that runs in 300 milliseconds but executes 50,000 times a day costs more than a 10 second query that runs once a week."},
+  {"q":"What is the difference between slow query log and EXPLAIN ANALYZE in PostgreSQL?","a":"The slow query log tells you which queries are slow and how often. EXPLAIN ANALYZE tells you why a specific query is slow by showing the query plan, execution costs, and actual row counts. You use the slow query log to find candidates, then EXPLAIN ANALYZE to diagnose them."},
+  {"q":"Can enabling the slow query log cause performance issues in production?","a":"At a high threshold it is negligible. At very low thresholds, logging every query introduces I/O overhead. The practical floor for production is around 50 to 100 milliseconds. Below that, consider using pg_stat_statements instead, which aggregates statistics without writing every slow query to disk."},
+  {"q":"What is pg_stat_statements and how does it relate to the slow query log?","a":"pg_stat_statements is a PostgreSQL extension that tracks aggregate execution statistics for every query. It shows total calls, total time, mean time, and row counts. It complements the slow query log because it catches queries that are individually fast but collectively expensive. Both should be active in production."},
+  {"q":"How do I prioritize which slow queries to fix first in a growing SaaS?","a":"Sort by total time, not max time. Total time equals mean execution time multiplied by call count. A query that runs in 300 milliseconds 10,000 times a day has a total time of 50 minutes. That almost always outweighs a query that ran once in 8 seconds. Fix the highest total time first."}
+]
+---
+
+## What you actually need to know
+
+- The slow query log is a first class production tool, not a debugging afterthought.
+- PostgreSQL and MySQL both support it natively. Enabling it takes five minutes.
+- Sort findings by total time, not individual execution time. Frequency matters as much as duration.
+- pg_stat_statements gives aggregate data across all queries. The slow query log gives the raw statements. Use both.
+- A weekly review cadence turns the log from a reactive tool into a proactive one.
+
+| Approach | What it captures | When to use it |
+|---|---|---|
+| Slow query log | Queries exceeding a time threshold, with full SQL | Finding individual bad queries |
+| pg_stat_statements | Aggregate stats for all queries: calls, total time, mean | Finding high-frequency, moderate-cost queries |
+| EXPLAIN ANALYZE | Execution plan and actual cost for one query | Diagnosing why a specific query is slow |
+| APM traces | Query time embedded in request traces | Correlating slow queries to slow endpoints |
+
+## The core argument
+
+Most SaaS teams find slow queries the same way: a customer complains, someone looks at the database, and a missing index turns up. The problem is fixed. The incident is closed. Three months later, a different query causes the same pattern. This is not a performance strategy. It is reactive maintenance on an infinite loop.
+
+The slow query log breaks that loop. It runs continuously in the background and writes to a log file every time a query exceeds your threshold. You check it weekly. You sort by total time. You fix the top three. Then you check again next week. The compounding effect is significant. A team that runs this discipline for a year rarely has database performance incidents.
+
+The other thing the slow query log does is reveal query shapes that your ORM hides from you. When you write a LINQ query or an ActiveRecord scope, you do not see the SQL. The ORM generates it. Sometimes the generated SQL is fine. Sometimes it does a full table scan on a two million row table because a column is not indexed. The slow query log shows you the actual SQL, not the abstraction.
+
+Frequency matters as much as duration. A query that takes 300 milliseconds and runs 20,000 times a day is costing you 100 minutes of database time daily. That is the query that degrades under load. The slow query log with a low threshold misses it unless you also look at call counts. This is why pg_stat_statements is the better primary tool for production. The slow query log catches the obvious disasters. pg_stat_statements catches the slow bleed.
+
+## How to read the slow query log
+
+### PostgreSQL setup
+
+The minimum configuration in postgresql.conf:
+
+```
+log_min_duration_statement = 200
+log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+```
+
+Reload without restart: `SELECT pg_reload_conf();`
+
+On managed databases, set `log_min_duration_statement` in the parameter group and check the database logs section in your cloud console.
+
+### What a useful log entry looks like
+
+```
+2025-07-05 14:22:11 UTC [12345]: user=app,db=production LOG:
+duration: 847.221 ms  statement: SELECT * FROM events
+WHERE account_id = $1 AND created_at > $2
+ORDER BY created_at DESC;
+```
+
+Three things to note here. The query is returning all columns with `SELECT *`. The filter on created_at suggests a range scan. The account_id filter is probably selective, but if there is no composite index on (account_id, created_at), the database is filtering on account_id first, then scanning all matching rows to apply the created_at filter.
+
+### What pg_stat_statements shows
+
+```sql
+SELECT query, calls, total_exec_time, mean_exec_time, rows
+FROM pg_stat_statements
+ORDER BY total_exec_time DESC
+LIMIT 10;
+```
+
+This gives you the top ten queries by total database time across the entire observation window. Reset it weekly with `SELECT pg_stat_statements_reset();` to keep the window relevant.
+
+## What it actually costs to set up
+
+| Setup | Engineering effort | Ongoing maintenance |
+|---|---|---|
+| Enable slow query log + pg_stat_statements | 1 hour | 30 minutes weekly |
+| Build a Grafana dashboard from pg_stat_statements | Half day | None after setup |
+| Integrate slow query data into APM tool (Datadog, Sentry) | 1 to 2 days | None after setup |
+| Set up automated alerting on query regression | 1 day | Quarterly threshold review |
+
+The ROI case is straightforward. A single slow query that causes five percent slower page loads for your top ten customers costs more in churn risk than a year of weekly slow query reviews.
+
+## What to look for in the log
+
+- Queries without indexed predicates. Look for sequential scans on large tables in EXPLAIN output.
+- SELECT * on tables with many columns. Fetching unused columns adds serialization time and increases memory pressure.
+- Queries with ORDER BY and LIMIT that are not using index-ordered scans.
+- N+1 patterns: the same query structure executing hundreds of times in a short window.
+- Queries with implicit type casts. WHERE user_id = '12345' on an integer column defeats the index.
+- Missing composite indexes. A query filtering on (account_id, status) needs both columns indexed together.
+
+## Expert opinion
+
+> The slow query log is the cheapest performance tool available. It requires one configuration change and costs nothing to run. The teams that do not use it are the teams that spend weekends firefighting database incidents that were telegraphed weeks in advance. I have never seen a team regret turning it on. I have seen many teams regret that they waited until something broke.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client had a support queue full of complaints about slow list views. The API was returning data, but some customers waited three to five seconds for pages that should load in under a second. The team had no slow query log enabled and no visibility into what the database was doing.
+
+We enabled pg_stat_statements and reviewed the first week's data. The top query by total time was a listing query that joined three tables and applied four filters. It ran 40,000 times a day at a mean execution time of 280 milliseconds. Total daily database cost: nearly two hours of compute. Adding a composite index on the two most selective filter columns dropped the mean to 18 milliseconds. The list views became instant.
+
+The second thing we found was a classic N+1. The application was loading a list of projects, then querying for the owner of each project in a separate database call. For a customer with 200 projects, that was 201 queries per page load. Rewriting to a JOIN reduced those 201 queries to one. The combination of these two fixes, found in a single weekly review, eliminated the support tickets entirely. For the deeper dive on the technical pattern behind that degradation, see [why your app got slower after you added users](/blog/why-your-app-got-slower-after-you-added-users) and [database query performance the five patterns that hurt the most](/blog/database-query-performance-the-five-patterns-that-hurt-the-most).
+
+## Common mistakes
+
+1. Setting the threshold too high and missing the majority of problem queries. Start at 500 milliseconds, then drop to 200 after clearing the obvious issues.
+2. Sorting by maximum duration instead of total time. The occasional eight-second query matters less than the 300 millisecond query that runs all day.
+3. Not enabling pg_stat_statements. The slow query log misses fast-but-frequent queries entirely without it.
+4. Running EXPLAIN without ANALYZE. EXPLAIN shows the planner's estimate. EXPLAIN ANALYZE shows what actually happened. The estimates and reality diverge on stale statistics.
+5. Fixing the query without fixing the data model. Adding an index on a poorly designed schema buys time but does not solve the underlying problem.
+6. Not resetting pg_stat_statements periodically. Stale data from three months ago obscures what is slow today.
+7. Ignoring queries from background jobs. Batch jobs that run at night still consume database resources and can block other operations through lock contention.
+
+## A 30 day plan to make this a standing discipline
+
+1. **Day one.** Enable log_min_duration_statement at 500 milliseconds and pg_stat_statements. Confirm both are writing data.
+2. **Days two to seven.** Review the first week's slow query log. List the top ten by total time from pg_stat_statements. Pick the worst three.
+3. **Week two.** Diagnose the top three with EXPLAIN ANALYZE. Add indexes, rewrite queries, or batch N+1 patterns as appropriate. Measure the improvement.
+4. **Week three.** Drop the slow query threshold to 200 milliseconds. Review again. The second pass usually surfaces a different class of query.
+5. **Week four.** Build a dashboard or add a recurring calendar item for weekly reviews. Treat a breach of the top ten as a task, not a crisis.
+
+For the broader performance context, [backend performance budgets how to set them](/blog/backend-performance-budgets-how-to-set-them) explains how to connect slow query data to endpoint-level latency targets, and [API response times how to track what matters](/blog/api-response-times-how-to-track-what-matters) shows how database time maps to the p95 and p99 numbers your customers actually feel.

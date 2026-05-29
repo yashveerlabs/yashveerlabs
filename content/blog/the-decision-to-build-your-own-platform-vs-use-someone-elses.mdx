@@ -1,0 +1,94 @@
+---
+slug: "the-decision-to-build-your-own-platform-vs-use-someone-elses"
+title: "The Decision to Build Your Own Platform vs Use Someone Else's"
+excerpt: "When building a custom platform is a competitive advantage and when it is a distraction from the product that actually matters."
+date: "2025-10-09"
+category: "Founder Decision Frameworks"
+tags: ["founders","platform","build-vs-buy","architecture","decision-frameworks"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-decision-to-build-your-own-platform-vs-use-someone-elses"
+status: "published"
+definition: "The build vs use decision applies to every layer of infrastructure a SaaS company depends on: authentication, payments, email delivery, feature flags, analytics, queuing, storage. Building your own version of any of these is a choice to take on maintenance burden and opportunity cost in exchange for customization control. Using someone else's is a choice to trade control for speed and simplicity."
+faq: [
+  {"q":"What should I almost always buy rather than build?","a":"Authentication (use Auth0, Clerk, or Supabase Auth), payments (use Stripe), email delivery (use Resend or Postmark), and monitoring (use Sentry, Datadog). These are solved problems with well-maintained solutions. Building them is almost always slower and worse than using the existing tools."},
+  {"q":"What makes sense to build rather than buy?","a":"The core product logic that differentiates you from competitors. If the thing you are building is the reason customers pay you, own it. Everything else is infrastructure and should be purchased. The question is: is this the thing that makes us different, or is this the scaffolding that holds the thing together?"},
+  {"q":"What is the real cost of building your own infrastructure?","a":"Engineering time, ongoing maintenance, debugging novel problems, and the opportunity cost of not building the product. Building your own authentication system takes 3 to 6 months of engineering time. Auth0 costs $200 per month. The cost is not the subscription. The cost is the months of opportunity cost."},
+  {"q":"When does building your own become the right call?","a":"When the vendor's pricing becomes prohibitive at scale, when a regulatory requirement prevents using a third-party vendor, when the vendor's capabilities are genuinely insufficient for your use case, or when the component is so central to your product that owning it is a strategic necessity."},
+  {"q":"How do I make the build vs buy decision systematically?","a":"Ask three questions: Does this component differentiate us from competitors? Is the vendor solution genuinely insufficient for our needs? Can we maintain a custom solution without it becoming a distraction? If all three answers are yes, build. Otherwise, buy."}
+]
+---
+
+## What you actually need to know
+
+- The default should be to buy. Building is justified only when the component is your core differentiator, the vendor cannot meet your needs, or you can sustain the maintenance without distraction.
+- Authentication, payments, email delivery, and monitoring are almost always better purchased than built.
+- The real cost of building is not the initial development. It is the years of maintenance, the on-call burden, and the opportunity cost of engineers not building the product.
+- Vendor pricing rarely justifies a rebuild until you are at a significant scale. Most founders overestimate how soon they will hit pricing limits.
+- Starting with a vendor and migrating later is almost always cheaper than building early and maintaining forever.
+
+| Component | Default Choice | Build When |
+|---|---|---|
+| Authentication | Buy (Clerk, Auth0, Supabase) | Regulatory requirement prevents vendor use |
+| Payments | Buy (Stripe) | Processing volume makes Stripe cost prohibitive |
+| Email delivery | Buy (Resend, Postmark) | Volume makes per-email pricing prohibitive |
+| Feature flags | Buy (LaunchDarkly, PostHog) | Flag logic is unusually complex |
+| Analytics | Buy (PostHog, Mixpanel) | Proprietary data model requires custom solution |
+| Queue/jobs | Build or buy (BullMQ, Inngest) | Depends on complexity and volume |
+| Core product logic | Build | Always. This is the point of the company. |
+
+## The core argument
+
+Founders who build their own infrastructure components before building their product are solving the wrong problem first. A custom authentication system built by a two-person startup will always be less secure, less maintained, and less reliable than Auth0 or Clerk. A custom payment system will always have more edge cases and compliance risk than Stripe. The engineering hours spent building these systems are hours not spent on the product that customers will pay for.
+
+The bias toward building comes from two places. The first is technical pride. Engineers like to build things. Building your own Redis is more interesting than configuring Redis. But interesting is not the standard. Effective is. The second is a fear of dependency. Using a vendor creates a risk that the vendor raises prices or shuts down. But this risk is almost always lower than the risk of maintaining a custom solution that no one outside your team understands.
+
+The frame I use: every engineering hour is a finite resource. The question is not "can we build this?" but "is this the highest-value use of our engineering hours this quarter?" Almost always, the highest-value use is building the thing customers pay for. The authentication system, the email delivery, the payment processing are scaffolding. They hold the product up. They are not the product.
+
+## The exceptions that justify building
+
+The exceptions are real, and they matter. There are components where building is the right choice.
+
+**When the component is the product.** If you are building a developer tools company and your product is a better queue system, you should build the queue system. The queue is the product. The exception is when you are building something adjacent to many customers' needs, not just your own.
+
+**When vendor pricing breaks the unit economics.** Stripe's 2.9 percent plus $0.30 per transaction makes sense at low volume. At very high volume (hundreds of millions in GMV), the math changes. At that scale, building a custom payment stack with direct processor relationships becomes economically rational. But this scale is much higher than most founders think.
+
+**When regulatory requirements block vendor use.** In specific highly regulated industries (defense, certain government verticals, healthcare with specific data requirements), regulatory constraints sometimes prevent using cloud vendors. In those cases, building is not a choice, it is a requirement.
+
+**When the vendor genuinely cannot do what you need.** This is rarer than founders think, because most vendors are well-maintained and have extensive customization options. But it happens. If after thorough evaluation the vendor cannot meet the requirement, building is justified.
+
+## How to evaluate a vendor before deciding to build
+
+Before starting a custom build, evaluate the vendor option thoroughly. Specifically:
+
+Read the vendor's documentation for the features you need. Can it be configured to work? Can it be extended with their API or webhooks? Many founders rule out vendors after reading the overview, not after reading the integration documentation.
+
+Calculate the vendor cost at your projected scale three years out. Vendor pricing that is $200 per month today might be $2,000 per month at scale. Is $2,000 per month prohibitive, or is it 2 percent of revenue at that scale? Most of the time, the percentage makes the cost acceptable.
+
+Find companies that are using the vendor at the scale you are targeting and ask about their experience. Other founders are usually willing to share honestly. This is the most reliable data about whether the vendor can handle your scale.
+
+## Common mistakes founders make on this decision
+
+1. Building infrastructure before there are customers. The most common form of premature platform building. There are no customers, but there is a custom authentication system.
+2. Underestimating the maintenance cost of a custom solution. Every component you build, you own forever. Bugs, security patches, API changes from services you depend on, scaling issues.
+3. Not considering the vendor at all because a senior engineer wanted to build it. The desire to build something technically interesting is not a valid business reason. Require a proper evaluation before approving a custom build.
+4. Building a custom solution that is architecturally inferior to the vendor option. This happens more often than founders admit. The vendor has been maintained by a team dedicated to that one problem. Your custom version will almost certainly have edge cases the vendor has already solved.
+5. Not planning for the migration when the custom solution eventually fails. Every custom solution reaches a point where it needs to be replaced. The migration from a custom component to a vendor is often harder than the original build. Plan for it from day one.
+
+## Where to start: a 3-step build vs use evaluation
+
+**Step 1: Classify the component.** Is this core product logic (always build) or infrastructure scaffolding (default to buy)? If you cannot answer this clearly, the component is probably scaffolding.
+
+**Step 2: Evaluate the best vendor option seriously.** Spend one day reading the documentation, calculating the cost at your projected scale, and finding a reference customer at that scale. This is not an afternoon Google search. It is a deliberate evaluation.
+
+**Step 3: If the vendor does not pass, document why.** Write one paragraph explaining why the vendor option is insufficient. This documentation serves two purposes: it forces the decision to be explicit rather than assumed, and it provides context for the person who will maintain the custom solution in two years.
+
+## What I Do on This Question Every Day
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. This decision comes up in every project I take on. Should we use a library or build a custom implementation? Should we use a vendor or write it ourselves? I have made this call many times in both directions. The framework in this post is the one I apply. The projects on the homepage are built with deliberate choices on this question. If you want to think through it for a specific component in your stack, the contact page is the place.
+
+## Related reading
+
+- [The Database You Did Not Think You Needed](/blog/the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse)
+- [The Decision to Build a Second Product](/blog/the-decision-to-build-a-second-product)
+- [The API Versioning Strategy That Survives Real-World Use](/blog/the-api-versioning-strategy-that-survives-real-world-use)
+- [Zapier vs Make vs n8n vs Custom in 2026](/blog/zapier-vs-make-vs-n8n-vs-custom-in-2026)

@@ -1,0 +1,146 @@
+---
+slug: "the-technical-due-diligence-checklist-for-investors"
+title: "The Technical Due Diligence Checklist for Investors"
+excerpt: "Technical due diligence surfaces the engineering risks that financial models miss. The checklist that follows is the one I use on real deals, written plainly so founders and investors can use it without translation."
+date: "2026-01-13"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","roadmaps"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-technical-due-diligence-checklist-for-investors"
+status: "published"
+definition: "Technical due diligence is the structured evaluation of a company's engineering assets, architecture decisions, team composition, and technical debt before an investment closes. The process identifies risks that financial models cannot capture: codebases that cannot scale, teams that will leave, dependencies that create single points of failure. Founders who prepare for it honestly close faster. Investors who skip it pay for the risks they did not see."
+faq: [
+  {"q":"What is technical due diligence and why do investors require it?","a":"Technical due diligence is a structured review of the engineering assets and risks behind a company before investment. Investors require it because financial models cannot capture codebase quality, architectural fragility, or team concentration risk. A product that looks healthy on a revenue dashboard can have a six-month rewrite hiding underneath it."},
+  {"q":"How long does a technical due diligence process typically take?","a":"For a seed or Series A deal, a focused technical review takes three to five days of a senior engineer's time. For later stage deals with more complex systems, two to three weeks is common. The timeline depends on codebase size, documentation quality, and how prepared the founders are with their materials."},
+  {"q":"What are the most common red flags in technical due diligence?","a":"Single-engineer concentration risk, where one person holds all critical system knowledge. No test coverage on the core business logic. Architectural decisions that will require a full rewrite to scale. Unresolved security vulnerabilities. Undocumented external dependencies. Any of these can delay or kill a deal."},
+  {"q":"Should founders prepare for technical due diligence in advance?","a":"Yes, and the preparation itself is valuable regardless of fundraising. Clean architecture documentation, a current dependency inventory, honest technical debt documentation, and a security posture summary all make the process faster. Investors read preparation as a signal of engineering maturity."},
+  {"q":"What documentation should a founder have ready for technical due diligence?","a":"A system architecture diagram. A dependency inventory with security status. A summary of known technical debt and the plan to address it. Team tenure and coverage documentation. Key architectural decisions with the rationale behind them. Most founders do not have all of this. The ones who do stand out."},
+  {"q":"How does technical due diligence differ between early stage and growth stage companies?","a":"At early stage, the reviewer accepts that the codebase is imperfect and focuses on the team's ability to address problems and the core architectural decisions. At growth stage, the focus shifts to scalability, compliance posture, team depth, and whether the current architecture can support the next three years of growth without a major rewrite."},
+  {"q":"What technical debt level is acceptable to investors during due diligence?","a":"Technical debt is expected. Zero technical debt is a red flag in a startup, since it usually means nothing was built. What investors assess is whether the team knows where the debt is, has a realistic plan to address it, and is not in denial about the cost. Honest debt documentation is more reassuring than claimed perfection."}
+]
+---
+
+## What you actually need to know
+
+- Technical due diligence surfaces engineering risks that financial models miss.
+- The three areas that kill deals most often are team concentration risk, architectural fragility, and undisclosed security vulnerabilities.
+- Founders who prepare honest documentation close faster and at better terms.
+- The process typically takes three to five days at early stage and two to three weeks at growth stage.
+- Technical debt is not disqualifying. Denial about it is.
+
+| Review area | What investors are actually looking for | Common gap |
+|---|---|---|
+| Architecture | Can this scale? Will it need a rewrite? | No documentation of key decisions |
+| Team | Who holds critical knowledge? Who might leave? | Single-engineer concentration |
+| Security | Known vulnerabilities? Compliance posture? | Unresolved CVEs, no access controls |
+| Code quality | Test coverage, maintainability, documentation | Zero coverage on core business logic |
+| Dependencies | External services, licensing, lock-in risk | Undocumented or outdated dependencies |
+| Technical debt | Known debt, severity, remediation plan | Denial or no inventory |
+
+## The core argument
+
+Technical due diligence is one of those processes that founders dread and investors often shortcut. Both are mistakes. The founders who dread it have not done the preparation work and discover during the process that they have documentation gaps they should have closed months earlier. The investors who shortcut it write a check based on a product demo and discover the architecture risk in the post-close technical review.
+
+The function of technical due diligence is to identify the engineering risks that do not appear in a financial model. A company with strong revenue growth and a system that will require a six-month rewrite to scale to the next tier of customers is a different investment than the revenue alone suggests. A company where one engineer holds the architecture of the entire system in their head represents a key-person risk that the org chart does not show.
+
+Neither risk is necessarily disqualifying. What matters is whether the team knows the risk exists, has a plan to address it, and can explain it honestly. The founder who walks into technical due diligence with a documented technical debt inventory and a credible remediation plan is in a stronger position than the founder who claims the codebase is pristine. Every experienced investor knows the pristine codebase is fiction.
+
+The preparation also has value independent of fundraising. Teams that document their architecture, audit their dependencies, and maintain an honest technical debt ledger make better engineering decisions. The discipline of preparing for due diligence is the discipline of running a clean engineering operation.
+
+## The checklist by area
+
+### Architecture review
+
+The reviewer is looking for whether the current architecture can support the next three years of growth without a full rewrite, and whether the key architectural decisions were made deliberately or by accident.
+
+- System architecture diagram, current and not aspirational.
+- Key architectural decisions with the rationale behind them.
+- Scalability bottlenecks and the plan to address them.
+- Single points of failure in the infrastructure.
+- Data model documentation.
+
+### Team review
+
+Concentration risk is the area that most founders underestimate. If one person leaves and the system becomes unmaintainable, that is a deal risk.
+
+- Org chart with tenure by engineer.
+- Who holds critical knowledge? Is it documented?
+- Hiring plan and current open roles.
+- Any known departures or team instability.
+
+### Security review
+
+Security gaps that were not disclosed before a deal are worse than the gaps themselves. The reviewer will find them.
+
+- Penetration test results, if any.
+- Known open vulnerabilities and remediation status.
+- Access control model. Who has production access?
+- Data handling practices and compliance posture.
+- Incident history.
+
+### Code quality review
+
+A sample code review across the core product surfaces maintainability, test coverage, and documentation quality.
+
+- Test coverage, especially on core business logic.
+- Code review practices.
+- Documentation quality.
+- Dependency currency and licensing.
+
+## How long does it take
+
+| Stage | Scope of review | Typical timeline |
+|---|---|---|
+| Pre-seed or seed | Architecture and team only | One to two days |
+| Series A | Full checklist, senior reviewer | Three to five days |
+| Series B | Full checklist, team of reviewers | One to two weeks |
+| Growth or late stage | Deep architecture and compliance | Two to four weeks |
+| M and A | Comprehensive including data and IP | Four to eight weeks |
+
+## Features the process must have
+
+- An independent reviewer with no stake in the outcome.
+- Access to the codebase, the infrastructure, and the team.
+- Structured findings, not an informal conversation.
+- A severity rating for each finding.
+- A remediation plan discussion before the report is final.
+- Founder participation in the review rather than defensive posture.
+- Clear separation of deal-breaking risks from routine technical debt.
+
+## Expert opinion
+
+> The technical due diligence processes that work well are the ones where the founder is prepared and candid. The reviewer is not trying to find a reason to kill the deal. They are trying to understand what they are buying. The founders who treat the process as an adversarial exam lose deals they should not have lost. The founders who walk in with honest documentation, known debt acknowledged, and a clear architectural story make the reviewer's job easier and close faster.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A Series A company was three weeks from closing a round when the lead investor's technical reviewer came in. The founder had not prepared materials. The architecture was undocumented. The security review surfaced two known vulnerabilities that had been logged and not addressed. The technical reviewer flagged concentration risk on the lead engineer.
+
+The deal did not die. But it paused for six weeks while the team produced documentation, remediated the vulnerabilities, and documented the key system knowledge. The round closed at a lower valuation than the term sheet had offered before the pause.
+
+The preparation work the team did in those six weeks was work they should have been doing anyway. The cost was not the six weeks. It was the six weeks at the worst possible time, under investor pressure, with a term sheet in limbo.
+
+For the preparation discipline, read [the tech debt audit a two day process](/blog/the-tech-debt-audit-a-two-day-process) and [building a security program from zero a twelve month plan](/blog/building-a-security-program-from-zero-a-twelve-month-plan).
+
+## Common mistakes
+
+1. Founder treating the process as adversarial rather than as a shared assessment.
+2. No architecture documentation prepared before the review starts.
+3. Known security vulnerabilities not disclosed upfront.
+4. Technical debt denied rather than acknowledged and quantified.
+5. Concentration risk in a single engineer not addressed before the process.
+6. No remediation plan for known issues, just the issues themselves.
+7. Selecting a reviewer who does not have experience with the specific technology stack.
+8. Closing without a technical review at growth stage and paying for it post-acquisition.
+
+## A 60 day preparation plan
+
+1. **Week one.** Produce a current system architecture diagram with key decisions documented.
+2. **Week two.** Run a dependency audit. Identify outdated libraries, licensing issues, and unmaintained dependencies.
+3. **Weeks three and four.** Run an honest technical debt inventory. Rate severity. Draft a remediation roadmap.
+4. **Week five.** Audit access controls. Document who has production access and why.
+5. **Week six.** Address the top security vulnerabilities in the debt inventory.
+6. **Weeks seven and eight.** Document team knowledge coverage. Identify concentration risks and begin cross-training.
+
+For the broader strategic context, read [the technical founders quarterly review](/blog/the-technical-founders-quarterly-review) and [the engineering dashboard every founder should have](/blog/the-engineering-dashboard-every-founder-should-have). The operational discipline behind clean due diligence preparation connects directly to [engineering capacity planning for small teams](/blog/engineering-capacity-planning-for-small-teams).

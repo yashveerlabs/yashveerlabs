@@ -1,0 +1,117 @@
+---
+slug: "why-ai-code-comments-lie-and-how-to-read-them-critically"
+title: "Why AI Code Comments Lie and How to Read Them Critically"
+excerpt: "AI generated code comments describe the code that was written, not the code that exists now. Every edit without a comment update is a lie in waiting. Here is how to read them so you do not get misled."
+date: "2025-01-26"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-ai-code-comments-lie-and-how-to-read-them-critically"
+status: "published"
+definition: "AI code comments are accurate at the moment of generation and drift from the truth the moment anyone edits the code without updating the comment. The problem is not that AI writes bad comments; it writes plausible ones that read like documentation. That plausibility is what makes them dangerous in an inherited codebase. I read them critically every time and I have developed a specific approach for doing so."
+faq: [
+  {"q":"why do ai generated code comments become inaccurate over time","a":"The comment describes what the code did when the AI generated it. When a developer later changes the code without updating the comment, the comment describes the old behavior. Because AI comments are written in confident, authoritative language, a reader treats them as documentation rather than as a starting point. The confidence of the comment and the accuracy of the comment diverge silently."},
+  {"q":"how do you verify an ai generated comment is still accurate","a":"Read the comment, then read the code independently as if the comment does not exist. Then compare your understanding of the code to what the comment claims. Any discrepancy is worth investigating. Do not assume the comment is right and the code is wrong, or the reverse. Verify both against the behavior you observe in tests or in a running system."},
+  {"q":"what types of ai code comments are most likely to be wrong","a":"Comments that describe function behavior at a high level are the most dangerous because they age the worst. Comments that say what a function returns are often wrong after the function is refactored. Comments that describe side effects are often incomplete because the AI did not know about all the places in the system the function affects. Inline comments on complex logic are usually more reliable because they describe a specific line."},
+  {"q":"how should you handle code comments when doing a vibe coding rescue","a":"Treat every comment as a hypothesis, not a fact. Mark suspicious comments with a TODO note and your own brief reading of what the code actually does. Do not delete comments that might be wrong; annotate them. Once you have established the correct behavior through tests, update the comment to reflect what you now know. Do not leave the original comment alongside the corrected one."},
+  {"q":"do ai tools ever update their own comments when the code changes","a":"Some modern AI code editors will prompt for or suggest comment updates when nearby code changes. But this is not automatic or reliable. The update depends on the developer accepting the suggestion, and many do not, either because they are in a hurry or because the suggestion looks close enough. You cannot depend on the tool to keep comments accurate."},
+  {"q":"how do ai generated comments affect junior engineers reading the codebase","a":"They read comments as documentation and trust them. A junior engineer who reads an inaccurate comment and writes code based on that understanding will produce code with a bug that is hard to trace, because the mental model they were operating from was wrong. The comment gave them false confidence in a false picture. This is one of the more insidious costs of AI generated codebases."},
+  {"q":"what is the best practice for comments in a codebase that uses heavy ai code generation","a":"Write comments that describe intent and reason rather than behavior. A comment that says why this function exists is more durable than a comment that says what it does, because the why rarely changes when the implementation is refactored. Reserve behavioral comments for genuinely non-obvious code. And establish a team norm that any edit to a function requires a check of the comment for accuracy."}
+]
+---
+
+## What you actually need to know
+
+- AI code comments are written to describe the code at the moment of generation. They do not update themselves when the code changes.
+- The danger is plausibility. AI writes comments that sound like documentation. A reader trusts them. When they are wrong, the trust is misdirected.
+- The most common failure: a developer edits a function, skips the comment, and the comment now describes behavior the function no longer has.
+- Reading AI comments critically means reading the code independently first, then comparing your understanding to what the comment claims.
+- In an inherited AI codebase, assume every comment needs verification until you have run the code and confirmed the behavior.
+
+| Comment type | Reliability over time | How to verify |
+|---|---|---|
+| High level function description | Low: ages badly with refactors | Run the function and trace the output |
+| Return value description | Low: changes with every signature update | Check the current return type and actual returned value |
+| Inline logic explanation | Medium: often accurate if the line did not move | Read the line independently, compare |
+| Side effect description | Low: often incomplete from the start | Trace all state changes the function makes |
+| Intent or why comment | High: rarely changes | Cross-reference with the surrounding architecture |
+
+## The core argument
+
+AI code generators write comments the way a good engineer writes comments: descriptively, confidently, in complete sentences. That is the problem. A comment written by a human is usually attached to the code mentally, because the human who wrote the comment wrote the code at the same time. They will remember to update the comment when they change the code, sometimes.
+
+A comment written by an AI has no such attachment. The AI wrote the comment when it wrote the function. After that, the comment is on its own. Every developer who edits the function without updating the comment is creating a discrepancy. And because the comment sounds authoritative, the next reader does not second-guess it. They build their understanding of the system on top of it.
+
+This is not hypothetical. I have cleaned up three AI generated codebases in the last year where a specific class of bug traced back to a comment that described the old behavior of a function. The developer who introduced the bug read the comment, understood the function to behave as described, and wrote new code that depended on the old behavior. When the new code ran, it got the new behavior. The bug was not obvious because the discrepancy was buried in a comment that looked correct.
+
+The solution is not to remove comments from AI generated code. Comments are useful. The solution is to read them with the same skepticism you would apply to any unverified claim.
+
+## How to read AI comments critically
+
+### Read the code first
+
+Before reading any comment in an AI generated file, read the actual code. Form your own understanding of what the function does, what it returns, and what side effects it has. Write that understanding in a scratch note if the function is complex. Then read the comment.
+
+If your understanding matches the comment, you can have reasonable confidence the comment is current. If they diverge, investigate the discrepancy before going further. The comment might be right and you might have misread the code. The code might have been updated and the comment not. One of those two things happened. Find out which.
+
+### Treat behavioral claims as hypotheses
+
+When a comment says "this function returns the user object with all permissions attached," that is a claim about behavior. Test it. Find the test that verifies it, or write one. If the test does not exist, you are operating on faith.
+
+This is especially important in security-adjacent code. A comment that says "validates that the user has admin permissions before proceeding" is a high-stakes claim. If the validation was removed in a later edit and the comment was not updated, you have an authorization gap that looks documented.
+
+### Mark suspicious comments
+
+When you find a comment that does not match your reading of the code, do not delete it immediately. Annotate it. A brief inline note that says something like "comment may be outdated, current behavior is X" is useful. It tells the next reader that someone already noticed the discrepancy. Once you have confirmed the correct behavior through testing, update the comment and remove your annotation.
+
+## What it requires
+
+| Activity | Time investment | What it prevents |
+|---|---|---|
+| Independent code reading before trusting comments | Five to fifteen minutes per function | Building on false mental models |
+| Comment verification in code review | Two to five minutes per PR | Shipping comment debt |
+| Test writing to confirm documented behavior | Thirty to sixty minutes per critical function | Silent regressions when behavior changes |
+| Comment audit in inherited codebase | One to three days for a medium project | Accumulating wrong assumptions across the team |
+
+## What to build into your process
+
+- A code review step that asks: does the comment in this PR still accurately describe the code in this PR?
+- A team norm that any refactor of a function includes a comment review.
+- A flag for comments in security-critical and payment-critical paths that marks them as requiring explicit verification.
+- A habit of writing intent comments rather than behavioral comments. Intent ages better.
+- A periodic comment audit on the highest-traffic parts of the codebase. Not every file, just the ones people read and rely on most.
+
+## Expert opinion
+
+> The comment that lies most effectively is the one that was accurate last month. It reads like documentation. It has the shape of something a careful engineer wrote. The only thing wrong with it is the code changed and nobody updated it. In an AI heavy codebase this happens constantly, and the teams that get hurt are the ones who treat the comments as documentation rather than as starting points.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A fintech startup asked me to audit their payment processing module. The module had been built with AI assistance over about two months. The comments were thorough and well written, which is usually a good sign.
+
+One function had a comment that read: "Checks for duplicate transaction ID before processing to prevent double charges." The comment was accurate when written. Somewhere in a later refactor, the duplicate check had been moved to a separate middleware function and removed from this one. The comment was not updated. Three months later, a race condition in the middleware allowed duplicate transaction IDs to pass through, and the function now had no backup check. The comment said the check existed. It did not.
+
+The audit took three days. We found four other functions where the comments described behavior that had been changed or removed. None of them were as consequential as the payment one. But they were all creating incorrect mental models in the developers reading them.
+
+For the broader pattern of what AI generated codebases look like when they arrive for rescue, see [vibe coding rescue: how to take over a codebase written by ChatGPT](/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt). For how AI code review tools can be tuned to catch comment drift before it becomes a problem, see [AI assisted code review](/blog/ai-assisted-code-review-a-process-that-actually-helps).
+
+## Common mistakes
+
+1. Reading comments before reading the code. This primes you to see what the comment describes rather than what the code does.
+2. Assuming the comment is wrong and the code is right. Sometimes the code was introduced incorrectly and the comment is the ground truth. Verify both.
+3. Deleting inaccurate comments without replacing them. An absent comment is better than a wrong one, but a correct comment is better than both.
+4. Letting comment drift accumulate in a fast-moving codebase. The drift compounds. What starts as one outdated comment becomes a wrong mental model for the next three engineers who read it.
+5. Not testing behavioral claims in critical paths. A comment in the auth layer that describes behavior you have not tested is a liability.
+6. Skipping comment review in code review because it feels like pedantry. Comment review is not optional on codebases where AI wrote the original documentation layer.
+7. Writing comments that describe what the code does instead of why it does it. Behavioral comments drift. Intent comments rarely do.
+
+## A 30 day plan
+
+1. **Week one.** Pick the five most critical files in the codebase: the ones where incorrect assumptions cause the worst bugs. Read every comment against the actual code. Document every discrepancy you find.
+2. **Week two.** Fix the discrepancies. Update comments to reflect current behavior. Write tests that confirm the behavior you are now documenting.
+3. **Week three.** Add comment review to the code review checklist. Train the team on the two-step: read the code first, then the comment.
+4. **Week four.** Schedule a quarterly comment audit for high-traffic files. Set a calendar reminder. Do not let this become a one-time fix.
+
+For deeper reading on what happens when inherited AI code is taken to production without this kind of audit, see [why AI generated code breaks in production](/blog/why-ai-generated-code-breaks-in-production). For the related question of what happens when comment drift compounds into a full structural problem, see [when AI code generation stops saving you time](/blog/when-ai-code-generation-stops-saving-you-time-and-starts-costing-you).

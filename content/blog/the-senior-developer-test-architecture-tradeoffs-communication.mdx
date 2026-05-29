@@ -1,0 +1,112 @@
+---
+slug: "the-senior-developer-test-architecture-tradeoffs-communication"
+title: "The Senior Developer Test: Architecture, Tradeoffs, Communication"
+excerpt: "Most titles on a resume lie. The senior developer test is three questions about architecture, tradeoffs, and communication that separate engineers who can lead a build from engineers who can only follow one."
+date: "2024-10-11"
+category: "Hiring Developers, Freelancers, and Agencies"
+tags: ["hiring","engineering-teams","freelance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-senior-developer-test-architecture-tradeoffs-communication"
+status: "published"
+definition: "When I need to know whether a developer is actually senior, I do not look at the resume. I ask three questions that cannot be rehearsed: one about a system they designed under constraints, one about a decision they regret, and one about how they explain something hard to someone who does not code. The answers tell me everything the LinkedIn profile will not."
+faq: [
+  {"q":"How do you evaluate a senior developer without being technical yourself as a founder?","a":"You do not need to understand the technical answer. You need to listen for how they give it. A real senior slows down when you ask a follow-up, names specific things rather than categories, and will tell you something did not go well. Anyone who stays at the marketing layer on every question is not senior."},
+  {"q":"What is the difference between a senior developer and a lead developer?","a":"A senior developer is accountable for their own code and the quality of their decisions. A lead developer is additionally accountable for the decisions of the people around them. The difference shows up in how they talk about past projects: seniors say 'I decided,' leads say 'we decided and here is why I steered it that way.'"},
+  {"q":"How long should a technical interview take to assess if someone is actually senior?","a":"Ninety minutes. Thirty minutes on past work, thirty minutes on a real architectural question from your domain, thirty minutes on a short practical exercise or code walkthrough. Longer than this adds noise. Shorter than this and you are reading a highlight reel, not a work sample."},
+  {"q":"Can a junior developer pass a senior developer test if they study hard enough?","a":"They can pass interview-style questions, yes. They cannot pass a conversation about tradeoffs in a system they designed under real constraints, because they have not designed systems under real constraints. The test is a proxy for experience, not for knowledge."},
+  {"q":"What architecture questions reveal the most about a senior developer's real experience?","a":"Ask them to describe a system they built that they would design differently now. The answer should include a specific component, a reason the original decision seemed right at the time, and what changed. Vague regrets are not regrets. They are performance."},
+  {"q":"How do I assess a developer's communication skills without working with them first?","a":"Give them something complex to explain. Watch whether they reach for analogies, whether they check if you followed, and whether they adjust when you look confused. Engineers who can only communicate with other engineers are a liability on a small team where you are the primary stakeholder."},
+  {"q":"Is a senior developer from an offshore market really equivalent to a senior from the US or Europe?","a":"Sometimes yes, sometimes no. The title does not travel consistently across markets. The test does. Ask the same three questions regardless of geography and you will get a consistent read. The best signal is always a two week paid trial on a real piece of work."}
+]
+---
+
+## What you actually need to know
+
+- The word senior on a resume is the least reliable signal in software hiring. It is a self-applied label that means something different at every company.
+- Architecture, tradeoffs, and communication are the three dimensions that separate senior engineers from mid-level engineers who have been around a long time.
+- You can test all three in ninety minutes without writing a single line of code yourself.
+- The questions that reveal the most are not technical questions. They are storytelling questions that happen to be about technical work.
+- A developer who cannot communicate their decisions to a non-technical founder is not senior enough for a small team, regardless of what they can build.
+
+| Signal | What a senior shows | What a mid-level shows |
+|---|---|---|
+| Architecture conversation | Names constraints first, then design choices | Names the stack first, constraints later or not at all |
+| Tradeoff discussion | Specific regret with a named decision and a reason | General statement that everything has tradeoffs |
+| Communication with non-technical stakeholders | Adjusts language in real time, checks for understanding | Stays in technical vocabulary, moves on regardless |
+| Response to scope pressure | Pushes back with data, offers alternatives | Accepts or silently pads the estimate |
+
+## The core argument
+
+The seniority problem in software hiring is that the title is self-reported and market-inconsistent. A senior at a fifty person startup and a senior at a two hundred thousand person company have almost nothing in common except the word on their LinkedIn. The founder who treats the title as a screening criterion will spend two months talking to people and still not know what they are actually getting.
+
+I stopped relying on seniority signals from resumes about three years into client work. What replaced them were three questions that I had noticed real seniors answered differently from everyone else. The difference was not vocabulary. It was specificity and willingness to say something went wrong. Juniors and mid-levels rehearse their answers around success. Seniors have enough scar tissue to talk openly about failure, because they have figured out that failure is more interesting than the wins.
+
+The architectural question is the hardest to fake. When you ask someone to describe a system they designed under a real constraint, a senior will name the constraint first. Something like "we had a hard latency requirement and the data model was already in production, so I could not change the schema." That sequencing matters. It means they experienced the constraint as primary, which is how real engineering decisions work. Someone who has not actually been in that seat will start with the solution and try to reverse-engineer the problem.
+
+The communication dimension is the one founders most often underweight. On a small team, the developer is not just shipping code. They are managing expectations, flagging risks before they become incidents, and explaining technical debt to someone who is not technical. If they cannot do that, the gap between what is happening in the codebase and what you understand is happening will grow every week. That gap is where projects die.
+
+## The three questions
+
+### Question one: describe a system you designed under a constraint you did not choose
+
+You are not testing what they built. You are testing how they explain the relationship between the constraint and the design. A real senior starts with the constraint. They will say something like "the API I had to integrate with was unreliable, so I built a queue in front of it rather than calling it synchronously." A mid-level will describe the queue and mention the API problem somewhere in the middle.
+
+### Question two: walk me through a technical decision you would make differently now
+
+This question is impossible to fake at the senior level. The answer needs a specific decision, a reason it seemed right at the time, and a clear articulation of what changed in their understanding. Vague answers like "I would document more" are not answers. The real answer sounds like "I used a relational database for a workload that turned out to be almost entirely write-heavy at scale, and I would have used a time-series store if I had thought harder about the access pattern before I started."
+
+### Question three: explain your last system to me as if I build no code
+
+This tests the communication dimension directly. Watch whether they reach for analogies. Watch whether they slow down when you look uncertain. Watch whether they check if you followed before moving on. Engineers who can only communicate with other engineers are not wrong, they are just mismatched for a small team where you are the person they report to. The ones who can cross the gap are rare and worth paying for.
+
+## What it actually costs
+
+| Tier | Day rate range | What you are buying |
+|---|---|---|
+| Strong mid-level presented as senior | 400 to 650 USD | Good execution within a defined scope, limited architectural judgment |
+| Genuine senior independent | 700 to 1200 USD | Architectural ownership, proactive communication, handles ambiguity |
+| Senior with domain depth (fintech, health, infra) | 1100 to 1800 USD | Judgment that saves you from expensive category mistakes |
+| Senior tech lead with team management history | 1300 to 2200 USD | Can run a two to three person team, sets standards, owns delivery |
+
+The spread in the table above is real. A genuine senior costs two to three times what a capable mid-level costs. The difference pays for itself when the senior prevents you from building the wrong system, which almost always happens once on an early stage product.
+
+## What to look for beyond the interview
+
+- A GitHub history with commits across more than one project, including the ugly work: migrations, rollbacks, config changes. Clean highlight repositories are not the same as real output.
+- Written communication that is direct and concise. Emails that take three paragraphs to say one thing are a preview of how the working relationship will feel.
+- A clear statement of what they will not work on. A senior with defined limits is more trustworthy than a generalist who says yes to everything.
+- The willingness to push back on your product assumptions without being asked. Engineers who only respond to your spec are order takers. You need someone with opinions.
+- References they offer before you ask. The ones who hesitate have a reason.
+
+## Expert opinion
+
+> The single most reliable test I run on a senior developer candidate is the regret question. Not because failure is disqualifying, but because how someone talks about their own failures tells you everything about how they process learning. Engineers who have no regrets have either not shipped anything hard or are not paying attention. Both are disqualifying.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I was brought in to audit a codebase that had been built over eight months by a developer the founder described as "very senior, incredible resume." What I found was a system with no clear data model, service boundaries drawn around frameworks rather than business domains, and no documented deployment process. The developer had deep knowledge of the tools. What they lacked was architectural judgment: the ability to look at the whole system and ask whether the pieces fit together in a way that would survive the next six months.
+
+The founder had not tested for architecture in the interview. They had asked technical questions that the developer answered correctly, because the developer was technically competent. The gap was in the questions, not the candidate. After the audit, we rebuilt the data layer and wrote a proper deployment runbook. The project recovered, but the eight months were expensive. If you want to understand what the vetting process should look like before you sign, [the vetting framework](/blog/the-vetting-framework-how-to-verify-a-developers-real-experience) covers the full sequence. For the questions to ask in the first conversation, [the hiring questions post](/blog/10-questions-every-non-technical-founder-must-ask-before-hiring-a-developer) has ten that would have caught this problem.
+
+## Common mistakes
+
+1. Treating "years of experience" as a proxy for seniority. A developer with twelve years of experience who has never owned a system under pressure is not senior in any useful sense.
+2. Asking only about successes. The most informative answers come from questions about what went wrong.
+3. Letting technical vocabulary intimidate you out of asking follow-up questions. If the answer does not make sense to you, ask again. A real senior will welcome it.
+4. Testing for knowledge instead of judgment. Knowing what a load balancer does is different from knowing when to put one in and when you do not need one yet.
+5. Skipping the practical exercise. A ninety-minute conversation is a good filter. A two-week paid trial is better.
+6. Hiring for your current stack instead of your current problem. A senior with good judgment in an unfamiliar stack will outperform a mid-level in your exact stack on anything that requires architectural decisions.
+7. Accepting the first reasonable candidate to avoid the search. The search is the cheap part. The wrong hire is the expensive part.
+8. Not calling references. Five minutes on the phone with a former client tells you more than two hours of interviews.
+
+## A 30 day hiring plan
+
+1. **Day one to three.** Write down the three hardest problems the new developer will face in the first ninety days. These become the raw material for your architecture questions.
+2. **Day four to seven.** Source three to five candidates. One from a referral, one from a public portfolio, one from a job board. Quality of source matters less than quantity of options.
+3. **Day eight to fourteen.** Run ninety minute calls with each. Use the three questions above. Score on specificity, willingness to name failures, and communication clarity with a non-technical person, meaning you.
+4. **Day fifteen to twenty-one.** Pick the top two. Run a paid two week trial with your first choice on a real piece of the product, not a toy exercise.
+5. **Day twenty-two to thirty.** Evaluate the trial. Did they communicate proactively? Did they push back on scope when it was right to push back? Did the work ship? If yes to all three, sign the longer engagement. If not, your second candidate is still available.
+
+For the broader hiring sequence, [the vetting framework](/blog/the-vetting-framework-how-to-verify-a-developers-real-experience) covers what to check before and after the interview. For the pricing math behind senior versus mid-level rates, [the post on why some developers cost three times more](/blog/why-some-developers-cost-three-times-more-and-when-they-are-worth-it) lays out when the premium pays off.

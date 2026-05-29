@@ -1,0 +1,108 @@
+---
+slug: "the-engineer-who-wrote-off-the-codebase-a-postmortem"
+title: "The Engineer Who Wrote Off the Codebase: A Postmortem"
+excerpt: "A postmortem on the moment an engineer decides the codebase is unsalvageable. What leads to that conclusion, when they are right, when they are wrong, and what happens to the company when the decision is made unilaterally."
+date: "2026-03-03"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","failure","incidents"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineer-who-wrote-off-the-codebase-a-postmortem"
+status: "published"
+definition: "At some point, almost every senior engineer who inherits a messy codebase reaches a moment of private verdict: this cannot be saved. Sometimes they are right. More often, they are experiencing a real architectural problem through a filter of frustration, and the write-off instinct is a coping mechanism as much as a technical assessment. The postmortem is about what happens when that verdict gets acted on."
+faq: [
+  {"q":"How do you know when a codebase genuinely needs to be rewritten versus refactored?","a":"A rewrite is justified when the architecture is incompatible with current requirements, not just when the code is messy. If you can refactor incrementally without stopping new feature work, refactoring is almost always cheaper. The cases where rewrite wins are when the data model is fundamentally wrong, the framework is end-of-life, or the performance characteristics are structurally unsolvable."},
+  {"q":"What happens when an engineer writes off the codebase without telling leadership?","a":"The usual outcome is a slow refusal. They stop fixing bugs they consider symptoms of the underlying problem. They deprioritize features that would require touching the broken parts. They start doing the rewrite in a side branch that is never production-ready. The codebase gradually gets worse while the team thinks the engineer is maintaining it."},
+  {"q":"How should a founder respond when an engineer says the codebase needs a rewrite?","a":"Ask for specifics, not opinions. What specifically is unsalvageable and why? What would a rewrite cost in time and risk? What would a targeted refactor of the worst areas cost? Most write-off verdicts are accurate about the problem and wrong about the required solution. A founder who pushes for specifics usually finds a path that does not require a full rewrite."},
+  {"q":"What is the real cost of a full codebase rewrite at a startup?","a":"Two to three times the original estimate, almost universally. A rewrite that is scoped for three months typically takes eight to twelve. During that time, the product is frozen or degraded. Customers see no improvements. The team is demoralized. The rewrite often ships with new bugs because the original codebase had implicit behavior that was never documented and therefore never replicated."},
+  {"q":"Can a codebase written by AI tools be trusted in production?","a":"It depends entirely on the review process. AI-generated code that was never critically reviewed by a senior engineer is a write-off risk. It often has the right shape but wrong behavior in edge cases. The danger is that it passes shallow review because it looks correct, then fails in production in ways that take hours to diagnose."},
+  {"q":"What is the strangler fig pattern and when should it replace a rewrite?","a":"The strangler fig pattern is an incremental replacement strategy where new code is written alongside old code, and traffic is gradually shifted as new functionality is validated. It takes longer than a full rewrite but never stops the product. For most startup codebases, it is a safer path than a full rewrite unless the entire data model is being changed."},
+  {"q":"How do you rebuild trust in a codebase after it has been written off?","a":"Start with a bounded audit, not a wholesale verdict. Find the three most problematic areas and address them specifically. A codebase that had five critical problems and now has two is a fundamentally different risk profile, even if it still has problems. Progress over perfection, documented in writing, resets the team's relationship with the code."}
+]
+---
+
+## What you actually need to know
+
+- An engineer writing off a codebase is almost always expressing a real problem through an extreme conclusion. The diagnosis is often accurate; the prescription is usually wrong.
+- Full rewrites cost two to three times the estimate and freeze product development during execution. They are the option of last resort, not the first response to a messy codebase.
+- The danger is not the opinion, it is the behavior that follows. An engineer who privately concluded the codebase is unsalvageable changes how they work in ways the team does not see.
+- The strangler fig pattern exists specifically for this situation. Incremental replacement with zero downtime is almost always available as an option before a full rewrite becomes necessary.
+- A founder who does not ask for specifics when an engineer says "we need to rewrite this" is accepting a diagnosis without evaluating the evidence.
+
+| Approach | Risk Level | Time to Benefit | Product Continuity | Best For |
+|---|---|---|---|---|
+| Full rewrite | Very high | 6 to 18 months | Halted | Data model is fundamentally broken |
+| Strangler fig (incremental) | Medium | 2 to 6 months | Continuous | Architecture is wrong, data model is salvageable |
+| Targeted refactor | Low | 2 to 8 weeks | Continuous | Specific modules are the problem |
+| Leave it and add tests | Very low | Immediate | Continuous | Behavior is correct, code is just messy |
+
+## The core argument
+
+The pattern I have seen repeats itself with enough consistency that I can describe it in advance. A new senior engineer joins, or an existing engineer reaches a tipping point of frustration with a legacy system. They form a private verdict. The codebase is beyond saving. They might be right about the codebase. They are almost always wrong about what needs to happen next.
+
+What follows the private verdict is a slow withdrawal. The engineer stops making the code better in small ways because why invest in something that is going to be replaced. They start doing work in parallel that never gets merged. They advocate loudly in planning meetings for the rewrite while quietly letting the existing system accumulate debt. The codebase, which was bad but functional, gets worse. The team does not notice until the technical debt compounds into a real incident.
+
+The rewrite that eventually gets approved is usually scoped optimistically and executed under pressure. Three months becomes eight. Eight becomes twelve. The original team that knew the implicit behavior of the old system has moved on. The new team is replicating behavior they inferred from reading the old code, which means they are replicating the bugs they did not know about as well as the features they did. The new codebase ships. The bugs start arriving.
+
+I am not arguing that codebases never need rewrites. Some do. But the write-off verdict is made too quickly, acted on too unilaterally, and scoped too ambitiously most of the time. The engineer who said "we need to rewrite this" was usually right that there was a serious problem. The postmortem is almost never about whether the problem was real. It is about whether the response was proportionate.
+
+## What actually happens after the write-off verdict
+
+When an engineer writes off a codebase in their head, the behavioral changes are predictable and worth knowing.
+
+### The slowdown
+
+Fixes that would take two hours start taking a day. The engineer is not lazy. They are doing the work twice: the immediate fix to keep the system running, and the correct solution in a branch that does not yet exist. The speed decrease is real and attributed to the complexity of the codebase rather than the doubled effort.
+
+### The advocacy campaign
+
+The engineer starts making the case for a rewrite in every available conversation. Architecture discussions, sprint planning, 1:1s with the founder. The arguments are technically coherent. The urgency is genuine. But the framing is binary: rewrite or continue to fail. The middle path, targeted refactoring with a clear scope, is not part of the conversation.
+
+### The experimental branch
+
+Almost always, there is a branch. Sometimes it is called "v2" or "new-arch" or the engineer's initials plus "refactor." It is months behind main. It will never catch up. It represents a significant amount of engineering time that is not improving the production system. When the engineer eventually leaves or the experiment is acknowledged, the branch is usually deleted.
+
+## What it requires
+
+Before approving any rewrite, run a technical audit against these criteria.
+
+| Audit Question | Rewrite Signal | Refactor Signal |
+|---|---|---|
+| Is the data model wrong? | Yes, migrations would break existing data | No, schema is salvageable |
+| Are core dependencies end-of-life? | Yes, no upgrade path exists | No, upgrade path is painful but available |
+| Is performance structurally bounded? | Yes, architecture prevents the needed gains | No, specific queries or paths are the problem |
+| Can new features be added without touching the bad code? | No, bad code is in the critical path | Yes, bad code is isolated |
+| What does a refactor scope look like? | Touches 80 percent of the codebase | Touches 20 percent or less |
+
+## Expert opinion
+
+> The engineers I trust most on rewrite decisions are the ones who come in with a scope, not a verdict. "I think we need to replace the billing module over the next six weeks" is a proposal I can evaluate. "We need to rewrite the whole thing" is a frustration looking for a budget. The best engineers I have worked with treated a messy codebase the way a surgeon treats a complicated patient: figure out what is actually causing the problem before deciding whether surgery is the answer. The [strangler fig pattern](/blog/the-strangler-fig-pattern-replacing-legacy-in-stages) exists because most of the time the answer is not surgery.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A fintech startup I worked with had a billing and reconciliation engine written three years earlier by a contractor who had long since moved on. The current backend lead had inherited it and formed the private verdict early: this was unsalvageable. He spent six months advocating for a rewrite while quietly building a parallel implementation that never got close to feature parity.
+
+When the write-off verdict finally reached the founder as a formal proposal, the scope was a three-month rewrite of the entire backend. The actual audit, which I helped facilitate, found that the billing engine was the problem and the rest of the backend was maintainable. The billing module was replaced incrementally over eight weeks using the strangler fig approach, with the existing system handling production traffic throughout. The rest of the backend was refactored in targeted sprints over the following quarter.
+
+The [true cost of a rewrite](/blog/the-true-cost-of-a-rewrite-when-it-is-worth-it) in this case would have been three to four times what the incremental approach cost, and would have frozen feature development for a quarter of a year. The senior engineer, to his credit, accepted the scoped approach once the audit was complete. The behavior change that followed the private write-off verdict had been the real cost. That was the six months of slowed output, the parallel branch, and the advocacy overhead, all of which disappeared once there was a concrete, bounded plan.
+
+## Common mistakes
+
+1. Accepting the write-off verdict without asking for a bounded scope. "We need to rewrite this" is not a proposal. Ask for a module-level breakdown of what is broken and why.
+2. Letting the experimental branch live too long. If a rewrite branch has not been merged in 90 days, it is probably not going to be. Acknowledge it and either commit to it or delete it.
+3. Treating the rewrite as a clean slate. Rewrites inherit all the implicit behavior of the original system, including the undocumented edge cases that the original system handled silently. The new bugs are usually the old bugs under different circumstances.
+4. Not running the [tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) before approving a rewrite. An audit takes two days and almost always reveals that the problem is more bounded than the write-off verdict suggested.
+5. Approving a rewrite without freezing the scope. A rewrite with an expanding scope is a project that will not ship.
+6. Assigning the rewrite to the same engineer who declared the write-off. They have strong feelings about the solution and those feelings will inflate the scope. An outside perspective, even a brief one, is worth getting.
+7. Underestimating the knowledge loss during a rewrite. The engineers who built the original system knew its behavior. The engineers building the replacement are working from inference.
+8. Not communicating the rewrite plan to customers. A product that stops improving for six months while a rewrite is underway loses customers. If the plan is to rewrite, be honest with the product roadmap and with users.
+
+## A 60-day plan
+
+1. In week one, commission a bounded technical audit. Not a verdict, an inventory. What are the three to five worst areas of the codebase, and why specifically? Ask for evidence, not opinions.
+2. In week two, map the specific problems to the strangler fig or targeted refactor approaches. For each problem, determine whether it can be addressed without a full rewrite. Most can.
+3. In weeks three and four, execute the highest-priority refactor with a clear scope and a defined done state. Ship it. Demonstrate that the codebase is improvable without a full replacement.
+4. In weeks five and six, repeat for the second-priority area. By this point, the team's relationship with the codebase has usually shifted. The private write-off verdict is replaced by a concrete improvement record.
+5. At the 60-day mark, re-evaluate whether a full rewrite of any remaining module is warranted. If it still is, scope it properly: one module, one team, one clearly defined done state, with the existing system running in parallel throughout.
+6. Review the [performance regression patterns](/blog/the-performance-regression-that-hides-in-ci) and the [five architectural failures](/blog/the-five-architectural-failures-that-killed-startups-i-worked-with) alongside the audit to ensure the improvement effort is targeting the right problems first.

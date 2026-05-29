@@ -1,0 +1,61 @@
+---
+slug: "tech-debt-in-startups-how-it-kills-products-and-how-to-manage-it"
+title: "Tech Debt in Startups: How It Kills Products and How to Manage It"
+excerpt: "Tech debt does not announce itself. It compounds quietly until velocity drops to zero. Here is how to manage it before it manages you."
+date: "2026-05-24"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt", "refactor", "startup", "engineering", "saas"]
+readingMinutes: 7
+ogImage: "/api/og/blog/tech-debt-in-startups-how-it-kills-products-and-how-to-manage-it"
+status: "published"
+faq: [
+  {"q":"How do I explain tech debt to a non-technical founder?","a":"Frame it as infrastructure maintenance. Every building needs maintenance or the pipes corrode and the walls crack. Software is the same. A tech debt sprint is not \"not building features.\" It is preventing the building from becoming uninhabitable, which would stop all feature work anyway."},
+  {"q":"Is it ever acceptable to skip debt repayment in favor of features?","a":"Yes, in specific circumstances: a hard deadline like a major customer demo, a time-sensitive competitive response, or a genuine emergency fix. The key is that the exception should be explicit and the debt incurred should be logged immediately with a committed repayment timeline."},
+  {"q":"When does tech debt require a rewrite versus a refactor?","a":"A refactor is always preferable when possible. A rewrite is justified when the existing code is so structurally compromised that refactoring it would take longer than rewriting and the rewrite can be isolated enough to test in parallel. In practice, this is rare. Most \"we need to rewrite this\" instincts are the strangler fig pattern in disguise."},
+  {"q":"How do I stop new tech debt from forming while paying down old debt?","a":"Code review discipline is the first lever. Standards around shortcuts (if you take one, log it immediately) is the second. The third is design reviews for significant new features before they are implemented, which catches architectural problems before they become embedded debt."},
+  {"q":"Does tech debt matter less for solo developer projects?","a":"It matters differently. As a solo developer, tech debt means slower feature development for yourself. The debt ledger is equally useful as a solo practice: it externalizes the problem from your head into a system, which makes it easier to prioritize and less likely to be forgotten."}
+]
+---
+
+# Tech Debt in Startups: How It Kills Products and How to Manage It
+
+**Tech debt is the accumulated cost of decisions made for speed in the short term that become friction in the long term. Every shortcut taken during an MVP sprint is a loan. Like financial debt, it accrues interest. Unlike financial debt, the interest shows up as slower shipping velocity, more bugs, harder onboarding, and higher engineering turnover. Startups that manage tech debt deliberately stay fast. The ones that ignore it spend their Series A money paying it back.**
+
+## What you need to know
+
+- Not all tech debt is bad; some is a deliberate trade that makes sense at an early stage
+- The debt that kills products is the kind that was never written down and never repaid
+- Tech debt compounds: the longer you wait, the more expensive and disruptive repayment becomes
+- The symptoms of unmanaged tech debt are predictable: features take twice as long, bugs arrive in clusters, engineers stop wanting to touch certain areas of the code
+- The remedy is not a rewrite; it is a discipline of continuous small repayments alongside feature work
+
+## The core argument
+
+The term "tech debt" gets used for everything from a poorly named variable to a fundamentally broken architecture. These are not the same problem. A poorly named variable is annoyance. A fundamentally broken architecture is existential. The useful distinction is between debt that costs ten minutes to fix in a quiet moment and debt that requires a planned quarter of engineering time and carries real risk of breaking production. Most teams have both and handle neither systematically.
+
+The debt that actually kills products is the structural kind: a data model that does not support the product you are now trying to build, a monolithic function that all critical features route through, an auth system built in week one that does not support the enterprise customers you started selling in month twelve. These debts were reasonable decisions at the time they were made. The mistake was not making them. The mistake was not acknowledging them, not writing them down, and not budgeting time to repay them as the product matured. The interest shows up as a feature that should take two days taking three weeks, because the codebase requires navigating around the structural debt to implement anything new.
+
+The management strategy that actually works is the debt ledger: a living document or Linear board where technical debt items are logged with a severity rating and an estimated cost to fix. Every sprint, a portion of engineering capacity goes to the highest-severity items on the ledger. This is not glamorous. It does not generate demo-worthy features. But it is what keeps the product shippable as it grows. I apply this model to every project I take on, including Nexli, where the debt ledger is a standard part of the project's Linear workspace and drives a consistent 15 to 20 percent of sprint capacity toward repayment.
+
+## Common mistakes
+
+1. **Not acknowledging debt when it is created.** The decision to ship a shortcut without logging the debt is what makes it insidious. If a shortcut is not logged, it is invisible, and invisible debt compounds without any counterpressure. Log every shortcut you take.
+2. **Treating the rewrite as the solution.** Most teams reach for the rewrite when debt becomes painful enough. Most rewrites take three times longer than estimated, produce new bugs, and leave the organization with two systems to maintain during the transition. The strangler fig pattern (gradual replacement) is almost always better.
+3. **Not allocating protected debt repayment capacity.** Teams that say "we will fix tech debt when we have time" never have time. The time has to be allocated in the sprint plan explicitly and protected from product scope creep. Even 15 percent of engineering capacity compounding over quarters makes a meaningful difference.
+4. **Confusing architectural opinions with tech debt.** A team member who thinks the codebase should use a different pattern is not identifying debt; they are expressing a preference. Tech debt is a specific, agreed-upon problem that has a concrete impact on velocity or quality. Keep the distinction clear.
+5. **Paying down debt nobody knows about.** If an engineer refactors a module in isolation without communicating the change, they may break integrations, surprise other engineers, or solve a problem that was already on someone else's list. Debt repayment should be visible in the same way feature work is visible.
+
+## Where to start
+
+**Step 1: Run a debt audit.** Ask every engineer on the team to list the three areas of the codebase they dread touching and why. Aggregate the list. The areas that appear multiple times are your highest-priority debt. This takes two hours and gives you a prioritized list you can act on immediately.
+
+**Step 2: Create a debt ledger with severity and estimated cost.** A simple table in Notion or a separate Linear project works. Each item: area of the codebase, what the problem is, severity (P1 to P3), estimated hours to fix. Review this ledger monthly. Retire items when they are repaid.
+
+**Step 3: Protect 15 to 20 percent of every sprint for debt repayment.** This is the hardest part because it requires founders and product managers to accept that not all capacity goes to new features. Frame it as infrastructure maintenance, not cleanup. The consequence of not doing it is predictable: velocity will slow, engineers will get frustrated, and the debt will eventually force an expensive remediation sprint anyway.
+
+## Related reading
+
+- [The Tech Debt Audit: A Two-Day Process](/blog/the-tech-debt-audit-a-two-day-process)
+- [When to Refactor and When to Rewrite](/blog/when-to-refactor-and-when-to-rewrite)
+- [The Cost of Tech Debt: A Founder's Worst Bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill)
+- [The Strangler Fig Pattern: Replacing Legacy in Stages](/blog/the-strangler-fig-pattern-replacing-legacy-in-stages)

@@ -1,0 +1,62 @@
+---
+slug: "saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once"
+title: "SaaS Webhook Reliability: From At Most Once to At Least Once to Exactly Once"
+excerpt: "Webhooks that fail silently destroy integrations and erode customer trust. Here is how delivery guarantees work, what each level costs to implement, and which one your SaaS product actually needs."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once"
+status: "published"
+definition: "Webhook delivery reliability is described in terms of three guarantees: at-most-once (the event may be lost but never delivered twice), at-least-once (the event will eventually be delivered but may be delivered more than once), and exactly-once (the event is delivered precisely once). Each guarantee requires progressively more infrastructure to implement. Most SaaS products target at-least-once delivery with idempotent receivers, which is the practical balance between reliability and implementation complexity."
+faq: [
+  {"q":"What is at-most-once webhook delivery and when is it acceptable?","a":"At-most-once delivery fires a webhook and does not retry on failure. If the receiving server is down, the event is lost. This is acceptable for low-stakes notifications where losing an event occasionally does not matter: analytics events, non-critical status updates, UI refresh triggers. It is not acceptable for financial events, state-changing integrations, or any event that the receiving system must process to maintain consistency with your platform."},
+  {"q":"What is at-least-once delivery and how do you implement it?","a":"At-least-once delivery retries the webhook until the receiving endpoint returns a 2xx response. Implementation requires: a webhook job queue (events are enqueued rather than fired synchronously), a delivery worker that processes the queue and records success or failure, exponential backoff retry logic (retry after 1 minute, 5 minutes, 30 minutes, 2 hours), and a delivery log that records each attempt. The queue and delivery log are typically stored in the database. At-least-once delivery means the receiver must handle duplicate deliveries gracefully, which requires idempotency."},
+  {"q":"What is idempotency in webhook handling and how do you implement it?","a":"An idempotent webhook handler produces the same result whether the event is processed once or ten times. Implementation: every webhook event should carry a unique event_id. The receiving system stores processed event IDs in a table. When an event arrives, the handler checks whether the event_id has already been processed. If yes, it returns 200 and exits. If no, it processes the event and records the event_id. This prevents duplicate processing from at-least-once delivery without requiring exactly-once infrastructure from the sender."},
+  {"q":"What is exactly-once delivery and when is it worth the complexity?","a":"Exactly-once delivery guarantees that each event is delivered precisely once, eliminating duplicates. It requires distributed consensus between the sender and receiver, which typically means transactional outboxes, deduplication at the message broker level, and two-phase commit patterns. Exactly-once delivery is worth the complexity only when the receiving system cannot be made idempotent (rare) or when duplicate events cause irreversible real-world actions (such as financial transactions that cannot be compensated). For most SaaS webhook use cases, at-least-once delivery with a receiver-side idempotency check is functionally equivalent and far simpler."},
+  {"q":"How do you handle webhook delivery failures and notify customers?","a":"Webhook failure handling: log every delivery attempt with the HTTP status code and response body. Alert the customer after a configurable failure threshold (three consecutive failures, or 24 hours without a successful delivery). Provide a webhook delivery dashboard where customers can see recent delivery attempts and retry failed events manually. Implement a dead letter queue for events that exhausted all retries. The dead letter queue allows retrospective analysis of what failed and why, and enables manual or automated replay once the receiving endpoint is restored."}
+]
+---
+
+## What you need to know
+
+- At-most-once delivery is fire-and-forget. Acceptable for non-critical notifications; unacceptable for state-changing integrations.
+- At-least-once delivery with exponential backoff retry is the right default for most SaaS webhooks. It requires a persistent job queue and delivery logging.
+- Idempotency must be implemented by the receiver, not the sender. Every webhook payload needs a unique event ID the receiver can use to deduplicate.
+- Exactly-once delivery requires distributed systems infrastructure that is rarely justified for SaaS webhooks. At-least-once plus receiver idempotency is the practical equivalent.
+- Customers need visibility into webhook delivery status. A delivery dashboard and failure alerts are product requirements, not nice-to-haves.
+
+## The core argument
+
+Webhooks look simple to implement and turn out to be one of the most reliability-sensitive surfaces in a SaaS product. The naive implementation fires an HTTP POST in the same request that processes a business event. If the receiving server is down or slow, the originating request degrades or fails. If the delivery fails silently, the customer's integration breaks without any indication of why. I have seen this pattern cause serious damage in production: Velmora had an early webhook implementation that fired synchronously during subscription state changes, and a temporary network issue between our infrastructure and a customer's integration endpoint caused subscription events to drop silently for several hours before anyone noticed.
+
+The fix is to decouple the event from the delivery. When a business event occurs, enqueue a webhook delivery job. The job processor fires the HTTP POST, records the result, and retries on failure with exponential backoff. The originating business logic is unaffected by webhook delivery failures. This is the at-least-once model, and it is the correct baseline for any webhook system that handles consequential events.
+
+The question of exactly-once delivery comes up regularly and the answer is almost always: do not build it. Exactly-once delivery at the sender level requires infrastructure complexity that is only justified for narrow cases. The practical solution is at-least-once delivery from the sender combined with idempotency enforcement at the receiver. Every event gets a unique ID. The receiver stores processed event IDs. Duplicates are discarded before they reach business logic. This combination is simpler to build, easier to reason about, and functionally equivalent for almost every SaaS use case.
+
+## Common mistakes
+
+1. **Firing webhooks synchronously in the request handler.** Synchronous delivery ties the reliability of the originating request to the availability of the customer's endpoint. Any receiver downtime, latency spike, or network hiccup degrades the originating operation. Webhook delivery must always happen asynchronously, decoupled from the request that triggered the event.
+
+2. **Not including a unique event ID in the payload.** Without a stable event ID, the receiving system cannot implement idempotency. Every webhook payload should include an event_id (a UUID generated when the event is first enqueued, not when it is delivered), a timestamp of when the event occurred, and the event type. These three fields are the minimum required for the receiver to build a reliable integration.
+
+3. **Retrying with constant intervals instead of exponential backoff.** A receiver that is down for a maintenance window will receive a flood of retry attempts at constant intervals. Exponential backoff with jitter (retry after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours) distributes load and gives the receiver time to recover. Cap the total retry window at 24 to 72 hours depending on the criticality of the event type.
+
+4. **Not logging delivery attempts.** Without a delivery log, debugging integration failures is impossible. Log every delivery attempt with the event ID, delivery timestamp, HTTP status code received, response body (truncated), and attempt number. This log is the primary debugging tool for both the engineering team investigating failures and customers investigating why their integration missed events.
+
+5. **Not exposing delivery status to customers.** Customers who build integrations on your webhooks need visibility into what was delivered and what failed. A webhook delivery dashboard showing the last N delivery attempts per endpoint, with retry controls and event replay, reduces support burden significantly. Customers can self-diagnose and replay missed events without opening a support ticket.
+
+## Where to start
+
+1. **Move all webhook delivery to an async job queue.** Create a webhook_deliveries table with columns for event_id, endpoint_url, payload, status (pending, delivered, failed), attempt_count, next_attempt_at, and last_response. Insert a row when a business event occurs. A background worker processes pending deliveries, fires the HTTP POST, and updates the row with the result. This is the foundation for all further reliability work.
+
+2. **Implement exponential backoff retry with a dead letter queue.** Update the background worker to reschedule failed deliveries with exponential delays up to a configurable maximum attempt count. After exhausting retries, move the delivery to a dead_letter_deliveries table rather than deleting it. This preserves the event for retrospective analysis and manual replay.
+
+3. **Add a unique event_id to every payload and document it for customers.** Generate a UUID when the event is enqueued (not when it is delivered, to ensure consistency across retries). Include the event_id in the payload as a top-level field. Document that customers should store processed event_ids to implement idempotency. This shifts the exactly-once responsibility to where it is naturally easier to implement: the receiver.
+
+## Related reading
+
+- [SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)
+- [Saga Patterns: Distributed Transactions Without Distributed Pain](/blog/saga-patterns-distributed-transactions-without-distributed-pain)
+- [SaaS Analytics Infrastructure: PostHog vs Mixpanel vs Snowflake vs Build Your Own](/blog/saas-analytics-infrastructure-posthog-vs-mixpanel-vs-snowflake-vs-build-your-own)

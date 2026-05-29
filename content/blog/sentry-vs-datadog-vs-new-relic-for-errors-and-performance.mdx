@@ -1,0 +1,62 @@
+---
+slug: "sentry-vs-datadog-vs-new-relic-for-errors-and-performance"
+title: "Sentry vs Datadog vs New Relic for Errors and Performance"
+excerpt: "Error tracking and performance monitoring serve different needs. Sentry, Datadog, and New Relic overlap but are not equivalent. Here is how to choose based on what your product actually needs to observe."
+date: "2026-05-23"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026"]
+readingMinutes: 6
+ogImage: "/api/og/blog/sentry-vs-datadog-vs-new-relic-for-errors-and-performance"
+status: "published"
+definition: "Error tracking and application performance monitoring (APM) tools capture runtime errors, performance traces, and infrastructure metrics from production applications. Sentry is focused on application error tracking and performance monitoring for web and mobile applications. Datadog is a full observability platform covering infrastructure metrics, APM traces, log management, and more. New Relic is a similar full-stack observability platform with APM, infrastructure monitoring, and distributed tracing. The tools overlap but differ in focus, pricing model, and the complexity of the observability problems they are designed to solve."
+faq: [
+  {"q":"What does Sentry do and when is it sufficient?","a":"Sentry captures application exceptions, groups them by root cause, provides stack traces with source maps, and tracks error frequency and affected user counts. Sentry performance monitoring adds distributed tracing and transaction performance data for web requests. Sentry is sufficient for: tracking frontend and backend errors in a web application, identifying performance regressions in specific API endpoints or page loads, and correlating errors with releases to detect what changes introduced regressions. Sentry is not sufficient for: infrastructure-level monitoring (CPU, memory, disk), custom metrics and dashboards, or log management at high volume."},
+  {"q":"What does Datadog do that Sentry does not?","a":"Datadog covers the full infrastructure and application observability stack: host and container metrics (CPU, memory, disk, network), APM traces with service dependency maps, log ingestion and search at scale, synthetic monitoring, custom metrics dashboards, and alerting on any combination of data. Datadog is the right choice when the team needs visibility across the infrastructure layer (not just the application layer), when log management is a requirement, or when the product runs distributed microservices where service dependency tracing is needed. The cost is higher than Sentry, especially at high log ingestion volumes."},
+  {"q":"How does New Relic compare to Datadog?","a":"New Relic and Datadog have very similar feature sets: both provide APM, infrastructure monitoring, log management, and custom dashboards. New Relic's pricing model moved to consumption-based pricing in 2021 (free for 100 GB/month of data ingest, paid per additional GB), which can be more cost-effective than Datadog for moderate data volumes. Datadog's pricing is more predictable for teams with known infrastructure counts but can grow unexpectedly with log volume. In practice, the choice between the two often comes down to which the team has more experience with, since the capabilities are comparable."},
+  {"q":"What is the cost structure for each tool?","a":"Sentry is priced per error event volume with a generous free tier and reasonable paid tiers for small to mid-size products. Datadog is priced per host per month for infrastructure monitoring, plus per GB for logs, plus per trace for APM. The cost grows with infrastructure scale and log volume; teams with many services and high log volume can face significant Datadog bills. New Relic's consumption pricing makes small teams cost-effective but large log volumes expensive. For an early-stage SaaS product, Sentry's error tracking + a lightweight infrastructure monitor (Grafana Cloud free tier, Axiom for logs) is often the most cost-effective observability stack."},
+  {"q":"Can Sentry and Datadog be used together?","a":"Yes, and this is a common pattern. Sentry handles application error tracking (frontend and backend exceptions, release-correlated error rates, user impact) while Datadog handles infrastructure metrics, distributed tracing at scale, and log management. The tools complement each other because Sentry's error context (exception message, stack trace, affected users) is richer than what Datadog's APM provides, while Datadog's infrastructure and service dependency visibility is broader than what Sentry provides. Teams that have both deployed use Sentry to investigate application errors and Datadog to understand infrastructure and service health."}
+]
+---
+
+## What you need to know
+
+- Sentry is purpose-built for error tracking and application performance monitoring at the code level. It is the right first observability tool for most web and mobile applications.
+- Datadog and New Relic are full observability platforms covering infrastructure, logs, APM, and custom metrics. They are appropriate when infrastructure visibility or distributed tracing is needed.
+- Using both Sentry and Datadog is a common and sensible pattern: Sentry for error context, Datadog for infrastructure.
+- Datadog's cost grows with log volume and host count. Model the cost carefully before committing at scale.
+- For early-stage products, Sentry + Grafana Cloud (free tier) covers the observability needs of most applications at minimal cost.
+
+## The core argument
+
+Observability decisions are often made by default: the team uses what they know, or uses the first tool recommended in an onboarding guide. This produces either under-instrumentation (missing critical signals) or over-instrumentation (paying for capabilities the team does not use). The right approach is to start from the questions the team needs to answer, then choose tools that answer those questions at the appropriate price point.
+
+For most early-stage SaaS products, the primary observability questions are: what errors are users experiencing? What is causing slow API responses? Is the infrastructure healthy? Sentry answers the first two questions well. Basic infrastructure monitoring (uptime checks, CPU and memory trends) answers the third without requiring a full Datadog deployment. The full Datadog deployment makes sense when the team has services that need distributed tracing, when log search is a regular operational requirement, or when infrastructure monitoring across many hosts needs centralized dashboards.
+
+The cost consideration is real. I have seen teams with $10,000 per month Datadog bills that could meet their actual observability requirements for $500 per month with Sentry plus a lightweight logging tool. The expensive Datadog deployment was acquired by default, not by design. Evaluate what is actually being used in the observability tooling before renewal conversations. In my experience, most small teams use 20 percent of the Datadog features they are paying for.
+
+## Common mistakes
+
+1. **Not setting up error tracking before launch.** Error tracking is the observability layer closest to the user. Launching without Sentry (or an equivalent) means production errors only become visible through user complaints rather than through engineering alerting. Set up error tracking in the first week of development and connect it to an alerting channel before anything ships to production.
+
+2. **Ignoring Datadog or New Relic cost growth as infrastructure scales.** Both tools have pricing that grows with data volume. A team that adds 10 new services, increases log volume by 5x, and adds a new region can see the monthly bill triple without making any explicit pricing tier change. Review the observability bill quarterly and understand which data sources are driving cost before the next scaling event.
+
+3. **Treating all errors as equally urgent.** A well-configured Sentry project distinguishes between critical errors (affecting many users, occurring frequently, in payment or auth flows) and background errors (rare, in non-critical paths, expected in certain edge cases). Without this distinction, high-frequency low-severity errors flood the alert channel and create alert fatigue that causes teams to ignore the genuine critical errors. Set up Sentry alert rules that prioritize by user impact, not by raw error count.
+
+4. **Not configuring release tracking in Sentry.** Sentry's release tracking connects errors to specific deployments, which is the most efficient way to identify regressions introduced by a release. Without release tracking, errors appear without context about when they first appeared. Configure Sentry to receive the current release version on each deployment and use the regressions view to detect new errors in recent releases.
+
+5. **Using infrastructure metrics without alerting.** Infrastructure dashboards that are only reviewed after an incident are documentation, not monitoring. Configure alerting on the metrics that indicate degradation: CPU above 80 percent for 10 minutes, memory above 90 percent, error rate above threshold, response time above target. The dashboard shows what happened; the alert tells you when it is happening.
+
+## Where to start
+
+1. **Add Sentry to the application this week if it is not already there.** The Sentry SDK for Node.js, Python, Ruby, or the browser takes 30 minutes to install and configure. Enable error tracking, configure source maps for frontend errors, and set up the alert channel. This produces immediate visibility into production errors at minimal cost.
+
+2. **Evaluate whether infrastructure monitoring is needed now or can be deferred.** If the application runs on a managed PaaS (Vercel, Railway, Render), the platform provides basic infrastructure metrics. If the application runs on self-managed infrastructure, add a lightweight monitoring agent (Datadog agent, Grafana Agent) to collect CPU, memory, and disk metrics. Defer the full Datadog contract until log search at scale or distributed tracing is genuinely required.
+
+3. **Define three alert rules that would wake someone up at 2am.** The three most important alerts for most web applications: error rate spike in the last 5 minutes (compared to the same window last week), response time above 5 seconds for the primary API endpoint, and database connection pool exhaustion. Configure these three alerts in whatever observability tool is in use. The three alerts represent the minimum effective on-call monitoring.
+
+## Related reading
+
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Real User Monitoring vs Synthetic Monitoring: Both, Not Either](/blog/real-user-monitoring-vs-synthetic-monitoring-both-not-either)
+- [Runbooks That Actually Get Used During Incidents](/blog/runbooks-that-actually-get-used-during-incidents)
+- [SLOs and SLIs for Founders: A Plain Language Guide](/blog/slos-and-slis-for-founders-a-plain-language-guide)

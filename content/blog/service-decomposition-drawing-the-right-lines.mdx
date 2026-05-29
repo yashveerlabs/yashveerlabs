@@ -1,0 +1,62 @@
+---
+slug: "service-decomposition-drawing-the-right-lines"
+title: "Service Decomposition: Drawing the Right Lines"
+excerpt: "Breaking a monolith into services is often the right move and often done wrong. The lines drawn between services determine whether the architecture produces independent deployability or distributed complexity. Here is how to draw the right lines."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/service-decomposition-drawing-the-right-lines"
+status: "published"
+definition: "Service decomposition is the architectural practice of splitting a monolithic application into distinct services that communicate over a network. The decomposition boundary defines what each service owns: its data, its logic, and its deployment lifecycle. Good decomposition produces services that can be deployed independently, scale independently, and are owned by teams independently. Poor decomposition produces distributed systems with tight coupling that is harder to operate than the original monolith."
+faq: [
+  {"q":"What is the strangler fig pattern and how does it apply to service decomposition?","a":"The strangler fig pattern gradually extracts functionality from a monolith by routing traffic for specific capabilities to new services while the monolith continues to handle the rest. The name comes from the strangler fig vine that grows around a tree over years and eventually replaces it. Applied to service decomposition: identify a capability (payment processing, notification sending, search indexing) that has a clear interface, extract it to a new service, route the relevant traffic to the new service, and retire the monolith code. This incremental approach is safer than a big-bang microservices rewrite because the system is always in a deployable state."},
+  {"q":"How do you identify the right service boundaries?","a":"Service boundaries should align with: business capabilities (the domains that the business executes, such as billing, user management, inventory); team ownership (Conway's law: system architecture mirrors organizational structure, so services should align with how teams are organized); data ownership (each service should own its data and not share a database with another service); and deployment frequency (code that needs to deploy independently belongs in a separate service from code with a different deployment cadence). Poor boundaries are created by technical decomposition (splitting along database tables, or separating the controller from the model) rather than domain decomposition."},
+  {"q":"What is the biggest cost of premature service decomposition?","a":"The biggest cost of premature service decomposition is network latency and distributed data management replacing in-process function calls and local transactions. Operations that were a simple database query become API calls with failure modes, retry logic, and eventual consistency. Joins across service boundaries require either a service that queries both or data denormalization. The operational cost of managing multiple deployed services (separate CI/CD pipelines, separate monitoring, separate on-call runbooks) multiplies by the number of services. Premature decomposition imposes this overhead before the team has the organizational maturity or scale to benefit from service independence."},
+  {"q":"When does the overhead of service decomposition become justified?","a":"Service decomposition becomes justified when: a specific capability has scaling requirements dramatically different from the rest of the system (a video processing service that needs GPU instances should not scale with the web API); team size has grown to the point where deployment coordination in a monolith creates bottlenecks (typically over 5 to 8 engineers shipping to the same codebase); organizational structure has evolved so that clear team boundaries exist that could own separate services; or a capability has different availability requirements (a payment service needs higher uptime than a reporting service). None of these conditions exist for most early-stage products."},
+  {"q":"What is data ownership in services and why does shared databases undermine the pattern?","a":"Data ownership means each service is the sole writer to its own data store. Other services read that service's data only through the service's API, not by querying the service's database directly. Shared databases (multiple services reading and writing the same database tables) create tight coupling at the data layer: schema changes in one service affect all other services reading those tables, and the database becomes a distributed system coordination point. In practice, many early microservices decompositions retain a shared database, which provides service deployment independence but not true service independence. Data ownership is the more important property but the harder one to implement without significant data migration work."}
+]
+---
+
+## What you need to know
+
+- Service boundaries should align with business capabilities and team ownership, not with database tables or technical layers.
+- The strangler fig pattern (gradual extraction) is safer than big-bang rewrites. The system is always in a deployable state during incremental decomposition.
+- Premature decomposition imposes distributed systems overhead without the organizational or scaling benefits that justify it. Most products should stay in a modular monolith longer than their instincts suggest.
+- Shared databases undermine service independence even when deployment is separated. Each service should own its data and expose it through its API.
+- Service decomposition is justified when scaling requirements, team size, or deployment independence requirements actually require it, not before.
+
+## The core argument
+
+The microservices decision is made too early in most products I have seen. The motivation is usually one of two things: the engineers on the team have worked at a large company with microservices and default to what they know, or the technical lead read about Netflix's architecture and wants to build for scale before the product has users. In both cases, the result is a distributed system with all of the operational complexity and none of the organizational scale that justified that complexity at Netflix.
+
+A well-structured monolith with clear module boundaries, a consistent data model, and a single deployment pipeline is easier to operate, faster to change, and more reliable than a premature microservices architecture. The monolith becomes a problem when team size creates deployment coordination bottlenecks, when specific capabilities have scaling requirements the rest of the application does not, or when organizational structure has evolved to the point where separate teams genuinely need independent deployment and ownership.
+
+The right time to extract a service from a monolith is when the cost of the extraction is less than the cost of not extracting. For Velmora, the first service extraction was the PDF generation service: it consumed significant CPU on the web server, had no dependencies on the rest of the application state, and ran on its own deployment cadence. Extracting it produced a clear benefit (isolated CPU usage, independent scaling) with a clear interface (generate PDF from HTML, return a file URL). The extraction took two days and the result was obviously better. That is the pattern for justified decomposition.
+
+## Common mistakes
+
+1. **Decomposing along technical layers instead of business capabilities.** Extracting "the API layer" or "the database layer" as separate services creates tight coupling across service boundaries because every operation requires coordination between the extracted layers. Decompose by business capability (billing, notifications, user authentication) so that each service can perform complete operations without depending on other services for every request.
+
+2. **Not establishing a data ownership principle before the first extraction.** The most expensive mistake in service decomposition is retaining a shared database after extracting services. Shared database access creates invisible coupling that surfaces as schema migration coordination requirements, data consistency bugs, and tight operational dependency between "independent" services. Establish the data ownership principle before the first extraction: the new service gets its own database and the monolith reads from the new service's API.
+
+3. **Under-investing in service communication patterns.** Services that communicate synchronously (API calls where the caller waits for a response) create chains of availability dependencies: service A calls service B which calls service C; a failure in service C causes failures in service B which causes failures in service A. Asynchronous communication (event-driven patterns, message queues) breaks these chains. Design the communication pattern for each service interaction before the extraction, not after.
+
+4. **Treating service decomposition as a one-time project rather than an ongoing evolutionary process.** Service boundaries that are right today may not be right when the product has different scale, team structure, and domain understanding. Teams that treat decomposition as a project to be completed rather than an evolutionary practice end up with service boundaries that are frozen in the assumptions of the time they were drawn.
+
+5. **Not monitoring distributed traces across service boundaries.** When a request spans multiple services, latency and errors can originate at any point in the call chain. Without distributed tracing (Jaeger, Datadog APM, OpenTelemetry), diagnosing performance problems and errors in a multi-service architecture is significantly harder than in a monolith. Instrument distributed tracing before extracting the first service.
+
+## Where to start
+
+1. **Identify the one capability in the current monolith that is a strong candidate for extraction.** The criteria: a clear boundary (the capability does not share data models with other capabilities), an independent scaling requirement or different deployment cadence, and a well-understood interface (the rest of the application talks to it through a small, well-defined set of calls). If no capability clearly meets these criteria, the monolith is not yet ready for decomposition.
+
+2. **Extract the candidate capability using the strangler fig pattern.** Create the new service, implement the API, and route the relevant traffic to it while the monolith retains the existing code. Verify the new service is operating correctly. Gradually reduce and eventually remove the monolith's implementation of the same capability. This incremental approach produces a system that is always in a working state.
+
+3. **Measure whether the extraction delivered the expected benefit.** After the extraction, answer: is the capability now independently deployable? Does it scale independently? Did the team experience a deployment velocity improvement? If the extraction did not produce measurable benefit, the boundary may have been drawn incorrectly, or the product may not be at the scale where decomposition produces returns. Use the data to inform the decision about the next extraction.
+
+## Related reading
+
+- [SaaS Multi Tenancy Patterns: Database per Tenant vs Shared Schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema)
+- [Saga Patterns: Distributed Transactions Without Distributed Pain](/blog/saga-patterns-distributed-transactions-without-distributed-pain)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)
+- [Schema Design Decisions That Haunt You at Million User Scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale)

@@ -1,0 +1,131 @@
+---
+slug: "why-most-rewrites-fail"
+title: "Why Most Rewrites Fail"
+excerpt: "Working notes on why most rewrites fail. Written for founders, engineers, and operators who want a clear read on tech debt and refactoring from someone who has shipped the work."
+date: "2025-08-31"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","ai"]
+readingMinutes: 13
+ogImage: "/api/og/blog/why-most-rewrites-fail"
+status: "published"
+definition: "Most rewrites fail not because the engineers are incompetent but because the work expands to absorb every known problem with the old system, the timeline slips past the point where the business can wait, and the new code turns out to have its own edge cases that only production use reveals. I have seen this pattern across dozens of teams. Understanding why it happens is the first step to avoiding it."
+faq: [
+  {"q":"What is the most common reason a software rewrite fails to ship?","a":"Scope expansion. The rewrite starts with one system and absorbs adjacent problems as it goes. Each expansion seems reasonable in isolation. Together they push the timeline from three months to eighteen. The business cannot wait eighteen months. The rewrite gets cancelled or ships an incomplete product that breaks customer trust."},
+  {"q":"How can a team avoid scope creep during a rewrite?","a":"Freeze the scope in writing before the first line of new code. Any new requirement goes through a change control process that requires explicit sign-off. The rule is that anything not in the original scope ships in a future iteration, not the rewrite. Enforcing this rule is uncomfortable. Ignoring it is worse."},
+  {"q":"Why do rewrites almost always take longer than the initial estimate?","a":"Because the estimate is based on what the team knows about the problem, and the old code knows things that the team does not. Edge cases discovered in production, behaviors added quietly during incidents, integrations that depend on undocumented quirks. Each discovery adds time. The old code is a compressed archive of years of problem-solving that the new code must rediscover from scratch."},
+  {"q":"Should the rewrite team also maintain the old system during the project?","a":"No, if at all possible. Maintaining the old system while building the new one splits attention and slows both. If the old system needs to stay live, assign a separate rotation for critical maintenance and protect the rewrite team from being pulled into it. Teams that try to do both at full capacity burn out and deliver neither well."},
+  {"q":"What is the second system effect and how does it apply to rewrites?","a":"Frederick Brooks named it in The Mythical Man-Month. Engineers who build the second version of a system overcomplicate it, because they finally have the freedom to build it right. The first version had constraints. The second version has ambition. The result is a system that is more sophisticated than necessary and harder to ship than expected."},
+  {"q":"Is it possible to run a successful big bang rewrite, and if so how?","a":"Yes, for systems that are small, well-tested, and well-understood. The conditions are: a clear interface contract that the new system must match, high test coverage on the existing system to verify equivalence, a rollback path that is trivially executable, and a team that has maintained the old system long enough to know all its behaviors."},
+  {"q":"How do you know when to cancel a rewrite that is failing?","a":"When the timeline has slipped more than fifty percent and the end is still not visible, when the team morale is significantly lower than at the start, or when the business is making product decisions around the rewrite rather than the other way around. Cancelling is hard. Continuing past the point of reasonable return is harder."}
+]
+---
+
+## What you actually need to know
+
+- Most rewrites fail because the scope grows after the start, not because of technical problems.
+- The old code knows things the team does not. Those things reveal themselves in production after the cutover.
+- Parallel systems are expensive to maintain and the team eventually stops caring about the old one, leaving customers on a broken path.
+- The second system effect is real. Engineers overcompensate for everything they hated about the first version.
+- A rewrite that takes more than two times its original estimate is statistically unlikely to deliver on the original promise.
+- Incremental replacement via the strangler fig pattern succeeds more often than big bang rewrites by a large margin.
+
+| Rewrite type | Success rate | Primary failure mode | Better alternative |
+|---|---|---|---|
+| Big bang, full application | Low | Scope creep, timeline slip, stale old system | Strangler fig migration |
+| Module rewrite with interface parity | Medium | Second system effect on the new module | Targeted refactor first |
+| Parallel build with traffic shift | Medium-high | Permanent dual maintenance burden | Gradual strangler migration |
+| Greenfield new product | Medium | Loses old product knowledge | Customer discovery before new build |
+| AI-assisted rewrite | Medium | New code lacks production context | Refactor with AI assist, not full rewrite |
+
+## The core argument
+
+Joel Spolsky wrote about this in 2000. The piece was called "Things You Should Never Do." The headline claim was that you should never rewrite from scratch. He was right about the mechanism even if the absolutism was overstated.
+
+The old code is not just code. It is a compressed archive of every bug the system ever had, every edge case a customer ever hit, every business rule that was added quietly during an incident at 2 am. When you throw it away and start over, you throw that knowledge away too. The new code will rediscover it. In production. Under load. In front of customers.
+
+This is not an argument against all rewrites. Some systems genuinely cannot be fixed. Some technical choices are so foundational that patching them is more expensive than replacing them. The argument is against the casual rewrite, the one that starts because the code is ugly and the team is frustrated and someone says "we should just start over."
+
+The teams that succeed with rewrites share a set of disciplines. They define a fixed scope and hold it against every attempt to expand it. They build the new system incrementally, moving traffic gradually rather than cutting over all at once. They keep the old system fully functional until the new one is proven at scale. And they treat the old code as a specification, reading it carefully for behaviors they might miss rather than ignoring it.
+
+## The failure modes, named and specific
+
+### Scope creep
+
+Every rewrite starts with good intentions. The scope is "just the payment module" or "just the authentication system." Then someone notices that the payment module calls a billing module that is also messy. The billing module calls the user management module. Three months in, the team is rewriting the entire application.
+
+Each expansion felt reasonable. None of them were. The original estimate was for the payment module. The team is now building a new product.
+
+### The 70 percent wall
+
+Rewrites follow a consistent pattern. The first 70 percent goes reasonably well. The basic flows work, the team is energized, the new codebase feels clean. Then the team hits the edge cases. The behaviors that only exist because of a bug that was fixed four years ago and nobody remembers why. The integration with the third party vendor that sends malformed data and the old code silently corrected for.
+
+Each edge case takes longer than expected. The team is tired. The business is impatient. The last 30 percent of the work takes as long as the first 70 percent. If the original estimate was three months, the project ships in six. If it was six months, it ships in twelve, or it does not ship at all.
+
+### The stale old system
+
+When a team is running two systems in parallel, attention naturally concentrates on the new one. Bugs in the old system get tagged as "will be fixed in the new version." New features go on the new system only. Customers on the old system notice. Support tickets accumulate. The old system becomes a customer relationship problem while the team is trying to ship the new one.
+
+## What a failed rewrite actually costs
+
+| Cost category | Typical range | Notes |
+|---|---|---|
+| Engineering time, direct | 3x to 5x original estimate | Scope creep and edge case discovery |
+| Opportunity cost of features not shipped | Hard to quantify | Often exceeds direct engineering cost |
+| Customer churn during parallel period | 5 to 15 percent for visible products | Customers on the old system get worse service |
+| Team morale and turnover | 1 to 2 engineers may leave | Demoralized teams are a real cost |
+| Post-rewrite stabilization | 1 to 3 months of elevated incidents | New code meets production reality |
+
+These numbers are not precise. They are directional, based on patterns I have seen across multiple projects. The point is that a failed or delayed rewrite is never just a schedule slip. It is a compounding cost across multiple dimensions simultaneously.
+
+## What to look for before approving a rewrite
+
+- A written scope definition that has been reviewed and agreed to by all parties.
+- An estimate that includes a fifty percent contingency for edge case discovery.
+- A traffic migration plan, not a cutover date.
+- A plan for maintaining the old system at minimum viable quality during the transition.
+- A cancel condition, a point at which the team will stop and reassess rather than continuing to sunk-cost the project.
+- A list of the known behaviors in the old system that the new system must replicate.
+- A rollback plan that is executable within four hours.
+
+## Expert opinion
+
+> Every rewrite I have seen start with confidence has ended with a story about how it was harder than expected. The teams that succeed are not more talented. They are more disciplined about scope and more honest about what they do not know about the old system. The ones who fail are usually the ones who were most confident at the start.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A mid-stage SaaS brought me in to assess a rewrite project that had been running for nine months against a four-month original estimate. The team had rewritten about sixty percent of the application. The remaining forty percent included the billing system, the permission model, and the real-time notification layer, each of which was harder than expected.
+
+The old system was still running. New customers were being onboarded to the new system. Existing customers were on the old system, which was receiving minimum viable maintenance. Support ticket volume for the old system was up forty percent from six months ago.
+
+We made the call to stop the big bang approach and switch to a strangler fig model. The new system would absorb one module at a time, moving existing customer traffic incrementally. The rewrite did finish, fourteen months after it started, with a gradual migration rather than a cutover.
+
+The lesson was not that the rewrite was wrong. It was that the big bang approach made it fragile. The strangler fig approach would have delivered the same outcome with less risk and probably in a shorter real-world timeline, because the parallel system problem would have been avoided.
+
+For the decision framework that should have been applied before this project started, [when to refactor and when to rewrite](/blog/when-to-refactor-and-when-to-rewrite) covers the cost-based analysis that makes this call analytical rather than emotional. For the migration strategy that replaces big bang rewrites in most cases, [big bang vs gradual migration](/blog/big-bang-vs-gradual-migration-a-decision-map) gives the full decision map.
+
+## Common mistakes
+
+1. Treating scope expansion as additive rather than multiplicative. Each new module added to the scope does not add its own estimate. It adds its own estimate plus the integration surface with everything already in scope.
+2. Setting an ambitious timeline to get approval and living with the optimism afterward. The estimate the founder approved was wrong from day one.
+3. Stopping maintenance on the old system before the new one is ready. Customer experience degrades and the old system becomes a liability at exactly the wrong time.
+4. Not reading the old code as a specification. The old code knows things you do not. Treat it as the most complete documentation you have.
+5. Assigning the rewrite to the most excited engineers rather than the engineers who understand the old system best. Enthusiasm without knowledge rediscovers every edge case in production.
+6. No cancel condition. The project continues past the point of reasonable return because stopping feels like failure. Stopping at the right moment is a decision, not a defeat.
+7. Overengineering the new system to avoid the mistakes of the old one. The second system effect is real and it compounds timelines.
+8. Cutting over on a hard date regardless of readiness. Hard cutover dates create pressure to ship incomplete systems.
+
+## A nine-week decision and planning process
+
+1. **Week one.** Document the cost of the existing system. Hours per sprint in workarounds, incidents per quarter, features blocked or slowed.
+2. **Week two.** Read the old code as a specification. Document every behavior that is not obvious from the interface.
+3. **Week three.** Write the scope definition. Sign off required from engineering lead, product lead, and founder.
+4. **Week four.** Build the traffic migration plan. Decide on strangler fig, percentage routing, or feature flag approach.
+5. **Week five.** Write the cancel condition. What metrics, at what threshold, will trigger a reassessment?
+6. **Week six.** Estimate with fifty percent contingency explicit and named. Present to founder with the contingency included.
+7. **Week seven.** Build the rollback plan. Test it before the first migration step.
+8. **Week eight.** Begin the first migration increment. One module, with old system still live and receiving traffic.
+9. **Week nine.** Measure and assess. Is the new module behaving as expected? Are the edge case discoveries within the expected range? Decide whether to continue.
+
+The companion read for the ongoing maintenance discipline is [the tech debt ledger post](/blog/the-tech-debt-ledger-a-discipline-worth-keeping), which shows how to track the decision to rewrite versus refactor as a running cost analysis rather than a one-time judgment call.

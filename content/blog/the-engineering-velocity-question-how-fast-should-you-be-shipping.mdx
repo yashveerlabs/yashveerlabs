@@ -1,0 +1,97 @@
+---
+slug: "the-engineering-velocity-question-how-fast-should-you-be-shipping"
+title: "The Engineering Velocity Question: How Fast Should You Be Shipping?"
+excerpt: "The right answer to engineering velocity is not 'as fast as possible' -- it is specific to the stage, the product maturity, and what the team is optimizing for."
+date: "2026-01-17"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","velocity","shipping","dora-metrics"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-velocity-question-how-fast-should-you-be-shipping"
+status: "published"
+definition: "Engineering velocity is not a single metric -- it is a function of how quickly a team can move from a validated idea to a working feature in production, measured against the constraints of quality and reliability appropriate for the product's current stage. The startup that is learning needs velocity optimized for iteration speed. The company with a critical financial product needs velocity optimized for safety and confidence. The right velocity is the one that serves the current optimization target, not the fastest velocity possible."
+faq: [
+  {"q":"What are DORA metrics and why do they matter for velocity?","a":"DORA metrics are four measurements developed by the DevOps Research and Assessment team: deployment frequency (how often code is deployed to production), lead time for changes (time from code commit to production), change failure rate (percentage of deployments causing a production issue), and mean time to recovery (how long to restore service after an incident). High-performing teams score well on all four. The four metrics together capture velocity without sacrificing reliability, which is why they are more useful than deployment frequency alone."},
+  {"q":"What is the difference between velocity and throughput?","a":"Throughput measures volume: how many features shipped, how many lines of code written, how many tickets closed. Velocity measures speed in a meaningful direction: how quickly the team moved from a user need to a tested solution in production. A team can have high throughput and low velocity if they are shipping many features that do not address user needs or that require rework after shipping."},
+  {"q":"How do I increase engineering velocity without increasing defect rate?","a":"The counterintuitive answer: the practices that most reliably reduce defect rate also increase velocity. Automated testing catches regressions faster than manual QA. CI/CD automation makes deployments faster and more consistent. Code review catches problems before they reach production. These investments have upfront cost and compound into both higher velocity and higher quality."},
+  {"q":"How do I know if my team is slow?","a":"Benchmark against DORA metrics for similar companies at similar stages. Elite performers (in the DORA research) deploy multiple times per day, have lead times under one hour, have change failure rates under 5 percent, and recover from incidents in under one hour. If your team is significantly below these benchmarks, the gap is worth investigating. The most common causes: slow CI, manual deployment steps, large batch sizes, or insufficient test automation."},
+  {"q":"Should velocity be the same across all teams in an engineering organization?","a":"No. Teams working on the core product loop where iteration speed creates competitive advantage should optimize for high deployment frequency and fast lead time. Teams working on financial infrastructure, security-critical systems, or regulatory compliance should optimize for safety, confidence, and auditability -- even if this means lower deployment frequency. The velocity target should match the risk profile of what is being shipped."}
+]
+---
+
+## What you actually need to know
+
+- The right velocity is the one that serves the current optimization target. Faster is not always better.
+- DORA metrics are the most validated way to measure engineering velocity without sacrificing reliability. All four matter.
+- The practices that improve velocity and the practices that improve reliability are largely the same: automated testing, CI/CD, small batch sizes, fast feedback loops.
+- A team with high throughput (many tickets closed) can have low velocity (not shipping anything meaningful). Measure outcomes, not activity.
+- Engineering velocity that feels slow is almost always caused by slow CI, large pull requests, manual deployment steps, or insufficient test automation -- not by the engineers being less capable.
+
+| DORA Metric | Elite Benchmark | Median Benchmark | Common Bottleneck |
+|---|---|---|---|
+| Deployment frequency | Multiple times/day | Once per week | Manual deployment process |
+| Lead time for changes | Under 1 hour | 1-4 weeks | Slow CI, large PRs |
+| Change failure rate | Under 5% | 10-20% | Insufficient testing |
+| Mean time to recovery | Under 1 hour | 1-24 hours | Poor monitoring, complex rollback |
+
+## The core argument
+
+The velocity question in engineering leadership has a wrong answer that is heard constantly: "we need to ship faster." This is sometimes true. It is often false. The team that ships faster by skipping code review accumulates a quality debt that slows future shipping. The team that ships faster by reducing test coverage ships regressions that take more time to fix than the shipping time saved. The team that ships faster by reducing architectural investment ships a system that becomes increasingly expensive to change.
+
+The correct question is not "how do we ship faster?" It is "what is the right velocity for our current optimization target, and are we achieving it?" The optimization target depends on the stage and the nature of what is being shipped.
+
+Early-stage startups that are still learning what customers want should optimize for iteration speed: the ability to ship a hypothesis to real users, collect feedback, and update the hypothesis quickly. The relevant metric is how long it takes from "we think this might work" to "we have data from users." This should be measured in days, not weeks.
+
+Companies that have found their product-market fit and are scaling should optimize for the sustainable velocity that allows steady feature delivery without accumulating the technical debt that will slow future development. The relevant metric here is the DORA metrics taken together: deployment frequency, lead time, change failure rate, and mean time to recovery.
+
+Companies with products where failures have significant consequences -- financial infrastructure, healthcare software, industrial control systems -- should optimize for confidence and safety. The relevant metric includes not just how fast they ship but how reliably the things they ship work and how quickly they can recover from the inevitable failures.
+
+The mistake is applying the wrong optimization target to the wrong stage. An early-stage company that is optimizing for safety when they should be optimizing for learning speed will never find their product-market fit before the runway runs out. A growth-stage company that is still optimizing for raw iteration speed without investing in reliability will accumulate technical debt and quality problems that compound into a crisis.
+
+## What slows velocity
+
+In every engineering team I have worked with or evaluated, the primary bottlenecks to velocity are predictable and largely independent of the engineers' individual skill.
+
+**Slow CI/CD.** A test suite that runs for 40 minutes before providing feedback means engineers wait 40 minutes to know whether their change is working. During that wait, context switches. A CI pipeline under 10 minutes keeps engineers in the flow state that produces fast iteration. Investing in CI performance -- parallelization, caching, test suite optimization -- is one of the highest-ROI engineering investments a team can make.
+
+**Large pull requests.** Pull requests with large diffs take longer to review, produce less useful review feedback (reviewers lose context across large changes), and are harder to revert if a problem is discovered. The practice of shipping small, focused pull requests consistently -- one conceptual change per PR, under 400 lines of change where possible -- is correlated with high-performing engineering teams in the DORA research.
+
+**Manual deployment steps.** Any deployment step that requires a human to do something manually is a step that introduces inconsistency and creates a bottleneck. Fully automated deployments, triggered by a passing CI run, are the norm in high-velocity teams. The investment in automation has a fixed cost and an ongoing return.
+
+**Insufficient test automation.** Teams without test automation cannot confidently deploy frequently because they do not know whether their changes broke existing behavior. The investment in a test suite that provides fast, reliable signal about system correctness is the enabler of high deployment frequency.
+
+## Measuring velocity accurately
+
+The most common mistake in measuring engineering velocity is measuring activity instead of outcomes. Tickets closed per week, lines of code per week, and pull requests per week all measure activity. They do not measure whether the team is moving in the right direction at the right speed.
+
+The DORA metrics measure outcomes. Deployment frequency measures the team's ability to ship working code to production regularly. Lead time measures how quickly an idea becomes a tested feature. Change failure rate measures the quality of what is being shipped. Mean time to recovery measures how resilient the team is when something goes wrong.
+
+These four metrics together capture the health of the engineering delivery process better than any single metric. A team with high deployment frequency and high change failure rate is shipping fast and breaking things regularly. A team with low change failure rate and long lead time is shipping safely but slowly. The target is high deployment frequency, short lead time, low change failure rate, and short mean time to recovery simultaneously.
+
+Measuring these metrics requires instrumentation. Deployment frequency comes from the CI/CD system logs. Lead time requires tracking from code commit to production deployment. Change failure rate requires an incident tracking system that tags incidents to specific deployments. Mean time to recovery requires incident tracking with timestamps. Setting up this instrumentation is a one-time investment that provides ongoing insight.
+
+## Common mistakes engineering leaders make with velocity
+
+1. Treating velocity as a moral virtue. "We need to ship faster" said without context is not engineering leadership -- it is pressure. Velocity is a means to an end, not an end in itself.
+2. Optimizing for one DORA metric at the expense of others. Teams that maximize deployment frequency without monitoring change failure rate are optimizing for a leading indicator without checking the lagging one.
+3. Blaming engineers for slow velocity that is caused by slow processes. The CI/CD pipeline that runs for 40 minutes is a process problem. The engineer working within that process cannot ship faster by working harder.
+4. Not measuring velocity at all. The team without velocity metrics cannot identify whether it is improving or degrading. The baseline measurement is the prerequisite to any improvement.
+5. Conflating velocity and throughput. The team that closes 50 tickets per week and the team that ships three meaningful features per week are not equally productive if the 50 tickets are not moving the product in the right direction.
+
+## Where to start: a 3-step velocity assessment
+
+**Step 1: Instrument the four DORA metrics.** Set up the data sources required to measure deployment frequency, lead time, change failure rate, and mean time to recovery. Calculate the current baseline for each metric.
+
+**Step 2: Identify the metric that is furthest from elite performance.** For most startups, this is lead time or deployment frequency. The metric with the largest gap is the highest-leverage place to invest.
+
+**Step 3: Trace the metric to its root cause.** For slow lead time: where is the time going? Code review wait? CI runtime? Manual deployment steps? For low deployment frequency: what is preventing more frequent deployments? Each root cause has a specific intervention. Fix the cause, not the metric.
+
+## Shipping at the Right Speed
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The velocity question for my own work is not "am I shipping as fast as possible?" It is "am I shipping at the pace required to learn what I need to know at this stage?" The answer changes as the product matures. The practice of measuring deployment frequency, lead time, and incident recovery time is what tells me whether the current pace is right.
+
+## Related reading
+
+- [The Deployment Pipeline That Survives Real-World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- [The Engineering OKR That Works](/blog/the-engineering-okr-that-works)
+- [The Engineering Dashboard Every Founder Should Have](/blog/the-engineering-dashboard-every-founder-should-have)
+- [The Engineering Operations Team: When You Need One](/blog/the-engineering-operations-team-when-you-need-one)

@@ -1,0 +1,119 @@
+---
+slug: "the-refactor-that-never-ended"
+title: "The Refactor That Never Ended"
+excerpt: "Working notes on the refactor that never ended. Written for founders, engineers, and operators who want a clear read on startup failure postmortems and fear from someone who has shipped the work."
+date: "2026-03-02"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","failure","incidents"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-refactor-that-never-ended"
+status: "published"
+definition: "An infinite refactor is not a code quality problem. It is a scope problem wearing code quality as a costume. I have seen teams spend an entire quarter on a refactor that delivered nothing to users because no one defined what done looked like before the first commit. The codebase gets cleaner and the product gets slower, and by the end both the engineers and the founders are frustrated at each other."
+faq: [
+  {"q":"Why do engineering refactors in startups so often run over time and never finish?","a":"Because scope expands the moment the team starts working. You open one module to refactor it and find three adjacent problems that feel wrong to leave. Each discovery adds work that was not in the original estimate. Without a strict done definition and an explicit stop condition, the refactor absorbs every adjacent improvement until it either ships in a degraded state or gets abandoned."},
+  {"q":"How do you scope a refactor so that it actually finishes?","a":"Define the exit criteria before writing a single line of new code. What does the system look like when the refactor is done? Which specific files, modules, or layers are in scope? What is explicitly out of scope? Write these down and make them visible to the whole team. When something out-of-scope is discovered during the work, log it and continue rather than absorbing it."},
+  {"q":"Is it ever the right call to stop a refactor that is already in progress and ship what you have?","a":"Yes, and it is often the right call. If the refactor has been running for more than twice the original estimate and the remaining scope is unclear, stopping and shipping the completed portion is usually better than continuing. The partial improvement is real. The unfinished portion can become a separate, more tightly scoped project."},
+  {"q":"What is the difference between a productive refactor and one that will never end?","a":"A productive refactor has a defined scope, a target state that everyone agrees on, measurable exit criteria, and a time box. One that will never end has good intentions and no constraints. The team knows roughly what they want the code to look like but has not written down the boundary between in scope and out of scope."},
+  {"q":"How should founders communicate with engineering about an ongoing refactor that appears to be stalling?","a":"Ask two questions: what is the exit condition, and when will we reach it? If neither can be answered specifically, the refactor needs to be re-scoped. This is not a criticism of the engineering team. Refactors without clear exit conditions are structurally incomplete projects, not engineering failures."},
+  {"q":"What are the best strategies for refactoring without blocking product development entirely?","a":"The strangler fig pattern works well. Refactor incrementally on the boundary between old and new code while keeping the old code running. New features use the new patterns. Old features get migrated opportunistically. The product keeps moving. The codebase improves continuously rather than in one expensive pause."},
+  {"q":"How do you prevent a refactor from turning into a de facto rewrite?","a":"Set a line between refactoring and rewriting before you start and enforce it. Refactoring changes structure without changing observable behavior. If you are changing how data is stored, how services communicate, or what the public API looks like, you have crossed into rewrite territory. That requires a different plan, a different estimate, and a different conversation with stakeholders."}
+]
+---
+
+## What you actually need to know
+
+- A refactor without an explicit done definition is not a project. It is an open-ended commitment with no natural stopping point.
+- Scope creep in refactors is structural, not a team discipline failure. Every file opened reveals adjacent problems that feel wrong to leave.
+- The right way to handle adjacent problems found during a refactor is to log them, not absorb them.
+- Partial refactors that ship are more valuable than complete refactors that stay on a branch for five months.
+- Founders and engineers have different mental models of what a refactor produces. Aligning on that before the work starts prevents a lot of friction.
+
+| Refactor Type | Scope Clarity | Typical Duration | Risk of Never Finishing |
+|---|---|---|---|
+| Single module cleanup | High | 1-2 weeks | Low |
+| Cross-cutting pattern change (e.g., error handling) | Medium | 3-6 weeks | Medium |
+| Architecture layer replacement (e.g., new ORM) | Low | 6-12 weeks | High |
+| Full domain model redesign | Very low | Unpredictable | Very high |
+
+## The core argument
+
+The refactor starts with good intentions. The codebase has been accumulating fast-path decisions for eighteen months and the engineers are right that something needs to change. The original architecture was not wrong for a three-person team on a tight budget. It is wrong for the twelve-person team trying to ship features at the current pace. This conversation with founders usually lands well. The refactor gets time on the roadmap.
+
+Then it starts.
+
+Week two, the team discovers that the module they are refactoring has implicit dependencies on three other modules that were not in scope. Week three, a new engineer joins and has strong opinions about the target pattern. Week four, a customer request creates pressure to ship a feature that touches the module being refactored, so the refactor gets paused while the feature ships, then resumes, and the context has been partially lost.
+
+By week eight, the branch has 400 commits and no clear release date. The rest of the product is moving forward on the old patterns because that is what works. The refactored code lives in a long-running branch that is increasingly difficult to merge. The team is frustrated. The founders are asking when the refactor will be done. Nobody has a good answer.
+
+This is not a story about a bad engineering team. It is a story about a project that was started without a done definition, scope controls, or a merge strategy.
+
+## Why refactors expand and what to do about it
+
+The expansion mechanism is predictable. You open a module and find something adjacent that is clearly wrong. It would take ten minutes to fix. You fix it. That fix reveals another thing. You are now two layers deep in something that was not the original plan, and you have not written a line of the actual refactor yet.
+
+Multiply this by every engineer on the team working in parallel and you have a refactor that has tripled in scope before it is 20 percent complete.
+
+### The log-and-continue rule
+
+The practical fix is the log-and-continue rule. When you discover something out of scope during a refactor, you write it in a shared list and continue with the scoped work. The list exists. The problem is acknowledged. It will be addressed after this refactor ships. This is not perfectionism deferred. It is scope discipline applied consistently.
+
+Teams that struggle with this rule usually struggle because the adjacent problems feel urgent and because fixing them now seems cheaper than coming back. This reasoning is almost always wrong. The cost of absorbing the adjacent problem is paid in scope expansion, delayed shipping, and branch divergence. The cost of logging it is five minutes.
+
+### When to stop and ship the partial improvement
+
+If a refactor has been running for more than twice the original estimate, it should be evaluated for partial delivery. What portion is complete and stable? Can it ship? What does the rest look like? Is the remaining work well understood or is it still revealing new scope?
+
+Shipping the completed portion as-is, even if the architecture is not perfectly uniform, is often the right call. The improvement is real. The branch is cleared. The team can form a new project for the remaining work with tighter scope.
+
+## How long does it take
+
+| Refactor Phase | What Happens | Typical Duration |
+|---|---|---|
+| Scoping and done-definition | Define target state, list in-scope modules, write exit criteria | 2-3 days |
+| Baseline and branch setup | Establish test coverage baseline, create merge strategy | 1-2 days |
+| Core refactor work | Systematic module-by-module changes, log-and-continue | 2-8 weeks depending on scope |
+| Integration and conflict resolution | Merge with main, resolve divergence, run full test suite | 3-5 days |
+| Validation and release | Verify behavior unchanged, ship, monitor | 1 week |
+
+## What to look for in a refactor plan
+
+- An explicit list of which files, modules, or layers are in scope
+- An equally explicit list of what is out of scope, written down before work starts
+- A done definition that does not include perfection
+- A merge strategy that prevents months of branch divergence
+- A log-and-continue discipline for adjacent problems discovered during the work
+- A re-estimate checkpoint at the halfway mark against the original scope
+- A stop condition if the refactor exceeds two times the original estimate without clear path to completion
+
+## Expert opinion
+
+> The refactors I have seen fail all had the same structure at the start: a real problem, a well-intentioned team, and no written done definition. The well-intentioned team was not the failure point. The missing done definition was. I now refuse to start a refactor without writing the exit criteria in a shared document first. Not because I am precious about process, but because I have seen what happens when it does not exist. The team works hard, ships nothing, and everyone ends up angry at each other for reasons they cannot fully articulate.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A team I worked with had a monolith that had been serving them for two years. The ORM layer was inconsistent, the error handling was scattered, and the test coverage was low. All of this was real and worth addressing. They scoped a refactor to standardize the ORM usage across the backend, which they estimated at four weeks.
+
+Six weeks in, the branch had grown to include error handling standardization, a new logging format, and the beginnings of a service extraction that nobody had planned. The original ORM work was about 70 percent done but could not ship because the branch had been modified so many times that merging it back to main was now a multi-day project.
+
+They stopped, audited the branch, identified what was clean and what was not, and shipped the ORM portion in a separate smaller PR. The other work went back into the backlog as separate projects with separate scopes. They used the [pareto refactor approach](/blog/the-pareto-refactor-twenty-percent-effort-for-eighty-percent-improvement) for the cleanup work and ran it as a focused sprint using [the refactor sprint model](/blog/the-refactor-sprint-when-a-quarter-of-the-roadmap-becomes-cleanup). Both shipped within three weeks of the audit. Total improvement: significant. Total disruption to product development: minimal after the reset.
+
+## Common mistakes
+
+1. Starting a refactor without a written done definition. Good intentions are not a project plan.
+2. Absorbing adjacent problems into the scope instead of logging them. Every absorption adds scope that was not estimated and creates new adjacent problems.
+3. Running a large refactor on a long-running branch that diverges further from main every day. Merge frequently or scope so tightly that the branch can ship in days.
+4. Treating the refactor as complete when the code looks right rather than when the exit criteria are met. The exit criteria are the definition of done, not the team's aesthetic satisfaction with the code.
+5. Not establishing a test coverage baseline before starting. Without a baseline, you cannot know whether the refactor has changed behavior in unintended ways.
+6. Letting the refactor absorb engineers who were supposed to be working on product features. This turns a code quality improvement into a product velocity problem.
+7. Not communicating progress to founders in terms they can evaluate. "The architecture is getting cleaner" means nothing to a founder managing runway. "We are 60 percent through the scoped modules and on track to ship in two weeks" means something.
+8. Continuing past the two-times-estimate checkpoint without a formal re-scope. This is where infinite refactors are born.
+
+## A four-week refactor plan
+
+1. Day one: write the done definition together. What does the system look like when this is finished? What files or modules are in scope? What is explicitly not in scope? What are the exit criteria?
+2. Day two: establish the baseline. Run the full test suite. Record coverage. Identify which parts of the codebase have good coverage and which do not.
+3. Week one: start on the highest-risk module. Apply the log-and-continue rule from the first day. Merge back to main by end of week one even if the scope is not complete.
+4. Weeks two and three: continue module by module, merging incrementally. Re-estimate at the start of week three based on actual velocity. If the remaining scope is larger than the remaining time, re-scope now.
+5. Week four: integration, validation, and ship. Apply the exit criteria from day one. Ship what meets them. For broader guidance on what to clean up versus what to defer, [the tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) is a useful companion to this plan.

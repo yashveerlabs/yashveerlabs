@@ -1,0 +1,110 @@
+---
+slug: "algolia-vs-typesense-vs-meilisearch-vs-postgres-full-text"
+title: "Algolia vs Typesense vs Meilisearch vs Postgres Full Text"
+excerpt: "Four search options, four very different cost and operational profiles. The right one depends on scale, budget, and how much search engineering you want to own. Here is the call I make per project."
+date: "2026-05-18"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","search","saas","databases"]
+readingMinutes: 12
+ogImage: "/api/og/blog/algolia-vs-typesense-vs-meilisearch-vs-postgres-full-text"
+status: "published"
+definition: "Algolia is the premium managed option, fast and polished, expensive at scale. Typesense and Meilisearch are open source, self hostable, with strong defaults. Postgres full text is the boring choice that covers more cases than founders expect. The right pick depends on catalog size, search complexity, team capacity, and budget."
+faq: [
+  {"q":"Is Postgres full text good enough for a startup?","a":"For catalogs under a million records and search needs that fit basic ranking, yes. The setup costs a day. The performance is fine up to mid scale. The wins of moving to a dedicated search engine arrive once the search experience becomes a competitive differentiator, not before."},
+  {"q":"What is the practical price difference between Algolia and Typesense?","a":"At a million records and a hundred thousand searches per month, Algolia runs around 500 to 1500 dollars depending on tier. Typesense self hosted on a small VM runs 30 to 80 dollars. Typesense Cloud runs 70 to 200 dollars. The gap is real and gets wider as scale grows."},
+  {"q":"When is Algolia the right call?","a":"When the team wants zero search engineering and the budget supports it. Algolia ships fast, the SDK is polished, the search experience is best in class out of the box. For consumer apps where search latency directly drives conversion, the premium often pays for itself."},
+  {"q":"When is Meilisearch a better fit than Typesense?","a":"For teams that want a slightly more opinionated default and stronger faceted search out of the box. The two are close. I pick based on which one the team finds easier to operate, which usually comes down to documentation taste."},
+  {"q":"What about adding vector search?","a":"All four options now support some form of vector or hybrid search. Algolia and Typesense have the most polished integrations. Postgres with pgvector is a real option for hybrid search at moderate scale, with the lowest operational burden."},
+  {"q":"What happens to my search bill at ten million records?","a":"Algolia gets very expensive, often four to fifteen thousand dollars a month. Typesense and Meilisearch self hosted scale linearly with the VM cost, usually a few hundred dollars. Postgres full text struggles past a few million records on a single node and needs sharding or replication, which adds operational cost."},
+  {"q":"Can I migrate between them later?","a":"Yes, with discipline. Build a search abstraction at the application layer so the underlying engine is swappable. The migration itself takes one to three weeks for most catalogs. The discipline is what makes it cheap."}
+]
+---
+
+## What you actually need to know
+
+- Postgres full text is the cheapest option and works for most early stage products.
+- Typesense and Meilisearch are the right middle ground for teams that want better search without paying the Algolia bill.
+- Algolia is the right call when search is core to the product and the budget allows.
+- All four now support some form of vector or hybrid search in 2026.
+- In my experience, the search engine decision is reversible if the application layer is abstracted.
+
+| Option | Best for | Watch out for |
+|---|---|---|
+| Postgres full text | Early stage, small catalogs, low engineering capacity for search | Performance ceiling at a few million records |
+| Typesense | Mid stage SaaS, open source preference, strong defaults | Self hosting requires real operational discipline |
+| Meilisearch | Similar to Typesense, slightly different ergonomics | Same operational considerations |
+| Algolia | Consumer apps, premium search experience, no engineering capacity | Bill scales aggressively with usage |
+
+## The core argument
+
+Search is the feature founders most often underestimate at the start and most often regret underbuilding at scale. The lesson I have learned across client projects is that you do not need the best search engine on day one. You need a search engine that is good enough today and that you can swap out in three weeks if the workload demands it.
+
+This makes the question less about which engine is best in the abstract and more about which engine fits your current stage. A consumer app with a thousand products can run Postgres full text and never think about search again. A B2B SaaS with millions of records and search as a key UI surface needs something purpose built. A marketplace with rich faceted search and a strong consumer experience may need Algolia for the polish alone.
+
+The trap I see most often is teams that pick the most powerful option on day one because a conference talk made it sound necessary. They pay a thousand dollars a month for a search engine that is searching twelve thousand records, when Postgres would have done it for nothing. The opposite trap is teams that stay on Postgres too long and let the search experience degrade until customers complain.
+
+The right move is to build a clean search abstraction at the application layer, ship Postgres or Typesense by default, and revisit the decision when the workload changes. The abstraction is what makes the decision reversible.
+
+## When each one wins
+
+**Postgres full text wins when.** The catalog is under a million records. The search complexity is straightforward keyword and basic ranking. The team has limited capacity for search engineering. The infrastructure is already running Postgres.
+
+**Typesense wins when.** The catalog is between one and ten million records. The team wants better search than Postgres provides without the Algolia bill. The team has the operational capacity to run a small additional service. The product needs faceted search and typo tolerance out of the box.
+
+**Meilisearch wins when.** The team prefers a slightly different ergonomic and an opinionated default set of search behaviors. The differences from Typesense are real but small.
+
+**Algolia wins when.** Search is a core competitive feature. The team wants zero search engineering. The budget supports the bill. The product is consumer facing with high search volume and high stakes on conversion.
+
+## What it actually costs
+
+| Engine | Setup | Monthly at 1M records / 100k searches |
+|---|---|---|
+| Postgres full text | 1 day | Included in DB cost |
+| Typesense self hosted | 2 to 5 days | 30 to 80 dollars VM |
+| Typesense Cloud | 1 day | 70 to 200 dollars |
+| Meilisearch self hosted | 2 to 5 days | 30 to 80 dollars VM |
+| Meilisearch Cloud | 1 day | 50 to 200 dollars |
+| Algolia | 1 to 2 days | 500 to 1500 dollars |
+
+Numbers above are based on published 2026 pricing and what I see in client client engagements. The exact bill will move based on usage shape. The gap between the open source options and Algolia widens as scale grows.
+
+## Features to demand from your search layer
+
+- A clean application abstraction. The product code should not know which engine is running.
+- A reindex pipeline that can rebuild the search index from the source of truth on demand.
+- Telemetry on query latency, zero result rate, and click through. Search without these is invisible.
+- A way to handle typos and synonyms. Out of the box for the dedicated engines. Manual work for Postgres.
+- A way to integrate vector search later. All four support it now, but the implementation varies.
+- A clear answer to faceted filtering. Faceting in Postgres is doable but heavy.
+
+## Expert opinion
+
+> The search engine question is rarely the question founders think it is. The real question is how much engineering you want to own. Algolia removes the engineering. Postgres maximizes it. The middle two split the difference. Pick the one that fits the team you have, not the team you wish you had.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client B2B SaaS with about three hundred thousand records, we shipped on Postgres full text. The product launched, the search worked, customers were happy. Eighteen months later, the catalog had grown to two million records and customers were complaining about latency. We migrated to Typesense in eleven working days because the application layer had been abstracted from day one. The search experience improved noticeably and the cost increase was less than a hundred dollars a month.
+
+The opposite story is a project that started on Algolia at fifty thousand records. The monthly bill was four hundred dollars. The team complained about cost for a year before deciding to migrate. The migration to Typesense took six weeks because the application code was tightly coupled to the Algolia SDK. The migration cost more in engineering time than two years of Algolia bills.
+
+For more on the search topic, see [SaaS search at scale](/blog/saas-search-at-scale-postgres-full-text-vs-algolia-vs-typesense) and [the search problem why adding it late always hurts](/blog/the-search-problem-why-adding-it-late-always-hurts). For the vector search side, [vector databases compared](/blog/vector-databases-compared-pinecone-weaviate-pgvector-qdrant).
+
+## Common mistakes teams make
+
+1. Starting with the most powerful engine when the workload does not need it.
+2. Staying on Postgres until customers complain. The right time to migrate is just before the complaints.
+3. Tight coupling between application code and the search SDK. Abstract the boundary.
+4. No reindex pipeline. When the schema changes or the index gets corrupted, the team has no clean recovery.
+5. No telemetry on search. The team has no idea which queries are slow or returning no results.
+6. Ignoring vector search until customers ask for hybrid behavior. The infrastructure is there now, build for it.
+
+## Where to start, a 14 day plan
+
+1. **Day one and two.** Define your search abstraction. The interface the product code talks to. Implement the Postgres backend first.
+2. **Day three to seven.** Ship the Postgres implementation. Measure latency, zero result rate, and click through.
+3. **Day eight to ten.** If the metrics are clean, stop. You do not need another engine.
+4. **Day eleven to fourteen.** If the metrics are not clean, prototype Typesense or Meilisearch on the same abstraction. Run both side by side. Pick the winner.
+
+For deeper reading, [Postgres performance at scale](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle) covers what to do before moving off Postgres for any reason, and [the boring API](/blog/the-boring-api-why-predictability-beats-cleverness) covers the philosophy of why simple, swappable infrastructure beats clever locked in choices.

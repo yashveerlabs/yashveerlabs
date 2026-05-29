@@ -1,0 +1,104 @@
+---
+slug: "the-dunning-process-done-right"
+title: "The Dunning Process Done Right"
+excerpt: "How to recover failed payments automatically, when to involve humans, and how to communicate with customers who owe money without destroying the relationship."
+date: "2026-04-03"
+category: "Business Automation and Ops"
+tags: ["automation","payments","saas","revenue","operations"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-dunning-process-done-right"
+status: "published"
+definition: "Dunning is the process of communicating with customers whose payments have failed and recovering the revenue. In SaaS, most payment failures are not customer intent to stop paying. They are card expirations, temporary bank holds, or updated card numbers that the customer forgot to update. A well-designed dunning process recovers 60 to 80 percent of failed payments automatically, with only a small fraction requiring human intervention."
+faq: [
+  {"q":"What percentage of payment failures are involuntary?","a":"Research from Stripe and Recurly suggests that 60 to 80 percent of failed payments are involuntary: expired cards, temporary holds, insufficient funds that resolve within days. Only 20 to 40 percent represent genuine customer intent to cancel. This means most payment failures are a collection problem, not a churn problem."},
+  {"q":"How many retry attempts should I configure?","a":"The standard approach is three to four retry attempts over 14 to 21 days: immediately after failure, then at 3 days, 7 days, and 14 days. Stripe's Smart Retries can improve recovery rates by analyzing optimal retry timing. Beyond 21 days, recovery rates drop significantly and manual intervention is more effective."},
+  {"q":"When should I pause access versus allow continued access during failed payment?","a":"For month-to-month customers, pause access after 14 days of failed payment. For annual customers, allow continued access for 30 days. Pausing access too quickly turns a payment failure into churn. Allowing access too long incentivizes non-payment."},
+  {"q":"How do I communicate failed payment without feeling accusatory?","a":"Frame every message around helping the customer fix the issue, not demanding payment. 'We had trouble processing your payment. Here's how to update your card.' not 'Your payment failed. Please pay immediately.' The first gets updates. The second gets defensive responses."},
+  {"q":"What is Smart Retries and should I use it?","a":"Stripe's Smart Retries uses machine learning to identify the optimal time to retry a failed payment based on historical patterns for that card type and bank. It recovers 10 to 20 percent more failed payments than fixed retry schedules. Use it. It is available on all Stripe accounts with no additional cost."}
+]
+---
+
+## What you actually need to know
+
+- Most payment failures are involuntary. Treat them as collection problems, not churn signals.
+- Automated retries recover 60 to 80 percent of failed payments without any human intervention.
+- Communication should be helpful and specific: update your card here, the link expires in 7 days.
+- Pause access after 14 to 21 days for month-to-month customers. Pausing sooner triggers unnecessary churn. Pausing later allows indefinite free access.
+- Every dunning email needs a single specific action: a direct link to update payment method.
+
+| Dunning Day | Action | Communication |
+|---|---|---|
+| Day 0 (failure) | Retry immediately. Enable Smart Retries. | Email: payment failed, update card |
+| Day 3 | Retry | Email reminder with direct update link |
+| Day 7 | Retry | Email with urgency: access will pause soon |
+| Day 14 | Final retry. Pause access if still failed. | Email: access paused, restore with payment update |
+| Day 21 | Manual outreach for high-value accounts | Personal email or call for ARR over $500/month |
+
+## The core argument
+
+Most SaaS founders treat failed payments as a support problem: a customer contacts support because they got a payment failure email, and support helps them update their card. This reactive approach recovers the payments that customers notice and act on. It misses the payments where the customer did not notice the failure, or noticed it but meant to act later and forgot.
+
+A well-designed dunning process flips the default. Automatic retries handle the easiest cases. Automated communication handles the medium cases. Human outreach handles the high-value cases. The result is a recovery process that runs without founder attention on the low-value failures and focuses human effort on the accounts where a personal call is worth the time.
+
+The economics are clear. A SaaS company with $100,000 MRR and 3 percent monthly payment failure rate has $3,000 in monthly at-risk revenue. If the automated dunning process recovers 70 percent of that, it recovers $2,100 per month. At $25,200 per year, the investment in a well-designed dunning process is one of the highest-ROI operational investments the company can make.
+
+## Setting up the retry sequence
+
+Most payment processors support automatic retry scheduling. Stripe, Braintree, and Paddle all have configurable retry logic. The optimal sequence for most SaaS products:
+
+**Immediate retry.** When the payment fails, retry immediately. Some failures are transient: a temporary bank hold that has already cleared. Immediate retry recovers these without any communication.
+
+**Day 3 retry.** Many card failures resolve within a few days. Insufficient funds that resolve on payday. Temporary fraud holds that the customer has cleared. A day 3 retry catches these before the customer has even noticed the first failure.
+
+**Day 7 retry.** For failures that have persisted, the customer has likely received the first email and may have updated their card. A day 7 retry captures these updates.
+
+**Day 14 final retry.** This is the last automated attempt before access is paused. The final email should clearly state that access will pause after this date if payment is not recovered.
+
+Use Stripe Smart Retries alongside this schedule. The machine learning-based retry timing improves recovery rates without additional configuration.
+
+## Writing the dunning emails that recover payments
+
+The dunning email sequence has one purpose: help the customer update their payment method. Every element of the email should serve that purpose.
+
+**Email 1 (Day 0): Low urgency, helpful tone.** "We had trouble processing your payment. This sometimes happens when cards expire or banks place temporary holds. To keep your service uninterrupted, please update your payment method here." Include a direct link to the payment update page. No account number required.
+
+**Email 2 (Day 3): Light urgency, still helpful.** "We're still having trouble processing your payment. Here's a link to update your payment method. If this was a temporary issue, you can also retry your current card." Include the retry button and the update link.
+
+**Email 3 (Day 7): Moderate urgency, specific date.** "Your payment has been failing for 7 days. To avoid service interruption on [specific date], please update your payment method. Here is the link." The specific date creates urgency without being threatening.
+
+**Email 4 (Day 14): High urgency, clear consequences.** "Your account will be paused today if payment is not received. Click here to update your payment method and restore uninterrupted access." Send this the morning of the access pause, not the day before.
+
+## Handling high-value accounts
+
+For accounts above a defined ARR threshold (typically $500 to $1,000 per month), automated dunning alone is insufficient. These accounts warrant personal outreach.
+
+After two failed automated retries, a customer success manager or the founder should send a personal email to the account contact. The email is direct: a payment failed, here is the link to update, is there anything that would help? This is not an aggressive collection call. It is a relationship touchpoint that prevents the payment failure from becoming a churn event.
+
+For enterprise accounts, the payment failure conversation is often not with the person who uses the product. It may need to go to the finance or accounts payable team. Keeping a contact for the billing department separate from the product user in the CRM enables this direct outreach.
+
+## Common mistakes founders make with dunning
+
+1. Pausing access too quickly. Pausing access on day 7 converts involuntary churn into deliberate churn because the customer feels pushed out.
+2. Sending vague emails without a direct action link. "Please update your payment information" without a link requires the customer to navigate to the billing page themselves. Many will not. Include the direct link in every email.
+3. Not using Smart Retries. Leaving automatic recovery rate improvement on the table when it is available at no cost.
+4. Not tracking dunning recovery rate separately from overall churn. If dunning is recovering 50 percent of failures and the target is 70 percent, this is a specific problem to solve. Mixed in with overall churn metrics, the opportunity is invisible.
+5. Applying the same dunning cadence to annual and monthly customers. Annual customers have more at stake and more time to resolve the issue. Give them more time and more direct outreach before pausing access.
+
+## Where to start: a 3-step dunning setup
+
+**Step 1: Enable Stripe Smart Retries and configure the retry schedule.** In Stripe Dashboard, configure automatic retries at day 3, 7, and 14. Enable Smart Retries. This alone recovers the majority of involuntary failures.
+
+**Step 2: Write the four dunning emails and set them up in your email provider.** Use the tone and timing described above. Each email should have a direct payment update link generated for the customer's account. Use your transactional email provider to send these based on payment status webhooks.
+
+**Step 3: Define the access pause date and ensure the system enforces it.** Configure the subscription management system to pause access on day 14 for month-to-month customers. Verify this works in staging before enabling in production.
+
+## The Automation Behind Revenue Recovery
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The dunning process is an automation project: Stripe webhooks, email triggers, subscription status management, and access control updates. I have built these systems. The payment failure recovery rate is a direct output of how well the automation is designed. If you are losing revenue to failed payments and want to automate the recovery, that is a specific engineering problem I can solve.
+
+## Related reading
+
+- [The Business Automation Map: Where Founders Lose Hours](/blog/the-business-automation-map-where-founders-lose-hours)
+- [Workflow Automation for SaaS: A Founder's Guide](/blog/workflow-automation-for-saas-a-founders-guide)
+- [The Customer Onboarding Automation Map](/blog/the-customer-onboarding-automation-map)
+- [Building an Operations Stack Without an Operations Team](/blog/building-an-operations-stack-without-an-operations-team)

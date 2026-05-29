@@ -1,0 +1,67 @@
+---
+slug: "single-sign-on-for-enterprise-saas-saml-and-oidc-compared"
+title: "Single Sign On for Enterprise SaaS: SAML and OIDC Compared"
+excerpt: "SSO is a procurement requirement for enterprise deals. Here is what SAML and OIDC each mean for your engineering roadmap."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","sso","enterprise","saml","oidc"]
+readingMinutes: 8
+ogImage: "/api/og/blog/single-sign-on-for-enterprise-saas-saml-and-oidc-compared"
+status: "published"
+faq: [
+  {"q":"What is the difference between SSO and SCIM?","a":"SSO handles authentication: proving who a user is when they log in. SCIM (System for Cross-domain Identity Management) handles provisioning: automatically creating, updating, and deactivating user accounts when HR makes changes in the identity provider. Enterprise customers often want both."},
+  {"q":"Does SSO replace the need for passwords in my system?","a":"For users who authenticate via SSO, yes. Your system should not require or store a password for SSO users. The identity provider is responsible for credential management."},
+  {"q":"How long does SSO implementation take?","a":"Using a managed service like WorkOS, a complete SSO implementation with customer-facing configuration UI takes two to four weeks for an experienced team. Hand-rolling SAML and OIDC support from scratch takes longer and carries more risk."},
+  {"q":"Do SMB customers want SSO too?","a":"Less commonly, but growth-stage SMBs that have standardized on Okta or Azure AD will ask for it. The enterprise demand is more urgent and more likely to be a hard requirement."},
+  {"q":"What happens to existing password users when SSO is enabled?","a":"Design a migration flow. Common patterns: existing users can choose to link their SSO identity to their existing account, or SSO creates a new account and the old one is deactivated. The right choice depends on your data model and whether you want to preserve user history."}
+]
+---
+
+# Single Sign On for Enterprise SaaS: SAML and OIDC Compared
+
+**Single Sign On (SSO) allows users to authenticate to your SaaS product using their company's identity provider rather than a separate username and password. For enterprise buyers, SSO is not a nice-to-have feature; it is a security requirement that often appears on procurement checklists before any demo is scheduled. SAML and OIDC are the two dominant SSO protocols, with meaningfully different technical architectures and adoption patterns across enterprise IT environments.**
+
+## What you need to know
+
+- SAML (Security Assertion Markup Language) is the older, XML-based protocol; it dominates enterprises running Okta, Azure AD, and older identity infrastructure
+- OIDC (OpenID Connect) is the newer, JSON/OAuth 2.0-based protocol; it is what modern identity providers like Google Workspace and Auth0 prefer
+- Most enterprise SaaS products need to support both because enterprise IT environments are mixed
+- Implementing SSO in-house is complex and error-prone; libraries like WorkOS, Clerk, and Auth0 handle both protocols and are worth the cost for most teams
+- The decision to support SSO is a strategic one: it unlocks enterprise segments but requires ongoing maintenance as identity providers update their implementations
+
+## The core argument
+
+The business case for SSO is straightforward: without it, you cannot sell to most enterprises. IT departments require that user authentication runs through centralized identity providers so they can enforce policies (MFA requirements, session lengths, access revocation) across all company software from one place. When an employee is offboarded, they need one action in the identity provider to revoke access to every connected system, including your SaaS. If your product authenticates users with its own username/password system, you are not in that model, and IT procurement will tell you.
+
+The engineering case for supporting both SAML and OIDC is pragmatic. In my experience working on B2B SaaS implementations, about two thirds of enterprise customers use Okta or Azure AD, both of which have strong SAML support. The remaining third use newer identity systems or Google Workspace, which default to OIDC. Picking one protocol means turning away customers who use the other.
+
+SAML is the heavier protocol. The assertions are XML, the implementation involves certificate management and metadata XML files, and the debugging experience is worse than OIDC. But it is deeply embedded in enterprise IT and is not going away. OIDC is cleaner, built on OAuth 2.0, and easier to implement correctly, but requires the identity provider to support it. Both protocols accomplish the same end goal: your product receives a verified assertion that the user is who the identity provider says they are.
+
+The practical advice: do not build the SSO layer yourself unless you have a specific reason to. WorkOS, Clerk, and Auth0 all abstract both protocols behind clean APIs and handle the certificate management, metadata exchange, and edge cases that make hand-rolled SSO implementations dangerous. The engineering time saved is worth the service cost at any scale where enterprise customers are in scope.
+
+## Common mistakes
+
+1. **Advertising SSO support before the implementation is production-tested.** A broken SSO flow discovered during an enterprise evaluation is worse than not having SSO. Test with at least two real identity providers before it shows up in the sales cycle.
+
+2. **Implementing only SAML because it sounds more enterprise.** OIDC is equally enterprise-grade and required by customers using newer identity systems. Implement both.
+
+3. **Managing SSO configuration per-customer in a way that does not scale.** If your SSO setup requires manual steps from your engineering team every time a customer enables it, you need a self-service SSO configuration flow. Manual setup is not sustainable past ten enterprise customers.
+
+4. **Not handling attribute mapping correctly.** Identity providers send user attributes (email, name, department, role) in different formats. Your system needs to map these correctly, and the mapping needs to be configurable because customers use different attribute names.
+
+5. **Not documenting the setup process for IT admins.** Enterprise IT admins are not your product's users; they are configuring the integration. They need clear, technical documentation: the metadata URL, the attribute requirements, the callback URL, and the error troubleshooting guide.
+
+## Where to start
+
+1. **Evaluate WorkOS or Clerk for SSO first.** Both provide managed SSO that handles SAML and OIDC behind a unified API. The implementation is one integration on your side and a configuration UI for your customers. This is the fastest path to enterprise-ready SSO.
+
+2. **Build the customer-facing SSO configuration UI as part of the feature.** Customers need to be able to provide their identity provider metadata, test the connection, and enable SSO for their users without engineering involvement. This is part of the feature, not an afterthought.
+
+3. **Test with Okta, Azure AD, and Google Workspace before calling it done.** These three cover the vast majority of enterprise identity configurations you will encounter. If SSO works with all three, you are prepared for the real enterprise procurement process.
+
+## Related reading
+
+- [Authorization Patterns: RBAC, ABAC, ReBAC Explained](/blog/authorization-patterns-rbac-abac-rebac-explained)
+- [Auth0 vs Clerk vs Supabase Auth vs Build Your Own](/blog/auth0-vs-clerk-vs-supabase-auth-vs-build-your-own)
+- [SCIM Provisioning: The Feature Enterprise Customers Will Demand](/blog/scim-provisioning-the-feature-enterprise-customers-will-demand)
+- [How to Sell to Enterprise Without a Full Compliance Stack](/blog/how-to-sell-to-enterprise-without-a-full-compliance-stack)

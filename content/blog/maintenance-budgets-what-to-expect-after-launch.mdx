@@ -1,0 +1,62 @@
+---
+slug: "maintenance-budgets-what-to-expect-after-launch"
+title: "Maintenance Budgets: What to Expect After Launch"
+excerpt: "Most software cost conversations focus on building. The ongoing cost of maintaining, updating, and keeping a live product running is where founders get surprised. Here is what a realistic maintenance budget looks like."
+date: "2026-05-23"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing"]
+readingMinutes: 6
+ogImage: "/api/og/blog/maintenance-budgets-what-to-expect-after-launch"
+status: "published"
+definition: "A software maintenance budget covers the recurring cost of keeping a live product operational, current, and secure after the initial build is complete. This includes dependency updates, security patches, infrastructure costs, bug fixes, minor feature work to retain users, and the engineering time to handle production incidents. Most founders underestimate maintenance costs by a factor of two to three when planning their first product."
+faq: [
+  {"q":"What percentage of the initial build cost should I budget for annual maintenance?","a":"The industry rule of thumb is fifteen to twenty percent of the original build cost per year for maintenance of a stable product. A product that cost 100,000 dollars to build should budget 15,000 to 20,000 dollars per year for maintenance, not including new feature development. Products with external integrations, mobile apps, or high regulatory exposure tend toward the higher end of this range."},
+  {"q":"What is included in software maintenance costs?","a":"Dependency updates (npm, pip, or equivalent package updates, including security patches), infrastructure costs (hosting, database, CDN, third-party APIs), bug fixes for issues discovered post-launch, minor UX improvements required for retention, mobile app store compliance updates when Apple or Google change requirements, and the engineering time to monitor and respond to production incidents."},
+  {"q":"What are the most expensive maintenance categories for a SaaS product?","a":"Third-party integration maintenance is typically the most expensive category. External APIs change, deprecate endpoints, and alter authentication requirements. A SaaS product with ten external integrations should expect one to two breaking changes per quarter that require engineering time to resolve. Infrastructure cost management is the second most expensive, particularly for products with unpredictable traffic patterns."},
+  {"q":"How do you reduce maintenance costs without creating technical debt?","a":"The investment in automated testing, dependency update automation (Dependabot), and infrastructure as code all reduce maintenance labor costs over time. Products with high test coverage require less manual regression testing after each update. Products with IaC require less manual configuration management. These are investments at build time that reduce the ongoing cost of maintenance."},
+  {"q":"When does maintenance cost become a case for a rewrite?","a":"When the maintenance cost exceeds approximately 30 to 35 percent of the original build cost annually, when the product requires a senior engineer dedicated primarily to keeping it running rather than improving it, or when security vulnerabilities in core dependencies cannot be resolved without architectural changes. These are signals that the technical debt has compounded to the point where incremental maintenance is more expensive than a targeted rewrite."}
+]
+---
+
+## What you need to know
+
+- The fifteen to twenty percent rule is the starting point: budget fifteen to twenty percent of the original build cost per year for maintenance of a stable product.
+- Products with mobile apps, external API integrations, and compliance requirements have higher maintenance costs than products without.
+- Infrastructure costs compound as usage grows. An infrastructure cost model that works at 1,000 users may not work at 100,000 without optimization work that has its own engineering cost.
+- Dependency maintenance is not optional. Unpatched dependencies accumulate security vulnerabilities. The cost of a security incident far exceeds the cost of keeping dependencies current.
+- The cost of deferred maintenance compounds. A backlog of unaddressed dependency updates and technical debt increases the cost of each subsequent maintenance cycle.
+
+## The core argument
+
+The maintenance cost conversation that founders avoid is the one about ongoing infrastructure. A product launched on a cloud platform with a database, background job runner, email service, monitoring, and CDN has a monthly infrastructure cost that is independent of engineering time. This cost starts small and grows with usage. At 1,000 users, the infrastructure cost might be 200 to 400 dollars per month. At 10,000 users without cost optimization, the same infrastructure could cost 2,000 to 4,000 dollars per month, sometimes more depending on how the product was built. Infrastructure costs that were designed for a low-usage MVP do not scale gracefully.
+
+Engineering time is the larger maintenance cost. The typical maintenance work cycle for a live SaaS product involves dependency updates every four to six weeks, security patches as they are released, bug fixes from production incidents, and the minor feature work that customer retention requires. For a solo founder with a contractor relationship, this translates to three to five hours per month at minimum for a simple product, and twelve to twenty hours per month for a product with active customers and complex integrations. The mistake is budgeting zero engineering time for maintenance after launch and treating the product as complete when it goes live.
+
+Third-party API integrations are where maintenance costs surprise founders most. A product built on three or four external APIs inherits the maintenance burden of those APIs: when Stripe updates its API, when a data provider changes their authentication, when a payment processor deprecates a webhook event. These changes arrive on the external provider's timeline, not yours. In my experience working with products that have five or more external integrations, an average of one to two breaking integration changes per quarter is a realistic expectation. Budgeting engineering time for integration maintenance is not optional; it is the cost of using APIs you do not control.
+
+## Common mistakes
+
+1. **Treating the launch date as the end of the engineering cost.** A live product with users requires ongoing engineering investment. The launch date is the beginning of the maintenance phase, not the end of the engineering phase.
+
+2. **Not tracking infrastructure costs against usage growth.** Cloud costs that grow faster than revenue create a business model problem. Monitor cost per user or cost per transaction from the first month in production and set alerts when the ratio changes significantly.
+
+3. **Deferring dependency updates until a security incident forces them.** Outdated dependencies accumulate. A product that has not updated dependencies for twelve months may have dozens of known vulnerabilities. Batch dependency updates monthly or use automated tools like Dependabot to keep the backlog manageable.
+
+4. **Not budgeting for mobile app store compliance updates.** Apple and Google regularly change requirements for apps in their stores: new privacy permissions, updated API requirements, SDK version minimums. These updates are not optional and may require code changes on a schedule the store dictates.
+
+5. **Conflating maintenance cost with improvement cost.** A maintenance budget covers keeping the product running and compliant. New features and improvements are a separate budget. Conflating them makes it impossible to know whether the product is profitable to operate.
+
+## Where to start
+
+1. **Audit your current monthly infrastructure cost and track it per active user.** This gives you a baseline cost-per-user metric that makes infrastructure scaling costs predictable as the product grows.
+
+2. **Run a dependency audit on the product's main dependencies.** Check for dependencies with known security vulnerabilities using `npm audit`, `pip audit`, or equivalent. Set up Dependabot or a similar tool to automate dependency update PRs.
+
+3. **Create a maintenance line item in your budget.** Separate from new feature development, allocate a fixed number of engineering hours per month for maintenance: dependency updates, bug fixes from production, infrastructure optimization. This makes maintenance visible in financial planning.
+
+## Related reading
+
+- [How to Build a Twelve-Month Software Budget That Survives Reality](/blog/how-to-build-a-twelve-month-software-budget-that-survives-reality)
+- [How to Read AWS, Azure, and GCP Invoices Without Crying](/blog/how-to-read-aws-azure-and-gcp-invoices-without-crying)
+- [Hosting Cost Optimization: From Ten Thousand to a Million Users](/blog/hosting-cost-optimization-from-ten-thousand-to-a-million-users)
+- Tech Debt: The Real Cost and When to Pay It Down

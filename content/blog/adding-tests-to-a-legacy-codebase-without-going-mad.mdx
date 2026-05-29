@@ -1,0 +1,112 @@
+---
+slug: "adding-tests-to-a-legacy-codebase-without-going-mad"
+title: "Adding Tests to a Legacy Codebase Without Going Mad"
+excerpt: "How to ship a useful test suite on top of a codebase that has none, without quitting the company. A staged plan that delivers safety before perfection."
+date: "2026-05-18"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","testing","legacy"]
+readingMinutes: 12
+ogImage: "/api/og/blog/adding-tests-to-a-legacy-codebase-without-going-mad"
+status: "published"
+definition: "Adding tests to a legacy codebase that has never had them is not a refactor, it is an excavation. The work succeeds when it focuses on the highest risk seams first, accepts ugly tests as the price of safety, and trades coverage targets for confidence intervals. Below is the staged plan I use on rescue projects, and the rules I hold to when the tests get harder than the code."
+faq: [
+  {"q":"Where do I start if the codebase has zero tests?","a":"Start with one end to end test for the single most important user flow. Sign up, log in, the core action that produces revenue. That one test will catch ninety percent of the regressions that matter, even if every internal module is still untested. The goal of the first week is not coverage, it is confidence."},
+  {"q":"How much coverage should I aim for in a legacy codebase?","a":"Forget coverage. Aim for a small set of tests that cover the workflows you cannot afford to break. In my experience, twenty well chosen end to end tests catch more real bugs than two thousand low quality unit tests. The number on the dashboard is not the metric. The number of times tests prevent a real incident is the metric."},
+  {"q":"Should I refactor the code as I add tests?","a":"Only when the code is impossible to test without refactoring, and even then, do the minimum. Refactoring untested code is how you create new bugs. Add tests around the code as it is, get a safety net, then refactor with the net in place."},
+  {"q":"What about mocking versus real services?","a":"Mock external services to keep tests deterministic. Use real internal services where possible. The discipline is that the boundary of your application is where mocks belong. Mocks inside your domain are a source of false confidence."},
+  {"q":"How long does it take to feel safe?","a":"Two to six weeks of disciplined work to cover the top ten flows. After that, the team feels the difference. Deploys stop being terrifying. Bugs that would have shipped get caught in CI. The ROI of the work shows up in the second month, not the first."},
+  {"q":"Is it ever too late to add tests?","a":"No, but it is sometimes too late to add unit tests cheaply. Integration and end to end tests can be added to almost any codebase. They are the right starting point in a rescue. Unit tests come later, as the internal modules get refactored."},
+  {"q":"What tools do you reach for first?","a":"Playwright for end to end on the frontend. Vitest or Jest for unit and integration on Node. PyTest on Python. Postman or Bruno for API smoke tests if the team is non engineering. The tool matters less than the discipline of running them on every change."}
+]
+---
+
+## What you actually need to know
+
+- The goal of a legacy testing project is confidence, not coverage. Twenty good end to end tests beat two thousand bad unit tests.
+- Start at the boundary, where the user meets the system. The highest signal tests live there.
+- Do not refactor the code before you test it. Add the tests first, then refactor with a safety net.
+- Mock at the edges, not in the middle. Mocks inside the domain produce false green builds.
+- Two to six weeks is enough to cover the flows that matter. After that, deploys become routine again.
+- Most legacy codebases do not need a hundred percent coverage. They need ninety percent confidence on ten percent of the code, the ten percent that runs every revenue producing transaction.
+
+| Approach | Pros | Cons | When to use |
+|---|---|---|---|
+| End to end first | Fast confidence, catches real bugs | Slow, brittle if the UI moves | Rescue projects, no existing tests |
+| Unit tests bottom up | Fast, isolated | Misses integration bugs, slow ROI in rescues | Greenfield code |
+| Snapshot tests everywhere | Easy to write | Lock in current behavior including bugs | UI components only |
+
+## The core argument
+
+Most engineers who walk into a codebase without tests do one of two things. They quit, or they try to add unit tests everywhere and quit six months later. Both reactions come from the same misunderstanding. They treat the test suite as a goal in itself. The test suite is not a goal. The test suite is a tool for shipping with less fear. Once you treat it as a tool, the strategy changes.
+
+The strategy I use on every rescue project starts with end to end tests on the flows that produce revenue. Sign up. Log in. The core transaction. Three tests, written in a day, that run in CI on every commit. The day after those land, every developer on the team feels the difference. They can deploy on Friday without dreading Monday. The work is not done. It is started, in the place where it pays back first.
+
+After the end to end layer is in place, I move to integration tests on the modules that handle money or identity. These are written one feature at a time, usually as the team is about to change that feature anyway. The test is the discipline that says "I will not change this code until I can prove I did not break it." The test gets written once, the code gets refactored, the test stays as the safety net for the next round of changes.
+
+Unit tests come last, and only for the parts of the codebase that benefit from them. Pure functions. Validation logic. Calculation engines. Anywhere the input is small and the behavior is well defined. The bulk of a legacy codebase rarely needs deep unit coverage. The bulk of the bugs in a legacy codebase do not live in pure functions.
+
+## The staged plan
+
+**Stage one. End to end coverage on the top three flows.** One day per test if the framework is in place, two to three days if you are setting up Playwright or Cypress from scratch. The output is three tests that run on every commit. The whole team gets safer in week one.
+
+**Stage two. Integration tests around money and identity.** Anything that touches the database in a way that matters. Charges, signups, permission changes, exports. These are written one feature at a time. Two to four weeks to get the high value modules covered.
+
+**Stage three. Targeted unit tests.** Pick the modules that are pure logic. Add tests there. Skip the modules that are mostly glue. This stage continues forever, but the urgency drops once stages one and two are in place.
+
+**Stage four. Performance and load tests.** Last, not first. Performance tests are only meaningful once the functional tests are stable, because flaky tests at the load layer waste more time than they save.
+
+## What it actually costs
+
+| Approach | Time investment | Likely outcome |
+|---|---|---|
+| Skip tests, hope for the best | 0 hours up front | A bad incident in three to six months that costs more than the tests would have |
+| Hire a contractor to add tests | 20k to 80k over six weeks | Top ten flows covered, team learns from the engagement |
+| Reserve fifteen percent of team time | Ongoing | Coverage grows organically, sustainable, slower |
+| Stop feature work for a month and add tests | Hard sell, fast result | High coverage in eight weeks, big political cost |
+
+The numbers above are realistic ranges from my own rescue projects. The middle two options are usually the right ones for a team that has missed the on time window for adding tests at greenfield.
+
+## Features to demand from the test setup
+
+- Tests must run in CI on every commit. Tests that only run locally do not exist.
+- Tests must be fast enough that developers actually run them. If the suite takes ten minutes, it will not get run. Split into a fast suite and a slow suite if needed.
+- Tests must be deterministic. A flaky test is worse than no test because it teaches the team to ignore failures.
+- Tests must produce useful failure messages. "Expected true, got false" is a smell. "Customer signup failed because the email validator rejected an apostrophe" is a real test.
+- A single command that runs the whole suite. No multi step ritual.
+- A documented escape hatch for the rare case where a test must be skipped, with a date the skip expires.
+
+## Expert opinion
+
+> The test suite that saves a codebase is not the comprehensive one. It is the focused one. Twenty tests that cover the workflows that produce revenue will catch more real incidents than two thousand tests that cover internal utility functions. The work is to pick the twenty.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+The rescue project that taught me this lesson the hardest was a SaaS with around eight hundred users and zero tests. The team was scared to deploy. Every Friday they would batch up a week of changes and pray. We spent the first week writing five end to end tests. By the next Friday, the team was deploying twice a day. The test suite did not catch every bug. It caught the bugs that would have taken the product down, which was enough.
+
+In contrast, a project I joined later already had nine thousand unit tests when I arrived. The coverage number on the dashboard was eighty percent. The team still had a bug every other deploy, because the unit tests were testing the wrong layer. We deleted half of them and replaced them with twenty integration tests. The incident rate dropped within a month.
+
+The pattern is the same in both stories. The right tests for the right layer beat any test count number.
+
+For more on the broader refactor discipline, [the tech debt audit post](/blog/the-tech-debt-audit-a-two-day-process) walks through what to do before you start adding tests, and [the legacy codebase audit](/blog/the-legacy-codebase-a-senior-engineers-five-day-audit) covers the first five days of a rescue engagement.
+
+## Common mistakes teams make
+
+1. Setting a coverage target instead of a confidence target. The target produces tests that satisfy the metric without protecting the product.
+2. Starting with unit tests in a codebase that has no tests at all. The integration bugs are where the real risk lives.
+3. Refactoring the code before testing it. The tests should freeze the current behavior so the refactor is safe.
+4. Mocking too aggressively. A test that mocks the entire database is not testing anything except your understanding of the mock.
+5. Treating slow tests as acceptable. A ten minute suite gets skipped. A two minute suite gets run.
+6. Leaving flaky tests in the suite "just for now." Flaky tests train the team to ignore failures, which destroys the value of the suite.
+7. Trying to add tests to every part of the codebase at once. The right discipline is feature by feature, in the order they need to be changed.
+
+## Where to start, a 30 day plan
+
+1. **Day one to day five.** Pick the three highest value user flows. Write one end to end test for each. Get them running in CI. Celebrate.
+2. **Day six to day ten.** Identify the five most painful modules to deploy. Write integration tests around them, even ugly ones.
+3. **Day eleven to day fifteen.** Set up Sentry or an equivalent error tracker. The tests will not catch everything. Production telemetry covers the gaps.
+4. **Day sixteen to day twenty five.** Pair the tests with the next feature work. Every new feature ships with at least one test. Every changed feature gets a test backfilled if it does not have one.
+5. **Day twenty six to day thirty.** Review what got covered, what got skipped, and where the team still feels fear. Plan the next month around closing that fear.
+
+The companion post that goes deeper on the principles here is [the test pyramid for SaaS](/blog/the-test-pyramid-for-saas-unit-integration-end-to-end), and the related rewrite framing lives in [when to refactor and when to rewrite](/blog/when-to-refactor-and-when-to-rewrite). For the broader engineering culture question, see [why your test suite is slow](/blog/why-your-test-suite-is-slow-and-how-to-fix-it).

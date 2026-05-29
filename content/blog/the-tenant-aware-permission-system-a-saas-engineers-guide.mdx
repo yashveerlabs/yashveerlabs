@@ -1,0 +1,118 @@
+---
+slug: "the-tenant-aware-permission-system-a-saas-engineers-guide"
+title: "The Tenant Aware Permission System: A SaaS Engineer's Guide"
+excerpt: "Permissions in a multi-tenant SaaS are not just about what a user can do. They are about what a user can do within a specific organization. Getting the data model wrong early means either rebuilding it under sales pressure or shipping a permission system that enterprise buyers will not accept."
+date: "2024-11-11"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-tenant-aware-permission-system-a-saas-engineers-guide"
+status: "published"
+definition: "A tenant-aware permission system controls what actions a user can take within a specific organization, not just across the product. A user can be an admin in one tenant and a viewer in another. Permissions are scoped to the tenant context, and the enforcement layer always knows which tenant it is operating in. This is the design that B2B SaaS requires and the design that many teams skip in favor of a simpler global role model that does not scale past the first enterprise customer."
+faq: [
+  {"q":"what is the difference between a global role and a tenant scoped role in saas","a":"A global role applies to a user across the entire product regardless of which organization they are in. A tenant-scoped role applies only within a specific organization. In B2B SaaS you almost always need tenant-scoped roles because users can belong to multiple organizations and have different levels of access in each. The global role model breaks the moment a user needs different permissions in different tenants."},
+  {"q":"how do I design a permission system that supports both simple rbac and custom permissions for enterprise customers","a":"Build a two-layer system. Layer one is predefined roles that map to sets of permissions: admin, editor, viewer, or whatever fits your product. Layer two is a permission override table that maps a user plus a tenant plus a specific permission to a boolean. The predefined role handles 90 percent of customers. The override layer handles enterprise customers who need one person to have editor access everywhere except one sensitive area."},
+  {"q":"what is rbac vs abac and which should a saas team use","a":"RBAC assigns permissions through roles. ABAC assigns permissions based on attributes of the user, the resource, and the context. RBAC is simpler and covers most B2B SaaS cases. ABAC is more expressive but significantly more complex to implement and audit. Most SaaS products should start with RBAC and add attribute-based rules only when they have a specific use case that RBAC cannot express."},
+  {"q":"how should a saas permission system handle resource level permissions","a":"Resource-level permissions scope access to a specific record rather than a resource type. A user might be able to view all projects but edit only the ones they own. This requires a permission check that takes both the action and the resource ID as inputs. The enforcement point checks the role, then checks any resource-level overrides. Store resource-level grants in a join table keyed on user, resource type, resource ID, and permission."},
+  {"q":"how do I enforce permissions at the api layer without checking them manually in every handler","a":"Middleware or a permission service that runs before the handler. The middleware reads the user and tenant from the request context and calls a centralized permission check function. The handler receives a context that already includes the verified permissions. The alternative is a decorator or annotation pattern in frameworks that support it. The goal is one place where permission logic lives, not scattered checks across fifty handlers."},
+  {"q":"what audit trail should a permission system produce","a":"Every permission change should be an audit event: who changed it, what they changed it from, what they changed it to, in which tenant, at what time. Role assignments, permission overrides, and organization membership changes all belong in the audit log. Enterprise buyers will ask about this specifically. It also helps with support: when a user reports unexpected access, the audit trail shows when and how their permissions changed."},
+  {"q":"how should saas handle permissions when a user belongs to multiple organizations","a":"The user's active tenant context determines which permissions apply. When the user switches organizations, the permission context switches with them. The implementation stores permissions per user per tenant, and the session or token carries the active tenant ID. Every permission check is against the active tenant context, not the user's permissions globally."}
+]
+---
+
+## What you actually need to know
+
+- Permissions in B2B SaaS are always tenant-scoped. A user is an admin in one org and a viewer in another. The global role model breaks on the second enterprise customer.
+- Build the two-layer system from the start: predefined roles for simplicity, per-permission overrides for enterprise edge cases.
+- Every permission check needs the user context and the tenant context. One without the other is incomplete.
+- The permission system is an audit surface. Every change to a role or permission is a logged event.
+- In my experience, the teams that ship a real tenant-aware permission model before their first enterprise deal close significantly faster than the teams that have to retrofit it under sales pressure.
+
+| Model | Complexity | Enterprise fit | Custom permissions | Best for |
+|---|---|---|---|---|
+| Global role (admin/user) | Low | Poor | No | Simple consumer SaaS |
+| Tenant-scoped RBAC | Medium | Good | No | Most B2B SaaS |
+| Tenant-scoped RBAC + overrides | Medium-high | Excellent | Yes | B2B SaaS with enterprise tier |
+| ABAC | High | Excellent | Yes | Complex multi-resource products |
+| ReBAC (relationship-based) | High | Excellent | Yes | Products with deep resource hierarchies |
+
+## The core argument
+
+The global role model feels adequate until the moment it is not. The moment is usually the first enterprise prospect who asks, "Can you give our security team read-only access to audit logs but not to customer data?" The global role model has no answer to that question. The permission model that can answer it was not designed into the product. The deal either stalls while the team retrofits the permission system or the team says yes and ships something half-built.
+
+I have watched this happen from both sides. The teams that designed tenant-aware permissions from the start have a confident answer. The teams that did not have an awkward conversation about roadmap timelines in the middle of a sales process.
+
+The data model for a tenant-aware permission system is not complicated. A user can have one or more roles within a tenant. Each role maps to a set of permissions. A permission is a string that identifies an action and optionally a resource type: "projects.create", "reports.view", "billing.manage". The enforcement layer takes the user, the tenant, and the required permission as inputs and returns a boolean.
+
+The enterprise extension adds a permission override table. An override says: for this user in this tenant, grant or deny this specific permission regardless of their role. This is how you handle the security team that needs read access to audit logs but not to the main data. The override is a two-column exception to the role model. It does not require redesigning the whole system.
+
+The failure mode I see most often is not in the initial design. It is in the enforcement. Teams design the right model and then enforce it inconsistently. Some handlers check permissions. Some assume the calling code already checked. The result is a permission system that looks correct in the database and has gaps in the actual enforcement. The fix is centralized enforcement: one middleware or one permission service that every request passes through.
+
+## The data model
+
+### Core tables
+
+Four tables cover most of the surface. Users, the existing one. Tenants. Memberships, which join users to tenants and carry the role. Roles, with their associated permission sets. The membership row is the thing that determines what a user can do in a given tenant.
+
+The permission set can live in code as a role-to-permissions map, or in the database as a role-permissions join table. In code is simpler and adequate until the product offers custom roles. In the database is necessary once customers can create their own roles, which is a feature most SaaS products eventually need for enterprise.
+
+The override table adds three columns to an existing key: user ID, tenant ID, permission string, granted boolean. Granted false is an explicit deny that overrides the role. Granted true is an explicit allow. The logic is: check the override first; if no override, fall through to the role.
+
+### Resource-level grants
+
+Some products need permission at the record level: a user who can edit some projects but not others. This is a resource-level grant. It is a separate table keyed on user, tenant, resource type, resource ID, and permission. The enforcement check asks three questions in order: does the user have the tenant-level permission? If not, do they have a resource-level grant? If not, deny.
+
+## How much does this cost
+
+| Component | Engineering time | Notes |
+|---|---|---|
+| Basic tenant-scoped RBAC | One to two weeks | Data model and enforcement middleware |
+| Permission override table | Two to three days | Addition to existing model |
+| Custom role management UI | One to two weeks | For products that let customers define roles |
+| Resource-level grants | One week | Additional table and enforcement layer |
+| Audit trail for permission changes | Three to five days | Write to audit log on every membership change |
+| Permission check performance tuning | One to two days | Cache role-permission maps in Redis |
+
+## What the implementation must get right
+
+- Enforcement in one place. Middleware or a permission service. Not scattered across handlers.
+- Tenant context always present in the permission check. Never check permission without knowing the tenant.
+- Role-to-permissions map that is consistent and code-reviewed. Bad permission strings become security holes.
+- An explicit deny that overrides any allow. The override table's false value must win.
+- Caching of role-permission maps if the database lookup is in the hot path. But cache invalidation when permissions change.
+- Audit events for every membership change, role change, and override change.
+- A developer-facing permission check function that takes user, tenant, and permission as explicit arguments. No implicit global context.
+
+## Expert opinion
+
+> The permission model is one of those decisions that looks straightforward and is not. The teams that get it right early have a model that enterprise customers can configure without engineering involvement. The teams that get it wrong early have a support ticket for every permission edge case and a sales conversation they cannot finish without shipping a feature. I have seen the wrong choice cost a team their first enterprise deal.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A project management SaaS had been running with a two-role global model for fourteen months: admin or member. The product worked for small teams. When the first mid-market customer arrived, they asked for a billing-only role for their finance team, a read-only role for stakeholders, and the ability to restrict specific projects to specific team members. None of these were possible.
+
+The team spent four weeks building a tenant-scoped RBAC system under sales pressure. The migration from the global role model to the per-tenant model required touching every authorization check in the codebase, and they missed three. Those three gaps became support tickets within a week of launch.
+
+The second version, with centralized enforcement, took another week to finish properly. The total cost of the retrofit was five weeks of engineering on a critical path, plus the delay in closing the deal. For the audit trail that goes alongside this work, [audit logs for SaaS a compliance and trust tool](/blog/audit-logs-for-saas-a-compliance-and-trust-tool) covers the logging surface in depth, and [the permission system that scales with your b2b customers](/blog/the-permission-system-that-scales-with-your-b2b-customers) covers the longer-term scaling of what gets built here.
+
+## Common mistakes teams make
+
+1. Global roles instead of tenant-scoped roles. The model breaks the moment a user is in multiple organizations.
+2. Permission checks scattered across handlers instead of centralized in middleware.
+3. No explicit deny. Absence of a grant is treated as a deny, which is not the same as an explicit deny overriding a role.
+4. Permission strings that are not a controlled vocabulary. Free-text permission names become unsearchable and inconsistent.
+5. No audit trail for permission changes. Support cannot explain why a user lost access.
+6. Caching permission checks without invalidating on change. A removed role stays effective until cache expiry.
+7. No test coverage for permission boundaries. The logic works until an edge case hits production.
+8. Building custom roles before building basic roles. Complexity that arrives before the use case.
+
+## A 30 day plan to get this right
+
+1. **Week one.** Define the permission vocabulary. What actions exist in the product? Name them with a controlled string format like "resource.action".
+2. **Week two.** Build the data model. Memberships join table, role-to-permissions map, override table. Write the central permission check function.
+3. **Week three.** Audit every authorization check in the codebase. Replace scattered checks with calls to the central function.
+4. **Week four.** Add audit events for every permission change. Test the permission boundaries with integration tests for each role.
+
+For related reading on the broader security picture, [the tenant-aware permission system](/blog/the-tenant-aware-permission-system-a-saas-engineers-guide) naturally pairs with [the security gap how one missing SOC 2 control kills your enterprise deal](/blog/the-security-gap-how-one-missing-soc-2-control-kills-your-enterprise-deal), which covers how permission gaps surface in enterprise security reviews.

@@ -1,0 +1,179 @@
+---
+slug: "the-mobile-app-analytics-stack-for-2026"
+title: "The Mobile App Analytics Stack for 2026"
+excerpt: "The analytics tools that actually work for mobile in 2026: PostHog for product, Sentry for errors, and a clear event schema that ties them together."
+date: "2025-02-19"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","analytics","monitoring"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-app-analytics-stack-for-2026"
+status: "published"
+definition: "The mobile app analytics stack is the set of tools used to understand how users interact with a mobile application, where errors occur, and how the app performs in production. In 2026, the stack for most mobile products consists of a product analytics tool for user behavior, a crash and error reporting tool for reliability, and a performance monitoring tool for understanding real-world app performance. The tools must be configured with a well-defined event schema and privacy-compliant data handling, given the stricter requirements of App Store and Play Store privacy policies."
+faq: [
+  {"q":"What is the best product analytics tool for mobile apps in 2026?","a":"PostHog for teams who want a self-hostable, open-source option with feature flags included. Mixpanel for teams who need strong funnel and cohort analysis with good mobile SDKs. Amplitude for teams who prioritize behavioral cohort analysis and have the budget for an enterprise product. For most early-stage mobile products, PostHog's mobile SDK (React Native and Flutter) covers product analytics, session recording, and feature flags in one integration at a price that is significantly lower than Mixpanel or Amplitude."},
+  {"q":"What should be included in the mobile app privacy manifest?","a":"Apple now requires a privacy manifest (PrivacyInfo.xcprivacy) for apps that use certain APIs or collect certain types of data. Required declarations: the types of data collected (device identifiers, crash data, performance data, usage data), whether data is linked to the user's identity, and the purpose of each data type collected. Third-party SDKs that collect data (analytics, crash reporting) must also provide their own privacy manifests. Omitting a required declaration can result in App Store rejection."},
+  {"q":"How should mobile analytics events be structured?","a":"Use a consistent naming convention (noun_verb: screen_viewed, button_tapped, purchase_completed), include a standard set of properties on every event (user ID, session ID, app version, platform, device type), and document the event schema in a shared specification that both mobile and backend teams reference. The most common mistake is organic event growth where different team members add events with inconsistent naming, making the analytics data hard to query and compare."},
+  {"q":"What is the right crash reporting setup for a React Native or Flutter app?","a":"Sentry for crash reporting and error tracking, configured to include the user ID and session context with every error report. For React Native, Sentry's native SDK captures both JavaScript errors and native crashes (OOM, native module exceptions). For Flutter, Sentry's Flutter SDK captures Dart exceptions and native crashes. Configure source maps for React Native so that production stack traces resolve to readable source code rather than minified bundles. Set up Sentry alerts for error rate spikes and new errors before each release."},
+  {"q":"How does Apple's ATT (App Tracking Transparency) framework affect mobile analytics?","a":"ATT requires user consent before any cross-app or cross-website tracking. This primarily affects advertising attribution (understanding which ad drove a download) and device identifier-based tracking. Product analytics that is limited to your own app and does not use the IDFA (Identifier for Advertisers) or cross-app identifiers is generally exempt from ATT. The practical implication: use server-side user IDs (not device identifiers) for user-level analytics, and avoid any analytics tool that requires the IDFA for basic product analytics functionality."}
+]
+---
+
+## What you actually need to know
+
+- Mobile analytics must be configured before launch, not after. Retroactive analysis of user behavior is not possible without instrumentation that was running from the start.
+- The event schema is more important than the analytics tool. A well-defined schema with consistent naming and standard properties on every event produces useful data; an organic schema with ad-hoc events produces noise.
+- Sentry for crash reporting is non-negotiable. Flying blind to crashes in a mobile app means users uninstall before the engineering team knows the problem exists.
+- Apple's privacy manifest requirements are now enforced at App Store review. Missing privacy declarations cause rejection.
+- ATT compliance affects advertising attribution, not product analytics. Use server-side user IDs for analytics to avoid ATT complexity.
+
+| Analytics Layer | Tool | Primary Use | Mobile SDK |
+|---|---|---|---|
+| Product analytics | PostHog / Mixpanel | User behavior, funnels, retention | React Native + Flutter |
+| Crash reporting | Sentry | Error and crash tracking | React Native + Flutter |
+| Performance monitoring | Sentry Performance | API latency, app startup time | React Native + Flutter |
+| Attribution | Adjust / AppsFlyer | Ad campaign attribution (post-ATT) | Both platforms |
+| Session recording | PostHog | UX debugging | React Native (beta) |
+| A/B testing | PostHog / GrowthBook | Feature experiments | Both platforms |
+
+## The core argument
+
+Mobile analytics is frequently treated as an afterthought -- added after launch when the team realizes they cannot answer basic questions about how users interact with the app. By then, the data to answer those questions does not exist and cannot be retroactively collected. The funnel from download to first meaningful action, the retention curve at 1/7/30 days, the crash rate per app version -- these metrics require instrumentation that was running from the beginning.
+
+The right time to define the event schema and integrate the analytics tools is before the first TestFlight or Play Store beta, not after public launch. The overhead of integration is low (a few hours per tool, a day for the full stack); the cost of missing analytics data is months of operating without understanding what users actually do.
+
+The second mistake is the organic event schema: adding analytics events as features are built, without a shared naming convention or standard properties. The result is a data set where `screen_view`, `PageView`, `view_screen`, and `screen_shown` all mean roughly the same thing, appear in different contexts, and cannot be reliably queried or compared. Defining the schema before instrumentation starts -- even a one-page document with the naming convention, the standard event properties, and the list of events to track -- produces data that is actually useful for analysis.
+
+## The event schema
+
+Before integrating any analytics tool, define the event schema:
+
+**Naming convention.** Use `noun_verb` format: `screen_viewed`, `button_tapped`, `session_started`, `purchase_completed`, `error_displayed`. This format is easy to read, sorts logically in analytics dashboards, and makes the data model self-documenting.
+
+**Standard properties on every event.** These properties travel with every event regardless of which specific event it is:
+
+```typescript
+interface StandardEventProperties {
+  userId: string | null;      // null for anonymous users
+  sessionId: string;          // UUID generated at app start
+  appVersion: string;         // '2.1.0'
+  platform: 'ios' | 'android';
+  deviceType: 'phone' | 'tablet';
+  timestamp: string;          // ISO 8601
+}
+```
+
+**Event-specific properties.** Each event has its own properties in addition to the standard set. A `purchase_completed` event includes `productId`, `price`, `currency`, and `planType`. A `screen_viewed` event includes `screenName` and `referringScreen`.
+
+This schema is documented in a shared repository (or Notion/Confluence) before any integration code is written. Engineers implementing new features reference the schema document to add events consistently.
+
+## The PostHog integration for React Native
+
+PostHog's React Native SDK covers product analytics, feature flags, and session recording in a single integration:
+
+```typescript
+// App.tsx
+import PostHog from 'posthog-react-native';
+
+const posthog = new PostHog(POSTHOG_API_KEY, {
+  host: 'https://app.posthog.com',
+  disabled: __DEV__,  // disable in development
+});
+
+export function App() {
+  return (
+    <PostHogProvider client={posthog}>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    </PostHogProvider>
+  );
+}
+```
+
+Track events from anywhere in the app:
+
+```typescript
+posthog.capture('purchase_completed', {
+  productId: plan.id,
+  price: plan.price,
+  currency: 'USD',
+  planType: plan.tier,
+  // standard properties added automatically by the provider
+});
+```
+
+Identify users after authentication:
+
+```typescript
+posthog.identify(user.id, {
+  email: user.email,
+  name: user.name,
+  plan: user.plan,
+  createdAt: user.createdAt,
+});
+```
+
+## The Sentry integration for crash reporting
+
+Sentry's React Native SDK captures both JavaScript exceptions and native crashes. The setup requires the Sentry CLI for source map upload (so production stack traces are readable):
+
+```typescript
+// index.js (entry point)
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: SENTRY_DSN,
+  environment: __DEV__ ? 'development' : 'production',
+  tracesSampleRate: 0.2,  // 20% of sessions for performance monitoring
+  beforeSend(event) {
+    if (__DEV__) return null;  // suppress in development
+    return event;
+  },
+});
+```
+
+Add user context after authentication so crash reports are linked to specific users:
+
+```typescript
+Sentry.setUser({
+  id: user.id,
+  email: user.email,
+});
+```
+
+Set up Sentry alerts for: any new error (immediate notification), error rate spike above 1 percent (immediate notification), and app startup time regression above 20 percent (daily digest). These three alerts catch the majority of production reliability problems.
+
+## Privacy compliance in mobile analytics
+
+**Apple's privacy manifest.** Apps that use analytics SDKs must declare the data types collected in a `PrivacyInfo.xcprivacy` file. PostHog, Sentry, and most major SDKs provide their own privacy manifests; the app's manifest covers any data the app code collects directly. The manifest is part of the Xcode project; missing it causes rejection.
+
+**ATT (App Tracking Transparency).** ATT is required before accessing the IDFA (Identifier for Advertisers). Product analytics tools like PostHog and Mixpanel that use server-side user IDs do not require ATT consent. Advertising attribution tools (Adjust, AppsFlyer) do require ATT consent for device-level attribution. The practical setup: use user IDs for product analytics, implement ATT consent for attribution, and accept that a significant percentage of iOS users (50-70 percent in many categories) will decline ATT and produce attribution data gaps.
+
+**Google's data safety section.** The Play Store requires a data safety section declaration that lists the data collected, whether it is shared with third parties, and the purpose. The declaration must be accurate and kept up to date when the analytics stack changes. Inaccurate declarations can result in policy violations.
+
+## Common mistakes teams make with mobile analytics
+
+1. Using device identifiers (IDFA, Android Advertising ID) for user identification in product analytics. Server-side user IDs are more reliable (consistent across reinstalls), do not require ATT consent, and are simpler to implement.
+2. Adding analytics events without documenting the schema. Within six months, the event namespace will have inconsistencies that make querying the data harder than necessary.
+3. Not uploading source maps to Sentry. Production stack traces from a minified React Native bundle are unreadable without source maps. Configure the Sentry CLI source map upload in the CI/CD pipeline.
+4. Tracking every user action instead of business-level events. A `text_field_focused` event produces no useful business insight. A `search_performed` event does. Track the business intent, not the UI interaction.
+5. Not testing analytics in a staging environment that matches production. An analytics integration that works in development (with debug flags set) may behave differently in production builds. Include an analytics test pass in the pre-release checklist.
+
+## Where to start: a 3-step mobile analytics setup
+
+**Step 1: Define the event schema before writing any integration code.** A one-page document with the naming convention, the standard event properties, and the 10-15 most important events to track is sufficient to start. This document becomes the reference for every future analytics addition.
+
+**Step 2: Integrate Sentry before TestFlight or Play Store beta.** Crash reporting must be running from the first external distribution. Configure source map upload in the build pipeline, add user context after authentication, and set up the three core alerts (new error, error rate spike, startup time regression).
+
+**Step 3: Integrate PostHog and instrument the core user journey.** The events that matter most for an early-stage mobile product: `app_opened`, `user_signed_up`, `onboarding_completed`, `core_action_completed`, `session_started`. These five events produce the retention and activation funnel that answers the most important questions about early-stage product health.
+
+## The Stack That Tells You What Is Actually Happening
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app launched with PostHog for product analytics and Sentry for crash reporting configured before the first TestFlight. In the first two weeks of beta, Sentry caught three native crashes that we had not reproduced locally -- one in the push notification handler on iOS 16, one in the photo picker on Android 12, and one in the in-app purchase flow on devices with regional pricing. All three were fixed before the public launch because the crash reporting was running during the beta period. Without it, those three crashes would have reached production users who would have uninstalled without reporting the issue. That is the value of the analytics stack before launch: not the data for retrospective analysis, but the immediate signal that tells you what is broken before users form their first impression.
+
+## Related reading
+
+- [The Mobile App Privacy Manifest: What Apple Now Requires](/blog/the-mobile-app-privacy-manifest-what-apple-now-requires)
+- [The Hybrid Mobile Architecture: WebView Heavy Apps in 2026](/blog/the-hybrid-mobile-architecture-webview-heavy-apps-in-2026)
+- The App Store Submission Checklist That Actually Works
+- [The Internal Notification System for Founders](/blog/the-internal-notification-system-for-founders)

@@ -1,0 +1,109 @@
+---
+slug: "app-router-vs-pages-router-the-migration-decision"
+title: "App Router vs Pages Router: The Migration Decision"
+excerpt: "Next.js 13 introduced the App Router and the question has hung over every Next codebase since. The migration is real work. The question is whether the gains are worth it for your product. Here is the honest call."
+date: "2026-05-18"
+category: "Web App and Frontend Development"
+tags: ["nextjs","frontend","react","architecture"]
+readingMinutes: 11
+ogImage: "/api/og/blog/app-router-vs-pages-router-the-migration-decision"
+status: "published"
+definition: "App Router is the future of Next.js. Pages Router still works and will keep working. The migration question for an existing codebase is whether the gains in server components, streaming, and parallel routing justify the cost of porting. For new projects in 2026, the App Router is the default. For mature Pages Router apps, the answer is closer to the case by case."
+faq: [
+  {"q":"Is Pages Router going to be deprecated?","a":"Not announced. The Next.js team has committed to supporting Pages Router. New features are landing primarily on App Router. The strategic direction is clear but the practical sunset is not."},
+  {"q":"What is the biggest reason to migrate?","a":"Server Components, which let you fetch data and render on the server with the React component model rather than getServerSideProps. The mental model is cleaner and the data fetching surface is smaller."},
+  {"q":"What is the biggest reason not to migrate?","a":"The cost of porting a mature codebase. Routing changes, layout changes, data fetching changes, error handling changes. For a codebase with hundreds of pages and complex client side state, the migration is a real project."},
+  {"q":"Can I run both in the same Next.js project?","a":"Yes. Pages Router and App Router can coexist. This makes incremental migration possible. Start with one section, port it, ship, repeat. The codebase has two paradigms during the transition, which is its own kind of cost."},
+  {"q":"What patterns get easier with App Router?","a":"Nested layouts that share state. Streaming UI with Suspense. Loading and error states co located with pages. Server Actions for forms. These were all possible in Pages Router but the patterns are cleaner in App Router."},
+  {"q":"What patterns get harder with App Router?","a":"Anything that relied heavily on client side data fetching with SWR or React Query at the page level. The shift toward server fetching changes the mental model. Teams that lean into Server Components find the new way better. Teams that prefer client side find the transition annoying."},
+  {"q":"How long does a typical migration take?","a":"For a small app of under thirty routes, one to two weeks. For a medium app of fifty to two hundred routes, one to three months. For a large app, six months or more, usually done in stages."}
+]
+---
+
+## What you actually need to know
+
+- App Router is the default for new Next.js projects in 2026.
+- Pages Router still works and is still supported.
+- Migrating a mature codebase is real work. Expect weeks to months.
+- The two routers can coexist, which makes incremental migration viable.
+- In my experience, the gains compound over time on App Router for new builds, but the migration of a healthy Pages Router app is rarely urgent.
+
+| Router | Best for | Watch out for |
+|---|---|---|
+| Pages Router | Mature codebases, teams familiar with it | New features landing slower, ecosystem direction shifting |
+| App Router | New projects, codebases ready to embrace Server Components | Migration cost, learning curve |
+| Both at once | Incremental migration | Two paradigms in one repo, real cognitive cost |
+
+## The core argument
+
+The App Router is the bigger architectural change in Next.js history. It moved the default model toward server first rendering, introduced Server Components, replaced the data fetching API, changed how layouts work, and re drew the boundary between the page directory and the application directory. For a new project, this is mostly upside. For an existing project, the boundary between upside and migration cost is where the call gets made.
+
+I have built on both. The site this content lives on uses App Router because it was started after the App Router became stable. Some of my client projects still run Pages Router because the migration was not the most valuable work the team could do that quarter. There is no shame in either choice. The shame is in switching for the sake of switching, or in refusing to switch when the team is starting a new build and would benefit from the newer model.
+
+The case for migration is strongest when the codebase is taking on more pages, more data fetching, and more cross page state. The Server Components model handles those better than the equivalent Pages Router code. The case for staying is strongest when the codebase is mature, the team is fluent in Pages Router, and the engineering hours are better spent on product work.
+
+The framing I give founders is simple. If you are starting a new Next.js project in 2026, default to App Router. If you have a healthy Pages Router app, migrate when there is a specific feature that benefits from the new model. Do not migrate as a refactor for its own sake. The migration tax has to be paid for by real gains.
+
+## What the migration looks like
+
+**Phase one. Coexistence.** Update Next.js to a version that supports both routers. Confirm the existing Pages Router code still works. Add a single App Router route as a smoke test.
+
+**Phase two. New work on App Router.** Any new page or section gets built in App Router. Existing pages stay on Pages Router. The team learns the new patterns on small surfaces before tackling large ones.
+
+**Phase three. Targeted migration.** Pick the routes that would most benefit from App Router. Often these are routes with complex data fetching or nested layouts. Port them. Keep the simpler routes on Pages Router until later.
+
+**Phase four. Full migration.** Once the team is comfortable and most new work is on App Router, port the remaining Pages Router routes. This is usually a multi sprint effort.
+
+**Phase five. Cleanup.** Remove the Pages Router code entirely. The codebase now has one paradigm. The cognitive load drops noticeably.
+
+## What it actually costs
+
+| Project size | Migration effort | Risk |
+|---|---|---|
+| Small, under 30 routes | 1 to 2 weeks | Low |
+| Medium, 30 to 200 routes | 1 to 3 months | Moderate, focus testing |
+| Large, 200 plus routes | 3 to 9 months | High, requires careful staging |
+| Enterprise with multiple teams | 6 to 18 months | High, coordination is the main cost |
+
+The numbers come from my client work and from the public reports I have read on large migrations. The size of the codebase is one factor. The complexity of routing and data fetching is the other. Two apps with the same route count can have very different migration costs.
+
+## Features to demand from your migration plan
+
+- A working coexistence setup before any real porting begins.
+- A pilot route that exercises the new patterns before the team commits to broader migration.
+- A clear staging plan. Which routes migrate first, which last, why in that order.
+- Updated tests that exercise the new routing. Many test patterns break across the boundary.
+- A rollback plan. If a migrated route causes issues, the team can switch back to the Pages Router version.
+- A timeline that does not blow up the product roadmap. The migration is engineering work, not a product feature, and competing with product features is usually how the migration loses.
+
+## Expert opinion
+
+> The teams that migrate well treat App Router as a tool, not as a flag of modernity. The teams that migrate badly treat it as a religious move. The first group ships product. The second group ships migration. The difference matters.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+The Yashveer Labs site you are reading was built directly in App Router because the project started in late 2025 when the patterns were stable. The Server Components model fit the content rendering shape of the site. Layouts share data cleanly between routes. The site renders mostly on the server with selective client islands for interactivity. The build process is fast and the production output is small.
+
+On a client project, we ran a partial migration. The marketing pages migrated to App Router because they benefited from Server Components and streaming. The admin dashboard stayed on Pages Router because the client side state was deep and the migration cost outweighed the gain. The two coexisted for a year. The codebase had two paradigms, which was the cost, but the team had clear judgment on which paradigm to use for new work.
+
+For more on the broader frontend topic, see [Next.js vs Remix vs Astro vs Nuxt in 2026](/blog/next-js-vs-remix-vs-astro-vs-nuxt-in-2026), [server components in practice a founder engineer story](/blog/server-components-in-practice-a-founder-engineer-story), and [the state management question in 2026](/blog/the-state-management-question-in-2026).
+
+## Common mistakes teams make
+
+1. Migrating as a refactor for its own sake. The migration needs a real reason.
+2. Trying to do the full migration in one sprint. It is usually a quarter or longer for any real codebase.
+3. Skipping the pilot route. The team learns the new patterns on a large surface, which is expensive.
+4. Not updating tests. The migration breaks them in subtle ways.
+5. Mixing client side data fetching patterns from React Query into Server Components without thinking through the boundary.
+6. Treating the migration as low priority and starving it of engineering time. It stretches into a multi year drift.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Decide. New project starts on App Router. Mature project gets a written justification or stays put.
+2. **Week two.** If migrating, set up coexistence. Add a single App Router route as a smoke test.
+3. **Week three.** Pick the pilot route. Port it. Confirm tests pass. Measure the change in build time and bundle size.
+4. **Week four.** Plan the broader migration with a real staging order. Block time on the roadmap. Communicate with the team.
+
+For deeper reading, [the frontend architecture that survives three years of feature sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl) covers the broader sustainability question, and [tRPC vs REST vs GraphQL on the frontend](/blog/trpc-vs-rest-vs-graphql-on-the-frontend) covers the related data fetching debate.

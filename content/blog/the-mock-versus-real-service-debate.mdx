@@ -1,0 +1,145 @@
+---
+slug: "the-mock-versus-real-service-debate"
+title: "The Mock Versus Real Service Debate"
+excerpt: "When to mock external services in tests and when to use real ones -- and why the answer differs for unit tests, integration tests, and end-to-end tests."
+date: "2025-09-08"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","testing","quality","integration-tests"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mock-versus-real-service-debate"
+status: "published"
+definition: "The mock versus real service debate in software testing concerns whether tests should use mocked versions of external dependencies (databases, third-party APIs, queues) or real versions. The answer depends on the test type and the purpose of the test: unit tests test isolated logic and should mock everything external; integration tests test how components interact and should use real implementations of internal dependencies but can mock external APIs; end-to-end tests test the full user flow and should use real services wherever practical. The failure mode that causes the most production bugs is mocking too aggressively in integration tests, producing tests that pass against mocks but fail against real implementations."
+faq: [
+  {"q":"What is the fundamental problem with over-mocking in tests?","a":"Mocks diverge from the real implementation. A mock that returns a hardcoded response is a snapshot of what the real service returned at the time the mock was written. If the real service changes its response format, authentication mechanism, or error handling behavior, the mock does not update. Tests that use the stale mock continue to pass; production code continues to fail. The more aggressively a test suite mocks, the larger the gap between what the tests verify and what production actually does."},
+  {"q":"When is mocking clearly the right choice?","a":"For external APIs with rate limits, costs, or test environment unavailability: payment processors (Stripe tests in a CI environment without test keys configured), email services (you do not want to send real emails in CI), and third-party data providers with rate limits. For non-deterministic behavior you want to control: time-dependent tests where you need to set the current date, random number generation, or flaky external dependencies. For unit tests that test isolated business logic where external dependencies are irrelevant to what is being tested."},
+  {"q":"What is the right approach for testing database interactions?","a":"Use a real database in integration tests, not a mocked database or an in-memory database that does not match production behavior. The most common failure mode: tests pass against SQLite in CI but fail against PostgreSQL in production because SQLite has different type coercion, different constraint enforcement, and different query behavior. The solution: use the same PostgreSQL (or whatever production uses) in CI, either via Docker or a cloud-hosted test database. The overhead of spinning up a Docker PostgreSQL container in CI is 15-30 seconds -- worth it to catch the production-parity bugs that in-memory databases cannot surface."},
+  {"q":"How should third-party API calls be handled in an integration test suite?","a":"Use a test double that behaves like the real API without making real calls. For HTTP requests, Mock Service Worker (msw) intercepts HTTP calls at the network layer and returns configured responses -- more realistic than a library-level mock because it tests the serialization and HTTP behavior of the calling code. Stripe provides a test mode with test keys that make real API calls against a non-billing test environment -- use these in integration tests when the stripe behavior is part of what is being tested. The key distinction: test doubles that simulate real API behavior are preferable to mocks that return hardcoded values."},
+  {"q":"What does a well-structured test suite look like in terms of mock vs. real service usage?","a":"Unit tests (70% of the test suite): real logic, all dependencies mocked. Integration tests (20%): real database, real internal services, mocked external APIs (via MSW or test mode). End-to-end tests (10%): real database, real application, test mode for payment APIs, real browser. This distribution tests each layer with the appropriate level of fidelity. The end-to-end tests are most expensive to run and maintain but provide the highest confidence that the full system works correctly."}
+]
+---
+
+## What you actually need to know
+
+- Mocks that diverge from the real service produce false confidence. Tests pass; production fails. The bug is invisible until it reaches users.
+- Integration tests should use a real database (the same one as production). SQLite and in-memory databases do not reproduce PostgreSQL's behavior well enough to catch real bugs.
+- Mock Service Worker (MSW) for HTTP API mocking is better than library-level mocks because it tests the actual HTTP behavior, not just the function call.
+- Stripe's test mode with real API calls is preferable to mocking the Stripe library for integration tests of payment flows.
+- The cost of a Docker-based test database in CI is 15-30 seconds of startup time. The cost of in-memory database divergence is production bugs that could not be caught by tests.
+
+| Dependency Type | Unit Test | Integration Test | End-to-End Test |
+|---|---|---|---|
+| Database | Mock | Real (PostgreSQL in Docker) | Real |
+| Internal services | Mock | Real | Real |
+| HTTP APIs (third-party) | Mock | MSW / test mode | Test mode |
+| Time / randomness | Mock (fixed) | Mock (fixed) | Real |
+| Email service | Mock | Mock (capture) | Capture / real |
+| Payment processor | Mock | Stripe test mode | Stripe test mode |
+
+## The core argument
+
+The mock versus real service debate is settled by understanding what each test type is trying to verify. Unit tests verify that isolated logic produces correct output for given inputs. Mocking everything external is correct for unit tests because external behavior is not what is being tested. Integration tests verify that components work correctly together, with real data flowing through real code paths. Mocking the database in an integration test defeats the purpose -- the integration test cannot verify the real query behavior, the real constraint enforcement, or the real transaction behavior of the database.
+
+The teams I have worked with that over-mock their integration tests face a specific and predictable problem: test suites that are green in CI and broken in production. The SQLite mock that does not enforce the same foreign key constraints as PostgreSQL. The Stripe mock that returns a hardcoded `subscription.status = 'active'` without testing the actual subscription lifecycle. The email service mock that captures sent emails without testing the SMTP connection that fails in a new deployment environment.
+
+In each case, the mock was added to make the test easier to write. In each case, the mock produced a test that verifies something different from what the production code actually does. The principle that prevents this: mock at the boundary of your system's control, not at the boundary of what is inconvenient to test.
+
+## Where to use real services
+
+**Database.** The most important real service in any test suite. Production PostgreSQL behavior is not reproduced accurately by SQLite, in-memory databases, or ORM mocking. PostgreSQL has specific behavior for: JSONB operations, generated columns, full-text search, UUID types, constraint enforcement timing, transaction isolation levels, and many other features that are either unavailable or behave differently in alternatives.
+
+Setting up PostgreSQL for CI with Docker:
+
+```yaml
+# .github/workflows/test.yml
+services:
+  postgres:
+    image: postgres:16
+    env:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test
+    options: >-
+      --health-cmd pg_isready
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
+    ports:
+      - 5432:5432
+```
+
+The database is seeded with a schema migration at the start of the test run and reset between tests (either via transaction rollback or table truncation). This produces integration tests that behave identically to production database behavior.
+
+**Redis.** If the application uses Redis for caching, session storage, or queues, use a real Redis instance in integration tests. Redis's behavior for key expiration, pub/sub, and sorted sets is specific enough that mocking it at the library level produces different behavior from what production code experiences.
+
+**Stripe test mode.** Stripe's test mode API accepts real API calls with test keys and returns realistic responses that reflect the actual Stripe state machine. A subscription created in Stripe test mode goes through the actual subscription lifecycle -- it can be cancelled, have failed payments, and transition through past_due, cancelled, and active states. A mocked Stripe library cannot reproduce this without implementing the same state machine.
+
+## Mock Service Worker for HTTP APIs
+
+Mock Service Worker (MSW) intercepts HTTP requests at the service worker or Node.js module level and returns configured responses. The advantage over library mocks is that MSW tests the actual HTTP behavior of the calling code -- the request construction, headers, JSON serialization, and error handling -- rather than replacing the HTTP layer entirely.
+
+```typescript
+// tests/mocks/handlers.ts
+import { http, HttpResponse } from 'msw';
+
+export const handlers = [
+  http.post('https://api.sendgrid.com/v3/mail/send', () => {
+    return HttpResponse.json({ message: 'Queued' });
+  }),
+  
+  http.get('https://api.github.com/user', ({ request }) => {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new HttpResponse(null, { status: 401 });
+    }
+    return HttpResponse.json({
+      id: 12345,
+      login: 'testuser',
+      email: 'test@example.com',
+    });
+  }),
+];
+```
+
+The MSW handler intercepts the real HTTP call from the application code. The application's fetch or axios configuration, the request headers, and the response parsing logic are all exercised. Only the actual network call to the external service is intercepted.
+
+This is more realistic than mocking `sendgrid.send()` at the library level, which replaces the function call and skips everything between the application code and the mock return value.
+
+## The in-memory database trap
+
+The most common integration test mistake is using SQLite or an in-memory database to avoid the complexity of running a real PostgreSQL instance in CI. The specific production bugs this produces:
+
+**Type coercion differences.** SQLite stores everything as text, integers, or blobs with implicit coercion. PostgreSQL is strictly typed. An application that stores a string value in an integer column works in SQLite (implicit coercion) and throws a constraint violation in PostgreSQL.
+
+**Constraint timing.** PostgreSQL defers constraint checks to the end of a transaction by default for some constraint types. SQLite enforces constraints differently. Integration tests that rely on specific constraint behavior will produce different results in each database.
+
+**Query behavior.** PostgreSQL's handling of NULL in WHERE clauses, GROUP BY, and ORDER BY differs from SQLite's. Queries that work in SQLite may produce unexpected results in PostgreSQL due to different NULL comparison semantics.
+
+**Missing PostgreSQL features.** JSONB operations, `array_agg`, `string_agg`, window functions, generated columns, and many PostgreSQL-specific features either do not exist or behave differently in SQLite. Integration tests that use these features against SQLite cannot verify the actual query behavior.
+
+The fix is to use PostgreSQL in CI. The overhead is a 15-30 second startup time for the Docker container. The value is catching every production database bug before it reaches users.
+
+## Common mistakes teams make with mock vs. real service decisions
+
+1. Mocking the database in integration tests because "it is faster." The 15-30 seconds of PostgreSQL startup time is worthwhile. The alternative is an integration test suite that has never caught a real database interaction bug.
+2. Using library-level mocks instead of MSW for HTTP API testing. Library-level mocks skip the HTTP construction and response parsing that MSW exercises. The application code that constructs the request incorrectly passes a library-level mock; it fails against MSW because MSW validates the actual HTTP behavior.
+3. Mocking Stripe for payment flow tests instead of using test mode. Stripe's test mode is designed for integration testing. The mock that returns `{ status: 'active' }` does not test the subscription lifecycle; Stripe test mode does.
+4. Not resetting the database state between tests. Integration tests that share database state produce flaky tests that pass or fail depending on test execution order. Each test should start with a clean, seeded state.
+5. Over-mocking to make tests fast rather than to make them accurate. Test speed is a valid concern; mock correctness is a more important one. Fast tests that miss real bugs are worse than slightly slower tests that catch them.
+
+## Where to start: a 3-step mock vs. real service audit
+
+**Step 1: List every external dependency that is currently mocked in the integration test suite.** For each: is the mock realistic? Does it simulate the real service's behavior for error cases, state transitions, and edge cases? A mock that only returns the happy path is a mock that cannot catch the error handling bugs.
+
+**Step 2: Replace the in-memory or SQLite test database with PostgreSQL in Docker.** Set up the CI database service as described above, run the existing integration tests, and identify any tests that fail because they relied on SQLite-specific behavior. These failures are the bugs that would have reached production.
+
+**Step 3: Replace library-level HTTP mocks with MSW for the three most important external API integrations.** The payment processor, the email service, and the primary data integration are the highest-value MSW replacements. Each replacement produces a test that verifies more of the application code path.
+
+## The Tests That Tell the Truth
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I ran a test suite audit at a client company where the integration tests were using SQLite and mocking the payment library. The tests were green; the production code had two bugs. The first was a JSONB query that worked in SQLite (which stored the data as text) but produced an error in PostgreSQL (which expected JSONB operators). The second was a subscription cancellation flow that the Stripe mock handled as a simple function call but that Stripe's test mode revealed required a `cancel_at_period_end` parameter that was not being passed. Both bugs reached production before being discovered. Switching to PostgreSQL in Docker and Stripe test mode caught both in the next test run. The audit took two days; the bugs it would have caught had been live for three months.
+
+## Related reading
+
+- [The Frontend Testing Strategy That Works](/blog/the-frontend-testing-strategy-that-works)
+- [The Legacy Codebase: A Senior Engineer's Five Day Audit](/blog/the-legacy-codebase-a-senior-engineers-five-day-audit)
+- [The Insurance Math of Software Costs: Pay Now or Pay More Later](/blog/the-insurance-math-of-software-costs-pay-now-or-pay-more-later)
+- [The Game Day: How to Run a Failure Simulation](/blog/the-game-day-how-to-run-a-failure-simulation)

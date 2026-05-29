@@ -1,0 +1,62 @@
+---
+slug: "saga-patterns-distributed-transactions-without-distributed-pain"
+title: "Saga Patterns: Distributed Transactions Without Distributed Pain"
+excerpt: "Distributed transactions are hard. Sagas make them manageable by breaking long-running operations into compensatable steps. Here is how choreography and orchestration sagas work, when each fits, and what the implementation actually looks like."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","ai"]
+readingMinutes: 6
+ogImage: "/api/og/blog/saga-patterns-distributed-transactions-without-distributed-pain"
+status: "published"
+definition: "The saga pattern manages distributed transactions by breaking a multi-step operation into a sequence of local transactions, each with a compensating transaction that reverses its effects on failure. When a step fails, the saga executes compensating transactions for all previously completed steps, returning the system to a consistent state without requiring distributed locks or two-phase commit. Sagas are the standard approach to long-running transactions in microservices and multi-service architectures."
+faq: [
+  {"q":"What problem does the saga pattern solve?","a":"The saga pattern solves the distributed transaction problem: how to coordinate a multi-step operation across multiple services or databases where each step must either all succeed or all be rolled back. Traditional database transactions cannot span service boundaries, and two-phase commit (2PC) is slow, fragile, and creates distributed locking problems. Sagas replace atomic transactions with a sequence of local transactions plus compensating transactions that undo completed steps on failure. The result is eventual consistency without distributed locking."},
+  {"q":"What is the difference between choreography and orchestration sagas?","a":"Choreography sagas coordinate steps through events: each service listens for events from the previous step, performs its local transaction, and emits an event for the next step. No central coordinator exists. Orchestration sagas use a central orchestrator (a saga coordinator service or state machine) that sends commands to each service and waits for responses. Choreography is simpler for short sagas with a clear linear flow. Orchestration is better for complex sagas with conditional branches, parallel steps, or where observability of the overall transaction state matters."},
+  {"q":"What is a compensating transaction and how do you design one?","a":"A compensating transaction reverses the effects of a completed saga step when a later step fails. For a payment saga where step 1 reserves inventory and step 2 charges the customer, the compensating transaction for step 1 releases the reserved inventory if step 2 fails. Compensating transactions are not always exact reversals: if step 1 sent a confirmation email, the compensating transaction might send a cancellation email rather than unsending the original. Compensating transactions must be idempotent because they may be executed multiple times if the saga coordinator retries on failure."},
+  {"q":"How do you handle saga failures and partial execution?","a":"Saga failure handling requires: persisting the saga state (which steps have completed, what compensating transactions need to run) to durable storage before executing each step; implementing retry logic for transient failures before triggering compensation; executing compensating transactions in reverse order when a step fails and all retries are exhausted; and alerting the operations team when a saga enters a failed state that requires manual intervention. The saga state record is the source of truth for recovery: if the service restarts mid-saga, the state record allows resumption from the correct point."},
+  {"q":"When should you use sagas vs simpler alternatives?","a":"Use sagas when: a business operation spans multiple services or databases that cannot share a transaction, the operation includes steps that have real-world side effects (sending emails, charging cards, reserving inventory), and the operation must be recoverable on failure. For operations that can be made idempotent and retried as a whole, a simpler retry loop may be sufficient. For operations contained within a single database, local transactions are always preferable to sagas. Sagas add complexity that is only justified when the operation genuinely requires cross-service coordination with rollback semantics."}
+]
+---
+
+## What you need to know
+
+- Sagas replace distributed transactions with a sequence of local transactions plus compensating transactions for rollback. No distributed locks required.
+- Choreography sagas use events to coordinate steps with no central coordinator. Good for simple linear flows.
+- Orchestration sagas use a central coordinator that commands each step. Better for complex flows where observability of overall transaction state matters.
+- Compensating transactions must be designed upfront for every saga step. An uncommitted step with no compensating transaction is a correctness hole.
+- Saga state must be persisted to durable storage before each step executes. This is what makes sagas recoverable across service restarts.
+
+## The core argument
+
+The distributed transaction problem surfaces the moment a business operation touches more than one service. Order creation touches inventory, payment, fulfillment, and notification services. A failure halfway through leaves the system in an inconsistent state unless each step can be rolled back. Two-phase commit solves this with distributed locks, but distributed locks in production create availability problems, deadlock risks, and dependency chains between services that should be independent.
+
+Sagas solve the same problem without locking. Each step is a local transaction. If a step fails, the saga runs compensating transactions for previously completed steps. The system reaches a consistent state through a series of single-service operations rather than a cross-service atomic transaction. The trade-off is eventual consistency: there is a window where the system is in an intermediate state, which is acceptable for most business operations and unacceptable for a small number (financial settlements, for example, where intermediate states have regulatory implications).
+
+The choice between choreography and orchestration comes down to observability and complexity. For Nexli, we implemented a checkout saga using choreography initially because the flow was linear and the services were few. When the checkout flow added conditional branches (subscription products requiring different fulfillment than one-time purchases), the choreography model became hard to reason about because the overall transaction flow was implicit across multiple services. We migrated to orchestration, which made the transaction state visible in one place and made debugging saga failures straightforward.
+
+## Common mistakes
+
+1. **Not persisting saga state before executing each step.** If the saga coordinator crashes after step 2 completes but before step 3 is recorded as pending, restart recovery cannot determine what has been done and what needs compensation. Persist the intended next step before executing the current step. Write-ahead style: record what you are about to do before doing it.
+
+2. **Designing compensating transactions as exact reversals when side effects have occurred.** A compensating transaction for a step that sent an email cannot unsend the email. The compensating transaction must perform the appropriate real-world response (send a cancellation notification, record a credit) rather than reversing an irreversible action. Design compensating transactions for what can actually be undone.
+
+3. **Not making compensating transactions idempotent.** Compensating transactions are retried on transient failure. If a compensating transaction is not idempotent, retrying it causes double-compensation (crediting an account twice, releasing inventory twice). Treat compensating transactions the same as the original steps: idempotent, with deduplication on the operation ID.
+
+4. **Building sagas for operations that fit within a single database.** Adding saga infrastructure for operations that could be a single database transaction adds complexity without benefit. Sagas are justified when the operation genuinely crosses service or database boundaries. For a user account update that touches five tables in one database, a local transaction is always preferable.
+
+5. **Not monitoring saga failure rates as an operational metric.** Sagas that fail and require compensation are business events that should be visible to the operations team. A spike in saga failures indicates infrastructure problems, data integrity issues, or downstream service degradation. Instrument saga failure rates as a key metric with alerting thresholds.
+
+## Where to start
+
+1. **Identify the one business operation in the product that most needs distributed consistency.** In most SaaS products this is the checkout or subscription upgrade flow. Map the steps, the services involved, and what happens to the system if each step fails. This mapping reveals which steps need compensating transactions and what those compensations should do.
+
+2. **Implement an orchestration saga with persisted state for that operation.** Create a saga_executions table with columns for the operation type, current step, step history (JSON), status, and created/updated timestamps. Write a coordinator that progresses through steps by updating this table. This gives immediate visibility into in-flight and failed sagas.
+
+3. **Write integration tests that simulate failure at each step.** The most common saga bugs are in compensating transaction logic and recovery paths that are never exercised in normal operation. Write tests that force failure at each step and verify that compensating transactions restore the system to the correct initial state. These tests are the primary correctness check for saga implementations.
+
+## Related reading
+
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)
+- [SaaS Webhook Reliability: From At Most Once to At Least Once to Exactly Once](/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once)
+- [Schema Design Decisions That Haunt You at Million User Scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale)
+- [Service Decomposition: Drawing the Right Lines](/blog/service-decomposition-drawing-the-right-lines)

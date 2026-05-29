@@ -1,0 +1,114 @@
+---
+slug: "framer-motion-vs-gsap-vs-css-animations"
+title: "Framer Motion vs GSAP vs CSS Animations"
+excerpt: "CSS for the simple. Framer Motion for React component animations. GSAP for complex scroll choreography. Three credible options. Each fits a different shape of work."
+date: "2026-05-22"
+category: "Web App and Frontend Development"
+tags: ["animation","framer-motion","gsap","css"]
+readingMinutes: 11
+ogImage: "/api/og/blog/framer-motion-vs-gsap-vs-css-animations"
+status: "published"
+definition: "CSS animations are the cheapest and lightest option for simple effects. Framer Motion is the React first library for component animations with declarative APIs. GSAP is the most powerful animation library for complex scroll choreography and timeline based animation. The three are credible at different scales. Most React apps need CSS plus Framer Motion. Apps with serious scroll storytelling add GSAP."
+faq: [
+  {"q":"When are CSS animations enough?","a":"Hover effects. Simple transitions on state change. Loading spinners. Anything that fits the declarative CSS model. CSS animations are free in bundle size, hardware accelerated by default, and easy to maintain. Most apps use CSS for the majority of simple effects."},
+  {"q":"When does Framer Motion win?","a":"For React component animations that need to coordinate with state. Mount and unmount animations. Drag interactions. Layout animations when items reorder. The API is declarative and fits React patterns. Most modern React apps use Framer Motion for their animation layer."},
+  {"q":"When does GSAP win?","a":"For complex scroll choreography. Timeline based animations with many synchronized parts. SVG path animations. Anything where the precision and the timeline control matter. GSAP is the gold standard for cinematic web work."},
+  {"q":"What is the bundle cost?","a":"CSS is free. Framer Motion is about 50 KB compressed. GSAP is about 30 KB compressed for the core plus more for plugins. The cost is meaningful relative to the rest of the bundle. Use dynamic imports where appropriate."},
+  {"q":"What about performance?","a":"All three can be performant with care. CSS animations and transforms are hardware accelerated. Framer Motion animates with transform and opacity by default. GSAP picks the right properties. The performance lives in what you animate, not which library you use."},
+  {"q":"What about reduced motion?","a":"Respect prefers-reduced-motion. CSS supports this natively. Framer Motion has a MotionConfig that handles it. GSAP requires explicit checking. The accessibility matters. Always provide a quieter alternative."},
+  {"q":"What is the worst animation mistake?","a":"Animating layout properties like width, height, top, and left. Each triggers expensive recalculation. The fix is to animate transform and opacity. Both libraries default to these. The mistake usually comes from manual CSS."}
+]
+---
+
+## What you actually need to know
+
+- CSS for simple. Framer Motion for React components. GSAP for complex scroll.
+- Bundle costs are modest. Dynamic import for heavy uses.
+- Animate transform and opacity. Avoid layout properties.
+- Respect prefers reduced motion.
+- The library matters less than what you animate.
+
+| Library | Best fit | Bundle size compressed |
+|---|---|---|
+| CSS animations | Simple effects | Free |
+| Framer Motion | React component animations | About 50 KB |
+| GSAP | Complex scroll and timeline | 30 KB plus plugins |
+| Lottie | After Effects animations | Variable |
+| Anime.js | Lightweight JS animation | About 14 KB |
+| React Spring | Physics based animations | About 30 KB |
+
+## The core argument
+
+The animation library choice is one of those decisions that founders treat as preference and engineers treat as substantial. The reality is in between. The library matters less than what you animate. CSS animations done well outperform JavaScript animations done poorly. The library that fits your needs matters because of the developer experience and the patterns it supports.
+
+CSS animations are the cheapest and lightest option. They are hardware accelerated by default. They are free in bundle size. They cover most simple effects. Hover transitions, loading spinners, focus rings. The team that does not need more than this should not pay the bundle cost of a library.
+
+Framer Motion is the React first animation library. The API is declarative and fits React patterns. The library handles mount and unmount animations cleanly. Layout animations let items reorder smoothly. Drag interactions feel native. For React apps with component level animation needs, Framer Motion is the right default.
+
+GSAP is the most powerful animation library. The timeline control is precise. The scroll choreography handles complex multi step animations. The SVG capabilities are deep. For apps with cinematic scroll storytelling, GSAP is the gold standard. The bundle cost is real but justified for the work.
+
+Most React apps need CSS plus Framer Motion. Apps with serious scroll storytelling add GSAP. Apps that are React heavy but skip Framer Motion usually struggle with animation patterns that the library would have made easy. Apps that adopt GSAP for everything usually pay bundle cost they did not need to.
+
+## The decision by use case
+
+| Use case | Recommended library |
+|---|---|
+| Button hover | CSS |
+| Loading spinner | CSS |
+| Modal mount and unmount | Framer Motion |
+| Page transition | Framer Motion |
+| Drag and drop animation | Framer Motion plus dnd-kit |
+| Reorderable list animation | Framer Motion layout animation |
+| Scroll triggered hero | GSAP ScrollTrigger |
+| Multi step storytelling | GSAP timeline |
+| SVG path animation | GSAP |
+| Lottie file from designer | Lottie player |
+
+## How much does this cost
+
+The dollar cost of CSS is zero. Framer Motion is 50 KB compressed. GSAP is 30 KB plus plugins. The bundle cost is meaningful relative to the rest of the page. Dynamic import the heavy libraries where they are not needed on first paint.
+
+## Features the animation setup must have
+
+- Default to CSS for simple effects.
+- A library for complex animations.
+- Dynamic imports where the animation library is not needed on first paint.
+- Respect for prefers reduced motion.
+- A consistent API across the app.
+- Performance budget on animations.
+- Testing on slower devices.
+- Documentation of which animations exist and where.
+
+## Expert opinion
+
+> The animation library choice is downstream of the work you are doing. Most React apps need CSS plus Framer Motion. The teams that pick GSAP for everything pay for capability they do not use. The teams that try to do complex scroll choreography in Framer Motion struggle. The library should fit the work. The fitting is usually obvious once you state the work clearly.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client wanted to ship a cinematic marketing site with scroll triggered animations. The team had started with Framer Motion and was struggling. The scroll choreography did not fit the library's strengths.
+
+We migrated the scroll work to GSAP. The component animations stayed on Framer Motion. CSS handled the simple effects. The combination worked. The scroll telling that had been awkward in Framer Motion became natural in GSAP.
+
+The bundle grew by GSAP's size. We dynamic imported GSAP only on the pages that needed it. The marketing pages got the heavy bundle. The application pages stayed light. The performance held.
+
+For more on the related work, see [building cinematic web experiences without killing performance](/blog/building-cinematic-web-experiences-without-killing-performance) and [CLS without tears layout stability patterns](/blog/cls-without-tears-layout-stability-patterns).
+
+## Common mistakes teams make
+
+1. Adopting GSAP for animations that CSS would have handled.
+2. Hand rolling animations in CSS that Framer Motion would have made trivial.
+3. Animating layout properties. Slow.
+4. No prefers reduced motion respect.
+5. No dynamic import of heavy libraries.
+6. Mixing libraries inconsistently. Confusion.
+7. No testing on slow devices.
+8. Treating animation as polish rather than as part of the brand.
+
+## A two week setup plan
+
+1. **Week one.** Audit current animation needs. Pick the library set.
+2. **Week two.** Set up Framer Motion as the default. Add GSAP for scroll if needed. Establish the prefers reduced motion respect.
+
+For more on the related work, read [building cinematic web experiences without killing performance](/blog/building-cinematic-web-experiences-without-killing-performance) and the patterns that make a SaaS feel premium. On the broader frontend side, [bundle size the quiet killer of mobile web performance](/blog/bundle-size-the-quiet-killer-of-mobile-web-performance) is the natural next read.

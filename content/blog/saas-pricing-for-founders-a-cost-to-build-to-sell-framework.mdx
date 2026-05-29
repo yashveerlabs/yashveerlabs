@@ -1,0 +1,62 @@
+---
+slug: "saas-pricing-for-founders-a-cost-to-build-to-sell-framework"
+title: "SaaS Pricing for Founders: A Cost to Build to Sell Framework"
+excerpt: "SaaS pricing decisions that ignore build and infrastructure costs produce unprofitable products. Here is a framework for connecting what it costs to build and run the product to what it needs to sell for."
+date: "2026-05-23"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/saas-pricing-for-founders-a-cost-to-build-to-sell-framework"
+status: "published"
+definition: "SaaS pricing is the decision about how much to charge customers for access to the product and how to structure that pricing (per seat, per usage, per feature tier, or some combination). The cost-to-build-to-sell framework connects pricing to the cost structure of the product: the infrastructure cost per customer, the customer acquisition cost, the support cost per customer, and the gross margin required to build a sustainable business. Pricing that does not account for these costs produces a product that grows in users but shrinks in profitability."
+faq: [
+  {"q":"What is gross margin for a SaaS product and what is a healthy range?","a":"Gross margin is revenue minus cost of goods sold (COGS), expressed as a percentage of revenue. For SaaS, COGS includes: hosting and infrastructure costs, third-party API costs that scale with usage, customer support costs attributed to the support function, and payment processing fees. A healthy SaaS gross margin is 70 to 85 percent. Below 70 percent suggests the product is over-spending on infrastructure or support relative to revenue. Below 50 percent is a structural problem that makes scaling the business difficult because each additional dollar of revenue produces less than 50 cents of contribution to overhead and profit."},
+  {"q":"How do you calculate the minimum viable price for a SaaS product?","a":"Minimum viable price calculation: (monthly infrastructure cost per customer + monthly support cost per customer + monthly payment processing cost) / (1 - target gross margin). If infrastructure costs $5 per customer per month, support costs $10 per customer per month, payment processing costs $1 per customer per month, and the target gross margin is 75%, the minimum viable price is ($5 + $10 + $1) / (1 - 0.75) = $64 per customer per month. This is the floor below which the product loses money on every customer. Market pricing and willingness to pay determine the ceiling."},
+  {"q":"What is customer acquisition cost and how does it relate to pricing?","a":"Customer acquisition cost (CAC) is the total sales and marketing spend divided by the number of new customers acquired in the same period. A sustainable SaaS business recovers CAC within 12 to 18 months of a customer's subscription. If CAC is $500 and the monthly subscription price is $50, the payback period is 10 months (assuming 75% gross margin, the contribution per month is $37.50, and $500 / $37.50 = 13 months). If the pricing is too low, the payback period extends beyond 18 months, making the business capital-intensive and dependent on continuous fundraising to acquire customers."},
+  {"q":"What is value-based pricing and how does it differ from cost-plus pricing?","a":"Cost-plus pricing sets price based on costs plus a margin target. Value-based pricing sets price based on the economic value delivered to the customer. A tool that saves an enterprise 10 hours of analyst time per week at $100 per hour delivers $4,000 of monthly value and can price at $400 to $800 per month (10-20% of the value created). Cost-plus pricing for the same tool might produce $29 per month based on infrastructure costs, leaving 90%+ of value on the table. Value-based pricing is typically higher and produces better gross margins, but requires understanding customer economics, which is harder for founders with limited customer research."},
+  {"q":"How does per-seat vs per-usage pricing affect the cost structure?","a":"Per-seat pricing has predictable COGS: infrastructure costs are roughly proportional to the number of active seats. Per-usage pricing has variable COGS: a customer who uses the product heavily has higher infrastructure costs than a customer who uses it lightly. For per-usage pricing to produce acceptable gross margins, the infrastructure cost per unit of usage must be significantly below the revenue per unit of usage. AI products with LLM API costs are the most common case where per-usage COGS analysis is critical: an AI feature that costs $0.50 in LLM API calls per request but is included in a flat subscription can produce negative gross margin for heavy users."}
+]
+---
+
+## What you need to know
+
+- SaaS gross margin should be 70 to 85 percent. Infrastructure and support costs that exceed 15 to 30 percent of revenue indicate a pricing or cost structure problem.
+- Calculate the minimum viable price from actual COGS before pricing based on market comparison or intuition.
+- Customer acquisition cost payback should be under 18 months. Prices that produce longer payback require continuous capital to fund growth.
+- AI features with LLM API costs require specific per-feature cost analysis. LLM costs that scale with usage can produce negative gross margin for heavy users if the pricing is flat.
+- Value-based pricing produces better margins than cost-plus pricing but requires genuine customer research to calibrate correctly.
+
+## The core argument
+
+Most founders set prices by looking at competitors and slightly undercutting them, or by guessing what the market will bear, without doing the cost analysis that would tell them whether the price is profitable. The result is products that have users and growth but do not have a viable business model, because the infrastructure and support costs consume the gross margin before any overhead or profit remains.
+
+The framework that works: start with the unit economics. What does it cost the company to serve one customer for one month? This includes hosting, third-party APIs that scale with usage, customer support time allocated to support volume, and payment processing. This is the COGS floor. From there, work backward from the target gross margin to the minimum price. Then work upward from value-based analysis to understand the maximum price the market will support. The pricing decision lives in the range between the minimum (costs-based floor) and maximum (value-based ceiling).
+
+The insight that most early-stage founders miss is that the pricing decision is also a positioning decision. A $29 per month price attracts self-serve customers with price sensitivity. A $299 per month price attracts buyers who are solving a business problem and have budget. A $2,999 per month price attracts enterprise buyers with procurement processes. The same product can be positioned at any of these price points with different packaging, but the go-to-market strategy and customer success model are completely different at each level.
+
+## Common mistakes
+
+1. **Not tracking infrastructure costs per customer.** Many founders know total AWS costs but not the cost per customer, which makes it impossible to calculate gross margin accurately. Implement per-customer cost tagging in AWS or use a cost allocation tool that breaks costs down by product tier or customer segment.
+
+2. **Under-pricing to win early customers, without a plan to raise prices.** A product priced at $9 per month to attract early adopters faces significant challenges raising to $49 per month when the cost structure requires it. Early customers who agreed to $9 per month expect grandfather pricing, and raising prices risks churn. Price based on the sustainable unit economics from the start, even if it means slower early growth.
+
+3. **Ignoring support costs in the pricing model.** Support is a real COGS item for SaaS products. A product that requires two hours of onboarding support per customer at $50 per hour has $100 of support COGS per customer acquisition, not counting ongoing support. Include support costs in the unit economics calculation.
+
+4. **Treating AI feature costs as negligible.** LLM API costs (OpenAI, Anthropic) are not negligible at scale. A feature that calls GPT-4 three times per user session at $0.01 per call costs $0.03 per session. A user with 100 sessions per month generates $3 in LLM costs. At $29 per month, this is 10 percent of revenue from a single customer's AI feature usage before any other costs. Model the LLM cost per user per month before including AI features in a flat subscription price.
+
+5. **Setting prices without testing willingness to pay.** Willingness to pay testing does not require selling at the higher price; it requires asking potential customers whether they would buy at specific price points. The Van Westendorp pricing model (asking about price acceptance ranges) produces useful data about the price range the market considers reasonable. This research takes a week and prevents pricing mistakes that take months to correct.
+
+## Where to start
+
+1. **Calculate the current COGS per customer.** Pull the AWS bill, third-party API invoices, and support hours for the last month. Divide by the number of active customers to get the monthly COGS per customer. This number is the cost floor for pricing.
+
+2. **Calculate the current gross margin.** Monthly revenue minus monthly COGS, divided by monthly revenue. Compare to the 70-85% target range. If below 70%, identify which cost line is disproportionate and either reduce it or adjust pricing.
+
+3. **Run a value-based pricing analysis for one customer segment.** Interview five customers from the segment. Ask: what was the most expensive alternative to solving this problem? What would it cost if this product disappeared tomorrow and they had to solve the problem another way? What would they pay for the product if they had to justify it to a procurement team? The answers calibrate the value-based ceiling for pricing.
+
+## Related reading
+
+- [Per Seat vs Per Usage Pricing: Cost Implications for Buyers](/blog/per-seat-vs-per-usage-pricing-cost-implications-for-buyers)
+- [Per Hour vs Per Project Pricing Models Explained](/blog/per-hour-vs-per-project-pricing-models-explained)
+- Software Costs That Founders Underestimate
+- [Plan Upgrades and Downgrades: A Billing Architecture Story](/blog/plan-upgrades-and-downgrades-a-billing-architecture-story)

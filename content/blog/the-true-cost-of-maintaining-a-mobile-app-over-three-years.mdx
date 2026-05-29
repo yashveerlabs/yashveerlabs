@@ -1,0 +1,117 @@
+---
+slug: "the-true-cost-of-maintaining-a-mobile-app-over-three-years"
+title: "The True Cost of Maintaining a Mobile App Over Three Years"
+excerpt: "Most founders budget for the build and underestimate maintenance by a factor of two to three. Here is what the actual three year cost looks like broken down by line item."
+date: "2025-03-02"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","ai"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-true-cost-of-maintaining-a-mobile-app-over-three-years"
+status: "published"
+definition: "Mobile app maintenance over three years includes OS updates, third party dependency upgrades, app store compliance changes, bug fixes, performance work, and the feature work that keeps retention alive. The initial build is usually the smallest cost. I have watched teams budget ten thousand dollars for maintenance on an app that cost fifty thousand to build, then spend four times that keeping it alive. The real number is closer to sixty to one hundred percent of the initial build cost, per year."
+faq: [
+  {"q":"what does it actually cost to maintain a mobile app per year after launch","a":"For a typical app built by a small team, annual maintenance runs thirty to sixty percent of the original build cost. An app that cost eighty thousand dollars to build will likely cost twenty five to fifty thousand dollars per year to keep healthy. That covers OS updates, dependency upgrades, bug fixes, minor feature work, and the occasional store compliance change."},
+  {"q":"how many hours per year does an ios or android app need just to stay up to date","a":"A moderately complex app needs roughly two to four weeks of engineering time per year just for OS update testing and any required API changes. Add another two to four weeks for dependency upgrades, one to two weeks for app store compliance, and ongoing bug fix work. Before any feature development, you are at six to ten weeks of base maintenance per year."},
+  {"q":"what are the biggest hidden costs in mobile app maintenance","a":"The biggest surprises are third party SDK breaking changes, app store policy updates that require product changes rather than just code updates, push notification infrastructure costs that grow with user base, and the compounding cost of technical debt that makes every future change slower. Teams also underestimate the cost of testing across OS versions and device variants."},
+  {"q":"does react native or flutter cost more to maintain long term","a":"React Native maintenance cost has historically been higher due to the JavaScript dependency ecosystem changing faster than native code. The new architecture reduces some of this. Flutter maintenance is generally more predictable because the dependency ecosystem is smaller and Google controls more of the stack. Both are cheaper to maintain than two separate native codebases."},
+  {"q":"how do i budget for mobile app maintenance without knowing exactly what will break","a":"Use a percentage model. Budget twenty to thirty percent of the build cost annually as a baseline maintenance reserve. Track actual hours monthly. Adjust the percentage at the twelve month mark based on what you actually spent. The teams that treat maintenance as a known line item rather than a surprise perform better financially than the teams that budget reactively."},
+  {"q":"when does a mobile app become too expensive to maintain and should be rebuilt","a":"When maintenance hours exceed what new feature development would cost on a modern stack. Practically, when the app is more than three to four major OS versions behind, when the framework version is no longer supported, or when every bug fix introduces two new ones. The rewrite decision is expensive but bounded. Continued maintenance on a decaying codebase is expensive and unbounded."},
+  {"q":"how do app store policy changes affect maintenance cost","a":"More than most teams expect. Apple and Google regularly introduce requirements that mandate product changes, not just code changes. Privacy manifests, permission model updates, background processing restrictions, and payment policy changes have each forced significant engineering work on thousands of apps. Budget a week or two per year specifically for compliance work, and check the app store policy changelog as part of your quarterly planning."}
+]
+---
+
+## What you actually need to know
+
+- The initial build is the smallest cost in a three year lifespan. Maintenance typically runs sixty to one hundred percent of build cost per year.
+- OS updates, dependency upgrades, and app store compliance are non negotiable costs that exist independent of feature work.
+- Technical debt compounds. An unmaintained app does not stay frozen. It slowly becomes more expensive to touch.
+- Cross platform frameworks reduce maintenance cost compared to two native codebases, but do not eliminate it.
+- In my experience, most budget failures are not about building the wrong thing. They are about not planning for what it costs to keep the right thing alive.
+
+| Cost category | Year one | Year two | Year three |
+|---|---|---|---|
+| OS update testing and fixes | 2 to 4 weeks | 2 to 4 weeks | 2 to 4 weeks |
+| Dependency upgrades | 1 to 3 weeks | 2 to 4 weeks | 3 to 5 weeks |
+| App store compliance changes | 1 to 2 weeks | 1 to 3 weeks | 1 to 3 weeks |
+| Bug fixes | 10 to 20% of engineering time | 15 to 25% | 20 to 30% |
+| Performance work | Occasional | Quarterly | Monthly |
+| Feature work to maintain retention | Significant | Significant | Significant |
+
+## The core argument
+
+Founders who ask about mobile app cost almost always mean the build. They want to know how much it costs to get from zero to a shipped app on both stores. The build is finite and visible. It has a scope document, a sprint plan, and a launch date.
+
+Maintenance is the opposite. It is ongoing, partially invisible, and grows over time. Every dependency you add to the project is a future maintenance obligation. Every OS major version is a testing and compatibility event. Every app store policy change is a compliance task that may require product decisions, not just code changes.
+
+The compounding pattern is what trips teams up. In year one, the app is fresh. The dependencies are current. The OS gap is small. Maintenance feels manageable. By year two, some dependencies have had breaking changes. The app is targeting an OS version that is now one major behind. A few features rely on APIs that are deprecated. Maintenance still feels manageable but takes noticeably longer. By year three, if the team has not been disciplined, the codebase has grown a kind of systemic resistance. Everything takes longer than expected. Bug fixes introduce regressions. Adding a feature requires understanding a web of decisions made years earlier.
+
+This is not unique to mobile. But mobile has specific accelerants. Apple releases a new iOS version every September. Google releases Android updates more slowly but more continuously. Both stores update their policies regularly. The platform is not static in the way a web app backend is relatively static.
+
+## Where the money actually goes
+
+### OS updates
+
+Every new major iOS and Android release requires testing. Most of the time, apps work fine. Occasionally a behavior changes, a permission model shifts, or a UI component is deprecated. The testing alone takes time. Any required fixes add more. Teams that skip this end up with crashes on new OS versions that appear in reviews months after launch.
+
+### Dependency upgrades
+
+Mobile apps typically depend on dozens of third party libraries. Navigation, analytics, crash reporting, payments, authentication, push notifications, maps, and more. Each library has its own release cadence. Breaking changes happen. Libraries are abandoned and need replacing. The React Native JavaScript ecosystem in particular moves fast enough that a six month delay in dependency updates creates a real catch up problem.
+
+### App store compliance
+
+Apple and Google are not static landlords. They change the rules. Privacy manifest requirements, IDFA changes, new age restriction policies, updated payment APIs, background processing limits. Each one requires engineering evaluation and sometimes product decision and sometimes user communication. Teams that treat the app stores as a set and forget channel get surprised.
+
+## How much does it cost
+
+| App complexity | Build cost estimate | Annual maintenance (year one) | Annual maintenance (year three) |
+|---|---|---|---|
+| Simple utility, 5 to 10 screens | $25k to $50k | $8k to $15k | $12k to $20k |
+| Mid complexity, 15 to 30 screens | $60k to $120k | $20k to $40k | $35k to $60k |
+| Complex product, 30+ screens, backend integration | $120k to $250k | $40k to $80k | $70k to $120k |
+| Enterprise app with compliance requirements | $200k to $400k | $80k to $150k | $100k to $180k |
+
+These are engineering cost estimates. They do not include app store fees, infrastructure costs, or the opportunity cost of features you chose not to build while maintaining existing ones.
+
+## What to look for in a maintenance plan
+
+- A quarterly dependency audit process, not a reactive one.
+- OS beta testing starting in spring for iOS and running through the fall release cycle.
+- A documented policy for evaluating app store policy changelogs.
+- A technical debt register that tracks known debt by estimated remediation cost.
+- A separate maintenance budget line in the product roadmap, not buried in feature development.
+- Crash rate and ANR targets with automated alerts when thresholds are exceeded.
+- A defined process for evaluating when a library should be replaced versus upgraded.
+
+## Expert opinion
+
+> The teams that get surprised by maintenance cost are almost always the teams that budgeted only for the build. The pattern is consistent. The build finishes, the app ships, the team treats the maintenance as a light background task, and then eighteen months later they are spending more per quarter on maintenance than they budgeted for the entire year. Setting a maintenance percentage at the start, treating it as a known cost like hosting, is the single most useful financial habit I have seen in mobile product teams.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client came to me two years after shipping a React Native app. The build had cost ninety thousand dollars. They had budgeted five thousand dollars per year for maintenance and were now spending twenty five to thirty thousand dollars per year. Their biggest surprise was a twelve day project triggered by an Apple privacy manifest requirement that also required renegotiating data terms with three third party SDKs. None of that work touched a single user-facing feature.
+
+The second surprise was compound interest on deferred upgrades. They had skipped one major React Native version bump. Skipping the second was not possible because a dependency they needed had dropped support for the old version. The migration from two versions behind took four weeks instead of the one week it would have taken if done incrementally.
+
+For more on the cost structure of mobile apps over time, see [app maintenance cost a five year forecast model](/blog/app-maintenance-cost-a-five-year-forecast-model). For the decision of whether to rewrite or maintain, [mobile app rewrites when they are inevitable and when they are a mistake](/blog/mobile-app-rewrites-when-they-are-inevitable-and-when-they-are-a-mistake) covers the tradeoffs clearly.
+
+## Common mistakes
+
+1. Budgeting maintenance as a percentage of build cost without adjusting for app complexity or dependency surface area.
+2. Treating OS updates as optional until users complain about crashes.
+3. Deferring dependency upgrades because the app currently works. Deferred upgrades compound. A two version gap is three to five times the work of a one version gap.
+4. Not tracking maintenance hours separately from feature development hours. Without the data, the team cannot make a rational rewrite decision later.
+5. Assuming cross platform means maintenance free. React Native and Flutter reduce the duplicated platform code but do not reduce the OS update and store compliance obligations.
+6. Letting a library become load bearing without a documented contingency for if it is abandoned or broken.
+7. Treating app store policy as stable. It is not. Budget time to review changelogs every quarter.
+
+## A three year maintenance plan
+
+1. **Before launch.** Create a maintenance budget reserve equal to thirty percent of build cost for year one. Document every third party dependency with its license, version, and owner status.
+2. **Quarterly in year one.** Audit dependencies for new versions. Review app store policy changelogs. Track bug fix hours against the maintenance budget.
+3. **Spring of every year.** Begin OS beta testing when Apple and Google release developer betas. Plan for September and October remediation work.
+4. **Year two review.** Compare actual maintenance spend against budget. Adjust the year two and three reserves based on real data. Identify the highest risk dependencies.
+5. **Year three evaluation.** Decide between continued maintenance, a major refactor, or a rewrite based on the maintenance cost trend and the technical debt register.
+
+For framework selection decisions that affect the maintenance trajectory, see [flutter vs react native vs native in 2026 a founder decision matrix](/blog/flutter-vs-react-native-vs-native-in-2026-a-founder-decision-matrix) and [kotlin multiplatform vs flutter vs react native a real comparison](/blog/kotlin-multiplatform-vs-flutter-vs-react-native-a-real-comparison) for the comparative picture.

@@ -1,0 +1,62 @@
+---
+slug: "rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders"
+title: "REST vs GraphQL vs gRPC: A Decision Matrix for Founders"
+excerpt: "REST, GraphQL, and gRPC are not interchangeable. Each solves a specific class of API problems. Here is a clear decision matrix for choosing the right one based on what the API actually needs to do."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","founders"]
+readingMinutes: 6
+ogImage: "/api/og/blog/rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders"
+status: "published"
+definition: "REST, GraphQL, and gRPC are API design paradigms that determine how clients and servers communicate. REST uses HTTP methods and resource URLs with JSON responses, following the constraints of the web architecture. GraphQL is a query language where clients specify exactly what data they need in a single request, reducing over-fetching and under-fetching. gRPC uses Protocol Buffers over HTTP/2 for strongly typed, high-performance communication between services, primarily used for internal service-to-service communication. The choice between them is primarily determined by who the API clients are and what the communication requirements are."
+faq: [
+  {"q":"What is REST and when is it the right choice?","a":"REST (Representational State Transfer) is an architectural style for APIs that uses HTTP methods (GET, POST, PUT, DELETE) on resource URLs (users, products, orders) with JSON request and response bodies. REST is the right choice for: public APIs that external developers will consume, internal APIs where the client and server are built by the same team and the request patterns are well-understood, and APIs where HTTP caching (at CDN or browser level) is valuable. REST is the most universally understood API style, has the best tooling support (OpenAPI, Swagger, Postman), and integrates naturally with web infrastructure."},
+  {"q":"What problem does GraphQL solve that REST does not?","a":"GraphQL solves the over-fetching and under-fetching problems. In a REST API, a client fetching a user profile plus their recent orders might need two requests (GET /users/123, GET /users/123/orders) and receive fields in the user response that the client does not need. GraphQL allows the client to specify exactly which fields to retrieve in a single request, receiving exactly the data needed with no extra fields and no extra round trips. This is particularly valuable for mobile applications where bandwidth and round trips are constrained, and for complex frontend applications with many data dependencies."},
+  {"q":"What is gRPC and when is it appropriate?","a":"gRPC (Google Remote Procedure Call) uses Protocol Buffers to define service interfaces and messages in a language-agnostic schema, then generates client and server code in multiple languages. Communication happens over HTTP/2 with binary-encoded Protocol Buffer messages, which is significantly more efficient than JSON over HTTP/1.1. gRPC is appropriate for internal service-to-service communication where performance matters, for polyglot environments where services are written in different languages, and for streaming scenarios (server streaming, client streaming, bidirectional streaming) that are cumbersome in REST. gRPC is not appropriate for public APIs (browser support is limited) or for clients that benefit from human-readable request and response formats."},
+  {"q":"What is schema-first design and why does it matter for API choice?","a":"Schema-first design means defining the API contract (what data is available, what types it has, what operations are supported) before writing implementation code. Both GraphQL and gRPC are inherently schema-first: GraphQL has a Schema Definition Language and gRPC has Protocol Buffer definitions. REST can be schema-first with OpenAPI, but does not require it. Schema-first design enables code generation (client SDKs from the schema), validation (requests against the schema), and documentation (from the schema). Teams that invest in schema-first design with any of these three paradigms get better tooling and API consistency than teams that define the API implicitly in implementation."},
+  {"q":"Can you use GraphQL and REST in the same application?","a":"Yes, and it is common. A typical pattern is a public REST API for external integrations (third-party developers, webhooks, partner integrations) alongside a GraphQL API for the primary frontend client. The REST API has clear resource URLs that external developers can understand and integrate against without learning GraphQL. The GraphQL API serves the web and mobile frontends with flexible data fetching. Internal service communication may use gRPC for high-performance paths. These three paradigms can coexist in the same application, each serving the communication pattern it is best suited for."}
+]
+---
+
+## What you need to know
+
+- REST is the right default for public APIs, external integrations, and APIs where clients are not controlled by the same team. It is universally understood.
+- GraphQL is the right choice for data-heavy frontend applications where over-fetching and multiple round trips are affecting performance or developer productivity.
+- gRPC is for internal service-to-service communication where performance and type safety matter more than human-readability.
+- Mixing all three in one application is common and often correct. Each paradigm serves different client types and communication patterns.
+- Choosing GraphQL for a CRUD API where the data model is simple is over-engineering. Choose based on the actual data fetching requirements.
+
+## The core argument
+
+The REST vs GraphQL debate is usually not a technical argument; it is a preference argument where the choice is rationalized after the fact. Teams that prefer GraphQL find evidence that it solves over-fetching. Teams that prefer REST find evidence that GraphQL is complex to cache and secure. Both sides are correct: GraphQL does solve over-fetching, and it is harder to cache and secure than REST. The question is which trade-off matches the specific application's requirements.
+
+The decision matrix is simpler than most blog posts make it: who are the clients, and what are the data fetching patterns? For a public API that external developers will integrate against: REST. The tooling (OpenAPI, Postman, Swagger UI), the developer familiarity, and the caching infrastructure all favor REST for public APIs. For a data-heavy frontend application with complex and variable data dependencies: GraphQL. The frontend team can fetch exactly what they need without coordinating with the backend team for new endpoints. For internal services in a microservices architecture that need to communicate efficiently across language boundaries: gRPC.
+
+The implementation cost matters too. REST is the cheapest to implement correctly; every backend developer knows it, every HTTP framework supports it natively, and the tooling is mature. GraphQL has a steeper initial implementation cost (schema design, resolver implementation, N+1 query handling) but pays back through frontend velocity on complex data requirements. gRPC requires Protocol Buffer familiarity and the generated code workflow, which is unfamiliar to developers who have not used it before.
+
+## Common mistakes
+
+1. **Choosing GraphQL to solve performance problems that are actually backend problems.** If the API is slow because queries are not indexed or the business logic is inefficient, GraphQL does not fix the underlying performance. GraphQL reduces network round trips and data transfer, which helps for network-constrained clients, but it does not make slow resolvers fast.
+
+2. **Not implementing DataLoader for GraphQL N+1 queries.** GraphQL's resolver model naively produces N+1 queries: a query for a list of users that also requests each user's orders makes one database query for users and N queries for orders. DataLoader batches these requests into a single query per type per execution. Implementing GraphQL without DataLoader (or a similar batching solution) produces performance that is worse than the REST API it replaced.
+
+3. **Using gRPC for client-facing APIs without a transcoding proxy.** Browsers cannot make direct gRPC calls because HTTP/2 frames in the browser environment do not match gRPC's framing. gRPC-Web is a workaround, but it adds implementation complexity. For client-facing APIs, REST or GraphQL are the appropriate choices. gRPC belongs in the internal service mesh.
+
+4. **Not using OpenAPI for REST APIs.** A REST API without an OpenAPI specification has no machine-readable contract. This means manual documentation, no client SDK generation, and no request validation. Adding OpenAPI specification (either code-first with a library like tRPC or swagger-jsdoc, or design-first) is worth the investment for any API that external clients or other teams consume.
+
+5. **Implementing pagination differently across endpoints in a REST API.** REST APIs that use cursor pagination for some endpoints, offset pagination for others, and a custom scheme for yet others create inconsistent client integration work. Define a pagination convention across the API (cursor-based is more scalable than offset) and apply it consistently.
+
+## Where to start
+
+1. **Identify who the API clients are.** List every client: web frontend, mobile app, external integrations, internal services. For each client, identify whether they need flexible data fetching (favors GraphQL), need a stable public interface (favors REST), or need high-performance internal communication (favors gRPC). The client inventory determines the right paradigm.
+
+2. **For a new SaaS product: start with REST.** REST is the most productive starting point for a team building a new product quickly. It is universally understood, well-tooled, and correct for most API use cases. Consider GraphQL specifically when the frontend team expresses concrete pain with over-fetching or multiple round trips in the current REST implementation.
+
+3. **Write the API specification before writing implementation code.** For REST: write an OpenAPI spec. For GraphQL: write the schema. For gRPC: write the .proto file. The specification is the contract between client and server. Writing it first surfaces design issues (ambiguous resource relationships, missing operations) before implementation begins and makes the API design a deliberate decision.
+
+## Related reading
+
+- [Pagination Patterns: Cursor vs Offset and Why It Matters](/blog/pagination-patterns-cursor-vs-offset-and-why-it-matters)
+- [Rate Limiting Algorithms Compared: Token Bucket, Leaky Bucket, Fixed Window](/blog/rate-limiting-algorithms-compared-token-bucket-leaky-bucket-fixed-window)
+- [OAuth 2.0 Without Tears: A Founder Engineer's Guide](/blog/oauth-2-0-without-tears-a-founder-engineers-guide)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)

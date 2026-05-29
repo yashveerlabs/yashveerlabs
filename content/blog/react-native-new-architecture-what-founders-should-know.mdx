@@ -1,0 +1,62 @@
+---
+slug: "react-native-new-architecture-what-founders-should-know"
+title: "React Native New Architecture: What Founders Should Know"
+excerpt: "React Native's new architecture eliminates the JavaScript bridge that limited performance for years. Here is what changed, what it means for existing apps, and whether it is worth migrating now."
+date: "2026-05-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","founders"]
+readingMinutes: 6
+ogImage: "/api/og/blog/react-native-new-architecture-what-founders-should-know"
+status: "published"
+definition: "React Native's new architecture replaces the asynchronous JavaScript bridge with a synchronous JavaScript Interface (JSI) that allows JavaScript to directly call native code without serialization overhead. The new architecture includes three components: JSI (the synchronous native binding layer), Fabric (the new rendering system that enables synchronous UI updates), and TurboModules (lazy-loaded native modules that improve startup time). Together they eliminate the performance bottlenecks that distinguished React Native from fully native apps."
+faq: [
+  {"q":"What was wrong with the old React Native bridge?","a":"The old React Native bridge communicated between JavaScript and native code asynchronously using JSON serialization. Every native call required serializing data to JSON on the JavaScript side, passing it over the bridge, deserializing it on the native side, executing the native call, serializing the response, and passing it back. This overhead added latency to every native interaction and created a bottleneck for animations and touch handling that required frame-perfect timing. The bridge also meant JavaScript and native ran on different threads with asynchronous communication, making synchronous operations impossible."},
+  {"q":"What is JSI and how does it replace the bridge?","a":"JSI (JavaScript Interface) allows JavaScript to hold direct references to native objects and call native functions synchronously without serialization. Instead of sending a JSON message over a bridge and waiting for a response, JavaScript code can call a native function directly and receive the result in the same execution frame. JSI is the foundation for both Fabric (native UI components) and TurboModules (native code modules). The performance improvement is most visible in animations, gestures, and any interaction that previously required multiple bridge round trips."},
+  {"q":"Should existing React Native apps migrate to the new architecture now?","a":"Migration depends on the app's dependency ecosystem. The new architecture requires third-party native libraries to be updated to support JSI and TurboModules. Most major libraries (React Navigation, Reanimated, React Native Screens) support the new architecture. Libraries that have not been updated will either not work or fall back to compatibility mode. Before committing to migration, audit all native dependencies for new architecture support. Apps using widely-adopted libraries can migrate with moderate effort. Apps with custom or niche native modules may face more significant migration work."},
+  {"q":"What is Fabric and how does it change rendering?","a":"Fabric is the new React Native rendering system. The old renderer created UI components asynchronously: layout calculations happened on a background thread and updates were posted to the main thread asynchronously. Fabric enables synchronous rendering where layout calculations and UI updates can happen synchronously with JavaScript execution, eliminating the frame drops that occurred when the main thread received updates slightly after the frame deadline. Fabric also enables the 'Concurrent Mode' React features (transitions, Suspense boundaries) that were not possible with the old asynchronous renderer."},
+  {"q":"Does the new architecture change how React Native apps are written?","a":"For most application code, the new architecture is transparent. Components are still written as React components. Navigation, state management, and data fetching patterns remain the same. The changes are visible when writing or using native modules: TurboModules have a different interface for native module authors and a slightly different import pattern for consumers. Apps that use Reanimated 2+ (the new animated library built on Worklets) already benefit from JSI without any visible API change. New apps started today with Expo SDK 50+ or React Native 0.73+ use the new architecture by default."}
+]
+---
+
+## What you need to know
+
+- The new architecture is stable and enabled by default in React Native 0.73+ and Expo SDK 50+. New apps should use it. Existing apps should plan migration, not avoid it.
+- The performance improvements are most visible for animations, gestures, and touch interactions. Apps with complex navigation or gesture-driven UIs benefit most.
+- Migration requires auditing third-party native dependencies for new architecture support. Most major libraries are already compatible.
+- The new architecture does not fundamentally change how apps are written. Components, hooks, and navigation patterns are the same.
+- Flutter does not have a bridge architecture problem to solve. The new architecture primarily closes the performance gap between React Native and fully native apps.
+
+## The core argument
+
+The React Native bridge was the most frequently cited reason to choose Flutter or native development over React Native. The argument was valid: the asynchronous bridge introduced latency in animations and gesture handling that created a perceptible difference from native apps in performance-sensitive interactions. Native apps felt smooth; React Native apps had occasional dropped frames and jank during complex animations. The new architecture eliminates this structural limitation.
+
+What this means for founders making technology choices is that the performance argument against React Native has weakened significantly. Apps built on the new architecture with Reanimated 3 and Fabric rendering produce animations and gesture responses that are, in my experience, indistinguishable from native in typical business application use cases. Games, video editors, and applications with frame-critical rendering still benefit from fully native or Flutter implementations, but the broad category of business applications (forms, lists, dashboards, in-app chat) performs well on the new React Native architecture.
+
+The migration decision for existing apps is a cost-benefit calculation. The new architecture provides better performance and unlocks React Concurrent Mode features, but migration requires testing every native dependency and potentially updating custom native modules. For apps where performance is a competitive differentiator or where animation quality is part of the product experience, migration is worth the investment. For apps that are primarily data-driven screens with minimal animation, migration can be deferred until the dependency ecosystem makes it trivially easy.
+
+## Common mistakes
+
+1. **Starting a new React Native app without enabling the new architecture.** New React Native apps in 2026 should use the new architecture by default. Expo SDK 50+ enables it automatically. Starting without the new architecture means eventually needing to migrate or running on a deprecated stack.
+
+2. **Migrating before auditing native dependencies.** The most common migration blocker is a native library that does not support the new architecture. Audit every native dependency against the new architecture compatibility list before committing to migration. Libraries with compatibility issues will need updates or replacement.
+
+3. **Expecting the new architecture to fix non-performance problems.** The new architecture improves rendering and native call performance. It does not fix JavaScript-side performance issues: heavy computation in render functions, excessive re-renders, or large JavaScript bundle sizes. Use React DevTools Profiler and JavaScript thread monitoring to identify JS-side issues separately.
+
+4. **Confusing JSI with Hermes.** Hermes (React Native's optimized JavaScript engine) and JSI are complementary but separate. Hermes runs JavaScript more efficiently. JSI allows synchronous native calls. Both are now default in new React Native projects. Teams sometimes conflate the two improvements when assessing the new architecture.
+
+5. **Not testing on lower-end Android devices after migration.** The new architecture's performance improvements are most noticeable on mid-range and lower-end Android devices where the old bridge overhead was more impactful relative to device capabilities. Test on these devices specifically to validate the improvement and catch any regressions in the new rendering pipeline.
+
+## Where to start
+
+1. **For new projects: use Expo SDK 50+ or React Native 0.73+ which enable the new architecture by default.** The only decision is whether to use Expo managed workflow (faster setup, less native access) or bare React Native (more native control). Most B2B mobile apps are well-served by Expo managed workflow.
+
+2. **For existing projects: run the React Native upgrade helper and audit native dependencies.** The React Native upgrade helper tool generates a diff for migrating between versions. Review every entry in package.json with a native module and verify new architecture support before proceeding. Libraries like Reanimated, React Native Screens, and React Navigation are already fully compatible.
+
+3. **Enable new architecture in a staging build and run the full test suite.** The most reliable migration validation is running the existing test suite and doing a manual walkthrough of all navigation flows and gesture interactions on both iOS and Android. Pay particular attention to any screen with animated transitions or gesture-based interactions, as these are where architectural differences are most likely to surface.
+
+## Related reading
+
+- [React Native Performance: The Patterns That Make It Production Ready](/blog/react-native-performance-the-patterns-that-make-it-production-ready)
+- [PWA vs Native App: The Decision Every Startup Faces](/blog/pwa-vs-native-app-the-decision-every-startup-faces)
+- [Native iOS Development in 2026: SwiftUI, Combine, and the New Stack](/blog/native-ios-development-in-2026-swiftui-combine-and-the-new-stack)
+- [Mobile App Development Costs: Native, Cross-Platform, and Hybrid Compared](/blog/mobile-app-development-costs-native-cross-platform-and-hybrid-compared)

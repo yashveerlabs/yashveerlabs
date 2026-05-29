@@ -1,0 +1,120 @@
+---
+slug: "cockroachdb-and-tidb-when-distributed-sql-pays-off"
+title: "CockroachDB and TiDB: When Distributed SQL Pays Off"
+excerpt: "Distributed SQL solves problems most SaaS does not have. When it solves yours, it pays back richly. When it does not, the operational tax is brutal. Here is the honest decision."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["distributed-sql","cockroachdb","tidb","database"]
+readingMinutes: 12
+ogImage: "/api/og/blog/cockroachdb-and-tidb-when-distributed-sql-pays-off"
+status: "published"
+definition: "Distributed SQL is the category of databases that provide the familiar SQL interface with horizontal scaling and multi region replication. CockroachDB and TiDB are the leaders. They solve the problem of scaling a single database past what Postgres or MySQL can do on a single node. The trade off is operational complexity that most SaaS does not need. The right call depends on whether your scale or geography demands it."
+faq: [
+  {"q":"When does a SaaS actually need distributed SQL?","a":"When the single node database has hit its ceiling and partitioning is not the right answer. Or when the product requires strong consistency across multiple regions for latency or compliance reasons. Most B2B SaaS does not hit either condition until very large scale."},
+  {"q":"What is the difference between CockroachDB and TiDB?","a":"Both implement distributed SQL with strong consistency. CockroachDB is Postgres compatible and has a stronger heritage in financial workloads. TiDB is MySQL compatible and has a stronger heritage in analytics and HTAP. The choice often comes down to which dialect your application uses."},
+  {"q":"What is the operational cost?","a":"Significantly higher than Postgres or MySQL. The cluster has more moving parts. The performance tuning is more complex. The team needs database expertise at a level most B2B SaaS teams do not have. Managed offerings reduce but do not eliminate the operational tax."},
+  {"q":"Can I migrate from Postgres to CockroachDB?","a":"The compatibility is high but not perfect. Some Postgres features behave differently. The migration involves rewriting some queries and patterns. Plan a real project for any meaningful migration. Not a weekend swap."},
+  {"q":"What is HTAP and does it matter?","a":"Hybrid Transactional Analytical Processing. The same database serves both transactional workload and analytics queries. TiDB has stronger HTAP capability. For products where this matters the value is large. For products that send analytics to a warehouse, HTAP is irrelevant."},
+  {"q":"What are the cheaper alternatives?","a":"Postgres with read replicas and partitioning. Aurora Serverless v2. Spanner if you live on GCP. Each handles meaningful scale without distributed SQL complexity. Most B2B SaaS lives on these for the life of the company."},
+  {"q":"What is the most common mistake?","a":"Adopting distributed SQL preemptively because the team expects to need it. The operational tax is real and the team often discovers that the standard databases would have served them for years longer."}
+]
+---
+
+## What you actually need to know
+
+- Distributed SQL solves scale and geography problems most SaaS does not have.
+- CockroachDB is Postgres flavored. TiDB is MySQL flavored.
+- Operational complexity is significantly higher than Postgres or MySQL.
+- Most B2B SaaS lives on Postgres with replicas for the life of the company.
+- The premature adoption is the most common mistake.
+
+| Database | Compatible with | Best fit |
+|---|---|---|
+| Postgres single node | Standard SaaS | 99 percent of B2B SaaS |
+| Postgres with replicas and partitioning | Growing SaaS | Most large SaaS |
+| Aurora Serverless | Variable workloads | AWS deep teams |
+| Spanner | Strong consistency, global | GCP deep teams |
+| CockroachDB | Postgres flavored | High scale, global, financial |
+| TiDB | MySQL flavored | High scale, HTAP |
+
+## The core argument
+
+Distributed SQL is one of those technologies that founders consider years before they need it. The marketing is excellent. The case studies are impressive. The promise is appealing. The reality is that most SaaS does not hit the conditions that justify the operational complexity for years, if ever.
+
+The conditions that justify distributed SQL are specific. The single node database has hit its ceiling and partitioning would be the wrong fit. The product requires strong consistency across multiple regions for either latency or compliance reasons. The team has the operational maturity to run the additional complexity.
+
+Most B2B SaaS does not hit these conditions. The Postgres single node serves them well into the tens of millions of dollars in ARR. Read replicas handle the read scale. Partitioning handles specific large tables. The single region serves the customers without strong consistency requirements across regions. The operational simplicity of standard Postgres compounds.
+
+The teams that adopt distributed SQL preemptively pay the operational tax for years before they need the capability. The cluster has more moving parts. The performance characteristics are different. The query patterns that worked on Postgres need to be reviewed. The investment is real and rarely pays back until the scale that justified it finally arrives.
+
+The teams that adopt distributed SQL at the right time get the value. The scale that broke Postgres works on the new system. The multi region requirements that Postgres could not meet are now met. The operational tax is real but justified.
+
+## The honest decision
+
+| Question | Distributed SQL needed? |
+|---|---|
+| Are you hitting single node limits on Postgres? | Maybe |
+| Have you exhausted read replicas, partitioning, and connection pooling? | Probably yes |
+| Do you need strong consistency across regions? | Yes |
+| Do you have database operational maturity? | Required either way |
+| Are you below ten million ARR? | Almost never |
+| Are you above one hundred million ARR? | Worth evaluating |
+
+## How much does this cost
+
+| Option | Monthly infrastructure | Operational complexity |
+|---|---|---|
+| Postgres single node | A few hundred to a few thousand USD | Low |
+| Postgres with replicas | One thousand to ten thousand USD | Medium |
+| Aurora Serverless | One thousand to ten thousand USD | Lower than self managed |
+| CockroachDB Serverless | Free tier to thousands USD | Lower than self managed |
+| CockroachDB Dedicated | Two thousand USD minimum, scaling up | Higher |
+| TiDB Cloud Serverless | Free tier to thousands USD | Lower than self managed |
+| TiDB Cloud Dedicated | Two thousand USD minimum, scaling up | Higher |
+
+## Features the database choice must have
+
+- Strong durability guarantees.
+- Backup and restore that work.
+- Connection pooling appropriate to the scale.
+- Performance monitoring.
+- A migration path if you need to change later.
+- Multi region capability if the product needs it.
+- A documented operational runbook.
+- A team that can operate it.
+
+## Expert opinion
+
+> Distributed SQL is a powerful technology that solves a narrow set of problems. The teams that adopt it for the right reasons get years of capability. The teams that adopt it preemptively pay the operational tax without the corresponding capability use. The honest question is whether your scale or geography actually requires it. Most teams answer no. Most teams who answer yes were right.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS founder asked me to evaluate CockroachDB for their next architecture phase. They were at three million ARR. The Postgres on RDS was running comfortably. The team was small.
+
+We ran the numbers. Postgres would serve them for at least two more years at projected growth. The geographic distribution requirements they thought they had were not actually a requirement, only a preference. The operational tax of CockroachDB at their team size would have been meaningful.
+
+We stayed on Postgres. Added read replicas for the read scale that was coming. Partitioned the two largest tables. The cluster ran comfortably for two more years. By the time the team was ready to evaluate distributed SQL again, their scale and team had grown to the point where the decision was different. They ended up moving the most demanding surface to CockroachDB and kept the rest on Postgres.
+
+For more on the related work, see [PostgreSQL vs MySQL vs MongoDB for a new SaaS in 2026](/blog/postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026) and [PostgreSQL vs Supabase vs Neon vs Planetscale](/blog/postgresql-vs-supabase-vs-neon-vs-planetscale).
+
+## Common mistakes teams make
+
+1. Adopting distributed SQL preemptively.
+2. Believing the marketing about operational simplicity.
+3. Skipping Postgres scaling techniques that would have worked.
+4. Migrating a non distributed application to distributed SQL without rewriting query patterns.
+5. Choosing CockroachDB without Postgres compatibility verification.
+6. Choosing TiDB without MySQL compatibility verification.
+7. Ignoring the cost of the dedicated tier.
+8. Treating distributed SQL as a drop in replacement.
+
+## A 60 day evaluation plan
+
+1. **Weeks one and two.** Document the current database scale and growth trajectory.
+2. **Weeks three and four.** Identify whether single node Postgres or Aurora would last another two years.
+3. **Weeks five and six.** If distributed SQL is genuinely needed, evaluate CockroachDB and TiDB on a non production workload.
+4. **Weeks seven and eight.** Run the migration plan or shelve the project.
+
+For more on the related work, read [PostgreSQL vs MySQL vs MongoDB for a new SaaS in 2026](/blog/postgresql-vs-mysql-vs-mongodb-for-a-new-saas-in-2026) and [scaling from one thousand to one hundred thousand users the invisible database bottlenecks](/blog/scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks). On the broader scaling side, [sharding strategies for SaaS when to start and when to stop avoiding it](/blog/sharding-strategies-for-saas-when-to-start-and-when-to-stop-avoiding-it) is the natural next read.

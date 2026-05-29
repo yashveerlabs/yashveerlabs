@@ -1,0 +1,113 @@
+---
+slug: "customer-tier-enforcement-free-pro-enterprise-the-right-way"
+title: "Customer Tier Enforcement: Free, Pro, Enterprise the Right Way"
+excerpt: "Tier enforcement scattered across the codebase is the source of every upgrade bug. Centralized, declarative tier enforcement is the discipline that scales with the pricing model."
+date: "2026-05-20"
+category: "SaaS Architecture and Scaling"
+tags: ["pricing","tiers","enforcement","saas"]
+readingMinutes: 11
+ogImage: "/api/og/blog/customer-tier-enforcement-free-pro-enterprise-the-right-way"
+status: "published"
+definition: "Customer tier enforcement is the system that controls which features a customer can access based on the plan they pay for. Done well, it is a centralized declarative system that the rest of the application queries. Done badly, it is scattered if statements that break every time pricing changes. The right architecture scales with the pricing model and supports the inevitable changes."
+faq: [
+  {"q":"What is the worst tier enforcement pattern?","a":"Hardcoded plan name checks scattered through the codebase. if user.plan equals pro. The pattern works in the small. The pattern breaks every time the plan structure changes. Refactoring is painful because the checks are everywhere."},
+  {"q":"What is the right pattern?","a":"Feature flags or entitlements keyed to capabilities, not plan names. The application asks can this customer access feature X. The entitlement system answers based on the customer's current plan, add ons, and overrides. The application code does not know about plans."},
+  {"q":"What goes into the entitlement system?","a":"Plan to entitlement mapping. Add ons. Overrides for specific customers. Trial state. Usage limits. The system has to handle all of these because real pricing has all of them."},
+  {"q":"How do I handle usage limits?","a":"Each entitlement has a limit type. Unlimited. Number per period. Number total. The application checks the limit before allowing the action. The check is centralized like the entitlement check."},
+  {"q":"Should I build this myself?","a":"Yes for most B2B SaaS at startup scale. The build is roughly two weeks. The third party options like Stigg, Schematic, and others are credible. The trade off is vendor lock versus build time. Most teams should build their own first version."},
+  {"q":"How does this interact with Stripe?","a":"Stripe holds the source of truth for what the customer is paying for. The entitlement system reads from Stripe via webhooks or scheduled sync. The application reads from the entitlement system. The separation lets you change billing without touching enforcement."},
+  {"q":"What is the most common mistake?","a":"Treating tier enforcement as solved after the first version. Pricing changes. New plans get added. The enforcement system has to evolve. The teams that did not centralize have to update every check. The teams that did centralize update one place."}
+]
+---
+
+## What you actually need to know
+
+- Centralize tier enforcement. Avoid scattered plan name checks.
+- Key on capabilities, not plan names.
+- Include plans, add ons, overrides, trials, and limits.
+- Read from Stripe via webhooks. Application reads from the entitlement system.
+- Pricing changes. Build for evolution from the start.
+
+| Pattern | Maintainability |
+|---|---|
+| Hardcoded plan checks | Worst |
+| Database flag per feature | Better |
+| Centralized entitlement service | Best |
+| Third party entitlement platform | Good with vendor lock |
+
+## The core argument
+
+Customer tier enforcement is one of those engineering decisions that founders make without realizing it is a decision. The first version is a few if statements checking the plan name. The second version is a few more. The tenth version is a junction box of plan checks scattered across the codebase. Every pricing change becomes a refactoring project.
+
+The fix is centralization. The application asks the entitlement system whether a customer can access a feature. The entitlement system answers based on the customer's plan, add ons, overrides, trial state, and usage. The application code does not know about plans. The entitlement system is the only thing that knows about plans.
+
+The architecture is straightforward. A table mapping plans to capabilities. A table of customer specific add ons and overrides. A function that takes a customer and a capability and returns whether access is allowed. The application calls the function. The function handles the complexity.
+
+The teams that adopt this from day one ship pricing changes in hours. The teams that scatter plan checks ship pricing changes in weeks because every change requires finding and updating every check. The compounding effect over years is the difference between a pricing system that supports business needs and one that fights them.
+
+## The architecture
+
+| Layer | Responsibility |
+|---|---|
+| Stripe | Source of truth for what customer is paying for |
+| Webhook handler | Updates the customer's plan in the entitlement system |
+| Entitlement system | Plans, add ons, overrides, trials, limits |
+| Entitlement API | can this customer do X? |
+| Application | Calls the entitlement API. Does not know about plans. |
+| Admin tool | Adjust overrides for specific customers |
+
+## How much does this cost
+
+| Approach | Build cost | Ongoing maintenance |
+|---|---|---|
+| Hardcoded plan checks | Hours initially, weeks to refactor later | Painful |
+| Database flag per feature | A few days | Modest |
+| Centralized entitlement service | Two weeks | Light |
+| Third party platform | A sprint to integrate | Vendor subscription |
+
+## Features the enforcement must have
+
+- Centralized capability check.
+- Mapping of plans to capabilities.
+- Add ons and overrides per customer.
+- Trial state handling.
+- Usage limit enforcement.
+- Stripe webhook integration.
+- Admin tool to adjust overrides.
+- Audit log on every entitlement change.
+
+## Expert opinion
+
+> Centralized entitlement is one of those engineering investments that founders skip because the first version of the product does not need it. By the third pricing change they wish they had built it. The cost of the centralized version is two weeks. The cost of refactoring scattered checks is months. The early investment compounds across every pricing change for the life of the product.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client was on their fourth pricing change in eighteen months. Each change required engineering work in many places. The team had hardcoded plan name checks throughout the codebase. The latest change was estimated at four weeks of engineering work.
+
+We rebuilt the enforcement as a centralized entitlement service. Capabilities were named. Plans mapped to capabilities. The application called a single check function. The build took two weeks.
+
+The pricing change that had been estimated at four weeks shipped in two days against the new system. The next pricing change six months later took half a day. The pricing model has continued to evolve without significant engineering cost. The investment paid back on the first change.
+
+For more on the related work, see [plan upgrades and downgrades a billing architecture story](/blog/plan-upgrades-and-downgrades-a-billing-architecture-story) and [the SaaS refund workflow a quiet source of engineering debt](/blog/the-saas-refund-workflow-a-quiet-source-of-engineering-debt).
+
+## Common mistakes teams make
+
+1. Hardcoded plan name checks.
+2. No central capability registry.
+3. No add on or override support. Edge cases break.
+4. No trial state handling.
+5. No usage limit enforcement.
+6. No webhook integration with Stripe. Manual sync.
+7. No admin tool for overrides. Engineering escalations.
+8. No audit log. Disputes follow.
+
+## A two week build plan
+
+1. **Days one to three.** Design the entitlement schema. Plans, capabilities, overrides.
+2. **Days four to six.** Build the service and the API.
+3. **Days seven to eight.** Integrate Stripe webhooks.
+4. **Days nine and ten.** Migrate scattered checks to the centralized API. One surface at a time.
+
+For more on the related work, read [plan upgrades and downgrades a billing architecture story](/blog/plan-upgrades-and-downgrades-a-billing-architecture-story) and [the subscription billing stack in 2026](/blog/the-subscription-billing-stack-in-2026). On the broader architecture side, [SaaS multi tenancy patterns database per tenant vs shared schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema) is the natural next read.

@@ -1,0 +1,107 @@
+---
+slug: "the-email-sending-infrastructure-postmark-resend-sendgrid-compared"
+title: "The Email Sending Infrastructure: Postmark, Resend, SendGrid Compared"
+excerpt: "Which email sending provider to use for transactional email, when to switch, and what the operational differences actually feel like."
+date: "2024-11-29"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","email","infrastructure","transactional","postmark","resend","sendgrid"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-email-sending-infrastructure-postmark-resend-sendgrid-compared"
+status: "published"
+definition: "Transactional email infrastructure is the service layer responsible for delivering the automated emails your SaaS product sends: password resets, account confirmations, onboarding sequences, payment receipts, and system notifications. Choosing the right provider affects deliverability (whether emails reach the inbox), developer experience (how fast you can build email workflows), and cost at scale. The major options each make different trade-offs."
+faq: [
+  {"q":"What is the difference between transactional and marketing email?","a":"Transactional email is triggered by a user action: a password reset, a signup confirmation, a payment receipt. It is expected and wanted by the recipient. Marketing email is sent to a list: newsletters, product announcements, promotional campaigns. Most providers differentiate these because deliverability requirements differ. Transactional emails must arrive immediately and reliably. Marketing emails can be batched."},
+  {"q":"Why does email deliverability matter so much?","a":"A password reset that arrives in the spam folder means the user cannot log in and will churn. A payment receipt that is not delivered creates a support ticket. Poor deliverability on transactional email directly damages the product experience. The delivering provider's IP reputation, your domain's SPF/DKIM configuration, and your sending volume patterns all affect deliverability."},
+  {"q":"What is Resend and how does it compare to Postmark?","a":"Resend is a developer-focused transactional email provider with a modern API and React Email template support. Postmark is the established standard for transactional email with exceptional deliverability and detailed delivery analytics. Resend is better for developer experience. Postmark is better for deliverability confidence on production systems."},
+  {"q":"When should I use SendGrid?","a":"When you need both transactional and marketing email from a single platform, or when your organization already has a SendGrid contract. SendGrid is the most comprehensive platform but also the most complex to configure correctly. For pure transactional email, Postmark or Resend are easier to start with."},
+  {"q":"What are the required DNS records for email deliverability?","a":"SPF (Sender Policy Framework) specifies which servers can send email for your domain. DKIM (DomainKeys Identified Mail) adds a cryptographic signature to each email. DMARC (Domain-based Message Authentication) tells receiving servers what to do when SPF or DKIM fails. All three are required for professional transactional email deliverability."}
+]
+---
+
+## What you actually need to know
+
+- Postmark is the default choice for production transactional email. Its deliverability track record and delivery analytics are industry-leading.
+- Resend has the best developer experience and React Email integration. The right choice for teams that want to move fast and ship complex email templates.
+- SendGrid is a full platform (transactional plus marketing) but more complex than needed for pure transactional email.
+- SPF, DKIM, and DMARC must be configured on the sending domain. Without them, emails go to spam regardless of the provider.
+- Use separate sending domains for transactional and marketing email to protect transactional deliverability from marketing campaigns.
+
+| Provider | Best For | Transactional Deliverability | Developer Experience | Starting Price |
+|---|---|---|---|---|
+| Postmark | Production transactional email | Excellent | Good | $15/month (10k emails) |
+| Resend | Developer-first projects, React Email | Good | Excellent | Free (3k/month), $20/month |
+| SendGrid | Combined transactional + marketing | Good | Moderate | Free (100/day), then usage |
+| Amazon SES | High volume, cost-sensitive | Good (requires configuration) | Low | $0.10 per 1,000 emails |
+
+## The core argument
+
+Email sending is infrastructure that most teams choose once and rarely revisit. The initial choice is made during the first week of a project when the team needs to send a password reset email and just picks a provider. Three years later, the product is sending 100,000 emails per month and the original choice is now load-bearing infrastructure that is difficult to migrate.
+
+The right time to make the deliberate choice is at the beginning, not after the migration is expensive. The criteria: deliverability (will the emails arrive in the inbox reliably?), developer experience (how fast can the team build and maintain email templates?), observability (can the team see what happened to a specific email?), and cost at the expected volume.
+
+For most SaaS products starting out, Postmark or Resend are the right choices. Postmark for teams that prioritize deliverability and production reliability. Resend for teams building with React Email templates and prioritizing development speed. Both are significantly better choices than rolling your own SMTP server, which requires managing IP warming, handling bounces, and maintaining deliverability infrastructure that full-time teams at these providers do professionally.
+
+## Postmark in practice
+
+Postmark is used by Basecamp, Gitlab, and thousands of other production SaaS products. The reputation for transactional deliverability is earned over years. Their dedicated transactional sending infrastructure means that one customer's poor sending practices do not affect another customer's deliverability.
+
+The API is clean and the delivery analytics are the best in class. For every email sent, you can see the exact delivery timeline: when the email was accepted, when it was delivered, when it was opened, when the link was clicked. This level of visibility is invaluable when debugging why a specific customer did not receive a password reset.
+
+The limitation: Postmark's email template system is less sophisticated than some alternatives. Teams that need complex, dynamic email templates with a visual editor may find the template tooling limiting. The workaround is to render email HTML in the application and pass it to the API, which works well for developer-controlled templates.
+
+Postmark's pricing: $15 per month for 10,000 emails, scaling from there. For a product sending fewer than 3,000 transactional emails per month, Resend's free tier is more economical.
+
+## Resend in practice
+
+Resend launched in 2023 and positioned itself as the developer-first alternative to Postmark. The differentiator is React Email: an open-source library for building email templates as React components. For teams already building with Next.js or React, this integration is genuinely valuable. Email templates become version-controlled components, testable in isolation, with TypeScript support.
+
+The API is modern and well-documented. The SDK has first-class TypeScript support. The onboarding experience is faster than Postmark.
+
+The deliverability track record is shorter than Postmark's because the product is newer. For most SaaS products, this is an acceptable trade-off. For products where a single missed transactional email means a lost customer, Postmark's longer deliverability history is worth the worse developer experience.
+
+## Amazon SES for high-volume senders
+
+Amazon SES is the right choice when volume makes per-email pricing significant. At $0.10 per 1,000 emails, SES is 10 to 20 times cheaper than Postmark or Resend at high volume. For a product sending 1 million emails per month, the cost difference is $100 versus $1,500.
+
+The cost comes with operational complexity. SES requires IP warming (gradually increasing send volume to establish reputation), manual bounce and complaint handling, and more configuration for advanced features. Teams without dedicated infrastructure engineering capacity usually underestimate this overhead and end up with deliverability problems that require expertise to resolve.
+
+The practical path: start with Postmark or Resend. When monthly email volume exceeds 200,000 to 500,000 and the team has the capacity to manage SES, evaluate the migration. Not before.
+
+## DNS configuration that cannot be skipped
+
+Regardless of the provider, three DNS records are required for professional transactional email deliverability.
+
+**SPF.** A TXT record on your domain that specifies which IP addresses are authorized to send email for that domain. Most providers generate this record for you and require you to add it to your domain's DNS.
+
+**DKIM.** A public key published in DNS that allows receiving servers to verify that the email was actually sent by an authorized sender. All major providers generate and require DKIM records as part of setup.
+
+**DMARC.** A policy that tells receiving servers what to do when SPF or DKIM validation fails. Start with `p=none` (monitor only) and move to `p=quarantine` or `p=reject` once you have confirmed that legitimate email is passing validation.
+
+Without these three records, emails will land in spam even with the best provider. Configure them before sending the first production email.
+
+## Common mistakes teams make with email infrastructure
+
+1. Using a shared domain for both transactional and marketing email. If your marketing campaigns generate spam complaints, they affect the domain's reputation for transactional email too. Use `transactional.yourdomain.com` for transactional and `news.yourdomain.com` for marketing.
+2. Not setting up bounce handling. Sending to addresses that bounce repeatedly damages sender reputation. Configure the provider's webhook to receive bounce notifications and suppress future sends to those addresses.
+3. Not monitoring delivery rates. Most providers expose delivery, bounce, and spam complaint rates. Set up alerts when bounce rates exceed 2 percent or spam complaint rates exceed 0.1 percent.
+4. Using SMTP instead of the provider's API. SMTP integration is older, slower, and provides less observability than the HTTP API. Use the API.
+5. Not testing transactional emails across email clients. Outlook, Apple Mail, and Gmail render HTML email differently. Test in multiple clients before shipping.
+
+## Where to start: a 3-step email infrastructure setup
+
+**Step 1: Choose Postmark or Resend based on your team's priorities.** Postmark if deliverability and analytics are the priority. Resend if developer experience and React Email are the priority. Both are good choices.
+
+**Step 2: Configure SPF, DKIM, and DMARC before sending the first email.** Add the provider's required DNS records to your domain. Verify the configuration using a tool like MXToolbox or the provider's domain verification dashboard.
+
+**Step 3: Set up bounce and complaint webhooks before launch.** Configure the webhook endpoint in your application before sending any production volume. The webhook handler should add bounced addresses to a suppression list and log complaint events for investigation.
+
+## The Infrastructure Behind the Communication
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. Email sending infrastructure is part of every product I build. The transactional email setup, the React Email templates, the delivery analytics, and the bounce handling are all standard components that I configure correctly from the start. If you are setting up or migrating email infrastructure and want it done right the first time, that is the level of care I bring.
+
+## Related reading
+
+- [The Customer Onboarding Automation Map](/blog/the-customer-onboarding-automation-map)
+- [The Dunning Process Done Right](/blog/the-dunning-process-done-right)
+- The SaaS Architecture Stack That Scales to One Million Users
+- [Workflow Automation for SaaS: A Founder's Guide](/blog/workflow-automation-for-saas-a-founders-guide)

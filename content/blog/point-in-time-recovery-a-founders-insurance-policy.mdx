@@ -1,0 +1,62 @@
+---
+slug: "point-in-time-recovery-a-founders-insurance-policy"
+title: "Point in Time Recovery: A Founder's Insurance Policy"
+excerpt: "Point in time recovery (PITR) is the ability to restore a database to any moment in the past, not just to the last backup. Here is how it works, what it costs, and why every SaaS product should have it before they need it."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","founders"]
+readingMinutes: 6
+ogImage: "/api/og/blog/point-in-time-recovery-a-founders-insurance-policy"
+status: "published"
+definition: "Point in time recovery (PITR) is a database recovery capability that allows restoring the database to any specific moment within a retention window, not just to a predetermined backup snapshot. PITR is implemented by combining regular full or incremental backups with continuous write-ahead log (WAL) archiving. To restore to a specific point, the system replays the WAL from the nearest snapshot up to the target timestamp. PITR is critical for recovering from accidental data deletion or corruption that is discovered hours or days after it occurred."
+faq: [
+  {"q":"What is the difference between PITR and regular database backups?","a":"Regular backups create snapshots at scheduled intervals (daily, hourly). Restoration restores to a snapshot, meaning any data changes between the last snapshot and the incident time are lost. Point in time recovery captures every change as it happens through continuous WAL archiving and allows restoration to any moment within the retention window, losing at most a few seconds of data rather than hours. For a database with hourly snapshots, a data deletion incident that is discovered three hours later could lose up to three hours of data with regular backups but near-zero data with PITR."},
+  {"q":"What is a WAL and how does it enable PITR?","a":"WAL (Write-Ahead Log) is a Postgres feature where every database change is written to a log file before it is applied to the database. The WAL is an append-only record of every insert, update, delete, and schema change. WAL archiving captures these log files continuously to remote storage. To restore to a specific point in time, the recovery process starts from the nearest full backup snapshot and replays the WAL up to the target timestamp, reproducing exactly the database state at that moment."},
+  {"q":"Which managed database platforms include PITR?","a":"AWS RDS and Aurora include PITR with configurable retention windows (up to 35 days). Neon includes PITR as a core feature for all plans with varying retention windows. Supabase includes PITR on Pro and Team plans. PlanetScale includes point-in-time restore capabilities in its platform. Google Cloud SQL includes automated backups with PITR. Heroku Postgres includes continuous protection with PITR on its standard plans. For self-managed Postgres, WAL-G and pgBackRest are the two primary open source tools for implementing PITR."},
+  {"q":"What is the recovery time objective (RTO) for PITR?","a":"Recovery time for PITR depends on the database size, the distance from the nearest snapshot to the target point in time, and the infrastructure performing the recovery. A 100 GB database being restored to a point 4 hours after the nearest nightly backup requires replaying 4 hours of WAL, which might take 30 minutes to an hour on typical infrastructure. Larger databases, longer recovery windows, and slower infrastructure increase recovery time. RTO should be tested in a non-production environment before assuming it meets the business's availability requirements."},
+  {"q":"How long should the PITR retention window be?","a":"The retention window should be long enough that data incidents are discovered before the retention window expires. Most data deletion incidents are discovered within 7 days. A 30-day retention window covers nearly all practical recovery scenarios. Longer windows (90 days) add cost but provide protection for incidents that are discovered late or that require historical forensics. The cost of WAL storage for longer retention windows is typically modest compared to the cost of unrecoverable data loss, making the 30-day default a reasonable minimum."}
+]
+---
+
+## What you need to know
+
+- PITR protects against the most common data disaster scenario: accidental deletion or corruption discovered hours or days after it happened, when regular backups have already overwritten the pre-incident state.
+- Most managed database platforms include PITR as a feature. Enable it and verify the retention window before the product goes to production users.
+- PITR recovery should be tested before it is needed. Knowing how to restore to a specific point in time under pressure is different from knowing that the feature exists.
+- The retention window should be at least 30 days for any production database with real user data. A 7-day window means a data incident discovered on day 8 is unrecoverable.
+- PITR does not protect against all data loss scenarios. It does not recover from deleted database instances (only the WAL and backups survive), infrastructure-level corruption, or incidents outside the retention window.
+
+## The core argument
+
+Database backups are standard practice for any responsible SaaS operation. PITR is the upgrade that makes those backups actually useful for the most common recovery scenarios. The problem with daily snapshots is that most data incidents are not discovered at the moment they occur. A bad migration that corrupts a subset of records, a bug that silently deletes user data, or an administrative action that deletes the wrong records are typically discovered hours or days later. By the time the incident is identified, the daily snapshot has already been overwritten by the corrupted state.
+
+PITR solves this by allowing recovery to any point before the incident, even if that point is 15 days ago. The database is not restored to yesterday's snapshot; it is restored to the specific minute before the bad migration ran, or the specific hour before the bug caused deletions. The data loss is measured in seconds rather than in hours or days.
+
+For founders running production SaaS products, PITR is one of the highest-value infrastructure features to enable relative to its cost. The cost of PITR on most managed database platforms is included in the standard platform subscription or adds a small monthly cost for additional WAL storage. The cost of a data loss incident without PITR is potentially catastrophic: user data that cannot be recovered, customer trust that is irreparably damaged, and regulatory obligations that cannot be met. In my experience, the founders who have experienced a data incident without PITR always wish they had enabled it.
+
+## Common mistakes
+
+1. **Not verifying that PITR is enabled after account setup.** Managed database platforms often have PITR enabled by default but with a 7-day retention window. Verify the configuration explicitly and extend the retention window to 30 days before the product receives any user data.
+
+2. **Not testing restoration before an incident occurs.** PITR documentation describes the process; testing reveals the actual recovery time and any configuration issues. Run a test restoration to a recent timestamp on a non-production database to verify the process works and to measure the recovery time.
+
+3. **Not documenting the PITR restoration procedure.** The restoration procedure should be documented in the runbook and accessible to every engineer who might need to execute it. An incident at 2am is not the time to figure out the restoration commands for the first time.
+
+4. **Confusing PITR with disaster recovery.** PITR protects against data corruption and accidental deletion within the retention window. It does not protect against the database instance being deleted, the cloud provider region going down, or infrastructure-level failures. Disaster recovery requires cross-region replication or backups stored in a different provider.
+
+5. **Treating PITR as a substitute for data validation.** PITR enables recovery from data incidents; it does not prevent them. A schema migration that corrupts records should be prevented by testing the migration in staging first and by having a rollback plan. PITR is the last resort, not the first defense.
+
+## Where to start
+
+1. **Verify PITR configuration on all production databases.** Log in to the database platform and confirm: PITR is enabled, the retention window is at least 30 days, WAL archiving is active. For self-managed Postgres, verify that WAL-G or pgBackRest is configured and that WAL files are being archived to remote storage.
+
+2. **Test a restoration to a specific point in time.** Use a development or staging environment copy of the production database. Select a target timestamp from the past 24 hours. Execute the restoration procedure. Verify that the restored database contains the expected state at that timestamp.
+
+3. **Document the restoration procedure in the engineering runbook.** Write the step-by-step process for restoring the production database to a specific point in time. Include the commands, the expected output, and the verification steps. Store this document where it is accessible to all engineers.
+
+## Related reading
+
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Incident Severity Levels: A Practical Definition](/blog/incident-severity-levels-a-practical-definition)
+- [Multi-Region Deployments: Decision Framework and Cost Math](/blog/multi-region-deployments-decision-framework-and-cost-math)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)

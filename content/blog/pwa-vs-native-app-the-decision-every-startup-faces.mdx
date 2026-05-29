@@ -1,0 +1,62 @@
+---
+slug: "pwa-vs-native-app-the-decision-every-startup-faces"
+title: "PWA vs Native App: The Decision Every Startup Faces"
+excerpt: "Progressive web apps promise native-like experiences without app store distribution. Native apps promise platform integration and performance. Here is the honest comparison and how to decide which is right for a specific product."
+date: "2026-05-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter"]
+readingMinutes: 6
+ogImage: "/api/og/blog/pwa-vs-native-app-the-decision-every-startup-faces"
+status: "published"
+definition: "A progressive web app (PWA) is a web application that uses modern browser APIs to provide capabilities previously available only to native apps: offline functionality, push notifications, home screen installation, and access to some device hardware. A native app is compiled for a specific platform (iOS or Android) and runs on the device's native runtime, with access to the full range of platform APIs. The PWA vs native decision involves tradeoffs between development cost, distribution model, platform capability access, and user experience quality."
+faq: [
+  {"q":"What can PWAs do that they could not do three years ago?","a":"PWAs have gained significant capability through newer browser APIs. Web Bluetooth and Web NFC allow communication with nearby hardware devices. Web Push on iOS (supported since iOS 16.4) allows push notifications on iPhone without a native app. The Screen Wake Lock API prevents the screen from sleeping during active tasks. File System Access API allows reading and writing local files. Web Share API integrates with the system share sheet. Service Workers provide robust offline functionality and background sync. These additions reduce the PWA-native capability gap for most common use cases, though deep hardware access and some platform-specific integrations still require native."},
+  {"q":"What are the distribution advantages of native apps over PWAs?","a":"Native apps are distributed through the App Store and Google Play, where users actively discover new apps through search, charts, and editorial features. App store presence provides social proof (ratings, reviews, download counts), which influences user adoption decisions. The home screen icon from a PWA installation is indistinguishable from a native app icon once installed, but the installation path differs: app store installation is familiar and trusted; PWA installation requires the user to know about the 'Add to Home Screen' gesture. For consumer products where discovery and trust matter, app store distribution provides advantages that PWA installation cannot replicate."},
+  {"q":"When is a PWA clearly the better choice?","a":"When the primary users are on desktop or laptop (PWAs are native equivalents on desktop more than on mobile). When the product is B2B SaaS with a tech-savvy user base that uses the product at a desk. When the product needs rapid iteration without app store review cycles. When the team has strong web development skills but no mobile development experience. When the product is primarily content consumption or simple data entry without device hardware requirements. In these scenarios, the PWA provides comparable experience to native at significantly lower development and distribution cost."},
+  {"q":"What is the performance difference between PWAs and native apps on mobile?","a":"Native apps have a direct performance advantage for CPU-intensive operations, complex animations, and scroll performance. They run on the platform's native runtime (Swift/Objective-C on iOS, Kotlin/Java on Android) with direct access to GPU rendering and no JavaScript bridge overhead. PWAs run in the browser's JavaScript engine with one rendering layer between the web content and the hardware. For most business applications with standard UI, the performance difference is imperceptible. For games, video editing, AR features, and highly animated interfaces, native's performance advantage is significant."},
+  {"q":"What is the cost difference between building a PWA versus a native app?","a":"A PWA that extends an existing web application costs a few weeks of development to add service worker offline support, a web app manifest, and push notification integration. Building a native iOS or Android app from scratch typically takes three to six months for a team-size of two engineers. A React Native or Flutter cross-platform app reduces the native development cost by 30 to 50 percent compared to building separate iOS and Android apps, but still requires significantly more investment than a PWA. For early-stage products, the PWA's lower development cost is a meaningful advantage that allows earlier market validation."}
+]
+---
+
+## What you need to know
+
+- PWAs are the right choice for B2B web-primary products, products where rapid iteration matters more than platform depth, and products where the team has web skills but not mobile skills.
+- Native apps are the right choice when the product requires deep device integration (sensors, Bluetooth, HealthKit, biometric auth), when the target audience expects an app store experience, or when performance is a key differentiation.
+- The iOS PWA push notification gap closed with iOS 16.4. PWAs can now deliver push notifications on iPhone through the browser's push API without requiring a native app.
+- The App Store and Google Play distribution model provides discovery and trust that PWAs cannot replicate. For consumer products, this may be the single most important factor.
+- Hybrid approaches are common: ship a PWA first to validate the product, then build a native wrapper or native app after the core experience is validated.
+
+## The core argument
+
+The PWA vs native decision is often framed as a technical capability question, but it is primarily a business question: who are the users, how do they discover and install apps, and what platform capabilities does the product genuinely need? Technical capability has converged significantly; the decision factors that remain are distribution model, user trust, and platform integration depth.
+
+For B2B SaaS products, the PWA is often the right default. Enterprise users access software on laptops and desktops; mobile is secondary. The App Store review process is unnecessary overhead when the primary users access the product from a browser. A PWA that can be added to the home screen on mobile covers the mobile use case without the distribution cost and review overhead. The development efficiency is significant: one codebase serves desktop, mobile web, and PWA installation.
+
+For consumer products, the calculus is different. App store distribution provides a trust signal that web-based installation does not. A user who finds a consumer app through a Google search and is asked to install a PWA may be more hesitant than a user who downloads the same app from the App Store, because the App Store review process provides a security baseline that web-based installation does not. For products where trust and discovery are important, native app store distribution addresses both.
+
+## Common mistakes
+
+1. **Building a PWA when the product requires capabilities that PWAs cannot deliver.** Camera access for video conferencing, background location tracking, HealthKit integration, Bluetooth connectivity, and NFC are examples of capabilities that either require native apps or have limited PWA support. Verify the capability requirements before committing to PWA.
+
+2. **Underestimating the service worker implementation complexity for true offline support.** A PWA with meaningful offline support (data entry that syncs when connectivity is restored, not just a cached shell) requires significant service worker development work. The PWA's lower initial cost advantage narrows when true offline functionality is required.
+
+3. **Not testing PWA installation on iOS specifically.** iOS PWA support has historically lagged Android. Test the installation flow, push notifications, and home screen experience on recent iOS versions explicitly. The experience differs from Android in ways that are not obvious from desktop testing.
+
+4. **Choosing native because "it feels more serious" rather than based on user requirements.** Building a native app because it signals commitment or because "real companies have native apps" is not a technical justification. Evaluate based on what users need and what the product requires.
+
+5. **Not building a PWA first for market validation before a native app investment.** A native app takes three to six months to build. A PWA can be deployed in weeks. For an unvalidated product concept, validating the core experience with a PWA before investing in native development is a sound risk management approach.
+
+## Where to start
+
+1. **List the platform capabilities the product requires.** For each required capability, verify whether PWA APIs support it on both iOS and Android. If capabilities are required that PWAs cannot deliver, native development is necessary. If all capabilities are available via web APIs, PWA is the more cost-efficient choice.
+
+2. **Evaluate the distribution model against the target user.** For B2B with tech-savvy users who access software in a browser: PWA. For consumer products with app store discovery as a key acquisition channel: native app. For products that need both: native wrapper around a web view with PWA as the underlying technology.
+
+3. **Estimate the development cost difference.** Calculate the cost of a PWA extension to the current web app versus a React Native or native iOS/Android app. The difference should be weighed against the capability and distribution benefits of native. For most B2B SaaS, the PWA cost savings are significant enough to justify the approach.
+
+## Related reading
+
+- [Native iOS Development in 2026: SwiftUI, Combine, and the New Stack](/blog/native-ios-development-in-2026-swiftui-combine-and-the-new-stack)
+- [Native Android Development in 2026: Compose, KMP, and Where It Is Going](/blog/native-android-development-in-2026-compose-kmp-and-where-it-is-going)
+- [Mobile App Development Costs: Native, Cross-Platform, and Hybrid Compared](/blog/mobile-app-development-costs-native-cross-platform-and-hybrid-compared)
+- [Offline First Mobile Apps: A Reality Check](/blog/offline-first-mobile-apps-a-reality-check)

@@ -1,0 +1,123 @@
+---
+slug: "the-three-layer-engineering-roadmap-run-grow-transform"
+title: "The Three Layer Engineering Roadmap: Run, Grow, Transform"
+excerpt: "Most engineering roadmaps fail because they treat all work as equal. The three-layer model separates keeping the lights on from growing the product from changing the architecture. That separation is where planning gets honest."
+date: "2026-01-20"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","roadmaps"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-three-layer-engineering-roadmap-run-grow-transform"
+status: "published"
+definition: "The three-layer engineering roadmap is a planning framework that separates engineering work into three distinct buckets: Run covers the operational work that keeps the existing product healthy, Grow covers new features that expand the product's value, and Transform covers the architectural investments that change the system's fundamental capabilities. The model makes capacity tradeoffs visible and prevents operational maintenance from silently consuming the roadmap."
+faq: [
+  {"q":"What is the Run Grow Transform engineering roadmap framework?","a":"A planning model that categorizes all engineering work into three buckets. Run is the operational work that keeps existing systems healthy: maintenance, reliability, incident response. Grow is new feature work that expands product value. Transform is architectural investment that changes what the system can do or how it scales. The separation makes capacity tradeoffs explicit."},
+  {"q":"What percentage of engineering capacity should go to each layer?","a":"A typical healthy ratio at growth stage is roughly thirty to forty percent Run, fifty to sixty percent Grow, and ten to fifteen percent Transform. The ratios shift with product maturity. Early stage teams run more Grow. Mature products with compliance and scale demands run more Run and Transform. The ratios should be set deliberately, not discovered at the end of the quarter."},
+  {"q":"Why do most engineering roadmaps fail to account for operational work?","a":"Because the roadmap is planned in a planning meeting where everyone is focused on what to build, not on what it costs to keep what you have already built. Operational work is invisible until it is not. The teams that do not budget for it discover the cost when maintenance has silently consumed thirty percent of the quarter."},
+  {"q":"How does the Transform layer relate to technical debt remediation?","a":"Transform covers structural architectural changes that open new capability. Technical debt remediation that is purely cosmetic or incremental belongs in Run. Large-scale changes, such as re-architecting from monolith to modular, migrating to a new data model, or building a new platform layer, belong in Transform because they change what the system can do."},
+  {"q":"What is the most common mistake in applying the three-layer model?","a":"Classifying everything as Grow to make the roadmap look product-focused, then discovering that Run work has consumed the quarter without any visible shipping. The discipline of the model is the honest classification. If a task keeps the lights on, it is Run, even if it feels boring to admit."},
+  {"q":"How does the three-layer model help with investor communication?","a":"It gives investors a clean view of where engineering capacity is going. Investors who ask why feature velocity is slower than expected can be shown a run layer that is consuming thirty percent of capacity due to compliance work or infrastructure maintenance. The model makes the answer honest and specific rather than defensive."},
+  {"q":"Can small teams use the three-layer model or is it only for larger engineering organizations?","a":"Small teams benefit from it the most. At five engineers, the invisible consumption of Run work can derail an entire quarter. The model gives the founder visibility into where capacity is actually going and why. The labels do not require ceremony. Even a simple spreadsheet with Run, Grow, and Transform columns captures the discipline."}
+]
+---
+
+## What you actually need to know
+
+- Most roadmaps fail because they treat all engineering work as equivalent.
+- Run, Grow, and Transform are three distinct capacity buckets that require separate planning.
+- Run work is invisible until it is not. It must be explicitly budgeted.
+- Transform investments are the most commonly deferred and the most expensive when they finally arrive.
+- The ratios between the three layers should be set deliberately, not discovered at the end of the quarter.
+
+| Layer | What belongs here | Typical capacity share |
+|---|---|---|
+| Run | Reliability, maintenance, incident response, compliance operational work | 30 to 40 percent |
+| Grow | New features, product expansion, customer-driven additions | 50 to 60 percent |
+| Transform | Architecture changes, platform investments, capability unlocks | 10 to 15 percent |
+
+## The core argument
+
+Engineering roadmaps fail for a predictable reason. The planning process focuses on what to build and ignores what it costs to keep everything already built operational. The roadmap that a team commits to in January looks plausible. By March, roughly a third of the capacity has been absorbed by maintenance, reliability work, and operational demands that were never budgeted. The team looks behind. The founder is frustrated. The engineers are tired. Nobody planned for the maintenance.
+
+The three-layer model fixes this by forcing every piece of engineering work into one of three explicit buckets before the quarter starts. Run covers everything that keeps the existing system healthy. Grow covers the new work that expands the product. Transform covers the structural investments that change what the system can do. Each layer has a capacity budget. The total must add up to what the team can actually deliver.
+
+The discipline is in the honest classification. Run work feels boring to plan. Founders want to talk about Grow. But a mature SaaS product at growth stage might spend thirty to forty percent of engineering capacity on Run work legitimately: monitoring, reliability improvements, compliance maintenance, dependency updates, incident response, and technical debt that cannot be deferred further. That is not a dysfunction. It is the cost of operating a real product. The roadmap that does not budget for it will always slip.
+
+Transform is the other layer that founders underfund. The architectural investments that would allow the system to scale, to support new enterprise customers, or to add an entire category of capability tend to get deferred in favor of Grow work. Then the system hits a ceiling. A customer wants something the architecture cannot support. The team faces a six-month rewrite. The Transform work that was deferred for two years arrives at the worst possible moment.
+
+## How the three layers interact
+
+### Run decisions
+
+Run work is not just reactive. Proactive Run investment prevents the reactive firefighting. The team that spends five percent of capacity on reliability improvements each quarter is not the team that loses a weekend to a production incident every six months. The budget for Run should reflect both the reactive overhead and the proactive investment that reduces it.
+
+The most common Run work categories: monitoring and alerting improvements, dependency updates and security patches, incident response and post-incident work, compliance maintenance, and the incremental technical debt remediation that keeps the codebase navigable.
+
+### Grow decisions
+
+Grow is the layer most founders think about. It is the features, the product expansion, the customer requests, the competitive responses. The discipline in the Grow layer is prioritization: not everything that could be in Grow should be in a given quarter.
+
+The Grow layer should reflect the customer feedback pipeline, the product roadmap, and the revenue priorities. The capacity budgeted to Grow should reflect what remains after honest Run and Transform allocations, not the other way around.
+
+### Transform decisions
+
+Transform work is the most strategically significant and the most commonly deferred. A migration from a shared database schema to a per-tenant schema is Transform. A re-architecture of the background job system to support enterprise-scale workloads is Transform. A platform layer that will support a marketplace or a partner ecosystem is Transform.
+
+The teams that never invest in Transform arrive at a product ceiling and face a rewrite that was avoidable. The discipline is to allocate a small but consistent share of capacity to Transform every quarter, even when the Grow backlog is long.
+
+## How much does it cost
+
+| Scenario | Run | Grow | Transform |
+|---|---|---|---|
+| Early stage, pre-product-market-fit | 15 to 20 percent | 70 to 80 percent | 5 percent |
+| Growth stage, scaling product | 30 to 40 percent | 50 to 55 percent | 10 to 15 percent |
+| Mature product, compliance-heavy | 40 to 50 percent | 35 to 45 percent | 10 to 15 percent |
+| Post-incident recovery quarter | 50 to 60 percent | 30 to 40 percent | Minimal |
+| Architecture migration quarter | 20 to 25 percent | 30 to 40 percent | 30 to 40 percent |
+
+## Features the three-layer model must have
+
+- An explicit capacity budget for each layer before the quarter starts.
+- A classification rule that the whole team understands.
+- A review of actual versus planned allocation at quarter end.
+- Executive understanding that Run is not waste: it is the cost of operating a product.
+- A minimum Transform budget, even when the Grow backlog is long.
+- Visibility of the model in the planning tool the team uses.
+- A quarterly retrospective on whether the ratios were realistic.
+
+## Expert opinion
+
+> The engineering teams I have worked with that use the three-layer model consistently have better planning fidelity than the ones that run a flat backlog. The difference is visibility. When the founder can see that thirty-five percent of the quarter went to Run work, the conversation about why Grow slipped is honest. When everything is in one backlog, the Run work is invisible and the Grow work takes the blame for the miss.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A growth-stage SaaS client had a pattern of missing roadmap commitments every quarter. The team was capable. The planning sessions were detailed. The engineering manager was experienced. The miss was consistent at about thirty percent of committed features per quarter.
+
+We ran a retrospective classification of the last two quarters of completed work. The result was striking: forty-one percent of the completed work in those quarters was Run work that had never been planned for. It had arrived as operational demand during the quarter and absorbed capacity that was committed to Grow.
+
+The fix was straightforward. We introduced the three-layer model and explicitly budgeted Run at thirty-five percent for the following quarter. The Grow commitment was reduced accordingly. The quarter shipped on commitment for the first time in three quarters. The engineering team's morale improved visibly because they stopped feeling behind on work they had never actually committed to.
+
+For related reading, see [engineering capacity planning for small teams](/blog/engineering-capacity-planning-for-small-teams) and [engineering roadmaps that survive reality](/blog/engineering-roadmaps-that-survive-reality).
+
+## Common mistakes
+
+1. Classifying all work as Grow to make the roadmap look product-focused.
+2. No explicit capacity budget for Run work.
+3. Deferring Transform every quarter until the architecture becomes a blocker.
+4. Setting the layer ratios once and never revisiting them as the product matures.
+5. Treating Run work as failure rather than as the legitimate cost of operating a product.
+6. Using the model as a reporting framework but not as a planning framework.
+7. No classification retrospective at quarter end.
+8. Not communicating the Run budget to non-engineering stakeholders who wonder why features are slow.
+
+## A quarterly planning structure using the three layers
+
+1. **Planning session, hour one.** Review last quarter's actual Run, Grow, and Transform allocation against the planned allocation. Note the gaps.
+2. **Planning session, hour two.** Set the capacity ratios for the new quarter based on the current state of the product, the compliance calendar, and any known architectural work.
+3. **Planning session, hour three.** Fill the Grow backlog against the Grow capacity. Prioritize against revenue and customer signals.
+4. **Planning session, hour four.** Identify the Transform investment for the quarter. Even if small, name it explicitly.
+5. **Planning session, hour five.** Cross-functional review. Validate that the Grow commitment matches business expectations given the honest capacity split.
+6. **Mid-quarter check.** Review actual allocation against plan. Adjust if Run is overrunning.
+
+For more on running the discipline well, read [the technical founders quarterly review](/blog/the-technical-founders-quarterly-review) and [the roadmap vs reality gap a founder discussion](/blog/the-roadmap-vs-reality-gap-a-founder-discussion). On the capacity math that supports the layer budgeting, [engineering capacity planning for small teams](/blog/engineering-capacity-planning-for-small-teams) is the prerequisite read.

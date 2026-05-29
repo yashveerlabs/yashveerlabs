@@ -1,0 +1,117 @@
+---
+slug: "deep-linking-a-mobile-engineering-primer"
+title: "Deep Linking: A Mobile Engineering Primer"
+excerpt: "Deep links are how the rest of the world reaches into your mobile app. Done right, they make every email, push, and shared URL land where the user expected. Done wrong, they break in ways the team does not notice until customers complain."
+date: "2026-05-22"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","deep-linking","ios","android"]
+readingMinutes: 12
+ogImage: "/api/og/blog/deep-linking-a-mobile-engineering-primer"
+status: "published"
+definition: "A deep link is a URL that opens directly to a specific screen inside a mobile app, with optional context. The user clicks the link in an email, a message, a notification, or a web page. The app opens to the right screen. Done well, deep linking is invisible plumbing that powers marketing, sharing, and notifications. Done poorly, links route to the wrong place or open the web instead of the app."
+faq: [
+  {"q":"What is the difference between a deep link and a universal link?","a":"A deep link is the broader category. Universal links on iOS and App Links on Android are the modern flavor that uses your own HTTPS domain. The same URL works on the web if the app is not installed and opens the app if it is. Universal links are the right default for new products."},
+  {"q":"How do I set up universal links?","a":"On iOS, configure Associated Domains in the app entitlements and host an apple-app-site-association file at your domain. On Android, configure intent filters and host an assetlinks.json file. The server side files declare which paths your app handles. The setup is mostly configuration."},
+  {"q":"What about deferred deep linking?","a":"Deferred deep linking captures the link before the app is installed and routes the user to the right screen after install. Branch.io and similar services handle this. The pattern is excellent for marketing flows where the user clicks before having the app."},
+  {"q":"What if my app has multiple environments?","a":"Each environment needs its own apple-app-site-association and assetlinks.json files. Sandbox versus production. Staging versus prod. The configuration grows. Use a deployment tool that handles environment specific files."},
+  {"q":"How do I handle the link when the user is not authenticated?","a":"Capture the destination. Route to the login flow. After login, redirect to the captured destination. The user feels the seamless experience. The implementation is small but easy to miss."},
+  {"q":"What about analytics on deep links?","a":"Tag the source of every link. The campaign. The medium. The specific email. The data flows into your analytics tool. The team can measure which links convert and which do not. Without tagging, the deep links are invisible to attribution."},
+  {"q":"What is the most common deep linking mistake?","a":"Universal link configuration that does not work in production. The links open the web instead of the app. The team did not test on a fresh device install. The fix is to test on real devices after every change to the configuration."}
+]
+---
+
+## What you actually need to know
+
+- Universal links on iOS and App Links on Android are the modern default.
+- Server side configuration files declare which paths your app handles.
+- Deferred deep linking handles the case where the app is not installed.
+- Capture destination, route through auth, redirect.
+- Test on real devices after every configuration change.
+
+| Pattern | Use case |
+|---|---|
+| Universal links and App Links | Default for any URL that should open the app |
+| Custom URL scheme | Legacy. Use only when universal will not work. |
+| Deferred deep link | Marketing flow before app install |
+| Push notification with deep link | Notification routing |
+| Email with deep link | Lifecycle email routing |
+| Share sheet with deep link | User sharing |
+
+## The core argument
+
+Deep linking is the plumbing that connects the rest of the world to your mobile app. The marketing email. The push notification. The shared URL. The QR code. Each of these is a link that should open the app to the right place. Done well, the linking is invisible. Done poorly, the links break and the user lands on the wrong screen or in the web browser.
+
+The modern default is universal links on iOS and App Links on Android. The same URL works whether the app is installed or not. The configuration is straightforward but easy to misconfigure. The server side files declare which paths the app claims. The app entitlements declare the same. The platform connects the two.
+
+The pattern that matters most for marketing flows is deferred deep linking. The user clicks a link before the app is installed. The link opens a fallback page. The user installs the app. The app opens to the destination the original link encoded. The user does not see the seam.
+
+The pattern that matters most for product flows is authentication routing. The link arrives. The user is not logged in. The app captures the destination. The user logs in. The app redirects to the captured destination. The seamless experience is small engineering but easy to skip.
+
+## The setup checklist
+
+| Item | Required for |
+|---|---|
+| Associated Domains entitlement | iOS universal links |
+| apple-app-site-association file | iOS universal links |
+| Intent filters in AndroidManifest | Android App Links |
+| assetlinks.json file | Android App Links |
+| Universal Links handler in code | Both platforms |
+| Authentication routing | Both platforms |
+| Deferred deep link integration | Marketing flows |
+| Analytics tagging | Attribution |
+| Per environment configuration | Staging and production |
+| Test on fresh device install | Verification |
+
+## How much does this cost
+
+The initial setup is roughly a week of mobile engineering work. The deferred deep link integration with a service like Branch is a few hundred USD per month. The ongoing maintenance is small. The return is the marketing, notification, and sharing flows that actually land in the app.
+
+## Features the deep linking system must have
+
+- Universal links on iOS.
+- App Links on Android.
+- Custom URL scheme as a fallback.
+- Authentication routing.
+- Deferred deep link support for marketing.
+- Analytics tagging on every link.
+- Per environment configuration.
+- A test plan that includes fresh installs.
+
+## Expert opinion
+
+> Deep linking is one of those mobile features that does not get attention until it does not work. The team ships universal links and forgets about them. The marketing team starts running campaigns. The links break for some users on some platforms. The conversion suffers. The fix is to invest in deep linking as a real feature with testing and observability. The investment is small. The marketing leverage is large.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had universal links configured but the apple-app-site-association file was on staging and not on production. Marketing emails opened to the web instead of the app for production users. The team did not notice for weeks.
+
+We fixed the configuration. Added per environment files. Added a test on fresh install for every release. Added analytics tagging on every marketing link. The next campaign's app open rate from email tripled compared to the broken version.
+
+The investment was two days. The marketing impact was measurable from the next campaign. The team adopted deep linking as a tested feature rather than as configuration that gets done once and forgotten.
+
+For more on the related work, see [the mobile app onboarding flow that converts](/blog/the-mobile-app-onboarding-flow-that-converts) and [push notifications the architecture most apps get wrong](/blog/push-notifications-the-architecture-most-apps-get-wrong).
+
+## Common mistakes teams make
+
+1. Universal links configured but never tested on a fresh install.
+2. apple-app-site-association on staging but not production.
+3. No authentication routing. Links land on login then are forgotten.
+4. No deferred deep linking. Marketing breaks for new installs.
+5. No analytics tagging. Cannot measure conversion.
+6. Custom URL schemes only. Wrong default in 2026.
+7. No per environment configuration. Confusion follows.
+8. Treating deep linking as one time configuration.
+
+## A one week setup plan
+
+1. **Day one.** Configure Associated Domains on iOS. Host apple-app-site-association.
+2. **Day two.** Configure intent filters on Android. Host assetlinks.json.
+3. **Day three.** Implement the universal links handler in the app.
+4. **Day four.** Implement authentication routing.
+5. **Day five.** Integrate deferred deep linking service.
+6. **Day six.** Add analytics tagging convention.
+7. **Day seven.** Test on real devices with fresh installs. Document.
+
+For more on the related work, read [the mobile app onboarding flow that converts](/blog/the-mobile-app-onboarding-flow-that-converts) and [push notifications the architecture most apps get wrong](/blog/push-notifications-the-architecture-most-apps-get-wrong). On the broader mobile side, [building a mobile app without hiring a mobile engineer](/blog/building-a-mobile-app-without-hiring-a-mobile-engineer) is the natural next read.

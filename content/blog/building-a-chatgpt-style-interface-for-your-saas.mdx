@@ -1,0 +1,119 @@
+---
+slug: "building-a-chatgpt-style-interface-for-your-saas"
+title: "Building a ChatGPT Style Interface for Your SaaS"
+excerpt: "A conversational interface looks easy and ships hard. Streaming, citations, function calling, history, evals, and safety. Here is the architecture I use to ship a real chat surface, not a demo."
+date: "2026-05-20"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","chat","llm","saas","ux"]
+readingMinutes: 13
+ogImage: "/api/og/blog/building-a-chatgpt-style-interface-for-your-saas"
+status: "published"
+definition: "A ChatGPT style interface in a SaaS product is not a wrapper around a model. It is a coordinated surface that streams tokens, retrieves context, calls functions in your product, preserves conversation history, evaluates output quality, and handles safety. The visible piece is the chat window. The invisible piece is the work that makes the chat window worth using on the second visit."
+faq: [
+  {"q":"What is the simplest stack for a chat interface in 2026?","a":"Vercel AI SDK or the Anthropic SDK on the server, a streaming endpoint, and a frontend that uses Server Sent Events or the AI SDK's React hooks. The total integration is under a day for a working prototype. The work after the prototype is where the real interface gets built."},
+  {"q":"How do I add retrieval to the chat?","a":"Retrieval Augmented Generation. Embed your product's documents, store them in a vector database like pgvector or Pinecone, retrieve relevant chunks at query time, and pass them to the model in the prompt. The retrieval quality determines the answer quality more than the model choice."},
+  {"q":"What is function calling and why does it matter?","a":"Function calling lets the model invoke your application's functions to fetch data or take actions. The model decides which function to call and with what arguments. Function calling is what turns a chat into an interface that does work, not just answers questions."},
+  {"q":"How do I handle conversation history?","a":"Store every turn in your database. Pass the relevant recent history to the model on each turn. Summarize older history when the context window gets tight. Allow the user to start a new conversation or branch from an existing one."},
+  {"q":"How do I evaluate the chat quality?","a":"Build a small set of representative questions with expected answer characteristics. Run them on every prompt change and every model upgrade. Measure for correctness, helpfulness, and tone. Without evals, every change is a coin flip."},
+  {"q":"What about safety and refusal?","a":"Use the model's built in safety policies. Add your own checks for product specific cases like data access boundaries and tenant isolation. Refuse cleanly when the request crosses a line. Log refusals for review."},
+  {"q":"How much does running a chat interface cost?","a":"At modest scale, 200 to 1500 USD per month in model fees. At higher scale, the cost scales with usage and can reach thousands per month. Cache aggressively. Use the cheaper model for routing and the better model for the answer."}
+]
+---
+
+## What you actually need to know
+
+- The chat window is the visible five percent. The rest is the work.
+- Streaming, retrieval, function calling, history, evals, and safety are all real surfaces.
+- Cache, route to cheaper models when possible, and pay for the expensive model only when needed.
+- Evals are not optional. Without them every change is a guess.
+- The cost scales with usage. Budget for it.
+
+| Surface | What it provides | Investment |
+|---|---|---|
+| Streaming | Visible token by token output | A few hours |
+| Retrieval (RAG) | Grounded answers from your data | One to two sprints |
+| Function calling | The chat takes actions | One to three sprints |
+| History | Conversations resume | A few days |
+| Evals | Quality stays constant | One sprint, ongoing |
+| Safety | Refusals at the right places | A few days, ongoing |
+
+## The core argument
+
+The first version of a chat interface ships in two days. The second version ships in two months. The gap is where the real work lives. The first version is a streaming wrapper around a model. The second version is a coordinated surface that does work, grounds its answers, preserves context, and gets evaluated when it changes.
+
+The founders who confuse the two end up with chat interfaces that get used once. The user asks a question, the model gives a generic answer that does not use the product's data, and the user moves on. The chat does not become part of how the product is used. It becomes a demo.
+
+The chat interfaces that get used daily are the ones that do work. Retrieval brings the product's data into the answer. Function calling lets the chat take actions inside the product. Conversation history makes the chat feel like a real assistant rather than a one shot question answerer. The user comes back because the chat is faster than the alternative.
+
+The investment to get there is real. Not enormous. Three to six engineering weeks for a serious version. The team has to think about prompts, retrieval, function design, evals, and observability. The pieces compose into something that feels like a real product.
+
+## Architecture in one diagram
+
+The frontend has a chat component with input, message list, and streaming output. The frontend talks to a backend endpoint that streams tokens via Server Sent Events. The backend orchestrates the work. It retrieves relevant context from the vector store. It builds the prompt. It calls the model with the prompt plus the function definitions. It streams the model output back to the frontend. When the model calls a function, the backend executes the function, sends the result back to the model, and resumes streaming. When the conversation ends, the backend writes the history to the database.
+
+The model layer can have multiple models. A cheap fast model for routing and intent detection. A more capable model for the actual answer. The cost difference between them is often ten to twenty times. The architecture that uses the cheap model for everything that does not need the expensive one cuts the cost dramatically without affecting quality.
+
+The eval layer runs offline. Representative questions, expected behaviors, automated scoring where possible and human scoring where not. The eval runs on every prompt change, every model upgrade, and on a weekly cadence regardless of changes.
+
+## How much does this cost
+
+| Cost layer | Modest scale monthly | High scale monthly |
+|---|---|---|
+| Model fees | 200 to 1500 USD | 3000 to 30000 USD |
+| Vector database | 50 to 300 USD | 500 to 3000 USD |
+| Logging and observability | 50 to 200 USD | 500 to 2000 USD |
+| Caching layer | Negligible | 100 to 500 USD |
+| Eval infrastructure | Negligible | A few hundred USD |
+| Engineering for evals | Few hours per week | Dedicated headcount |
+
+The numbers come from projects I have shipped or rescued. Caching is the biggest lever on cost. Aggressive caching can cut the bill by half.
+
+## Features the chat must have
+
+- Streaming output that feels instant.
+- Stop and regenerate controls.
+- Conversation history with search.
+- Citations to the sources the answer used.
+- Function calling for the actions the chat takes.
+- A clear refusal path when the request is out of scope.
+- Telemetry on every turn for debugging and evals.
+- Multi tenant isolation for the retrieval layer.
+
+## Expert opinion
+
+> The teams that ship a real chat interface treat it as a product surface, not a demo. They invest in retrieval, function calling, and evals. They iterate on prompts the way teams iterate on UI. The teams that treat it as a demo ship a streaming wrapper and wonder why nobody uses it. The difference is six engineering weeks and the discipline to evaluate quality before shipping.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client wanted a chat interface in their product. The first version was a streaming wrapper around Claude. The usage in the first week was high. The usage in the second week was a third of that. By month two it was background noise.
+
+We rebuilt the chat as a real surface. Added retrieval against the product's documents. Added function calling for the four most common actions. Added conversation history with citations. Added an eval suite with thirty representative questions.
+
+The usage came back in week one of the new version and stayed. The chat is now used by roughly forty percent of weekly active users on every visit. The function calls reduce the number of clicks the user has to make to common workflows. The product is genuinely different.
+
+For more on the related work, see [the difference between an AI wrapper and an AI product](/blog/the-difference-between-an-ai-wrapper-and-an-ai-product) and [RAG retrieval augmented generation for SaaS when it helps and when it does not](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not).
+
+## Common mistakes teams make
+
+1. Shipping a streaming wrapper and calling it a chat product.
+2. No retrieval. The model gives generic answers.
+3. No function calling. The chat answers but does not act.
+4. No evals. Quality drifts.
+5. No caching. The bill grows fast.
+6. One model for everything. The cheap model would have sufficed for most calls.
+7. No safety boundary. The chat crosses tenant or data lines.
+8. No telemetry. Debugging is a fishing expedition.
+
+## A 60 day plan to ship a real chat
+
+1. **Weeks one and two.** Streaming endpoint, basic chat UI, conversation history.
+2. **Weeks three and four.** Retrieval. Embed the relevant data. Test answer quality.
+3. **Weeks five and six.** Function calling. Pick the three most common actions.
+4. **Week seven.** Citations and source display.
+5. **Week eight.** Eval suite. Build the representative set.
+6. **Week nine.** Caching. Routing to the cheaper model where possible.
+7. **Week ten.** Safety boundaries. Refusal paths. Logging.
+
+For more on the related work, read [streaming AI responses to users an architecture primer](/blog/streaming-ai-responses-to-users-an-architecture-primer) and [AI function calling the pattern that changes product surface area](/blog/ai-function-calling-the-pattern-that-changes-product-surface-area). On the cost side, [token economics why your AI bill surprised you and how to fix it](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it) is the natural next read.

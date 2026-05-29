@@ -1,0 +1,122 @@
+---
+slug: "the-notification-system-a-bigger-project-than-founders-realize"
+title: "The Notification System: A Bigger Project Than Founders Realize"
+excerpt: "Every SaaS needs a notification system. Most founders bolt one on and spend the next two years paying the interest on that decision. Here is what a real notification system looks like before you commit to the wrong shape."
+date: "2024-11-20"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-notification-system-a-bigger-project-than-founders-realize"
+status: "published"
+definition: "A notification system is the layer that decides when to tell a user something, through which channel, and what to say. It sounds simple. In practice it involves preference management, delivery guarantees, channel routing, templating, suppression rules, and an audit trail. Most SaaS products build it in pieces across six different engineers over three years. I have seen what that looks like. It is not good."
+faq: [
+  {"q":"What channels should a SaaS notification system support?","a":"Email is the baseline. In-app notifications come next. Push for mobile if you have a mobile product. SMS for time-sensitive alerts. Slack and webhook delivery for the developer and power-user tier. Start with email and in-app. Add channels when users ask for them, not before."},
+  {"q":"How do I handle notification preferences?","a":"Per-user, per-channel, per-notification-type. The user should be able to mute a notification type on one channel while keeping it on another. Store preferences as a sparse table, not a large boolean grid. Default to the most useful setting for new users rather than maximum noise."},
+  {"q":"What is a notification digest and when do I need one?","a":"A digest batches multiple notifications into one delivery. You need it when a single user action can trigger many events in a short window. Without a digest, an active day produces an email flood. A five minute or hourly digest window prevents that and increases the chance users actually read what you send."},
+  {"q":"Should I build the notification system or buy it?","a":"Buy the delivery layer for email and push. Services like Resend, Postmark, and OneSignal are cheap and reliable. Build the routing layer and preference management yourself because that is product-specific logic. The hybrid approach gives you reliability on the delivery side and control on the logic side."},
+  {"q":"How do I prevent notification spam from my own product?","a":"Suppression rules at the routing layer. A user who just received a notification in the last ten minutes should not get the same type again. A user who is actively using the product does not need an in-app ping. Rate limits per user per channel per hour are the right primitive."},
+  {"q":"What is the hardest part of building a notification system?","a":"Preference management at scale, followed closely by making the system observable. Knowing which notifications were sent, which were suppressed, which bounced, and which were opened requires an event store and a delivery log. Teams that skip the observability layer spend weeks debugging production issues they cannot see."},
+  {"q":"How do I handle notification delivery failures?","a":"Retry with exponential backoff for transient failures. Mark as failed and surface to an operations queue for persistent failures. Email bounces should update the user's email status and trigger an in-app fallback. Never silently drop a notification that a user has not opted out of."}
+]
+---
+
+## What you actually need to know
+
+- Notification systems have three distinct layers: logic, routing, and delivery. Most teams build only the delivery layer and call it done.
+- Preference management is a product surface, not a settings page. Enterprise users treat it that way.
+- Digests and suppression rules prevent the spam problem. Without them, you build it yourself the hard way after complaints.
+- Delivery observability is non-negotiable. You need to know what was sent, what bounced, and what was read.
+- In my experience, teams that bolt on notifications as an afterthought spend more engineering time fixing the system than they saved by not planning it.
+
+| Approach | Control | Delivery reliability | Effort to build | Best fit |
+|---|---|---|---|---|
+| Roll your own (SMTP + logic) | Full | Variable | High | Teams with specific requirements |
+| Email SaaS only (Resend, Postmark) | Partial | High | Low | Early stage, email only |
+| Notification platform (Novu, Courier) | High | High | Medium | Teams wanting unified routing |
+| In-house router plus delivery SaaS | High | High | Medium | Most B2B SaaS at growth stage |
+| Push-only service (OneSignal, Firebase) | Partial | High | Low | Mobile-first products |
+
+## The core argument
+
+I have rebuilt notification systems more times than I would like. The pattern is always the same. The first version is a few lines of code that send an email from the request thread. It works. Nobody thinks about it again until it does not work, and then a year has passed and the system has four entry points, three template formats, no preference management, and a delivery log that is a boolean column on the users table.
+
+The notification system is one of those backend concerns that looks like glue code and acts like infrastructure. Every feature touches it. The more features you add, the more notification paths exist. The more notification paths exist, the more the original bolt-on approach creates inconsistency. One feature sends plain text email. Another sends HTML. A third logs to the database but does not email. A fourth emails but does not check preferences.
+
+The way out is not a big rewrite. The way out is treating the notification system as a product component from the start, with a single entry point, a defined schema for notification events, and a routing layer that handles channel selection, preference checks, suppression, and delivery hand-off. That design costs two to three weeks of up-front engineering and saves a year of incremental fixes.
+
+## The architecture that holds up
+
+The system has three parts. An event producer, a routing layer, and delivery adapters.
+
+### The event producer
+
+Any part of the application can emit a notification event. The event has a type, a recipient, a set of contextual data, and optionally a priority. It does not know or care what channel will be used. That decision belongs to the router.
+
+The event schema matters. `notification.type` is a controlled vocabulary. `user.mentioned`, `invoice.paid`, `subscription.expiring` are examples. Free text event names produce a mess within six months.
+
+### The routing layer
+
+The router receives events and decides: which channels apply to this event type, does the user have this notification type enabled on each channel, is the user in a suppression window, should this be digested rather than sent immediately. The router produces delivery jobs, one per channel per recipient.
+
+This is where most systems fall short. The routing layer is the product-specific logic. No third party service can own it because it depends on your data model, your user preferences schema, and your business rules.
+
+### Delivery adapters
+
+One adapter per channel. Email, in-app, push, SMS, webhook. Each adapter handles templating for its channel, delivery to the third party service, and reporting of success or failure back to the event log. Adapters are interchangeable. Adding a new channel means adding an adapter, not changing the router.
+
+## How much does it cost
+
+| Component | Engineering time | Monthly cost |
+|---|---|---|
+| Email delivery (Resend or Postmark) | Half a day | 20 to 100 USD at moderate volume |
+| In-app notification store | Two to three days | Negligible, runs on your database |
+| Push delivery (OneSignal or Firebase) | One day | Free to 100 USD |
+| Routing layer (custom) | One to two weeks | Engineering cost only |
+| Preference management UI | Three to five days | Engineering cost only |
+| Digest and suppression logic | Two to four days | Engineering cost only |
+| Delivery event log | Two to three days | Storage cost, usually under 50 USD/month |
+
+## What the notification system must have
+
+- A single entry point for all notification events across the codebase.
+- A controlled vocabulary of event types with a documented schema.
+- Per-user, per-channel, per-type preference storage.
+- Suppression rules to prevent spam windows.
+- Digest support for high-frequency event types.
+- A delivery event log with sent, failed, and opened states.
+- Dead-letter handling for persistent delivery failures.
+- An operations interface to inspect recent deliveries by user.
+
+## Expert opinion
+
+> The notification system is the feature users notice most when it breaks and least when it works. Every team underestimates it. The first implementation is always too thin. The third implementation is usually right. The goal is to get to the third implementation without building the first two.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client came to me with a support ticket backlog that was forty percent "I did not get the notification." Their notification system had five separate code paths that sent email, none of which shared a template engine, none of which checked user preferences, and none of which logged delivery results. The support team had no way to look up what had been sent to a given user.
+
+We spent three weeks building a proper routing layer and migrating all five code paths into it. Every notification event now goes through a single function. The router checks preferences, applies suppression windows, and hands off to delivery adapters that log every attempt. Within two weeks of shipping, the "I did not get the notification" ticket category dropped by sixty percent. The remaining tickets were almost all legitimate delivery failures that the log made easy to diagnose.
+
+The in-app notification store was the unexpected win. Users who had turned off email for certain event types still wanted to see the history. The in-app store became their audit trail. It reduced support load further because users could answer their own "what happened to my account" questions. For more on related patterns, see [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) and [transactional email architecture templates retries bounces](/blog/transactional-email-architecture-templates-retries-bounces).
+
+## Common mistakes teams make
+
+1. Building the notification system inside the request thread. Delivery failures block users.
+2. No preference management. Users cannot control what they receive or cannot be heard when they ask to be left alone.
+3. No suppression rules. A busy product becomes an email spammer.
+4. Multiple code paths for notifications with no shared logic. Templates drift, preferences are ignored in some paths.
+5. No delivery event log. Support cannot answer "did I get that notification" and engineers cannot debug failures.
+6. Treating digest as a feature for later. Without digest, high-frequency events produce floods.
+7. No bounce handling. Email addresses go stale. A system that keeps sending to bounced addresses hurts deliverability for everyone.
+8. No channel fallback. If push fails and the user has not set up email, the notification disappears silently.
+
+## A four-week plan
+
+1. **Week one.** Audit every place in the codebase that sends a notification. List the event types. Document what each one sends and to whom.
+2. **Week two.** Build the routing layer. Single entry point. Event type schema. Basic channel selection. No preference management yet.
+3. **Week three.** Add preference management. Per-user, per-channel, per-type. Suppression rules. Delivery event log.
+4. **Week four.** Migrate all existing notification paths to the new router. Add digest for the highest-frequency event types. Wire delivery observability.
+
+For the delivery side, [why your saas should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one) covers the async infrastructure that makes reliable notification delivery possible. For the broader architecture context, [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip) is the natural companion read.

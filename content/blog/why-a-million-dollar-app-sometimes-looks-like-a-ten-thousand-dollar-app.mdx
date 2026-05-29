@@ -1,0 +1,124 @@
+---
+slug: "why-a-million-dollar-app-sometimes-looks-like-a-ten-thousand-dollar-app"
+title: "Why a Million Dollar App Sometimes Looks Like a Ten Thousand Dollar App"
+excerpt: "The surface of a product tells you almost nothing about the cost underneath it. Here is why a simple looking app can represent a year of engineering work, and how to read the signals before you quote or get quoted."
+date: "2024-09-01"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-a-million-dollar-app-sometimes-looks-like-a-ten-thousand-dollar-app"
+status: "published"
+definition: "A million dollar app looks like a ten thousand dollar app when the expensive work is invisible at the surface. The complexity lives in the data architecture, the integrations, the compliance requirements, the scale requirements, or the operational infrastructure, none of which show up in a screenshot. I use this framing to help founders understand why their cost estimate is higher than they expected before they compare it to a cheaper quote."
+faq: [
+  {"q":"why does a simple looking app cost so much to build","a":"Because the visible layer, what users see and tap, is a small fraction of the total work. The expensive parts are the data model, the authentication system, the integrations, the background jobs, the error handling, the logging, the deployment infrastructure, and the compliance requirements. A clean UI with complex logic underneath is the norm, not the exception."},
+  {"q":"what makes one app cost ten times more than another app that looks the same","a":"Integrations are the most common multiplier. An app that connects to one API is cheaper than one that connects to ten. Multi tenancy, custom permissions, real time features, offline support, and compliance requirements each add significant cost. The surface similarity between two apps is almost never a reliable indicator of their relative cost."},
+  {"q":"how do investors evaluate the cost of building an app before funding","a":"Most do not evaluate it in technical detail at the seed stage. They look at whether the team has shipped before, whether the scope is realistic given the budget, and whether the founder understands what they are building. The detailed cost evaluation usually happens at the Series A when technical due diligence becomes formal."},
+  {"q":"can I build a million dollar quality app for ten thousand dollars","a":"Not for a product with real scale requirements, real integrations, or real compliance needs. You can build an MVP that validates the core idea for ten to twenty thousand. The gap between that MVP and a production product with enterprise customers is where the million dollar number comes from."},
+  {"q":"what are the most expensive invisible features in a software product","a":"Multi tenancy with custom permissions. Real time data synchronization. Third party integrations that require error handling, retry logic, and reconciliation. Compliance requirements for HIPAA, SOC 2, or GDPR. Offline support in mobile apps. Each of these adds tens of thousands of dollars to a build that might otherwise look simple from the outside."},
+  {"q":"how do I explain to a client why my app quote is higher than a cheaper competitor","a":"Show them the line items. Break the estimate into visible features and invisible infrastructure. The invisible infrastructure is where the price difference lives. A cheaper quote usually omits the invisible infrastructure or underestimates it. Either way, the cost lands somewhere. The question is whether it lands in the quote or in the change order."},
+  {"q":"what is the right way to scope an app project to get an accurate cost estimate","a":"Write down every integration, every user role, every data flow, every compliance requirement, and every performance requirement before asking for an estimate. An estimate given against a vague scope is not an estimate. It is a guess. The accuracy of the estimate scales directly with the specificity of the scope."}
+]
+---
+
+## What you actually need to know
+
+- The visible layer of an app, the screens users interact with, is a small fraction of total build cost.
+- The expensive work is typically architecture, integrations, compliance, and infrastructure.
+- Two apps that look identical at the surface can have a ten to one cost ratio underneath.
+- Cheaper quotes are almost always cheaper because they omit the invisible work.
+- In my experience, founders who understand this framing negotiate better and get fewer change order surprises.
+
+| App type | Looks like | Costs like | Why the gap exists |
+|---|---|---|---|
+| Simple CRUD with auth | 10k to 15k | 10k to 15k | No gap. What you see is what you get. |
+| CRUD with third party integrations | 10k to 15k | 25k to 60k | Each integration adds error handling, retry logic, reconciliation |
+| Multi tenant SaaS | 20k to 30k | 60k to 150k | Permissions, data isolation, billing, tenant management |
+| Real time collaboration tool | 20k to 30k | 80k to 200k | WebSocket infrastructure, conflict resolution, state sync |
+| HIPAA or SOC 2 compliant product | Any visible size | Add 40k to 100k | Audit logging, access controls, compliance documentation |
+
+## The core argument
+
+Software cost is not correlated with screen count. It is not correlated with design complexity. It is not correlated with how long it takes a user to understand the product. It is correlated with the complexity of the data model, the number and reliability requirements of the integrations, the scale requirements, and the compliance requirements. None of those things are visible from the outside.
+
+This creates a specific problem for founders. They look at a competitor's app or a reference product they admire and use the surface as a cost signal. It looks like ten screens and a database. Their developer says it will cost two hundred thousand dollars. The mismatch feels like either the developer is overcharging or they are building something unnecessarily complex.
+
+Usually neither is true. The developer can see the invisible work. The founder cannot. Bridging that gap is most of what a first conversation with a good developer should accomplish.
+
+The practical consequence is that cheap quotes are structurally incentivized. A developer who scopes a project broadly, skips the invisible infrastructure, and presents only the visible feature cost will always win on price. The work they skipped shows up in the project, eventually. It shows up as change orders, as launch delays, as post launch fires, or as a rewrite in year two. The cost was always there. The cheap quote just moved it to a line item the founder was not looking at when they made the decision.
+
+I do not say this to justify high prices. I say it because the only way to compare quotes honestly is to compare what is in them. A quote that includes the invisible work and a quote that excludes it are not two prices for the same thing. They are prices for different things, and the founder who does not know that will always choose the cheaper option and be surprised by the result.
+
+## The invisible work that creates the gap
+
+### Integrations
+
+The visible cost of an integration is connecting to the API and displaying the data. The invisible cost is handling the cases where the API is slow, returns unexpected data, fails mid transaction, or changes its schema. A single integration done properly adds between five and fifteen thousand dollars to a build. An app with five integrations can cost forty to eighty thousand dollars more than an app that looks identical but talks only to its own database.
+
+### Multi tenancy
+
+A product where multiple companies each have their own isolated data, their own users, their own settings, and their own billing is architecturally different from a product where there is one pool of data. The visible difference is a company selector in the nav. The invisible difference is a permissions system, a data isolation strategy, a billing integration, and an account management layer that together can add thirty to sixty thousand dollars to a build.
+
+### Compliance
+
+A product that needs to be HIPAA compliant or SOC 2 certified is not the same build as a product that does not. Audit logging, access controls, encryption at rest and in transit, incident response procedures, and the documentation required to pass an audit add real cost. I estimate forty to a hundred thousand dollars for a first SOC 2, depending on the product's existing architecture. It is invisible from the outside. It is very visible in the budget.
+
+### Scale and reliability
+
+An app that needs to serve ten users is cheaper to build than an app that needs to serve a hundred thousand. Not at the feature level. At the infrastructure, caching, database, and error handling level. The founder building for ten users can skip the parts that keep the app alive under load. The founder building for a hundred thousand cannot.
+
+## How much does it cost
+
+| Visible scope | Invisible additions | Realistic total range |
+|---|---|---|
+| 5 screens, auth, basic CRUD | None | 8k to 20k |
+| 5 screens, auth, basic CRUD | 3 third party integrations | 30k to 60k |
+| 10 screens, multi tenant | None | 40k to 80k |
+| 10 screens, multi tenant | 3 integrations plus billing | 80k to 150k |
+| 15 screens, multi tenant | Plus HIPAA compliance | 140k to 250k |
+| 20 screens, real time collaboration | Multi tenant plus integrations | 200k to 500k+ |
+
+These ranges assume a competent senior developer at market rates. Offshore teams can reduce the cost by thirty to fifty percent. The invisible work takes the same amount of time regardless of geography.
+
+## What to look for when evaluating a cost estimate
+
+- A line item breakdown that separates visible features from infrastructure and integrations.
+- Explicit treatment of third party APIs: which ones, and what does error handling look like.
+- An explicit statement on multi tenancy: is it in scope or not.
+- Any compliance requirements called out explicitly.
+- A clear infrastructure plan: hosting, database, monitoring, backups.
+- A change order policy. A quote without one will produce surprises.
+
+## Expert opinion
+
+> When a founder tells me a quote feels too high, I ask them to walk me through the invisible work in their product. Most of the time, they have not thought about the integrations, the permissions model, the compliance requirements, or the infrastructure. When we walk through those together, the cost usually makes sense. The quotes that feel too high are usually the ones that did the work of scoping honestly. The quotes that feel right are often the ones that skipped it.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder came to me with three quotes for the same product. Fifteen thousand dollars, forty five thousand dollars, and ninety thousand dollars. The product was a SaaS for a specific industry with HIPAA requirements, a Stripe billing integration, a multi tenant architecture, and a real time notification layer. The fifteen thousand dollar quote covered the visible screens. The forty five thousand covered most of the invisible work. The ninety thousand covered all of it plus a proper compliance audit trail.
+
+They chose the forty five thousand dollar option. By month four, the HIPAA requirements had surfaced as a major gap. The developer added a thirty thousand dollar change order. The total came to seventy five thousand dollars, and they still did not have the audit trail the ninety thousand dollar quote included.
+
+The invisible work does not disappear because a quote does not include it. It just moves to a different conversation at a worse time.
+
+For more on how to read cost estimates, see [why most app quotes are wrong and how to spot it](/blog/why-most-app-quotes-are-wrong-and-how-to-spot-it) and [the software cost pyramid where your money actually goes](/blog/the-software-cost-pyramid-where-your-money-actually-goes).
+
+## Common mistakes
+
+1. Using screen count as a proxy for cost. It is not a proxy for cost.
+2. Comparing quotes without understanding what each one includes.
+3. Skipping compliance requirements in the initial scope. They do not disappear.
+4. Treating integrations as simple API calls. The error handling is where the cost lives.
+5. Choosing the cheapest quote without asking what it excludes.
+6. Not asking about the infrastructure plan. Hosting, monitoring, and backups are real costs.
+7. Assuming a mobile app version adds only a small percentage to the cost. Mobile is usually fifty to one hundred percent additional.
+
+## A 30 day plan
+
+1. **Week one.** Write down every integration your product requires. For each one, note whether it needs error handling, retry logic, or data reconciliation. That list is a significant part of your invisible cost.
+2. **Week two.** Identify any compliance requirements. HIPAA, SOC 2, GDPR, PCI. If you are building for a regulated industry, get explicit about what is required before you ask for quotes.
+3. **Week three.** Define the multi tenancy model. Single tenant or multi tenant. If multi tenant, what does data isolation look like. If permissions are custom, write them down.
+4. **Week four.** Collect quotes that include explicit line items for all of the above. Compare the quotes at the line item level, not the total. The difference between quotes is almost always in the invisible work.
+
+For related context, see [why a twenty thousand dollar app sometimes costs two hundred thousand](/blog/why-a-twenty-thousand-dollar-app-sometimes-costs-two-hundred-thousand) and [the real cost of compliance soc 2 gdpr hipaa compared](/blog/the-real-cost-of-compliance-soc-2-gdpr-hipaa-compared).

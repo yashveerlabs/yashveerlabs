@@ -1,0 +1,118 @@
+---
+slug: "database-hosted-vs-self-hosted-an-honest-comparison"
+title: "Database Hosted vs Self Hosted: An Honest Comparison"
+excerpt: "Managed databases cost more in dollars and less in time. Self hosted databases cost less in dollars and more in time. The right call depends on what your team has more of."
+date: "2026-05-20"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["database","hosted","self-hosted","postgres"]
+readingMinutes: 11
+ogImage: "/api/og/blog/database-hosted-vs-self-hosted-an-honest-comparison"
+status: "published"
+definition: "Managed databases are run by a provider who handles backups, upgrades, monitoring, and operations. Self hosted databases are run by your team on your infrastructure. Managed costs more in dollars and dramatically less in engineering time. Self hosted costs less in dollars and dramatically more in engineering time. For most B2B SaaS the managed option is the right call. For specific cases self hosted earns its place."
+faq: [
+  {"q":"When does managed win?","a":"Almost always for B2B SaaS at startup and growth scale. The operational tax of self hosting is real. The team's time is more valuable spent on product than on database operations. Managed Postgres on RDS, Cloud SQL, Supabase, or Neon is the right default."},
+  {"q":"When does self hosted win?","a":"At very large scale where the managed premium becomes meaningful. When the team has dedicated database expertise. When the workload has specific requirements that managed options do not support. Each of these is real but rare at the scales most SaaS operates at."},
+  {"q":"What is the managed premium?","a":"Typically 30 to 60 percent over the equivalent compute and storage cost of self hosting. The premium pays for backups, upgrades, monitoring, and on call. The math is favorable until the database bill is large enough that the premium becomes significant in absolute terms."},
+  {"q":"What about Postgres specifically?","a":"Managed Postgres options are excellent in 2026. RDS is the most mature. Cloud SQL is comparable. Supabase combines managed Postgres with auth and storage. Neon offers serverless Postgres with branching. The choice depends on the surrounding stack."},
+  {"q":"What about scaling?","a":"Managed databases scale by changing the instance size. Some support read replicas automatically. Some support serverless scaling. The team does not have to operate the scaling. The trade off is that some scaling patterns are not available on managed."},
+  {"q":"What are the risks of managed?","a":"Vendor lock. The price can change. The provider might deprecate a version you depend on. The provider might have an outage that takes you down. Each is real. The mitigation is a documented migration path and not betting the company on a single vendor."},
+  {"q":"What is the worst self hosting mistake?","a":"Underestimating the operational tax. The team that runs their own Postgres without dedicated database expertise loses meaningful engineering time to operations. The cost shows up not as the database bill but as the product velocity that did not happen."}
+]
+---
+
+## What you actually need to know
+
+- Managed is the right default for most B2B SaaS.
+- The premium is 30 to 60 percent. Worth it for engineering time.
+- Self hosted earns its place at scale or with specific needs.
+- Managed Postgres is excellent in 2026.
+- Vendor lock is the main managed risk. Plan a migration path.
+
+| Option | Best fit | Cost premium | Operational tax |
+|---|---|---|---|
+| Managed (RDS, Cloud SQL, Supabase, Neon) | Most B2B SaaS | 30 to 60 percent | Low |
+| Self hosted on cloud VMs | Cost optimized at scale | None | High |
+| Self hosted on bare metal | Specific scale or compliance | None to negative | Highest |
+| Hybrid (managed primary, self hosted replicas) | Mature operations | Mixed | Medium |
+
+## The core argument
+
+The database decision is one of those infrastructure choices that compounds across years. The wrong call costs both money and time. The right call removes a class of operational problems that the team would otherwise have to solve themselves.
+
+For most B2B SaaS at startup and growth scale, managed is the right call. The premium over self hosting is real but smaller than the engineering time saved. The team can focus on product. The database problems get solved by the provider's specialists. The on call wakeup at 3 am for a database issue does not happen because the provider handles it.
+
+For very large scale or for teams with dedicated database expertise, self hosted earns its place. The premium becomes significant in absolute terms at large scale. The expertise on the team can run the database with discipline. The specific workload requirements that managed options do not support justify the operational complexity.
+
+The teams that get this wrong in either direction pay for it. The startup that self hosts to save money loses more in engineering time than they save in cloud bills. The mature company that pays the managed premium at scale could have saved meaningful money by hiring database engineers. The right call shifts with stage.
+
+The defense against the wrong call is to revisit the decision every year. The right answer at year one may not be the right answer at year five. The migration is real work but it is bounded. The teams that refuse to revisit the decision lock themselves into a choice that may not still fit.
+
+## The honest decision
+
+| Question | Managed | Self hosted |
+|---|---|---|
+| Is your team under 10 engineers? | Yes | No |
+| Is the database bill under 5000 USD per month? | Yes | No |
+| Do you have dedicated database expertise? | No | Yes |
+| Do you have specific requirements managed does not support? | No | Yes |
+| Is on call a concern? | Yes | Sometimes |
+| Is engineering time the constraint? | Yes | No |
+
+## How much does this cost
+
+| Scale | Managed monthly cost | Self hosted monthly cost |
+|---|---|---|
+| Small | 50 to 300 USD | 30 to 150 USD plus engineer time |
+| Moderate | 300 to 2000 USD | 150 to 800 USD plus engineer time |
+| Large | 2000 to 20000 USD | 800 to 8000 USD plus dedicated engineers |
+| Very large | 20000 USD and up | 8000 USD and up plus team |
+
+## Features the database choice must have
+
+- Backup and restore that work.
+- Point in time recovery.
+- Read replicas if needed.
+- Encryption at rest and in transit.
+- Connection pooling appropriate to the workload.
+- Monitoring on the right metrics.
+- A documented operational runbook.
+- A migration path if you ever need to leave.
+
+## Expert opinion
+
+> The managed versus self hosted decision is one of those choices where the right answer depends on what your team has more of. Time or money. Most startups have less time. Managed wins. Mature companies sometimes have more time relative to their database bill. Self hosted starts to compete. The decision should be revisited as the company grows. The static answer is the wrong answer over years.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS at growth stage was running self hosted Postgres on EC2 because the founding engineer wanted control. The team spent roughly fifteen percent of engineering capacity on database operations. The cost savings versus RDS was real but smaller than the engineering capacity lost.
+
+We migrated to RDS over six weeks. The cost rose by roughly 40 percent on the database line. The engineering capacity recovered was much larger in dollar value. The team's velocity improved measurably over the next quarter.
+
+A different client at much larger scale was running on managed Postgres and the bill was meaningful. The team had dedicated database expertise. We migrated a portion of the workload to self hosted Postgres on dedicated instances. The cost savings were real and the operational risk was manageable because the expertise existed.
+
+Both decisions were right for their stage. Neither would have been right for the other.
+
+For more on the related work, see [PostgreSQL vs Supabase vs Neon vs Planetscale](/blog/postgresql-vs-supabase-vs-neon-vs-planetscale) and [database backups the setup most teams get wrong](/blog/database-backups-the-setup-most-teams-get-wrong).
+
+## Common mistakes teams make
+
+1. Self hosting to save money at startup scale.
+2. Paying the managed premium at very large scale without revisiting.
+3. No migration path. Vendor lock.
+4. Treating the database as solved. The decision should be revisited.
+5. Underestimating the operational tax of self hosting.
+6. Underestimating the managed premium at scale.
+7. No dedicated database expertise on a self hosted team.
+8. No backup verification on either path.
+
+## A yearly review framework
+
+1. **Step one.** Measure the current database bill.
+2. **Step two.** Estimate the engineering time spent on database operations.
+3. **Step three.** Compare to the alternative.
+4. **Step four.** Decide whether to migrate.
+5. **Step five.** Document the decision and the next review date.
+
+For more on the related work, read [PostgreSQL vs Supabase vs Neon vs Planetscale](/blog/postgresql-vs-supabase-vs-neon-vs-planetscale) and [PlanetScale vs Supabase vs Neon vs Aurora Serverless](/blog/planetscale-vs-supabase-vs-neon-vs-aurora-serverless). On the broader infrastructure side, [AWS ECS vs EKS vs Fargate a SaaS founder comparison](/blog/aws-ecs-vs-eks-vs-fargate-a-saas-founder-comparison) is the natural next read.

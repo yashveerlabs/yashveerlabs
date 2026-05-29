@@ -1,0 +1,62 @@
+---
+slug: "pagination-patterns-cursor-vs-offset-and-why-it-matters"
+title: "Pagination Patterns: Cursor vs Offset and Why It Matters"
+excerpt: "Offset pagination is the default and the wrong choice for most production APIs. Cursor pagination is harder to implement and correct at scale. Here is when to use each and why the choice affects performance, consistency, and user experience."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/pagination-patterns-cursor-vs-offset-and-why-it-matters"
+status: "published"
+definition: "Pagination is the mechanism for breaking large dataset results into smaller pages. Offset pagination (LIMIT/OFFSET in SQL) skips a fixed number of rows to retrieve a specific page. Cursor pagination uses a position marker from the previous page to retrieve the next set of results. Offset pagination is simpler but produces inconsistent results on live data and degrades in performance on large offsets. Cursor pagination is more complex but produces consistent results and performs well regardless of dataset size."
+faq: [
+  {"q":"What is offset pagination and what are its limitations?","a":"Offset pagination works by telling the database to skip N rows and return the next M rows. A request for page 5 of 20 results per page translates to LIMIT 20 OFFSET 80. The limitations: if new rows are inserted before the current offset position, items shift and the same item may appear on two pages or be skipped entirely. Performance degrades on large offsets because the database must scan all preceding rows before returning results. An offset of 1,000,000 on a large table produces a slow query regardless of the index used."},
+  {"q":"What is cursor pagination and how does it work?","a":"Cursor pagination uses a stable reference to a position in the dataset, typically the ID or a combination of sort key and ID of the last item seen. Instead of 'give me rows 80 to 100', the query says 'give me 20 rows that come after item with ID 1234'. The cursor is opaque to the client (often base64 encoded) and is returned with each page response. The client sends the cursor back to retrieve the next page. This approach produces consistent results regardless of concurrent insertions and performs well on large datasets because the query uses an index seek rather than a row skip."},
+  {"q":"When is offset pagination acceptable despite its limitations?","a":"For small, mostly static datasets where the total row count will never produce significant offsets and concurrent modifications are rare. A dataset of a few thousand rows accessed by admin tools is a reasonable use case for offset pagination. The simplicity of implementation (SQL LIMIT/OFFSET and page number in the URL) is worth more than cursor consistency in contexts where the data does not change frequently and the dataset is small enough that performance is not a concern."},
+  {"q":"How do you implement cursor pagination in a SQL database?","a":"The standard approach for cursor pagination on an ordered list sorted by created_at and then by id: the cursor encodes the created_at and id of the last item returned. The next page query adds a WHERE clause: WHERE (created_at, id) < (cursor_created_at, cursor_id) LIMIT page_size ORDER BY created_at DESC, id DESC. This query uses a composite index on (created_at, id) and performs consistently regardless of dataset size. The cursor value is returned with the page response and the client sends it back to get the next page."},
+  {"q":"How does GraphQL Connections specification handle pagination?","a":"The GraphQL Connections specification (from the Relay project) defines a standard cursor pagination structure: edges (the items), nodes (the item data), and pageInfo (cursor information including hasNextPage, endCursor, startCursor). This structure allows any GraphQL client built for the Connections spec to handle pagination consistently without custom handling per API. It uses opaque cursors that the client treats as black boxes. Most GraphQL server libraries have utilities for implementing the Connections spec correctly."}
+]
+---
+
+## What you need to know
+
+- Offset pagination produces inconsistent results on live data: new insertions shift pages, causing items to appear twice or be skipped. This is a correctness issue, not just a performance issue.
+- Cursor pagination performs well at any dataset size because it uses index seeks rather than row scans. Offset pagination degrades significantly on large offsets.
+- The choice between offset and cursor affects API contract design. Offset pagination uses page numbers (page=5). Cursor pagination uses opaque cursors. Switching between them is a breaking API change.
+- Cursor pagination requires a stable sort order. Sorting by a non-unique column without a tiebreaker produces unpredictable cursors. Always include a unique column (ID) as the tiebreaker.
+- GraphQL's Connections spec provides a standard structure for cursor pagination that GraphQL clients handle automatically. REST APIs can adopt cursor pagination with different conventions but the correctness properties are the same.
+
+## The core argument
+
+Offset pagination is taught first because it is intuitive and maps directly to how humans think about pages: "go to page five" translates naturally to "skip the first 80 items." It is the right pedagogical starting point and the wrong production default for most applications. The correctness problem alone should disqualify it for any API that clients use to display data that changes while users are browsing.
+
+The correctness problem manifests as follows: the user loads page one of a feed sorted by recent first. While they are reading, ten new items are inserted at the top. When they advance to page two, they request items 21 to 40. But the ten new insertions shifted the index: items that were positions 21 to 30 on the first request are now positions 31 to 40. The client shows items 21 to 30 again (duplicated) or misses items 31 to 40 (skipped). Neither error is visible to the user in a way that produces a clear error message; the feed simply shows wrong results.
+
+The performance problem is secondary but real. On a table with one million rows, `SELECT * FROM posts ORDER BY created_at DESC LIMIT 20 OFFSET 500000` forces the database to scan and discard 500,000 rows before returning the 20 results. The query cannot terminate early regardless of indexing because the offset requires knowing exactly which rows are positions 1 through 500,000. Cursor pagination with `WHERE (created_at, id) < (cursor_created_at, cursor_id) LIMIT 20 ORDER BY created_at DESC, id DESC` seeks directly to the cursor position using the index and returns results immediately. The performance difference between a large offset and cursor pagination on a production table is measured in seconds versus milliseconds.
+
+## Common mistakes
+
+1. **Using offset pagination for user-facing feeds and lists.** Any list that displays recent content to users and allows browsing multiple pages should use cursor pagination. The duplicate/skipped item problem is user-visible on any dataset with frequent insertions, which is exactly the data pattern that feeds represent.
+
+2. **Implementing cursor pagination without a unique tiebreaker in the sort order.** A cursor built on created_at alone is ambiguous when multiple items share the same timestamp (batch inserts, clock skew). Adding the item ID as a tiebreaker makes the sort order deterministic and the cursor unique.
+
+3. **Exposing the cursor structure to clients.** Cursors should be opaque: base64-encoded or otherwise serialized in a way that clients cannot parse or construct. An opaque cursor allows the server to change the cursor format without a client-breaking change. A cursor that encodes the ID directly (cursor=1234) invites clients to construct cursors manually and breaks when the cursor format changes.
+
+4. **Not returning hasNextPage and hasPreviousPage with cursor responses.** Cursor pagination without a next-page indicator forces clients to detect end-of-list by checking whether the returned page is smaller than the requested size, which is a fragile check that breaks on the last full page. Return explicit pagination metadata.
+
+5. **Using cursor pagination for UIs that require random access by page number.** Cursor pagination does not support jumping to "page 47" because there is no way to compute the cursor for page 47 without iterating through the first 46 pages. If the UI requires page number navigation, offset pagination may be acceptable and cursor pagination cannot serve the use case.
+
+## Where to start
+
+1. **Audit the API endpoints that return lists.** For each list endpoint, identify whether the data is live-changing and whether large offsets are possible. Endpoints serving user feeds, activity logs, and any list with frequent insertions should be migrated to cursor pagination.
+
+2. **Choose a cursor encoding strategy before implementation.** The most portable strategy: encode the sort key values as a JSON object and base64-encode the result. This is human-unreadable to clients but easy to decode on the server, and changing the sort key structure requires only a schema change to the cursor format.
+
+3. **Add a composite index on the sort columns.** Cursor pagination performs well only if the WHERE clause uses an index. For a common pattern of sorting by created_at DESC with id as a tiebreaker, create a composite index on (created_at DESC, id DESC) and verify with EXPLAIN that queries use it.
+
+## Related reading
+
+- [JSON Columns in Postgres: When They Make Sense](/blog/json-columns-in-postgres-when-they-make-sense)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- API Rate Limiting That Does Not Punish Good Customers
+- [Message Queues Compared: SQS, Kafka, RabbitMQ, Redis Streams](/blog/message-queues-compared-sqs-kafka-rabbitmq-redis-streams)

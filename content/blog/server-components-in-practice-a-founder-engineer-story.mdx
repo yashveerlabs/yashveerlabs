@@ -1,0 +1,62 @@
+---
+slug: "server-components-in-practice-a-founder-engineer-story"
+title: "Server Components in Practice: A Founder Engineer Story"
+excerpt: "React Server Components change the data fetching model fundamentally. Here is what adopting them in a real product looks like, what the mental model shift requires, and what they are worth for a founder who writes their own code."
+date: "2026-05-23"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","founders"]
+readingMinutes: 6
+ogImage: "/api/og/blog/server-components-in-practice-a-founder-engineer-story"
+status: "published"
+definition: "React Server Components (RSC) are a component model introduced in React 18 and adopted by Next.js 13+ via the App Router that allows components to run on the server, access server-side resources (databases, file system, environment variables) directly, and render HTML without sending the component code to the browser. Server components coexist with client components (which run in the browser and handle interactivity) in the same component tree. The distinction fundamentally changes how data fetching is structured in React applications."
+faq: [
+  {"q":"What is the core mental model change with server components?","a":"The core mental model shift: in the traditional React model, all components run in the browser and data is fetched via API calls that the server processes. In the server component model, components that do not need interactivity run on the server, fetch data directly (from the database, an internal API, or an external service), and render HTML that is streamed to the browser. The client only receives the rendered output and the client components that require browser APIs or state. This eliminates the API layer for components that are purely presentational: a server component that reads a list of records from the database renders the list directly without a client-side fetch."},
+  {"q":"What can server components do that client components cannot?","a":"Server components can: access the database directly using server-side database clients; read environment variables and secrets without exposing them to the browser; access the file system; call internal APIs without CORS restrictions; and import server-only libraries (pdf generators, image processors, ORM clients) without including them in the client bundle. Server components cannot: use React state (useState) or effects (useEffect); use browser APIs (window, document, localStorage); add event listeners; or render interactive elements that respond to user input. Interactive elements are handled by client components embedded within the server component tree."},
+  {"q":"How does data fetching work differently with server components?","a":"In the pages router (pre-App Router), data fetching was centralized in getServerSideProps or getStaticProps at the page level. In the App Router with server components, every component can fetch its own data directly. A dashboard page does not have a single data fetching function that loads all the data; instead, each section of the dashboard (sidebar navigation, main content, user info) is its own server component that fetches the data it needs directly. This colocation of components and their data makes components more self-contained but requires understanding the Suspense-based loading model to avoid waterfall fetches."},
+  {"q":"What are the practical downsides of the App Router server component model?","a":"The practical challenges of server components in production: the distinction between server and client components is not always intuitive and crossing the boundary incorrectly produces runtime errors that can be confusing to diagnose; third-party libraries are not always compatible with the server component model (libraries that use useLayoutEffect or browser APIs at module scope break server component rendering); caching behavior is nuanced and changed significantly between Next.js 13, 14, and 15; and the mental model for error boundaries and loading states is more complex than the pages router. Teams new to the App Router should budget additional learning time, especially if converting an existing pages router application."},
+  {"q":"When should a founder use the App Router with server components vs the pages router?","a":"For new applications started after Next.js 13.4, the App Router is the default choice and the direction of Next.js development. The pages router is in maintenance mode and will not receive new features. For existing pages router applications, migration is worthwhile when: the application has complex data fetching that would benefit from per-component data colocation, or the team wants to use React 18 concurrent features (Suspense, streaming). For a founder engineer building a new SaaS product, start with the App Router and server components from day one. The learning curve is real but front-loaded, and the patterns it establishes are the direction of the React ecosystem."}
+]
+---
+
+## What you need to know
+
+- Server components run on the server, access databases and secrets directly, and render HTML without client-side JavaScript. Client components handle interactivity.
+- Data fetching moves from centralized page-level functions (getServerSideProps) to per-component fetches colocated with the component that needs the data.
+- The server/client component distinction must be maintained explicitly. Passing non-serializable objects (functions, class instances) across the boundary produces runtime errors.
+- Third-party library compatibility with server components is improving but still inconsistent. Check before adopting libraries in server component-heavy applications.
+- For new Next.js applications, start with the App Router. The learning curve is front-loaded but the model is where React is heading.
+
+## The core argument
+
+Server components represent the biggest mental model shift in React development since hooks. The premise is compelling: components that do not need to run in the browser should not run there. Moving data fetching to the component level on the server eliminates the API layer for read operations, reduces the client-side JavaScript bundle, and enables streaming HTML to the browser rather than waiting for the full page to render.
+
+What the model looks like in practice is different from what the documentation suggests. The first time building a dashboard in the App Router, the instinct is to reach for API routes and client-side fetching for everything, because that is the mental model the pages router established. Unlearning that instinct and trusting that a server component can just call `db.query(...)` directly takes time. Once the trust is established, the simplicity is real: a list page that reads from a database is just a component and a query, with no API route in between.
+
+The rough edges are real too. I built a portion of Nexli's dashboard using the App Router during its early adoption period and encountered two classes of problems repeatedly: third-party UI libraries that used browser APIs at module scope (fixing by lazy loading them within client components), and caching behavior that was not intuitive (queries that should have been fresh were cached, and queries that should have been cached were fetching on every request). Both problems are solvable, but they require understanding the caching model in depth before the behavior makes sense.
+
+## Common mistakes
+
+1. **Converting every component to a server component without understanding the boundary.** Not every component benefits from being a server component. Components that use local state, event handlers, or browser APIs must be client components. The correct approach is to make components server components by default and opt into client components when interactivity or browser APIs are required, not to make every component a server component reflexively.
+
+2. **Creating data fetching waterfalls with sequential server component fetches.** A server component that fetches data and then renders child server components that each fetch their own data can create sequential database queries: parent fetches first, then each child fetches. In many cases, parallel fetching with Promise.all or restructuring the component hierarchy to colocate related data is more efficient. Next.js automatically deduplicates fetch requests using the Request API, but sequential queries within a component tree are not deduplicated.
+
+3. **Not using Suspense boundaries for loading states.** Server components that fetch data suspend while loading, and without explicit Suspense boundaries, the entire page waits for the slowest data fetch. Wrap independent sections of the page in Suspense with appropriate loading fallbacks. This enables streaming HTML to the browser, where sections load progressively rather than waiting for all data.
+
+4. **Importing server-only libraries in client components.** Client components are bundled for the browser. Importing a library that uses Node.js APIs (database clients, file system tools, server-only SDKs) in a client component produces a build error or a runtime error. Use the `server-only` package to throw a build-time error if a server module is accidentally imported in a client component.
+
+5. **Recreating the pages router pattern with a layout file that fetches all the data.** The App Router's layout files run on every navigation within the layout's segment. Fetching large amounts of data in a layout (to pass to children) replicates the centralized data fetching pattern of getServerSideProps without the performance benefits of component-level fetching. Colocate data fetching with the components that need it rather than centralizing it in layouts.
+
+## Where to start
+
+1. **Build a single read-only page using server components and direct database access.** Pick a list page (a table of records) and implement it as a server component that queries the database directly without an API route. Verify it renders correctly, implement pagination, and add a loading state with Suspense. This exercise establishes the basic server component pattern and uncovers the first round of mental model adjustments.
+
+2. **Identify the existing API routes that only serve a single page component.** In the current application, find API routes that are only called from one specific page and only to load data for that page. These are the best candidates for migration to server component fetching, because they have no external callers and the migration produces a net reduction in code.
+
+3. **Read the Next.js caching documentation before the first cache-related bug.** The App Router has a four-layer caching model that governs whether requests, segments, and data fetches are cached. Understanding this model before encountering cache-related bugs saves significant debugging time. The key concept: fetch requests in server components are cached by default; understanding how to opt out of caching (the force-no-store option) and how cache invalidation works (revalidatePath, revalidateTag) is necessary for any application with mutable data.
+
+## Related reading
+
+- [Server Actions, Edge Functions, and the Modern Backend Surface](/blog/server-actions-edge-functions-and-the-modern-backend-surface)
+- [Server Rendering vs Client Rendering vs Static: The 2026 Map](/blog/server-rendering-vs-client-rendering-vs-static-the-2026-map)
+- [React Query vs SWR vs RTK Query](/blog/react-query-vs-swr-vs-rtk-query)
+- [Routing Patterns That Survive Real World Use](/blog/routing-patterns-that-survive-real-world-use)

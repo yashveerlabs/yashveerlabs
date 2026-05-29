@@ -1,0 +1,123 @@
+---
+slug: "big-bang-vs-gradual-migration-a-decision-map"
+title: "Big Bang vs Gradual Migration: A Decision Map"
+excerpt: "Big bang migrations look fast and end badly. Gradual migrations look slow and end well. The decision is rarely as binary as the framing suggests. Here is the map I use to pick."
+date: "2026-05-19"
+category: "Tech Debt and Refactoring"
+tags: ["migration","tech-debt","refactor","strategy"]
+readingMinutes: 12
+ogImage: "/api/og/blog/big-bang-vs-gradual-migration-a-decision-map"
+status: "published"
+definition: "A big bang migration replaces a system in one cutover. A gradual migration runs the old and new systems in parallel and moves traffic incrementally. Big bang is faster on paper, riskier in practice, and the right call only for small contained systems. Gradual is slower on paper, safer in practice, and the right call for almost every meaningful production migration."
+faq: [
+  {"q":"When is a big bang migration the right call?","a":"When the system is small, the test coverage is high, the rollback is trivial, and the parallel run cost is prohibitive. Smaller internal tools and isolated services can be cut over in one weekend. Production user facing systems almost never qualify."},
+  {"q":"What is the strangler fig pattern?","a":"A gradual migration pattern where a new system grows around the old one, intercepts traffic for the migrated surfaces, and slowly replaces the old system function by function. The original is eventually retired. The name comes from the strangler fig tree. The pattern is the gold standard for large migrations."},
+  {"q":"How long should a gradual migration take?","a":"Months to years depending on scope. A typical SaaS database migration runs three to twelve months. A monolith to service decomposition can run two years or more. The duration is acceptable when the team can ship product work in parallel. If the migration blocks all product work, the duration is the problem."},
+  {"q":"How do I measure migration progress?","a":"Percentage of traffic on the new system, percentage of features migrated, percentage of dependencies cleaned up. Track all three. A migration that has moved fifty percent of traffic but only ten percent of features is in trouble."},
+  {"q":"What is the most common migration failure?","a":"Running out of momentum at the seventy percent mark. The remaining thirty percent is always harder than expected and the team is exhausted. The fix is to plan for the seventy percent wall in advance and reserve energy for the last push."},
+  {"q":"Should the migration be a separate team's responsibility?","a":"Usually no. A separate migration team produces a finished new system that the original team rejects. The original team has to lead the migration to inherit the result. The pattern of dedicated migration teams almost always ends badly."},
+  {"q":"What about data migrations specifically?","a":"Data migrations are usually gradual by necessity. Dual write to both systems, validate the new system mirrors the old, switch reads gradually, eventually retire the old. The big bang data migration is the riskiest of all because mistakes are hard to reverse."}
+]
+---
+
+## What you actually need to know
+
+- Gradual is the right default. Big bang is the exception.
+- The strangler fig pattern is the gold standard for large migrations.
+- The seventy percent wall is real. Plan for it.
+- The migration team should be the team that owns the original system.
+- Data migrations are gradual by necessity.
+
+| Migration type | Big bang viable? | Why |
+|---|---|---|
+| Small internal tool | Often | Limited blast radius |
+| Library swap with same interface | Often | Test coverage proves equivalence |
+| Database engine change | Rarely | Dual write is safer |
+| Service decomposition | Almost never | Surface area too large |
+| Front end framework | Sometimes | Visible regressions catch issues fast |
+| Authentication provider | Never | Session and credential continuity matter too much |
+| Monolith to services | Never | Strangler fig is the only sane path |
+
+## The core argument
+
+The instinct to migrate in one cutover is psychological. The team wants the migration to be done. They want the old system off the road. They want to ship the next thing. The big bang feels decisive. The gradual approach feels like prolonging the pain. Both feelings are real. Neither should drive the technical decision.
+
+The technical reality is that any migration above a certain blast radius is too dangerous to attempt in one cutover. The team cannot anticipate everything the old system handles. The customers depend on behaviors that nobody documented. The integrations send shapes of data that nobody mapped. The big bang reveals these surprises all at once, often at 2 am, with no easy rollback.
+
+The gradual migration absorbs surprises one at a time. Each surprise is small. Each fix is contained. The team learns the production reality of the old system while building the new one. The cutover happens over weeks or months, with traffic moving from one to five to twenty to fifty to ninety percent on the new system. At every checkpoint the team can pause, study the data, and decide whether to push forward or hold.
+
+The cost of gradual is real. The team operates two systems for the duration of the migration. The codebase has more complexity during the transition. The customer might see edge cases that are different on each system. The cost is paid against the benefit of dramatically reduced risk.
+
+## The decision map
+
+| Question | Big bang signal | Gradual signal |
+|---|---|---|
+| Can the system be rolled back trivially? | Yes | No |
+| Is the customer impact contained? | Yes | No |
+| Is test coverage above 80 percent? | Yes | No |
+| Is the parallel run cost prohibitive? | Yes | No |
+| Is the team experienced with this system? | Yes | No |
+| Has a similar migration been done before? | Yes | No |
+
+The honest read is that a big bang is right only when most of those questions answer yes. If even two answer no, the gradual approach is almost always the better call.
+
+## How much does this cost
+
+| Approach | Engineering cost | Operational cost during migration | Risk |
+|---|---|---|---|
+| Big bang | Lower in calendar time | None | High |
+| Gradual with feature flags | Higher in calendar time | Modest | Low |
+| Strangler fig | Highest in calendar time | Higher | Lowest |
+| Parallel run with reconciliation | Similar to strangler | High | Lowest |
+
+The cost framing is important. Gradual costs more engineering time. Big bang costs more risk. The risk cost is hidden until it materializes. Most teams under count it.
+
+## Features the migration plan must have
+
+- A named owner and a sponsor at the executive level.
+- A documented success criterion. Not just done, but done well.
+- A checkpoint cadence. Weekly or biweekly progress reviews.
+- A traffic shaping mechanism. Feature flags, percentage routing, or shadow traffic.
+- A rollback path at every checkpoint.
+- A retirement plan for the old system. With a date.
+- A communication plan for the team and customers.
+
+## Expert opinion
+
+> The migrations that succeed are the ones where the team accepted the timeline. The migrations that fail are the ones where the team tried to compress the timeline by cutting corners on validation. The honest planning beats the optimistic planning every time. A migration that ships in fourteen months on schedule is more valuable than one that ships in nine months and breaks production.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS needed to migrate from a hand rolled authentication system to Clerk. The team's first instinct was a big bang. Pick a Saturday, dump the user table into Clerk, swap the auth code, deploy.
+
+We ran the gradual playbook instead. New users went to Clerk first. Existing users migrated on next login with a password reset prompt. The application supported both auth paths for ninety days. The old system was retired after that.
+
+The migration took four months. Three issues surfaced that would have been catastrophic in a big bang. A subset of legacy users had email addresses with case sensitive comparisons that broke under the new system. A second group used a deprecated SSO provider that needed manual migration. A third group had session tokens with non standard claims that needed a translation layer.
+
+Each was contained. Each was fixed. The customers experienced minor friction but no outages. The big bang version of this migration would have produced a multi day incident.
+
+For more on the related work, see [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) and [the refactor that never ended](/blog/the-refactor-that-never-ended).
+
+## Common mistakes teams make
+
+1. Choosing big bang because the team wants to feel decisive.
+2. Underestimating the seventy percent wall.
+3. No rollback plan at the checkpoints.
+4. Dedicating a separate team that hands off a finished system the original team rejects.
+5. No retirement date for the old system. It runs forever.
+6. Skipping the parallel validation. The new system silently diverges.
+7. Compressing the timeline by skipping checkpoints.
+8. Refusing to communicate the migration to customers. They notice anyway.
+
+## A planning playbook
+
+1. **Week one.** Map the scope. Inventory every behavior of the old system.
+2. **Week two.** Pick the approach. Use the decision map.
+3. **Week three.** Design the traffic shaping mechanism.
+4. **Week four.** Build the rollback path.
+5. **Weeks five and beyond.** Migrate one surface at a time. Validate. Move on.
+6. **Final phase.** Retire the old system. Document the lessons.
+
+For more on the related work, read [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad) and [the migration that ate the roadmap](/blog/the-migration-that-ate-the-roadmap). On the broader strategy, [when to refactor an MVP and when to throw it away](/blog/when-to-refactor-an-mvp-and-when-to-throw-it-away) is the natural next read.

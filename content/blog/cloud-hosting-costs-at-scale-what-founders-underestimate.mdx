@@ -1,0 +1,119 @@
+---
+slug: "cloud-hosting-costs-at-scale-what-founders-underestimate"
+title: "Cloud Hosting Costs at Scale: What Founders Underestimate"
+excerpt: "The cloud bill at small scale is small. The cloud bill at scale is not. Founders underestimate egress, NAT, snapshots, idle resources, and the data transfer between services. Here is what to expect."
+date: "2026-05-20"
+category: "Software Costs and Budgeting"
+tags: ["cloud","cost","aws","gcp","azure"]
+readingMinutes: 12
+ogImage: "/api/og/blog/cloud-hosting-costs-at-scale-what-founders-underestimate"
+status: "published"
+definition: "Cloud hosting costs scale non linearly with usage. The compute and storage line items are predictable. The hidden costs are not. Egress charges, NAT gateway data processing, snapshot retention, idle resources, cross zone data transfer, and managed service premiums all compound. Founders who model only compute and storage are surprised by their actual bill. Founders who model the full picture make better architecture decisions."
+faq: [
+  {"q":"What are the most underestimated cloud costs?","a":"Egress from the cloud to the public internet. NAT gateway data processing on AWS. Cross availability zone data transfer. Snapshot storage that accumulates. Idle resources that nobody decommissioned. Managed service premiums on top of the underlying compute. Each is small in isolation. Together they often equal the compute bill."},
+  {"q":"How much does egress actually cost?","a":"On AWS the first 100 GB per month is free since 2024. Beyond that it is 0.09 USD per GB to the public internet for most regions. At scale this is significant. A SaaS serving 50 TB per month pays roughly 4500 USD just in egress."},
+  {"q":"What is the NAT gateway trap?","a":"AWS NAT gateway charges 0.045 USD per GB processed plus an hourly fee. At scale the data processing charge dominates. A SaaS sending or receiving data through a NAT gateway at 50 TB per month pays roughly 2250 USD just for NAT processing on top of the egress."},
+  {"q":"How do I avoid the cross AZ tax?","a":"Cross zone data transfer is 0.01 USD per GB each way on AWS. At scale this is real. The fix is to make services availability zone aware. Place dependent services in the same AZ when possible. Use a load balancer that supports cross zone behavior intentionally."},
+  {"q":"What about snapshot storage?","a":"Snapshots accumulate quickly. Automated snapshot policies often retain more than needed. A snapshot of a 500 GB volume is roughly 25 USD per month on AWS. A team with thirty snapshots they did not need is paying significant amounts for no business reason."},
+  {"q":"What is the managed service premium?","a":"RDS costs roughly 50 percent more than the equivalent EC2 running Postgres yourself. ElastiCache costs more than self managed Redis. The premium pays for operational simplicity. The math is favorable at small scale and breaks down at very large scale."},
+  {"q":"How do I cut the bill?","a":"Right size compute. Use savings plans or reserved instances. Decommission idle resources. Reduce egress through CDN caching. Reduce cross AZ traffic. Audit snapshots quarterly. Each lever cuts a meaningful percentage."}
+]
+---
+
+## What you actually need to know
+
+- Egress, NAT, cross AZ, snapshots, and idle resources are the hidden costs.
+- They often equal the compute bill at scale.
+- Reserved instances and savings plans can cut 20 to 50 percent.
+- Right sizing and decommissioning idle resources is the easiest win.
+- Audit the bill quarterly. Costs drift.
+
+| Cost category | Typical share of AWS bill at scale |
+|---|---|
+| Compute (EC2, ECS, EKS) | 30 to 45 percent |
+| Database (RDS, DynamoDB) | 15 to 25 percent |
+| Storage (S3, EBS) | 10 to 20 percent |
+| Egress to internet | 5 to 15 percent |
+| NAT gateway | 3 to 10 percent |
+| Managed services premium | 5 to 15 percent |
+| Cross AZ traffic | 2 to 8 percent |
+| Snapshots | 1 to 5 percent |
+
+## The core argument
+
+The cloud bill at small scale is small because the free tiers and the absolute volume keep it that way. The bill at scale is shaped by line items that founders did not know they were paying for. Egress to the internet. NAT gateway data processing. Cross availability zone data transfer. Snapshot accumulation. Idle resources. The combined effect of these line items often equals the compute bill itself.
+
+The teams that take cloud cost seriously model the full picture. They tag every resource so the bill can be attributed. They review the bill monthly. They audit snapshots and idle resources quarterly. They negotiate reserved capacity for predictable workloads. They make architecture decisions with cost in mind.
+
+The teams that do not take it seriously discover the cost when it lands. The bill jumps. The CFO asks. The team spends a quarter unwinding what could have been avoided with planning. The discovery is unpleasant but useful. The lesson sticks.
+
+The architecture decisions matter. A service that needs frequent cross AZ communication should be designed to minimize that. A service that handles large egress should pair with a CDN. A team that snapshots aggressively should set retention. Each decision is small in isolation. The compounding effect on the bill is large.
+
+## The hidden line items in detail
+
+Egress to the internet. The free tier covers the first 100 GB per month on AWS. Beyond that the rate is 0.09 USD per GB to most regions. A SaaS serving 50 TB per month pays roughly 4500 USD per month in egress alone. The CDN can cut this dramatically because CDN egress to user is often cheaper than origin egress to user.
+
+NAT gateway data processing. The NAT gateway charges 0.045 USD per GB processed plus an hourly fee per gateway. A workload that sends or receives 50 TB through the NAT pays 2250 USD per month just for NAT processing. The fix is VPC endpoints for AWS services. The endpoints bypass the NAT and the data processing fee.
+
+Cross availability zone data transfer. AWS charges 0.01 USD per GB each direction for traffic between AZs. The fix is AZ aware service placement and load balancers that respect zonal affinity.
+
+Snapshot accumulation. Automated snapshot policies often retain more than needed. The cost compounds over months. A quarterly audit can reduce the snapshot bill by half in many cases.
+
+Managed service premium. RDS, ElastiCache, OpenSearch, MSK, and others charge a premium over the equivalent compute. The premium is worth paying for operational simplicity at most scales. The premium is worth questioning at very large scale.
+
+Idle resources. EBS volumes attached to terminated instances. Load balancers with no targets. Elastic IPs not attached. Each of these costs money for no work. A quarterly audit catches them.
+
+## How much does this cost
+
+| Stage | Typical monthly cloud bill |
+|---|---|
+| Early SaaS | 200 to 1000 USD |
+| Growth | 1000 to 8000 USD |
+| Mid stage | 8000 to 50000 USD |
+| Mature | 50000 to 500000 USD |
+
+## Features the cost discipline must have
+
+- A tag every resource policy.
+- Monthly cost review.
+- Quarterly snapshot and idle resource audit.
+- Reserved instance or savings plan strategy.
+- CDN strategy that reduces origin egress.
+- VPC endpoint strategy that reduces NAT processing.
+- A documented cost owner per service.
+
+## Expert opinion
+
+> The cloud bill is one of the few costs that founders consistently underestimate even after they have seen it grow. The reason is psychology. The first month bill is small. The team assumes it will scale linearly. It does not. The hidden line items compound. The teams that model the full bill from the start make architecture decisions that compound favorably. The teams that do not learn the lesson late.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was experiencing rapidly growing cloud costs that the founder could not explain. The compute bill was roughly what they expected. The total bill was nearly double.
+
+We audited the bill. Egress to internet was significant because the team had not configured the CDN for API responses. NAT gateway processing was significant because the application was talking to S3 over the public path instead of through a VPC endpoint. Snapshot retention was set to ninety days when seven would have been enough. Two large EBS volumes were attached to instances that had been terminated.
+
+We fixed each issue. Added CloudFront in front of the API. Created a VPC endpoint for S3. Tightened snapshot retention. Decommissioned the orphan volumes. The total bill dropped by roughly thirty five percent in the next month. The team adopted a quarterly cost audit cadence.
+
+For more on the related work, see [how to read AWS Azure and GCP invoices without crying](/blog/how-to-read-aws-azure-and-gcp-invoices-without-crying) and [reserved instances and cost math when they pay off](/blog/reserved-instances-and-cost-math-when-they-pay-off).
+
+## Common mistakes founders make
+
+1. Modeling only compute and storage. The hidden line items are larger than expected.
+2. No tag policy. Cannot attribute costs to teams or features.
+3. Default snapshot retention. Storage accumulates.
+4. No VPC endpoints. NAT charges balloon.
+5. No CDN strategy. Egress is full price.
+6. No reserved instance strategy. Paying on demand at scale.
+7. No idle resource audit. Money leaks.
+8. Treating the bill as fixed. It is not.
+
+## A 30 day plan to control cloud costs
+
+1. **Week one.** Audit the bill by service. Identify the largest line items.
+2. **Week two.** Fix the easy wins. Decommission idle. Tighten snapshots.
+3. **Week three.** Add CDN and VPC endpoints. Reduce egress and NAT.
+4. **Week four.** Buy reserved instances or savings plans for predictable workloads.
+
+For more on the related work, read [how to read AWS Azure and GCP invoices without crying](/blog/how-to-read-aws-azure-and-gcp-invoices-without-crying) and [reserved instances and cost math when they pay off](/blog/reserved-instances-and-cost-math-when-they-pay-off). On the broader cost side, [the honest cost of building an app in 2026 global breakdown](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown) is the natural next read.

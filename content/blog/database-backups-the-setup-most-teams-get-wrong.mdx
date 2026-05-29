@@ -1,0 +1,127 @@
+---
+slug: "database-backups-the-setup-most-teams-get-wrong"
+title: "Database Backups: The Setup Most Teams Get Wrong"
+excerpt: "Database backups are easier to misconfigure than to configure correctly. The defaults are dangerous. The right setup is small but specific. Here is what to verify before you need the backup."
+date: "2026-05-20"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["database","backup","postgres","reliability"]
+readingMinutes: 11
+ogImage: "/api/og/blog/database-backups-the-setup-most-teams-get-wrong"
+status: "published"
+definition: "Database backups are the system that protects you from data loss caused by corruption, accidental deletion, hardware failure, ransomware, or human error. The default backup configuration on most managed databases is inadequate for production. The right setup requires deliberate choices about retention, cross account storage, point in time recovery, and tested restoration. The cost is small. The cost of getting it wrong is the kind of incident that ends companies."
+faq: [
+  {"q":"What is wrong with the default backup setup?","a":"The defaults often have backups in the same account as the primary database, which is a ransomware risk. The retention is often too short for compliance. Point in time recovery is sometimes not enabled. The backups have rarely been tested. Each of these is a real risk that the default does not address."},
+  {"q":"What is point in time recovery?","a":"The ability to restore the database to any moment in the recovery window. Useful when a corruption happened at a known time. The team can restore to the moment before the corruption. PITR is supported by most managed Postgres options including RDS, Cloud SQL, Supabase, and Neon."},
+  {"q":"What is the right retention?","a":"At minimum seven days for point in time recovery. Thirty days of daily snapshots. Twelve months for monthly snapshots. Healthcare and finance may require longer. Tier hot and cold storage to control cost."},
+  {"q":"Where should backups live?","a":"In a different account or at least a different storage location from the primary. A ransomware attack or compromised credential should not be able to delete the backups. Cross account backup with restrictive access is the right shape."},
+  {"q":"How do I know the backups work?","a":"Test the restore. Quarterly at minimum. Restore to a clean environment. Verify the data. Measure the recovery time. A backup that has never been restored is not a backup. It is a guess."},
+  {"q":"What about logical versus physical backups?","a":"Physical backups are faster to take and restore but tied to the database version. Logical backups are slower but portable. Production databases usually need both. The physical for fast recovery. The logical for portability and verification."},
+  {"q":"What is the worst backup configuration?","a":"Backups in the same account as the primary, no point in time recovery, no test of restoration. The team thinks they have backups. They have a hope. The first real corruption proves the difference."}
+]
+---
+
+## What you actually need to know
+
+- The defaults are inadequate. Configure deliberately.
+- Backups live in a different account from the primary.
+- Point in time recovery enabled with a recovery window that matches your needs.
+- Quarterly restore tests.
+- Both physical and logical backups for production.
+
+| Setting | Right value |
+|---|---|
+| Point in time recovery window | Seven days minimum |
+| Daily snapshot retention | Thirty days |
+| Monthly snapshot retention | Twelve months |
+| Backup storage location | Different account or region |
+| Restore test cadence | Quarterly |
+| Restore test environment | Clean isolated mirror of production |
+| Encryption at rest | Always |
+| Cross region replication | Recommended for production |
+
+## The core argument
+
+Database backups are the kind of infrastructure that founders think is solved when it is not. The managed database provider takes backups. The team assumes those backups are sufficient. The default configuration produces backups that are technically present but practically inadequate for the failures that actually happen.
+
+The first inadequacy is location. Default backups often live in the same account as the primary database. A compromised credential or a ransomware attack that can reach the primary can also reach the backups. The data is gone. The cross account backup pattern eliminates this risk.
+
+The second inadequacy is retention. The default might retain backups for seven days. Most teams need more. Compliance requirements often demand twelve months. The team configures retention to match the regulation, not the default.
+
+The third inadequacy is testing. The backup that has never been restored is not a backup. The first time the team learns the backup process is during a real incident is the worst time. Quarterly restore tests verify the process works. The tests are mechanical and small.
+
+The fix for all three is mechanical. Configure cross account backups. Set retention to match your compliance and business needs. Run restore tests on a cadence. The cost is small. The cost of skipping is the kind of incident that ends companies.
+
+## The right setup
+
+| Setting | Production value |
+|---|---|
+| Point in time recovery | Enabled, seven to thirty day window |
+| Daily snapshot | Enabled, thirty day retention |
+| Monthly snapshot | Enabled, twelve month retention |
+| Backup account | Different from primary |
+| Encryption | Required |
+| Cross region copy | Recommended |
+| Restore test | Quarterly |
+| Restore documentation | Current and runnable |
+| Logical backup | Periodic, for portability |
+| Backup monitoring | Alarms on missing or failed backups |
+
+## How much does this cost
+
+| Component | Monthly cost at moderate scale |
+|---|---|
+| Snapshot storage | 25 to 200 USD |
+| Cross region copy | Additional 25 to 200 USD |
+| Logical backup pipeline | Modest |
+| Restore test infrastructure | Hours of compute during the test |
+
+The cost is small relative to the protection it provides.
+
+## Features the backup setup must have
+
+- Point in time recovery enabled.
+- Daily and monthly snapshot retention configured.
+- Cross account or cross region backup storage.
+- Encryption at rest.
+- Monitoring on backup success or failure.
+- A runnable restore runbook.
+- Quarterly restore test results documented.
+- A clear owner of the backup system.
+
+## Expert opinion
+
+> The teams that have never tested a restore are usually one incident away from a catastrophic data loss they did not have to suffer. The fix is mechanical. The quarterly drill is hours of engineering time. The cost of skipping is the kind of incident you do not recover from. The reasonable teams have drilled. The lucky teams have not had to find out.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS suffered a database corruption from a faulty migration. They had backups. The team had never tested a restore. The recovery took seventy two hours. The team improvised the runbook during the incident. They lost six hours of customer data because the most recent clean point in time was older than expected.
+
+After the incident we rebuilt the backup setup. Cross account storage. Tighter retention. Documented runbook. Quarterly restore tests.
+
+The first test took six hours and surfaced three gaps. The team fixed them. The second test took two hours. The third test took ninety minutes. The team had built fluency in the process.
+
+A second corruption six months later was contained within four hours. The customer impact was minimal. The drilled process worked. The investment in the backup setup paid back many times over.
+
+For more on the related work, see [backup and restore drills a compliance asset most teams skip](/blog/backup-and-restore-drills-a-compliance-asset-most-teams-skip) and [backup restore and drill practice a SaaS disaster recovery guide](/blog/backup-restore-and-drill-practice-a-saas-disaster-recovery-guide).
+
+## Common mistakes teams make
+
+1. Default backup configuration without auditing.
+2. Backups in the same account as the primary.
+3. Short retention that misses compliance requirements.
+4. No point in time recovery.
+5. No restore tests.
+6. No monitoring on backup success.
+7. No documented runbook.
+8. Single person knowledge of the backup system.
+
+## A one day audit
+
+1. **Hour one and two.** Inventory current backup configuration.
+2. **Hour three and four.** Compare against the right setup. Identify gaps.
+3. **Hour five and six.** Fix the easy gaps. Cross account storage. Retention. PITR.
+4. **Hour seven and eight.** Plan the first restore test for the next sprint.
+
+For more on the related work, read [backup and restore drills a compliance asset most teams skip](/blog/backup-and-restore-drills-a-compliance-asset-most-teams-skip) and [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide). On the broader reliability side, [chaos engineering at startup scale](/blog/chaos-engineering-at-startup-scale) is the natural next read.

@@ -1,0 +1,106 @@
+---
+slug: "csrf-xss-ssrf-a-modern-web-security-primer"
+title: "CSRF, XSS, SSRF: A Modern Web Security Primer"
+excerpt: "Three of the most common web vulnerabilities in 2026 are still CSRF, XSS, and SSRF. The frameworks help with some. The team has to handle the rest. Here is the modern read on each."
+date: "2026-05-20"
+category: "Security, Auth, and Compliance"
+tags: ["security","csrf","xss","ssrf"]
+readingMinutes: 12
+ogImage: "/api/og/blog/csrf-xss-ssrf-a-modern-web-security-primer"
+status: "published"
+definition: "CSRF, XSS, and SSRF are three of the most common classes of web vulnerability. Cross site request forgery tricks an authenticated user into performing an action they did not intend. Cross site scripting injects malicious script into a page viewed by other users. Server side request forgery makes the server send a request the attacker controls. All three remain common in 2026 because the patterns that cause them are still in production code."
+faq: [
+  {"q":"What is CSRF in plain terms?","a":"An attacker tricks the user's browser into making a request the user did not intend, using the user's existing session. The classic example is a link that triggers a money transfer on a banking site where the user is already logged in."},
+  {"q":"How do I prevent CSRF?","a":"SameSite cookies. CSRF tokens on state changing requests. Custom headers that the browser would not send cross site. Modern frameworks include CSRF protection by default. Verify that yours does and that the protection is not bypassed by careless code."},
+  {"q":"What is XSS?","a":"Cross site scripting. The attacker injects JavaScript into a page that other users view. The script runs in the victim's browser with their session. The classic example is an unescaped user comment that contains a script tag."},
+  {"q":"How do I prevent XSS?","a":"Output escaping by default. Content Security Policy headers. Sanitize user input that allows rich content. Avoid eval and dangerouslySetInnerHTML. Modern React and Vue escape by default. Trust the framework but verify."},
+  {"q":"What is SSRF?","a":"Server side request forgery. The attacker makes the server send a request to a destination the attacker controls. The server might be inside a network that the attacker cannot reach directly. SSRF turns the server into a proxy for the attacker."},
+  {"q":"How do I prevent SSRF?","a":"Validate URLs before fetching. Block requests to internal IP ranges from user provided URLs. Use a fetch wrapper that enforces an allowlist. Disable URL redirects in fetches. The web fetch APIs are easy to misuse. The wrapper is the right place to enforce the policy."},
+  {"q":"Which is the most damaging?","a":"All three can be catastrophic. SSRF often allows access to internal services that have no auth. XSS allows session hijacking. CSRF allows arbitrary actions on behalf of the user. The damage depends on what the application allows."}
+]
+---
+
+## What you actually need to know
+
+- CSRF, XSS, and SSRF are still in production code in 2026.
+- Frameworks help. They do not eliminate the need for vigilance.
+- SameSite cookies and CSRF tokens prevent CSRF.
+- Output escaping and CSP prevent XSS.
+- URL validation and allowlists prevent SSRF.
+
+| Vulnerability | Primary defense | Secondary defense |
+|---|---|---|
+| CSRF | SameSite cookies | CSRF tokens |
+| XSS | Output escaping | Content Security Policy |
+| SSRF | URL validation | Network controls |
+
+## The core argument
+
+The OWASP Top Ten has shifted over the years but CSRF, XSS, and SSRF have remained in the conversation because the patterns that produce them are still in production code. Modern frameworks have helped. React escapes output by default. Most server frameworks include CSRF protection by default. The defaults catch the common cases.
+
+The defaults do not catch every case. dangerouslySetInnerHTML in React. Sites that disable CSRF protection on specific endpoints because the team did not understand it. Server side fetch calls that take a URL from user input. Each of these is a specific careless pattern that produces the vulnerability the framework would otherwise have prevented.
+
+The teams that take security seriously train the team on the patterns, add tooling that catches the patterns automatically, and review every change for the patterns at code review. The training, tooling, and review combination is the discipline that produces secure web applications. The teams that rely on the framework defaults alone occasionally ship vulnerabilities that they could have prevented.
+
+The cost of the discipline is small. The framework already does most of the work. The team has to learn the patterns that break the framework's defenses. The learning is hours. The vulnerability is hours to days of crisis when it lands.
+
+## The specific defenses
+
+CSRF defenses. SameSite cookies set to Lax or Strict for session cookies. CSRF tokens on state changing requests. Custom headers like X-Requested-With that the browser would not send on cross site requests. SameSite alone is not enough because older browsers do not honor it. The combination is the discipline.
+
+XSS defenses. Output escaping by default in templates. Content Security Policy header that restricts where scripts can come from. Sanitization libraries for user input that allows rich content like comments or rich text. Avoid eval, new Function, and dangerouslySetInnerHTML. When you must use them, sanitize first.
+
+SSRF defenses. Validate every URL before fetching. Block requests to private IP ranges from user provided URLs. Use a fetch wrapper that enforces the allowlist. Disable redirects. The wrapper is the place to enforce these rules consistently.
+
+## How much does this cost
+
+The cost of the disciplines is small. A few hours of team training. CI rules that catch the common careless patterns. Code review awareness. The combination is roughly one sprint of work to establish. The ongoing cost is the discipline.
+
+## Features the security setup must have
+
+- SameSite cookies on sessions.
+- CSRF tokens on state changing requests.
+- Output escaping by default in templates.
+- Content Security Policy header.
+- Sanitization for user provided rich content.
+- URL validation wrapper for server side fetches.
+- Allowlist for outbound server requests.
+- Security training for the team.
+
+## Expert opinion
+
+> The three classic vulnerabilities are still common because the patterns that cause them are still common. The frameworks have made the basic cases safe. The careless patterns remain. The teams that catch these in code review and CI ship secure web applications. The teams that rely on the framework alone occasionally ship vulnerabilities. The discipline is small and well understood. The cost of skipping it is the kind of incident you do not want.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was preparing for a SOC 2 audit. We ran a security review before the auditor arrived. The review found a CSRF vulnerability on a specific endpoint where the team had disabled CSRF protection because it was an API endpoint. We added the protection back with a proper token mechanism. The fix was an hour.
+
+A second review found an SSRF issue. A feature that fetched the user's avatar from a URL they provided did not validate the URL. The user could provide an internal URL and trick the server into proxying it. We added a URL validation wrapper. The fix was a few hours.
+
+A third review found an XSS issue in a rich text editor. The team had disabled the default sanitization because they wanted custom HTML in comments. We replaced the editor with one that allowed safe HTML and sanitized everything else. The fix was a day.
+
+All three were fixed before the auditor saw them. The vulnerabilities would have been findings if discovered later. The pre audit review paid for itself.
+
+For more on the related work, see [OWASP top ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026) and [insecure direct object references the bug founders underestimate](/blog/insecure-direct-object-references-the-bug-founders-underestimate).
+
+## Common mistakes teams make
+
+1. Disabling framework CSRF protection without understanding it.
+2. Using dangerouslySetInnerHTML or equivalent without sanitization.
+3. Fetching URLs from user input without validation.
+4. No Content Security Policy.
+5. SameSite cookies not set on sessions.
+6. No team training on the patterns.
+7. No CI rules that catch the careless patterns.
+8. Treating security as the framework's job alone.
+
+## A 30 day plan to put defenses in place
+
+1. **Week one.** Audit the current code for the careless patterns.
+2. **Week two.** Fix the gaps. Add SameSite cookies, CSP, URL validation.
+3. **Week three.** Add CI rules that catch the patterns.
+4. **Week four.** Train the team. Establish code review awareness.
+
+For more on the related work, read [OWASP top ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026) and [server side request forgery the quiet killer in SaaS integrations](/blog/server-side-request-forgery-the-quiet-killer-in-saas-integrations). On the broader security side, [building a security program from zero a twelve month plan](/blog/building-a-security-program-from-zero-a-twelve-month-plan) is the natural next read.

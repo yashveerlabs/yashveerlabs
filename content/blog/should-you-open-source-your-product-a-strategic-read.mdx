@@ -1,0 +1,67 @@
+---
+slug: "should-you-open-source-your-product-a-strategic-read"
+title: "Should You Open Source Your Product? A Strategic Read"
+excerpt: "Open sourcing your product changes your distribution, your competition, and your monetization permanently."
+date: "2026-05-23"
+category: "Founder Decision Frameworks"
+tags: ["founders","open-source","strategy","decision-frameworks"]
+readingMinutes: 7
+ogImage: "/api/og/blog/should-you-open-source-your-product-a-strategic-read"
+status: "published"
+faq: [
+  {"q":"What is the open core model?","a":"Open core means the core product is open source and free, while advanced features (enterprise SSO, audit logging, advanced analytics, SLAs) are available only in a paid commercial version. It is the standard monetization model for open source companies."},
+  {"q":"Can I change my license after open sourcing?","a":"Technically yes, but existing versions under the original license remain available under that license. The community that adopted the original terms may react negatively to a more restrictive license change. HashiCorp's move from MPL to BSL for Terraform is a recent example of the fallout."},
+  {"q":"Does open source help with enterprise sales?","a":"Sometimes. Enterprise buyers can review the code for security audits, which reduces procurement friction. On the other hand, the open core model creates a floor for what enterprise buyers expect to get for free, which can complicate pricing conversations."},
+  {"q":"What happens if a large company forks my open source product?","a":"They are legally permitted to do so if the license allows. AWS forking Elasticsearch was a high-profile example that led Elastic to change their license. Choose your license with awareness that large cloud providers may build hosted versions of your software."},
+  {"q":"Should I open source just to attract developer hiring?","a":"A public GitHub with quality code does help with hiring. But that benefit applies whether you open source your product or just have a public portfolio. Consider publishing separate open source tools or libraries rather than the product itself to get the hiring signal without the competitive exposure."}
+]
+---
+
+# Should You Open Source Your Product? A Strategic Read
+
+**Open sourcing a product means making the source code publicly available, inviting external contributions, and accepting that anyone can read, copy, or fork what you built. It is a distribution strategy, a trust signal, and a competitive positioning decision simultaneously. Open source accelerates adoption for developer tools and infrastructure. It often kills monetization for products where the software itself is the value, not the service or data around it.**
+
+## What you need to know
+
+- Open source works best when the software is a tool or platform that others build on, not when the software is the end product itself
+- The open core model (free community version, paid enterprise version with extra features) is the standard commercialization pattern and works for a specific category of products
+- Open sourcing your codebase makes your architecture and implementation visible to every competitor; assess that exposure honestly
+- The contribution flywheel (more users contribute improvements, which attract more users) is real but takes years to develop and requires active community maintenance
+- Going from closed to open source is a one-way door in practice; going from open to closed triggers significant community backlash
+
+## The core argument
+
+The decision to open source is not primarily a technical decision. It is a go-to-market decision. The companies that benefit most from open sourcing their code are ones where distribution is the constraint, not the product itself. Developer tools, infrastructure software, databases, frameworks: these categories have benefited enormously from open source because the more developers use them, the more developers contribute, and the more companies end up paying for the hosted or enterprise version.
+
+The companies that should not open source are ones where the software is the product and there is no clear open core model. If your competitive advantage is the code itself and not the network, data, or service you wrap around it, open sourcing hands that advantage to everyone who can spin up a competing instance. I know founders who open sourced their products thinking it would accelerate distribution and instead gave a well-funded competitor the architecture they needed to catch up in months.
+
+The honest question is: what is your actual moat? If it is the code, keep it closed. If it is the data your users generate, the network effects on your platform, the support and compliance layer you wrap around the product, or the integrations you have built, then open sourcing the underlying software might actually strengthen those moats by removing the distribution friction.
+
+For Nexli, the decision was easy: closed source. The competitive advantage is in the specific workflows, the local education compliance requirements built into the system, and the integrations with Indian education administration. Open sourcing the code would expose those decisions to every competitor in the space without giving Nexli a meaningful distribution benefit. The users are schools, not developers.
+
+## Common mistakes
+
+1. **Open sourcing to get contributions before the product is mature.** A new codebase with poor documentation, unclear architecture, and no tests will not attract quality contributors. It will attract issue spam and questions the team has to answer.
+
+2. **Choosing an open source license without legal review.** GPL, MIT, Apache 2.0, AGPL, BSL: these licenses have very different implications for commercial use, forking, and the obligations of users. Pick the wrong one and you either give away too much or create friction for enterprise adoption.
+
+3. **Expecting open source to replace marketing.** Putting code on GitHub does not create distribution. Distribution still requires developer community engagement, documentation, examples, conference talks, and content. Open source removes one barrier; it does not remove the work of building an audience.
+
+4. **Not budgeting for community maintenance.** A public repository generates issues, pull requests, and questions. If no one from your team is dedicated to responding, the community experience becomes a negative signal rather than a positive one.
+
+5. **Open sourcing as a defense against competition.** "If we open source, they cannot copy us" is flawed reasoning. A competitor with resources can fork your open source code, improve it, and launch a competing product. Open source is not a defense; it is a distribution strategy.
+
+## Where to start
+
+1. **Define what the open source license would and would not allow.** Read the OSI-approved license options. For developer tools with a commercial version, the AGPL or the Business Source License are common choices that limit competitor usage of the cloud service without restricting individual use.
+
+2. **Assess your moat honestly.** Write down the three things that make your product defensible. If any of them are the codebase itself, that is your signal to stay closed or use a more restrictive license.
+
+3. **Start with a component, not the whole product.** Many companies open source libraries, SDKs, or specific modules while keeping the core product closed. This builds community goodwill and attracts developers to the ecosystem without exposing the entire competitive surface.
+
+## Related reading
+
+- [Build vs Buy vs Partner: A Founder Decision Tree](/blog/build-vs-buy-vs-partner-a-founder-decision-tree)
+- [The Decision to Build a Second Product](/blog/the-decision-to-build-a-second-product)
+- [Engineer LinkedIn Profiles That Actually Convert Recruiters](/blog/engineer-linkedin-profiles-that-actually-convert-recruiters)
+- [The Decision to Productize a Service](/blog/the-decision-to-productize-a-service)

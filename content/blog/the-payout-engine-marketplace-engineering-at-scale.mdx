@@ -1,0 +1,122 @@
+---
+slug: "the-payout-engine-marketplace-engineering-at-scale"
+title: "The Payout Engine: Marketplace Engineering at Scale"
+excerpt: "Working notes on the payout engine: marketplace engineering at scale. Written for founders, engineers, and operators who want a clear read on business automation and ops from someone who has shipped the work."
+date: "2026-04-01"
+category: "Business Automation and Ops"
+tags: ["automation","operations","internal-tools"]
+readingMinutes: 13
+ogImage: "/api/og/blog/the-payout-engine-marketplace-engineering-at-scale"
+status: "published"
+definition: "A payout engine is the system that collects money from buyers, holds it during a transaction, and releases it to sellers or service providers on a defined schedule minus the platform fee. In marketplaces with any meaningful volume, this system needs to be idempotent, auditable, and resilient to partial failures. Getting it right early saves months of painful remediation later."
+faq: [
+  {"q":"What is the difference between Stripe Connect Standard, Express, and Custom for marketplace payouts?","a":"Standard gives the most control to the connected account holder. Express gives the platform more control over onboarding and branding but the connected account still manages their own dashboard. Custom gives the platform full control including the UI and communication with the seller. The tradeoff is compliance burden. Custom requires the platform to handle KYC and AML obligations that Stripe manages on Standard and Express accounts."},
+  {"q":"How do I handle payout failures when a seller's bank account is invalid or closed?","a":"Build an explicit failure state in your payout records. Retry once after 24 hours with a notification to the seller. If the retry fails, hold the funds in the seller's platform balance and alert them to update their account details. Never silently drop payout failures. The seller will notice, and the support cost of explaining where their money went is much higher than building the failure state correctly."},
+  {"q":"What is idempotency and why does it matter for payout systems?","a":"Idempotency means that running the same operation multiple times produces the same result as running it once. In payout systems this matters because network failures and retries are routine. If your payout job does not track which payouts have been initiated, a retry after a partial failure can send money twice. This is expensive to reconcile and damaging to trust."},
+  {"q":"How do I handle multi-currency payouts in a marketplace operating in more than one country?","a":"Stripe Connect handles currency conversion between the platform account and connected accounts. The complexity is in how you display fees and how you reconcile. Keep books in a single base currency internally. Convert at payout time using the provider's rate. Store the exchange rate used with every payout record. Auditors and sellers will ask for it."},
+  {"q":"When should I build a custom payout engine versus using Stripe Connect or a similar managed service?","a":"Use managed services until volume forces you out of them. Stripe Connect handles the compliance, KYC, and bank connectivity that would take a team many months to build. The cost at scale is real, roughly 0.25 percent per payout plus any international fees. The break-even for building custom infrastructure is typically in the tens of millions of dollars in annual payout volume."},
+  {"q":"How should I structure payout schedules for a marketplace with sellers who have different preferences?","a":"Offer a small number of standard options: daily, weekly, or monthly. Let sellers choose but default to weekly. Daily payouts increase operational complexity and cost without proportionally increasing seller satisfaction for most marketplace types. Monthly payouts improve float but reduce seller trust. Weekly is the default that works for most marketplaces."},
+  {"q":"What compliance requirements do I need to think about when processing payouts to sellers in different countries?","a":"At minimum: KYC and identity verification for sellers above reporting thresholds, AML screening, 1099-K reporting for US sellers above the IRS threshold, and VAT compliance in Europe. Stripe handles most of this on Standard and Express accounts. On Custom accounts it is your responsibility. Get a lawyer familiar with payments regulation in each market before you launch."}
+]
+---
+
+## What you actually need to know
+
+- Build idempotent payout jobs from the start. Retries happen. Double payouts are catastrophic.
+- Stripe Connect covers the compliance burden on Standard and Express. Custom shifts it to you.
+- Every payout record needs a clear state machine: pending, initiated, succeeded, failed.
+- Payout failures need an explicit user-facing path. Silently failing is not an option.
+- Multi-currency adds complexity at every layer. Design for it early even if you launch single currency.
+
+| Provider | Best for | Fee structure | Compliance handling |
+|---|---|---|---|
+| Stripe Connect | Most marketplaces at any stage | 0.25% per payout + card fees | High on Standard/Express |
+| Adyen Marketplace | Enterprise volume, complex splits | Custom pricing above threshold | High, more configurable |
+| Mangopay | EU-focused marketplaces | Flat fee plus percentage | Strong EU compliance stack |
+| Payoneer | Cross-border freelancer payments | Fixed fees per transfer | Handles mass payouts globally |
+
+## The core argument
+
+Marketplace founders underestimate the payout engine until they ship one. The inbound payment is straightforward. Stripe, a checkout form, a webhook. The payout side is where the complexity lives. You are moving money to multiple parties, on different schedules, in potentially different currencies, subject to different compliance obligations, while the platform takes a fee in the middle.
+
+The naive version is a cron job that pulls unsettled balances and fires transfers. It works until it does not. A network failure mid-run, a bank account that has been closed, a payout that was double-initiated because the job retried after a timeout. Each of these produces a support ticket that takes hours to resolve. At volume they produce legal exposure.
+
+The right version is a small state machine. Each payout has a status. The job that initiates payouts only picks up records in the correct state. The job that marks payouts as succeeded only processes the webhook once, regardless of how many times it fires. The job that handles failures creates a user-visible state and sends a notification. None of this is architecturally complex. It just requires writing it down before writing the code.
+
+I have helped build and audit payout engines for three marketplace clients. The pattern that fails is always the same. The team builds the happy path first, ships it, and deals with the edge cases reactively when they surface in production. The edge cases always surface. Building the state machine first is about two weeks of extra work. Retrofitting it after things go wrong in production is much more.
+
+## Designing the state machine
+
+### Payout record states
+
+Every payout record in your database should have one of these states: pending, scheduled, initiated, succeeded, failed, or held. Pending means the funds have cleared but payout has not been scheduled. Scheduled means the payout is queued for the next batch. Initiated means the API call to the payment processor has been made. Succeeded means the processor confirmed delivery. Failed means the processor returned an error. Held means the payout is paused because the seller needs to update their account.
+
+### Idempotency keys
+
+Every API call to initiate a payout should include an idempotency key derived from the payout record ID. If the job retries after a timeout, the processor will return the same result for the same key rather than creating a second transfer. Stripe supports this natively. Use it.
+
+### Webhook handling
+
+The confirmation that a payout succeeded comes via webhook. Process each webhook event once. Store the event ID. If the same event arrives twice, return 200 and skip processing. The duplication happens more than you expect.
+
+### Fee calculation
+
+Calculate the platform fee before the payout, not at the payout. Store the gross amount, the fee amount, and the net payout amount on every record. This is what you need for reconciliation, for tax reporting, and for the seller's earnings statement.
+
+## How much does it cost
+
+| Volume per month | Stripe Connect cost | Engineering cost to build | Time to build |
+|---|---|---|---|
+| Under 50k USD | 0.25% plus card fees | Low, shared with billing work | 2 to 4 weeks |
+| 50k to 500k USD | 0.25% plus card fees | Medium, state machine required | 4 to 8 weeks |
+| 500k to 5M USD | Negotiable | High, reconciliation tooling needed | 3 to 6 months |
+| Above 5M USD | Custom agreement | Very high, potentially custom infra | 6 to 18 months |
+
+## What the payout engine must handle
+
+- Idempotent payout initiation with idempotency keys on every API call.
+- Explicit failure states with seller-facing notifications and a path to resolution.
+- Scheduled payout batches that are atomic or resumable on failure.
+- Reconciliation reports that match internal records to processor records.
+- Audit log of every state transition on every payout record.
+- Multi-currency support with exchange rate stored per payout.
+- Held funds handling for KYC holds, disputes, or seller account issues.
+- 1099-K and equivalent tax reporting records for each seller.
+
+## Expert opinion
+
+> The founders who build the payout engine correctly the first time treat it like a financial system, not a feature. A feature ships and iterates. A financial system has invariants that cannot be violated by a bug. The state machine is the invariant. It is not optional and it is not something you retrofit cleanly after the fact. Build it before you have volume that depends on it working.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A two-sided services marketplace client came to me with a payout problem six months after launch. Their payout cron job had a race condition under load. Two instances of the job ran simultaneously during a brief infrastructure incident. Roughly thirty sellers received duplicate payouts totaling about 14,000 USD. No state machine. No idempotency keys. No duplicate detection on the webhook handler.
+
+The immediate fix was a database-level lock on the payout job and deduplication on the webhook handler. The proper fix took three weeks: a full state machine rebuild, idempotency keys on every Stripe API call, a reconciliation script that compared internal records to Stripe's transfer log, and an ops dashboard showing payout status per seller.
+
+The 14,000 USD was recoverable because the sellers were generally cooperative and the amounts per seller were small. The cost in engineer time and trust was not recoverable. Two sellers churned. The rebuild cost about four weeks of senior engineer time that was not in the roadmap.
+
+For more on the broader engineering context, see [why your saas should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one) and [building an operations stack without an operations team](/blog/building-an-operations-stack-without-an-operations-team).
+
+## Common mistakes
+
+1. No idempotency keys on payout API calls. Retries produce duplicate transfers.
+2. Silently failing payouts. The seller notices eventually, and then it is a support crisis.
+3. No explicit failed state. The payout just disappears from the queue.
+4. Fee calculation at payout time from live data. The fee should be locked at the time of the transaction.
+5. Webhook processing without deduplication. Processors retry. Process each event once.
+6. Storing only the net payout amount. You need gross, fee, and net for every record.
+7. Not testing partial failure scenarios. Run the payout job and kill it mid-batch in staging.
+8. Launching multi-currency without storing the exchange rate used. Reconciliation becomes impossible.
+
+## A 6 week plan
+
+1. **Week one.** Define the state machine. Draw it. Get sign-off from the team before writing code.
+2. **Week two.** Build the payout record schema with all states. Write the job that transitions pending to scheduled.
+3. **Week three.** Build the initiation job with idempotency keys. Build the webhook handler with deduplication.
+4. **Week four.** Build the failure state, seller notification, and the held state for KYC or account issues.
+5. **Week five.** Build the reconciliation report. Verify it matches Stripe's transfer log in staging.
+6. **Week six.** Load test the payout job with simulated concurrent runs. Verify the lock holds.
+
+For more on the engineering patterns that make this work reliably, read [webhooks the reliable pattern that most companies get wrong](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong) and [the subscription billing stack in 2026](/blog/the-subscription-billing-stack-in-2026).

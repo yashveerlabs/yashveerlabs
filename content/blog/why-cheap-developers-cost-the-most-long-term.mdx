@@ -1,0 +1,117 @@
+---
+slug: "why-cheap-developers-cost-the-most-long-term"
+title: "Why \"Cheap\" Developers Cost the Most Long Term"
+excerpt: "The developer who charges half the rate of the senior engineer rarely delivers half the result. More often they deliver a third of the result and leave the cleanup bill for the next person. Here is the math that founders rarely run before they hire."
+date: "2024-07-26"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing"]
+readingMinutes: 11
+ogImage: "/api/og/blog/why-cheap-developers-cost-the-most-long-term"
+status: "published"
+definition: "A cheap developer costs the most long term because the code they produce requires more time to maintain, more time to extend, and eventually a rewrite that costs more than the original build. I track this pattern across the projects I have worked on and the number is consistent: the cleanup cost of a cheap build is between one point five and three times the original cost."
+faq: [
+  {"q":"why do cheap developers end up costing more than experienced developers","a":"Because the cost of a developer is not the hourly rate. It is the hourly rate multiplied by the hours required to reach the desired outcome. A developer who charges half the rate but takes three times as long to produce maintainable code is fifty percent more expensive. Add the cleanup and maintenance overhead and the total cost is typically higher than a senior engineer at market rate."},
+  {"q":"how do I know if a developer is actually cheaper or just appears cheaper","a":"Run the total cost calculation. Take their hourly rate and multiply it by the estimated hours. Then add a maintenance multiplier. A clean codebase from a senior engineer costs roughly ten percent of build cost per year to maintain. A messy codebase from a junior or underskilled engineer costs twenty to forty percent per year. The maintenance delta compounds every year."},
+  {"q":"what are the warning signs that a developer's work will be expensive to maintain","a":"No test suite. Variable naming that is not descriptive. No error handling. Direct database queries scattered across the codebase rather than in a data layer. No logging. Dependencies that are outdated at the time of delivery. A codebase that only the original developer can navigate. Any two of these together are a signal of high future maintenance cost."},
+  {"q":"is offshore development actually cheaper when you account for total cost","a":"Sometimes yes. Sometimes no. The rate difference is real. The overhead of communication, time zone management, and quality review is also real. For well defined projects with clear specs, offshore can reduce cost by thirty to fifty percent. For exploratory or rapidly evolving products, the coordination cost often closes the gap. The answer depends on the project type."},
+  {"q":"what is the real cost of a bad developer hire for a startup","a":"The direct cost is the salary or contract payment for the period of poor output. The indirect cost is the cleanup work, the delayed launch, the customers who did not get a working product, and the morale impact on the rest of the team. For early stage startups, a bad technical hire can set the product back six to twelve months. That cost is not visible in the invoice."},
+  {"q":"how do I evaluate a developer's quality before I hire them","a":"Ask for a sample of recent code. Look for the warning signs above. Ask about their approach to testing. Ask how they handle a failing third party API. Ask what they would do differently on a past project. The answers to these questions tell you more than a portfolio of screenshots. Screenshots are the surface. Code is the cost."},
+  {"q":"when is a junior or lower cost developer actually the right choice","a":"For well defined, low complexity tasks where the output is easy to review. For work where a senior engineer can review every pull request before it merges. For tasks where the cost of a mistake is low and the timeline is flexible. For these scenarios a junior engineer at lower cost can be a genuinely good choice. For anything that will carry significant maintenance cost or business risk, the math typically favors a senior engineer."}
+]
+---
+
+## What you actually need to know
+
+- Developer cost is not the hourly rate. It is the hourly rate multiplied by the hours required to produce a usable, maintainable result.
+- Maintenance cost is where the real difference between cheap and senior developers shows up.
+- A messy codebase costs between twenty and forty percent of build cost per year to maintain. A clean one costs ten to fifteen percent.
+- The cleanup cost when a cheap developer's work has to be redone is typically one point five to three times the original build cost.
+- In my experience, the founders who run this math before hiring almost always change their decision.
+
+| Developer type | Hourly rate | Hours to same outcome | Annual maintenance cost | 3 year total cost (60k project equivalent) |
+|---|---|---|---|---|
+| Junior or low cost | 30 to 50 USD | 1.5 to 2x senior | 20 to 40 percent of build | 200k to 300k+ |
+| Mid level | 60 to 90 USD | 1.1 to 1.3x senior | 15 to 20 percent of build | 120k to 160k |
+| Senior at market rate | 100 to 150 USD | 1x baseline | 10 to 15 percent of build | 90k to 110k |
+| Offshore senior | 40 to 70 USD | 1.1 to 1.5x with coordination overhead | 12 to 18 percent of build | 100k to 130k |
+
+## The core argument
+
+The comparison founders make when evaluating developers is almost always the hourly rate or the project quote. Forty dollars per hour versus one hundred and twenty dollars per hour. That is a three to one ratio. For a founder watching a budget, the lower number is compelling.
+
+The comparison that matters is the total cost of ownership over the product's lifetime. The forty dollar developer will take longer to produce the same feature. The code they produce will be harder to maintain, harder to extend, and more likely to require partial or full rewrite. The developer who inherits their work will bill more hours to understand it. The security vulnerabilities they leave in will cost more to fix than they would have cost to prevent.
+
+I have taken over codebases from low cost developers on multiple occasions. The work is always present. The screens exist. The features nominally function. What is absent is the infrastructure that makes the code sustainable. No test suite. No consistent data layer. No error handling. No logging. Queries embedded directly in controllers. Global state managed through side effects. These are not cosmetic problems. They are expensive problems.
+
+The founder who hired the forty dollar developer paid forty dollars per hour. The founder who pays me to clean up the work pays one hundred and twenty dollars per hour, for more hours, to fix something that already exists. The total cost of the cheap developer choice is the original cost plus the cleanup cost plus the difference in maintenance overhead over the product's lifetime. That total is almost always higher than a senior developer at market rate would have charged for the original build.
+
+This is not an argument that every project needs a senior developer. It is an argument that the calculation founders should run before hiring is not the hourly rate. It is the total cost of ownership, and that calculation reliably produces a different answer.
+
+## Why the cost compounds
+
+### Test debt
+
+A codebase without tests requires manual verification of every change. Every feature addition takes longer because the developer cannot confirm that the change did not break something else. Every bug fix is riskier. The time cost of missing tests is roughly ten to twenty percent overhead on every subsequent piece of work. Over twelve months of active development, that overhead compounds to significant cost.
+
+### Architecture debt
+
+A flat, coupled architecture means that adding features requires touching more code in more places. A well factored architecture means that adding features requires touching a small, defined set of code. The difference in development speed between the two grows as the product grows. At month three, it is minor. At month eighteen, it is substantial.
+
+### Knowledge concentration
+
+When only the original developer understands the codebase, every change requires that developer. Replacing them is expensive because the incoming developer needs weeks to understand what was built and how. A well documented, consistently structured codebase is one that any competent developer can navigate. The cheap developer rarely builds the second kind.
+
+## How much does it cost
+
+| Scenario | Initial cheap build | Year 1 maintenance | Cleanup or rebuild in year 2 | 3 year total |
+|---|---|---|---|---|
+| Simple CRUD app | 10k cheap | 3k to 5k | 8k to 15k cleanup | 21k to 30k |
+| Same app, senior build | 18k to 25k | 2k to 4k | None required | 22k to 33k |
+| SaaS with integrations | 25k cheap | 8k to 15k | 20k to 40k cleanup | 53k to 80k |
+| Same SaaS, senior build | 45k to 70k | 5k to 10k | None required | 50k to 80k |
+
+The numbers converge. The cheap build and the senior build often cost about the same over three years. The difference is that the senior build's cost is predictable and front loaded. The cheap build's cost is unpredictable and back loaded, and the back loaded portion comes at the worst time.
+
+## What to look for in a developer's work before hiring
+
+- An existing codebase to review, not just a portfolio of screenshots.
+- Evidence of a test suite. Not perfect coverage. Meaningful coverage of the core logic.
+- Consistent naming and structure. Code that a stranger can read.
+- A clear data layer. Database queries in one place, not scattered.
+- Error handling. What happens when the third party API fails.
+- Documentation. At minimum, a README that tells the next developer what they are looking at.
+
+## Expert opinion
+
+> I stopped quoting against low cost developers by defending my rate. Instead I show the three year total cost calculation. The numbers usually make the argument without my help. The founder who sees the calculation and still chooses the cheaper developer is making a deliberate bet that the cheap developer's work will not require cleanup. Sometimes that bet pays off. More often it does not. The bet is fine. The problem is when it is not recognized as a bet.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder built a SaaS on a marketplace platform using a developer who charged thirty five dollars per hour. The initial build took four months and cost fourteen thousand dollars. The product launched and worked. Six months later, a feature addition that should have taken two weeks took eight weeks because the architecture did not support it cleanly. A security audit found three significant vulnerabilities in the authentication layer that required a full rewrite of that subsystem. The original developer was unavailable for the rewrite.
+
+I was brought in at month ten. The cleanup took six weeks at my rate. The rewrite of the authentication layer took another three weeks. Total cleanup cost: twenty six thousand dollars. Added to the original fourteen thousand, the total was forty thousand dollars. A senior engineer at market rate would have charged twenty eight to thirty five thousand for the original build, with an architecture that would not have required the cleanup and with a security posture that would have passed the audit.
+
+The founder paid more. They paid it later, at a worse time, under pressure. The choice was rational given the information they had at the time. It was expensive given the information they did not have.
+
+For more on how to evaluate costs before committing, see [why your software quote is different from mine a pricing postmortem](/blog/why-your-software-quote-is-different-from-mine-a-pricing-postmortem) and [the true cost of hiring offshore a transparent breakdown](/blog/the-true-cost-of-hiring-offshore-a-transparent-breakdown).
+
+## Common mistakes
+
+1. Comparing hourly rates without running the total cost of ownership calculation.
+2. Reviewing only the portfolio screenshots, not the code.
+3. Not asking about the test approach before hiring.
+4. Assuming a low rate reflects market conditions rather than skill level.
+5. No code review checkpoint during the project. The time to catch problems is during the build, not after.
+6. Hiring for the MVP only without considering who maintains the codebase after launch.
+7. No handoff documentation requirement in the contract. The next developer needs it.
+
+## A 30 day plan
+
+1. **Week one.** Run the total cost of ownership calculation for any developer you are considering. Use the maintenance multipliers above. The number that changes the comparison is the three year total, not the hourly rate.
+2. **Week two.** Request a code sample from any developer you are seriously considering. If they do not have one to share, ask for a small paid test task. Review the sample against the warning signs list above.
+3. **Week three.** Define what quality looks like in the contract. Test coverage requirements. Code review process. Documentation requirements. These are negotiable if you raise them before signing.
+4. **Week four.** Schedule a mid project code review checkpoint at the three month mark. The earlier you catch a quality problem, the cheaper it is to fix.
+
+For context on how developer quality affects the longer term cost picture, see [app maintenance cost a five year forecast model](/blog/app-maintenance-cost-a-five-year-forecast-model) and [why some developers cost three times more and when they are worth it](/blog/why-some-developers-cost-three-times-more-and-when-they-are-worth-it).

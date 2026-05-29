@@ -1,0 +1,92 @@
+---
+slug: "the-founder-coding-habit-that-killed-velocity"
+title: "The Founder Coding Habit That Killed Velocity"
+excerpt: "The specific ways that founders who code in their own product slow the engineering team down -- and the discipline required to stop doing it."
+date: "2026-03-09"
+category: "Startup Failure Postmortems and Fear"
+tags: ["postmortem","failure","founders","engineering-teams","velocity"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-founder-coding-habit-that-killed-velocity"
+status: "published"
+definition: "Founders who code in their own product after hiring a development team create a specific category of velocity problems: unreviewed changes that break conventions, direct production deployments that bypass the development process, and context switching that pulls engineers away from planned work. The pattern is well-intentioned -- the founder is technically capable and wants to contribute -- but the damage to engineering velocity and team morale consistently exceeds the value of the contribution."
+faq: [
+  {"q":"Is it always wrong for a founder to code in their own product?","a":"No. In the pre-team stage, the founder should be the primary engineer. The problem begins when the founder continues to code in production systems after hiring engineers to own those systems. The specific failures: bypassing the code review process, pushing direct to production, and making architectural decisions in code without team discussion."},
+  {"q":"What is the most common way founder coding damages engineering velocity?","a":"Unreviewed code that violates team conventions. When a founder pushes code directly without review, the engineers who maintain that code later encounter something that does not follow the patterns they established. Understanding and working around unreviewed founder code adds cognitive load to every subsequent change in that area."},
+  {"q":"How do founders who code justify the behavior?","a":"Usually with 'it was faster this way' or 'I just needed to test something' or 'it is my product and I understand it best.' All of these are true in the short term. In the medium term, the bypassed processes exist because they catch categories of problems that the founder's one-time change creates. The short-term speed gains are paid back in debugging and rework."},
+  {"q":"What is the right role for a technical founder after hiring engineers?","a":"Architecture decisions (with the team), requirements clarity (specifying behavior precisely so engineers can build it), code review (reading and commenting, not necessarily approving), and prototype spikes (standalone explorations that are never merged to production). The founder as prototyper -- not as a committer to the main branch."},
+  {"q":"How do I tell a founder that their coding habits are slowing the team down?","a":"Directly, with data. Show the specific pull requests where founder code was merged without review and the subsequent changes required to fix issues introduced. Show the incidents that originated in code pushed directly to production. The conversation is easier when it is grounded in specific events rather than general process arguments."}
+]
+---
+
+## What you actually need to know
+
+- Founder coding is not inherently damaging. Direct commits to production by a founder who has hired engineers to own the codebase are.
+- The damage is not always visible. Unreviewed code that works is still unreviewed code -- it sets a precedent and introduces subtle convention violations that compound.
+- The founder who pushes directly to production once teaches the team that the deployment process is optional for some people. The cultural damage outlasts the specific change.
+- The right frame is not "founders should not code." It is "code that goes to production should go through the same process regardless of who wrote it."
+- The technical founder's highest-leverage contribution after hiring engineers is architecture review and requirements clarity, not direct commits to the main branch.
+
+| Founder Coding Pattern | Short-Term Result | Long-Term Damage | Recovery |
+|---|---|---|---|
+| Direct push to main | Fast change | Skipped review, broken conventions | Code review required retroactively |
+| Production hotfix without review | Immediate fix | Untracked change, potential regression | Must be re-reviewed and possibly reverted |
+| Architecture changes in code | Fast prototype | Team inherits unilateral decisions | Refactoring or team alignment work |
+| Bypassing CI pipeline | Faster deploy | Unknown test status, unreliable signal | Trust in CI degraded |
+| Adding dependencies without review | New capability | Security and maintenance debt | Dependency audit |
+
+## The core argument
+
+The founder who hired engineers but still pushes directly to the main branch is not a founder who codes -- they are a rogue contributor to their own team. The word "rogue" is not hyperbole. The development process -- code review, CI, staging deployment, production deployment -- exists to catch errors before they reach users. When the founder bypasses that process because "it is faster," they are betting the team's reliability record on their own ability to catch their own errors. Developers who review their own code are worse at catching errors than reviewers who did not write the code. This is not a character flaw; it is how human cognition works.
+
+The pattern I have seen most often: a technical founder hires a small engineering team, continues to make small changes directly to the main branch "just to keep things moving," and eventually creates a codebase where there is the team's code and the founder's code. The team's code follows the conventions, has tests, and was reviewed. The founder's code follows whatever the founder was thinking that day, may or may not have tests, and was never reviewed. Maintaining the founder's code is harder than maintaining the team's code because it does not follow predictable patterns.
+
+On a project I was brought in to assess, the founder's direct commits made up about 15 percent of the codebase by file count. Those files accounted for 60 percent of the bugs reported in the previous quarter. Not because the founder was a bad engineer -- they were technically capable -- but because their code had never been through the review process that catches the categories of errors the team had learned to catch for each other.
+
+## The velocity math
+
+The founder who pushes a change directly because "it would take too long to open a PR" is correct about the immediate comparison: pushing directly is faster than opening a PR, waiting for review, addressing comments, and merging. If that were the only effect, the math would favor direct pushes.
+
+But the comparison ignores the probability-weighted cost of the review process's value. A code review catches, on average, some percentage of errors. If that percentage is 30 percent (conservative for a team that reviews carefully), the founder who skips ten reviews saves 10 review cycles but accepts a 30 percent higher defect rate in those changes. When those defects reach production, the debugging time, the incident response, and the customer impact cost more than the ten reviews would have.
+
+The founder who bypasses the deployment pipeline because "I just need to push this one fix" creates a different problem. The CI pipeline catches integration failures -- cases where the new code breaks something that was passing before. The pipeline run takes 15 minutes. The production incident caused by a skipped run can take hours to diagnose and fix. The 15 minutes was not a waste; it was an insurance premium.
+
+## The architecture unilateralism problem
+
+The most damaging form of founder coding is the architectural decision made in code without discussion. The founder who wakes up at 6am, has an idea about how the authentication system should work, and implements it before the team arrives has made a decision that everyone who works in the authentication system must now live with. The decision may be correct. But the team that did not participate in the decision must reverse-engineer the reasoning, cannot push back on the approach because the code is already written, and inherits the decision's implications regardless of whether they agree with them.
+
+Engineering teams that work well have a norm: significant architectural changes are discussed before they are implemented, not after. The founder who writes architecture in code and presents it as a fait accompli undermines this norm. The engineers who disagree with the architectural choice have two options: push back on already-written code (which triggers defensiveness and is socially expensive) or accept a decision they do not agree with and maintain it. Neither option is good for team culture or for code quality.
+
+The right process for a founder who has an architectural idea: bring it to the team as a proposal. Write it up, present the tradeoffs, invite pushback. If the team has strong objections, the founder's unilateral authority does not make the architecture right -- it just makes it uncontestable. Architecture decisions that are contested and resolved through discussion are better than architecture decisions that are uncontestable.
+
+## The direct production push problem
+
+The most immediately damaging founder coding habit is pushing directly to production without going through staging. Every startup has experienced a production incident that originated in a change that "only touches the frontend" or "just changes a text string" or "is such a small change it couldn't possibly break anything." The production environment has dependencies, integrations, and usage patterns that staging does not perfectly replicate. Changes that work in staging sometimes fail in production for reasons that are only discoverable in production.
+
+The deployment process exists to make production changes traceable, reviewable, and rollbackable. When a founder pushes directly to production, the change may work, but it is untraceable (no deployment record), unreviewed (no PR), and may be difficult to roll back (depending on the deployment tooling). The next incident response starts from a worse position because the change history is incomplete.
+
+## Common mistakes founders make when they code in their own product
+
+1. Treating code review as optional for changes they are confident in. Confidence in one's own code is the exact condition under which self-review is least reliable.
+2. Using production as a testing environment. "Let me just push it and see if it works" is a statement that production users are the test environment.
+3. Adding dependencies without security review. Third-party packages are a common attack vector. The founder who adds a dependency without review because it solves a quick problem introduces a dependency that may have known vulnerabilities.
+4. Making architecture decisions in code rather than in design documents. Written proposals can be reviewed before implementation. Code cannot.
+5. Not reverting when a direct push causes a problem. The founder who causes a production incident by pushing directly and then fixes it with another direct push has now made the incident twice as hard to understand.
+
+## Where to start: a 3-step founder coding reform
+
+**Step 1: Add a branch protection rule to the main branch that requires at least one review before merge.** This is a two-minute configuration change in GitHub or GitLab. It makes the bypass behavior explicit -- the founder who bypasses it must explicitly override the rule, which creates a moment of friction that often prevents the bypass.
+
+**Step 2: Define a specific scope for founder code contributions.** The clearest scope: prototype branches that are never merged to production and documented spikes that inform architectural decisions. The founder can build anything they want in a branch labeled `prototype/` -- none of it goes to production without the review process.
+
+**Step 3: In the next engineering retrospective, name the founder coding habits that are causing problems.** The retrospective is the right venue because it is a team conversation about process, not a personal confrontation. Specific examples (the incident from two weeks ago that originated in a direct push) ground the conversation in real impact rather than abstract process arguments.
+
+## The Discipline That Enables the Team
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The discipline that enabled the engineering teams I have worked with most effectively is the founder who stayed in the architecture and requirements lane and left the implementation lane to the team. I have worked with founders who coded constantly in production -- the engagement was marked by rework cycles, convention drift, and engineers who felt their work was provisional. I have worked with founders who channeled their technical energy into excellent specifications and architecture proposals -- the engagement moved faster and the codebase stayed cleaner. The technical founders who help their teams most are the ones who have learned where their contribution is highest leverage.
+
+## Related reading
+
+- [The Engineering Decision That Killed the Company](/blog/the-engineering-decision-that-killed-the-company)
+- [The First Engineering Manager: When and How to Hire](/blog/the-first-engineering-manager-when-and-how-to-hire)
+- [The Founder-Developer Communication Loop: A Weekly Cadence](/blog/the-founder-developer-communication-loop-a-weekly-cadence)
+- [The Five Architectural Failures That Killed Startups I Worked With](/blog/the-five-architectural-failures-that-killed-startups-i-worked-with)

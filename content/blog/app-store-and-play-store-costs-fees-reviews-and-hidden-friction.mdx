@@ -1,0 +1,112 @@
+---
+slug: "app-store-and-play-store-costs-fees-reviews-and-hidden-friction"
+title: "App Store and Play Store Costs: Fees, Reviews, and Hidden Friction"
+excerpt: "The thirty percent fee gets all the attention. The other costs of distributing through Apple and Google are equally real and far less discussed. Here is the honest list."
+date: "2026-05-18"
+category: "Software Costs and Budgeting"
+tags: ["mobile","cost","app-store","ios","android"]
+readingMinutes: 11
+ogImage: "/api/og/blog/app-store-and-play-store-costs-fees-reviews-and-hidden-friction"
+status: "published"
+definition: "Distributing a mobile app through Apple and Google has visible costs and hidden costs. The visible costs are the developer account fees and the commission on in app purchases. The hidden costs are the time spent on review, the engineering for compliance with platform policy, and the risk of arbitrary rejection that founders only learn about when it happens to them. A realistic budget includes all four."
+faq: [
+  {"q":"What does it cost to publish an app on the stores?","a":"Apple charges 99 dollars per year for an individual or organization developer account. Google charges a one time 25 dollar fee for a Play developer account. Those are the direct costs. The commission on in app purchases is the larger ongoing cost."},
+  {"q":"What is the current commission rate?","a":"Apple charges 30 percent on most purchases, dropping to 15 percent under the Small Business Program for developers earning under one million per year and on subscriptions in year two. Google charges 30 percent generally, dropping to 15 percent under their similar program. Recent regulatory changes in the EU and elsewhere allow alternative payment systems in some cases."},
+  {"q":"How long does app review take?","a":"Apple typically reviews in under 24 hours for established apps, longer for new submissions or apps with significant changes. Google is usually faster on first review but slower on appeals. Both can extend to days or weeks for edge cases, especially around health, finance, or content moderation."},
+  {"q":"What gets apps rejected most often?","a":"Privacy policy mismatches, payment system violations, content moderation failures, misleading descriptions, and broken core functionality during review. Apple is stricter on the first three. Google is stricter on the last two. Both reject for the same reasons, just with different frequency."},
+  {"q":"What are the hidden engineering costs?","a":"The privacy manifest on iOS. The data safety form on Android. The required disclosures for each app store update. The certificate management. The build pipeline tuning. Each of these is small individually and meaningful in aggregate."},
+  {"q":"What is the cost of a bad rejection?","a":"In time, two days to two weeks of delayed launch. In money, the marketing spend that lands on a non existent app. In team morale, real. The rejections that catch teams off guard cost more than the rejections that fit a known pattern."},
+  {"q":"Should I distribute outside the official stores?","a":"For most apps, no. The stores are where users are. Alternative distribution is viable for some niches and increasingly viable under regulatory changes, but the cost of building your own distribution channel is rarely worth it compared to playing by the store rules."}
+]
+---
+
+## What you actually need to know
+
+- Direct store fees are small. The commission on revenue is the largest ongoing cost.
+- Review timelines are usually short but unpredictable.
+- The hidden costs are compliance engineering and the operational tax of platform policy.
+- A rejection is usually fixable but always disruptive.
+- In my experience, the teams that budget for review time and policy compliance avoid most launch surprises.
+
+| Cost line | Apple | Google |
+|---|---|---|
+| Developer account | 99 USD per year | 25 USD one time |
+| Default commission | 30 percent | 30 percent |
+| Reduced commission program | 15 percent under 1M annual or subscription year 2+ | 15 percent under similar program |
+| Average review time | A few hours to a few days | A few hours to a few days |
+| Average rejection rate (first submission) | High for novice teams | Moderate |
+
+## The core argument
+
+The app store fee debate gets the attention. The thirty percent commission is real money for businesses with significant in app revenue, and the regulatory pressure on it is reshaping the economics in some jurisdictions. But that is only one of the four costs of distributing through the official stores.
+
+The second cost is review time. Apple and Google are both faster than they used to be. They are still unpredictable. A launch scheduled for Monday can slip to Wednesday because the review took longer than expected. The cost shows up in marketing burn that lands on a non existent app, and in team morale when a launch slips for reasons outside the team's control.
+
+The third cost is compliance engineering. The privacy manifest. The data safety form. The age rating questionnaire. The export compliance form. The required disclosures for each app store update. Each one is small. Cumulatively they take an experienced engineer one to three weeks per platform per year to keep current.
+
+The fourth cost is the risk of rejection. Most rejections are recoverable. Some are catastrophic. An app that gets pulled from the store after launch can lose its momentum and never recover. The teams that have lived through this know to factor it into their launch plans. The teams that have not lived through it are often surprised when it happens.
+
+The right way to budget for app store distribution is to treat it as an ongoing operational cost, not a one time onboarding fee. The numbers are predictable enough to model and large enough to matter.
+
+## Per platform notes
+
+**Apple.** Stricter on privacy and payment systems. Faster on first review for established teams. Slower on appeals when the appeal involves edge cases. Required to use Apple's payment system for most in app purchases, with exceptions for digital goods that follow specific rules and for products sold outside the app under certain reader app categories.
+
+**Google.** Slightly more lenient on first submission. Stricter on content moderation. Faster overall in 2026 than in past years. Payment system flexibility is increasing under regulatory pressure in the EU and some other markets.
+
+**Both.** Privacy disclosures are now non negotiable. The team needs an accurate, complete privacy manifest that matches what the app actually does. Mismatches between the disclosure and the runtime behavior are the largest single source of recent rejections in my experience.
+
+## What it actually costs
+
+| Line item | Annual cost for a moderately complex app |
+|---|---|
+| Apple developer account | 99 USD |
+| Google Play developer account | 25 USD one time, amortized |
+| Compliance engineering | 5k to 20k USD in engineer time |
+| Review time, delayed launches | Variable, often 2 to 8 weeks of cumulative slippage |
+| Commission on revenue | 15 to 30 percent of in app revenue |
+| Marketing waste from delayed launches | Variable, often 2 to 10 percent of marketing spend |
+
+Numbers come from my own client work. The compliance engineering line is the most often forgotten. The commission line is the most often debated. Both belong in the budget.
+
+## Features to demand from your launch plan
+
+- A privacy manifest and data safety form that match the runtime behavior of the app.
+- A documented in app purchase policy and matching implementation.
+- A buffer in the launch schedule for review time. Two weeks for first submission, one week for major updates.
+- A clean reviewer note explaining what changed and how to test the new behavior. Reviewers appreciate it.
+- A backup plan for rejection. What you change, who approves, how fast you resubmit.
+- A relationship with developer support if you are large enough to qualify. The escalation path matters when it matters.
+
+## Expert opinion
+
+> The teams that ship smoothly on the app stores are the teams that take platform policy seriously from day one. The teams that ship roughly are the teams that learned the policy details from a rejection. Both teams have the same product. The first one ships on schedule. The second one ships when Apple or Google decides.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client iOS app launch, we built the privacy manifest before the first feature was complete. We documented every data flow. We tested the disclosures against the runtime behavior. The first review took six hours. The app was approved on the first submission. Marketing went out the next morning, on schedule.
+
+The opposite story is an Android launch where the team treated the data safety form as paperwork. The form said the app collected no user identifiers. The app actually collected device IDs for analytics. Google's automated review caught the mismatch. The app was held for a week pending clarification. The marketing campaign hit a non existent app and the team had to apologize publicly. The fix was an hour of engineering. The cost was a week of delay and the morale hit of a public miss.
+
+For more on the broader topic, see [app store review hell how to survive it as a solo founder](/blog/app-store-review-hell-how-to-survive-it-as-a-solo-founder), [the mobile app privacy manifest what apple now requires](/blog/the-mobile-app-privacy-manifest-what-apple-now-requires), and [subscription apps on iOS StoreKit 2 in practice](/blog/subscription-apps-on-ios-storekit-2-in-practice).
+
+## Common mistakes teams make
+
+1. Treating the commission as the only cost.
+2. Skipping the privacy manifest. The mismatch costs more than the discipline would have.
+3. Launching with a marketing campaign that cannot be paused if review slips.
+4. No reviewer note explaining what changed. The review takes longer.
+5. Ignoring the data safety or privacy disclosures until the last week.
+6. No backup plan for rejection.
+
+## Where to start, a 60 day plan
+
+1. **Week one.** Inventory every data flow in the app. What is collected, why, where it goes.
+2. **Week two.** Build the privacy manifest on iOS and the data safety form on Android. Verify they match the runtime behavior.
+3. **Week three and four.** Test the in app purchase flow against the platform rules. Confirm the receipt validation works on both stores.
+4. **Week five and six.** Submit a beta build for review. Use TestFlight or the Play closed track. Confirm the review timeline.
+5. **Week seven and eight.** Final submission. Build in two weeks of buffer for review.
+
+For deeper reading, [the mobile app build pipeline](/blog/the-mobile-build-pipeline-fastlane-eas-and-the-path-of-least-pain) covers the engineering side of launches, and [the hidden costs of custom software development](/blog/the-hidden-costs-of-custom-software-development) covers related budget topics.

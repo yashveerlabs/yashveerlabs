@@ -1,0 +1,62 @@
+---
+slug: "message-queues-compared-sqs-kafka-rabbitmq-redis-streams"
+title: "Message Queues Compared: SQS, Kafka, RabbitMQ, Redis Streams"
+excerpt: "SQS, Kafka, RabbitMQ, and Redis Streams are all message queues, but they solve different problems at different scales. Here is how to choose the right one for your architecture without over-engineering the first version."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/message-queues-compared-sqs-kafka-rabbitmq-redis-streams"
+status: "published"
+definition: "Message queues decouple the production of work from its consumption: a producer writes a message to the queue, and a consumer reads and processes it independently. The choice between SQS, Kafka, RabbitMQ, and Redis Streams determines the delivery semantics, retention behavior, throughput ceiling, and operational complexity of your async processing infrastructure. Each tool has a different performance profile and a different use case where it is the natural fit."
+faq: [
+  {"q":"When should I use SQS instead of the other options?","a":"SQS is the right choice for AWS-native architectures where operational simplicity is a priority. It is fully managed, scales automatically, integrates natively with Lambda and other AWS services, and requires no infrastructure to operate. Use SQS when you need reliable message delivery for background jobs, email sending, and webhook processing, and when the team does not have specific requirements that SQS cannot meet."},
+  {"q":"What is Kafka's primary advantage over SQS and RabbitMQ?","a":"Kafka's primary advantages are very high throughput, durable log-based storage with configurable retention, and the ability for multiple consumer groups to independently read from the same stream. Unlike SQS where messages are deleted after consumption, Kafka retains messages for a configurable period. This allows replay, allows multiple independent consumers to process the same events, and makes Kafka the right choice for event streaming, audit logs, and data pipelines."},
+  {"q":"What is Redis Streams and when is it appropriate?","a":"Redis Streams is a data structure built into Redis that implements an append-only log with consumer group semantics. It is appropriate when you already operate Redis for caching or session storage and want to add lightweight message passing without introducing a new infrastructure component. The ceiling on message volume and retention is lower than Kafka, but for moderate-volume job queues and event streams within a single service boundary, Redis Streams is a pragmatic choice."},
+  {"q":"Why would I choose RabbitMQ over SQS?","a":"RabbitMQ provides more sophisticated routing: exchanges, bindings, and topic routing that allow messages to be routed to multiple queues based on routing keys. It is appropriate for systems that need fanout to multiple queues, dead letter exchanges with custom routing, and complex message routing logic that SQS cannot express. RabbitMQ requires infrastructure to operate, which is a cost compared to SQS, but provides more control over routing behavior."},
+  {"q":"Is Kafka overkill for a startup?","a":"For most startups, yes. Kafka requires a cluster of at least three brokers for production reliability, has significant operational overhead, and provides capabilities that most startups do not need until they are processing millions of events per day. Confluent Cloud and similar managed Kafka services reduce the operational burden but increase cost. The managed platforms like Inngest and Trigger.dev cover most startup background job requirements without introducing Kafka's complexity."}
+]
+---
+
+## What you need to know
+
+- SQS is the default choice for AWS architectures that need managed, reliable message delivery without operational overhead. Start here unless you have specific requirements it cannot meet.
+- Kafka is the right choice for high-throughput event streaming where multiple consumers need to process the same events independently, and where message retention and replay are requirements.
+- RabbitMQ provides more sophisticated routing than SQS and is appropriate for complex message routing scenarios that SQS cannot express cleanly.
+- Redis Streams is the pragmatic choice for teams already operating Redis who want a lightweight job queue without adding a new infrastructure component.
+- The complexity order from lowest to highest operational overhead is: SQS, Redis Streams, RabbitMQ, Kafka (self-hosted).
+
+## The core argument
+
+The message queue selection decision is primarily about operational complexity versus capability. SQS is a managed service: AWS runs it, scales it, and handles the operational complexity. The tradeoff is that SQS has limited routing capabilities, does not retain messages after consumption, and has a message size limit that matters for some use cases. For the majority of SaaS background job requirements, these limitations do not apply, and SQS is the pragmatic choice.
+
+Kafka enters the picture when the use case requires capabilities SQS cannot provide: high-throughput event streaming, message retention beyond delivery, or multiple independent consumers processing the same stream. These requirements are real for data-intensive products, analytics pipelines, and event sourcing architectures. They are not real for most SaaS background job use cases. The mistake is choosing Kafka because it sounds like the right enterprise architecture when the actual use case is sending email confirmations and processing webhooks. In my experience, the teams that adopt Kafka at seed stage spend six months fighting the operational complexity before they have the scale to justify it.
+
+Redis Streams occupies a useful middle ground. A product that already uses Redis for caching can add a message queue with no new infrastructure by using Redis Streams with consumer groups. The producer appends to a stream with XADD, the consumer reads with XREADGROUP, and the consumer acknowledges processed messages with XACK. The failure handling pattern is similar to SQS: unacknowledged messages can be reclaimed by other consumers after a timeout. The ceiling is lower than Kafka and the routing is simpler than RabbitMQ, but for moderate-volume queues within a service boundary, the zero-new-infrastructure advantage is significant.
+
+## Common mistakes
+
+1. **Choosing Kafka for background job processing.** Kafka is not a job queue. It is an event streaming platform. Using it for standard background job processing introduces Kafka's operational complexity without leveraging its streaming and retention capabilities. Use SQS, RabbitMQ, or a managed platform for job queues.
+
+2. **Not configuring dead letter queues on SQS.** An SQS queue without a DLQ sends messages that exceed the maximum receive count to the void. Configure a dead letter queue before processing any production messages.
+
+3. **Not planning for SQS visibility timeout.** The SQS visibility timeout determines how long a message is hidden from other consumers while being processed. If a job takes longer than the timeout, the message becomes visible again and is processed twice. Set the visibility timeout to be longer than the maximum expected job execution time.
+
+4. **Running a single Kafka broker in production.** A single Kafka broker has no fault tolerance. Kafka requires at least three brokers for production reliability. This minimum three-broker requirement is part of the operational cost that makes Kafka inappropriate for small-scale use cases.
+
+5. **Not designing for idempotency across all queue types.** All four queue systems provide at-least-once delivery under certain conditions. A consumer that receives the same message twice must handle it without corrupting data. Idempotent message handlers are a requirement regardless of which queue you use.
+
+## Where to start
+
+1. **Start with SQS if you are on AWS and do not have specific requirements that exclude it.** Create a queue with a matching DLQ, configure a visibility timeout appropriate for your job duration, and deploy a simple consumer. This takes two hours and works for most startup background job needs.
+
+2. **Evaluate Redis Streams if you already operate Redis.** If SQS is not available (non-AWS infrastructure) or if you want to minimize the number of managed services, Redis Streams covers standard job queue patterns with the Redis installation you already have.
+
+3. **Only consider Kafka when you need event streaming semantics.** If you need multiple consumer groups reading from the same stream, message replay, or high-throughput event ingestion, evaluate Confluent Cloud or MSK (Managed Streaming for Apache Kafka) before running Kafka yourself.
+
+## Related reading
+
+- [Inngest vs Trigger vs Temporal for Background Jobs](/blog/inngest-vs-trigger-vs-temporal-for-background-jobs)
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)
+- [SaaS Webhook Reliability: From At-Most-Once to At-Least-Once to Exactly-Once](/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)

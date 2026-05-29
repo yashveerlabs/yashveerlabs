@@ -1,0 +1,62 @@
+---
+slug: "push-notifications-the-architecture-most-apps-get-wrong"
+title: "Push Notifications: The Architecture Most Apps Get Wrong"
+excerpt: "Push notifications that arrive at the wrong time, with irrelevant content, or for the wrong users are worse than no notifications. Here is how to architect a push notification system that users respond to rather than disable."
+date: "2026-05-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter"]
+readingMinutes: 6
+ogImage: "/api/og/blog/push-notifications-the-architecture-most-apps-get-wrong"
+status: "published"
+definition: "Push notification architecture encompasses the server-side systems that determine when to send notifications, to whom, with what content, and through which delivery channel (FCM for Android, APNs for iOS, web push for PWAs). A well-architected push notification system stores user notification preferences, supports targeting by user attributes and behavior, tracks delivery and open rates, and respects do-not-disturb constraints. A poorly-architected system sends notifications to all users at the same time regardless of timezone, with the same content regardless of user context, and with no mechanism for users to control what they receive."
+faq: [
+  {"q":"What is the technical path for sending a push notification to an iOS device?","a":"iOS push notifications go through Apple Push Notification service (APNs). The process: the app registers for push notifications and receives a device token from APNs. The device token is sent to the app's backend and stored with the user record. When the backend wants to send a notification, it sends an HTTP/2 request to APNs with the device token, the notification content (title, body, badge count), and the authentication credentials (a JWT signed with an APNs key). APNs delivers the notification to the device. The same token is invalid after the app is uninstalled; the backend must handle token invalidation feedback from APNs."},
+  {"q":"What is the difference between FCM and APNs and do they require separate integrations?","a":"Firebase Cloud Messaging (FCM) is Google's push notification service for Android. Apple Push Notification service (APNs) is Apple's service for iOS. They are separate services with different authentication models and different message formats. Most mobile development platforms (React Native, Flutter, Expo) provide a unified push notification SDK that handles both FCM and APNs through a single API. For direct server-side integration, separate API calls are needed for Android and iOS devices. Services like OneSignal, Courier, and Knock provide a unified push notification API that abstracts the FCM/APNs difference."},
+  {"q":"What is notification fatigue and how does architecture prevent it?","a":"Notification fatigue is when users receive so many notifications from an app that they disable all notifications or uninstall the app. Architecture prevents it through: notification preferences that allow users to control which notification types they receive, frequency capping that limits how many notifications a user can receive in a time window, relevance scoring that sends notifications only when they are likely to be actionable, and delivery time optimization that sends notifications when the user is most likely to engage (not at 3am in the user's timezone)."},
+  {"q":"How should notification preferences be architected?","a":"Notification preferences should be stored at the user level, not the device level, so that preferences apply across all devices. The preference schema should have categories that match the user's mental model: 'New message received', 'Activity on your post', 'Account security alerts', not internal system categories. Users should be able to opt out of each category independently. The backend should check preferences before sending any notification. Some notification categories (security alerts, account access from new device) should not be disableable, because users need these regardless of preference."},
+  {"q":"What is rich push and when should it be used?","a":"Rich push notifications include images, action buttons, and custom UI beyond the standard title and body text. iOS supports notification content extensions for custom UI. Android supports large images, action buttons, and progress bars in notifications. Rich push increases engagement for notifications where visual context adds value: a message notification that shows the sender's avatar, a shopping app notification that shows the product image, an event reminder that shows the event location on a map. Rich push should not be used for every notification; it should be used where the additional visual content increases the notification's actionability."}
+]
+---
+
+## What you need to know
+
+- Push notifications that are irrelevant, poorly timed, or too frequent cause users to disable all notifications from the app. A disabled notification channel is worse than no notification feature.
+- User-level notification preferences (per notification category, not just on/off) are a prerequisite for a sustainable push notification strategy.
+- Timezone-aware delivery is not optional. Sending a marketing notification at 11pm in the user's timezone generates unsubscribes and app store reviews.
+- Device tokens for APNs and FCM expire and become invalid when users reinstall the app or change devices. The backend must handle token invalidation gracefully.
+- Notification delivery rates are not 100 percent. Track delivery confirmations and open rates to understand the real reach of each notification type.
+
+## The core argument
+
+Push notifications are one of the highest-value user re-engagement mechanisms available to mobile apps, and one of the most consistently misimplemented features. The implementation mistakes are predictable: notifications sent to all users simultaneously without timezone awareness, notifications sent regardless of whether the user is currently active in the app, no mechanism for users to control which notification types they receive, and no measurement of whether notifications are producing engagement or driving unsubscribes.
+
+The architectural problems stem from notifications being added as a feature after the core product is built, rather than designed as part of the product architecture from the start. A notification system bolted on after launch typically stores device tokens in the user table (rather than in a separate tokens table that handles multiple devices per user), sends notifications from synchronous request handlers (which doesn't scale for large user bases), and has no mechanism to track delivery or engagement (making optimization impossible).
+
+The right architecture treats the notification system as a domain: a service that manages user notification preferences, device tokens (with multiple devices per user), notification history, delivery tracking, and frequency constraints. Notifications are triggered by application events (new message, activity notification, scheduled reminder) and processed by the notification service, which applies preferences, frequency caps, timezone constraints, and targeting before dispatching to FCM/APNs. This separation allows the notification system to evolve independently from the rest of the application.
+
+## Common mistakes
+
+1. **Sending the same notification to all users at a fixed time.** A scheduled notification for an event should be sent at an appropriate time in each user's timezone, not at one universal time. A marketing email that references "this morning's update" should arrive in the morning in the recipient's timezone, not in the afternoon for half the user base.
+
+2. **Not implementing exponential backoff for delivery retries.** APNs and FCM occasionally return temporary errors. Retrying immediately on error creates retry storms. Implement exponential backoff for delivery retries, with a maximum retry count after which the notification is dropped.
+
+3. **Not handling token expiration and invalidation.** Device tokens become invalid when the app is uninstalled or when the OS refreshes the token. APNs returns specific error codes for invalid tokens (InvalidDeviceToken, Unregistered). The backend must remove or update invalid tokens based on these responses; sending to invalid tokens wastes API calls and may trigger rate limiting.
+
+4. **No notification history or delivery tracking.** A notification system that sends notifications but does not record what was sent, when it was sent, and whether it was delivered or opened cannot be optimized. Track notification history, delivery status, and engagement metrics from the start.
+
+5. **Asking for notification permission immediately on app launch.** iOS requires explicit user permission for push notifications. Asking for this permission on first app launch, before the user has experienced the app's value, produces low opt-in rates. Ask for permission at a moment of clear value: after the user completes an action where a notification would be helpful ("We'll send you a notification when your report is ready. Enable notifications?").
+
+## Where to start
+
+1. **Design the notification preference schema before implementation.** Define the notification categories from the user's perspective, the default state for each category (opted in or opted out by default), and which categories are mandatory (security alerts). Build the preferences UI and backend storage before building any notification triggers.
+
+2. **Use a managed notification service for the delivery layer.** Services like Expo Push Notifications, OneSignal, or Courier handle the FCM/APNs integration, token management, delivery tracking, and retry logic. Building this from scratch is significant infrastructure work that managed services provide as a product.
+
+3. **Implement timezone-aware delivery for any notifications that are time-sensitive.** Store the user's timezone in the user record (or infer it from the device at registration time). Any scheduled notification should calculate the delivery time relative to the user's timezone.
+
+## Related reading
+
+- [Native iOS Development in 2026: SwiftUI, Combine, and the New Stack](/blog/native-ios-development-in-2026-swiftui-combine-and-the-new-stack)
+- [Native Android Development in 2026: Compose, KMP, and Where It Is Going](/blog/native-android-development-in-2026-compose-kmp-and-where-it-is-going)
+- [PWA vs Native App: The Decision Every Startup Faces](/blog/pwa-vs-native-app-the-decision-every-startup-faces)
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)

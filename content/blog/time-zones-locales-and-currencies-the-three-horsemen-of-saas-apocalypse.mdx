@@ -1,0 +1,132 @@
+---
+slug: "time-zones-locales-and-currencies-the-three-horsemen-of-saas-apocalypse"
+title: "Time Zones, Locales, and Currencies: The Three Horsemen of SaaS Apocalypse"
+excerpt: "Time zones, locales, and currencies are each a trap on their own. Together they are the reason international SaaS launches get delayed, customer data gets corrupted, and engineers stop sleeping. Here is how to handle all three correctly."
+date: "2024-11-28"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/time-zones-locales-and-currencies-the-three-horsemen-of-saas-apocalypse"
+status: "published"
+definition: "Time zones, locales, and currencies are the three infrastructure concerns that look solved until your first international customer logs in. Each one has a correct pattern and a dozen incorrect patterns that compound over years. I've seen teams lose months to retrofitting these after the fact. The right design stores UTC, renders locally, stores amounts in minor units, delegates tax, and separates formatting from logic."
+faq: [
+  {"q":"Should I store timestamps in UTC or in the user's local time zone?","a":"Always store in UTC. Convert to the user's local time zone only at the rendering layer. Mixing storage formats is the single most common cause of off-by-one-hour bugs, daylight saving disasters, and corrupted reporting. The database never knows what time zone the user is in and should not try to."},
+  {"q":"How do I handle daylight saving time in a SaaS app?","a":"Store UTC and let a library like date-fns-tz or Luxon handle the conversion at render time using the user's stored IANA time zone identifier. Never store a UTC offset like plus five thirty. Offsets change. IANA zone names do not. The library knows the current rules and handles DST transitions correctly."},
+  {"q":"What is the safest way to store monetary amounts in a database?","a":"Store in the smallest denomination of the currency as an integer. Dollars as cents, yen as yen since yen has no subunit, dinars as fils. Never store a float. Float arithmetic on money causes rounding errors that accumulate and show up in reconciliation reports. Use a decimal type if your database and ORM guarantee precision."},
+  {"q":"How should I handle currency conversion in a SaaS billing system?","a":"Store all amounts in the transaction currency. Do not convert at storage time. If you need reporting in a base currency, store the exchange rate at transaction time alongside the original amount. Exchange rates change. A conversion done today will not match a conversion done yesterday."},
+  {"q":"What is the best way to handle locale-specific number and date formatting?","a":"Use the browser's Intl API for client-side formatting and a server-side equivalent for server-rendered content. Pass the locale as a string like en-US or de-DE derived from the user's preference or Accept-Language header. Never hardcode format strings. The Intl API handles thousands separators, decimal points, and date formats correctly for all major locales."},
+  {"q":"When should I add multi-currency support to my SaaS?","a":"Before the first international customer. Retrofitting currency support onto a single-currency billing system is significantly more painful than building it correctly from day one. The storage change from float to integer minor units alone can require a full database migration."},
+  {"q":"How do I handle VAT and sales tax in a multi-country SaaS?","a":"Do not write your own tax calculation engine. Use a dedicated service like Stripe Tax, TaxJar, or Avalara. Tax rules change constantly across jurisdictions. The engineering cost of maintaining a hand-rolled tax system exceeds the cost of any managed service by a wide margin within the first year."}
+]
+---
+
+## What you actually need to know
+
+- Store all timestamps in UTC. Convert at the rendering layer using the user's IANA time zone identifier.
+- Store monetary amounts as integers in the currency's minor unit. Never float.
+- Separate locale-specific formatting from business logic. The format belongs in the view, not the model.
+- Delegate tax calculation to a managed service. The rules change faster than you will ship updates.
+- In my experience, teams that defer these decisions past the first international customer spend three to six weeks cleaning up data corruption they could have prevented in three days.
+
+| Concern | Wrong approach | Right approach | Tools |
+|---|---|---|---|
+| Timestamps | Store in local time or with UTC offset | Store UTC, convert on render | date-fns-tz, Luxon, Temporal API |
+| Currency amounts | Store as float or string | Store as integer minor units | Dinero.js, custom Money type |
+| Locale formatting | Hardcoded format strings | Intl API with user locale | Intl.NumberFormat, Intl.DateTimeFormat |
+| Tax calculation | Hand-rolled rules engine | Managed tax service | Stripe Tax, TaxJar, Avalara |
+| Currency conversion | Convert at storage time | Store rate at transaction time | Fixer, Open Exchange Rates |
+
+## The core argument
+
+I have worked on three SaaS products that launched internationally without a clean time zone strategy. Every single one had a data corruption incident within six months. The pattern is the same. The team stored timestamps in their local time zone, or mixed UTC with offset-aware values, or let the ORM quietly convert UTC to local before writing. The database ends up with a mix of formats. Reports disagree. Scheduled jobs fire at the wrong time in summer because someone forgot that UTC+5:30 does not observe daylight saving. The audit log timestamps are wrong.
+
+Currency is the same story with a different disaster. A team stores prices as floats. The application rounds correctly at display time. The billing system rounds slightly differently. After ten thousand invoices, the totals in the reporting database are a few dollars off from the totals in the billing system. Nobody notices until a financial audit or an enterprise customer runs their own reconciliation.
+
+Locales are the quietest failure. The application formats dates as MM/DD/YYYY. A German customer sees the 3rd of October and reads it as the 10th of March. A financial user in a German locale sees 1,234.56 and reads it as a different number from what an American user sees with the same string. These bugs are usually reported as user confusion rather than bugs, so they do not get fixed.
+
+The good news is that all three have clean solutions. The patterns are well-established. The libraries exist. The managed services exist. The cost of doing it right from day one is one week of careful architecture work. The cost of doing it wrong is months of data correction under production pressure.
+
+## How each one actually breaks
+
+### Time zones
+
+The specific failure modes are worth naming. Storing timestamps with an offset like `2024-03-15 14:30:00+05:30` looks fine until the offset changes. The offset at the moment of storage is frozen. The user's actual time zone might have changed the offset. UTC avoids this entirely because UTC never changes.
+
+Scheduled jobs are the most common victim. A job configured to run at 9am in the user's time zone needs the IANA identifier to recalculate the correct UTC time each day. Store `America/New_York`, not `-05:00`. The offset changes twice a year. The IANA name does not.
+
+The other failure mode is the ORM silently converting. Postgres and MySQL both have timezone awareness at the column level. An application that connects from a server with a non-UTC system clock can write corrupted timestamps to a UTC column without throwing an error. Set the database server, the application server, and the ORM connection to UTC explicitly.
+
+### Currencies
+
+Floats fail because IEEE 754 floating point arithmetic is not decimal arithmetic. The number 0.1 cannot be represented exactly in binary floating point. Add enough 0.1s together and you get something like 0.30000000000000004. For a display value, this rounds away. For a billing total, it accumulates.
+
+The integer minor unit pattern is simple. One hundred dollars is stored as 10000. Ten dollars and fifty cents is stored as 1050. Arithmetic is exact. Division for display is the only operation that requires care, and it happens only at render time with explicit rounding rules.
+
+Zero-subunit currencies like Japanese yen are stored as the face value integer. A price of 1500 yen is stored as 1500. No conversion needed.
+
+### Locales
+
+The Intl API is available in every modern browser and in Node.js. There is no good reason to write a date or number format string by hand. Pass the locale and let the API do the work.
+
+The edge case to handle is the locale preference hierarchy. The user's stored preference beats the browser's Accept-Language header, which beats the IP geolocation, which beats the application default. Store the preference explicitly after the user sets it. Do not re-derive it on every request from a header that can change.
+
+## What it requires
+
+| Task | Engineering effort | Ongoing maintenance |
+|---|---|---|
+| UTC-everywhere database migration | One to three days | Near zero |
+| IANA time zone storage and render conversion | One to two days | Near zero |
+| Integer minor unit currency storage | One to three days if retrofitting | Near zero |
+| Intl API locale formatting layer | Half a day to one day | Near zero |
+| Managed tax service integration | One to two days | Vendor handles rule changes |
+| Exchange rate storage at transaction time | One day | Near zero |
+
+## Features to demand from the implementation
+
+- UTC-only storage with explicit IANA time zone identifier per user, not per session.
+- An integer money type in the data model with a currency code stored alongside the amount.
+- A rendering layer that never formats a date or number without an explicit locale argument.
+- Managed tax service integration with fallback handling for API outages.
+- Exchange rate recording at transaction creation time, not at report time.
+- Integration tests that run in a non-local time zone to catch implicit conversions.
+- A locale preview tool in the admin panel so support staff can see what a user sees.
+
+## Expert opinion
+
+> These three concerns share a property that makes them dangerous: they work fine in development and fail in production in ways that are hard to reproduce. The developer runs on a laptop in one time zone, tests with one currency, and never thinks about German number formatting. The bug ships. The international customer finds it. The team learns an expensive lesson. The fix is to treat UTC, minor unit currency, and locale-first formatting as non-negotiable defaults from day one, the same way you treat input validation.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had been running for eighteen months with timestamp storage in the application server's local time zone. The server was in UTC+5:30. When the first European customer signed up and set their time zone to Europe/Berlin, their scheduled reports started arriving at the wrong time, and their audit log showed activity timestamps that were off by five and a half hours.
+
+The migration was three days of work. We added an explicit UTC conversion at the ORM layer, updated the existing timestamps in the database with a one-time script, and added integration tests that ran with the server clock set to UTC and verified that user-facing times converted correctly. The fix was not hard. The diagnosis took two days because the team had not expected a time zone problem.
+
+The currency issue was discovered in the same audit. The product stored subscription amounts as floats. The discrepancy was less than a cent per transaction but visible in aggregate reporting. We migrated to integer minor units, added a Money value object to the domain model, and the reconciliation reports matched from the first run. For more on the related data integrity work, see [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) and [why your SaaS should treat its database like a product](/blog/why-your-saas-should-treat-its-database-like-a-product).
+
+## Common mistakes teams make
+
+1. Storing timestamps with a UTC offset instead of an IANA time zone identifier. The offset is stale the moment daylight saving time changes.
+2. Storing monetary amounts as floats. The rounding errors are invisible in development and visible in production reconciliation.
+3. Hardcoding date and number format strings. The format that works for one locale is wrong for another.
+4. Writing a custom tax calculation engine. Tax rules across jurisdictions change faster than a small team can maintain.
+5. Converting currencies at storage time. The exchange rate at storage is not the rate at transaction time.
+6. Inferring the user's locale from IP address alone. IP geolocation is approximate and changes. Explicit user preference is exact.
+7. Skipping integration tests in non-local time zones. The bug only appears when the system time and the user time zone are different.
+8. Treating zero-subunit currencies like yen the same as decimal currencies. One yen is 1, not 100.
+
+## A two week plan to get this right
+
+1. **Day one.** Audit the existing schema. Find every timestamp column and every currency column. Document the current format.
+2. **Days two and three.** Write the migration for timestamp columns to UTC. Write integration tests for the before and after state.
+3. **Day four.** Run the timestamp migration on a staging copy. Verify the test suite passes with the server clock set to UTC.
+4. **Day five.** Add the IANA time zone identifier column to the user table. Write the render conversion layer.
+5. **Days six and seven.** Audit the currency columns. Write the migration to integer minor units. Add a Money value object.
+6. **Day eight.** Integrate the Intl API for all date and number formatting. Remove hardcoded format strings.
+7. **Days nine and ten.** Integrate a managed tax service. Test with sample transactions in multiple jurisdictions.
+8. **Days eleven and twelve.** Add exchange rate recording to the transaction model. Verify reporting uses stored rates.
+9. **Day thirteen.** Load test the time zone conversion layer under read-heavy conditions.
+10. **Day fourteen.** Document the patterns. Add lint rules to prevent future regressions.
+
+For deeper reading on the architecture decisions that surround this work, [the stateless API building backends that scale horizontally](/blog/the-stateless-api-building-backends-that-scale-horizontally) covers the server design context, and [zero downtime database migrations a step-by-step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) covers the migration execution pattern.

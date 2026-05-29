@@ -1,0 +1,62 @@
+---
+slug: "jwt-best-practices-in-2026-what-has-changed"
+title: "JWT Best Practices in 2026: What Has Changed"
+excerpt: "JWT implementation mistakes from 2019 are still shipping in 2026. Here is what the current best practices actually are, what has changed with algorithm recommendations, and the common pitfalls that create security vulnerabilities."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance"]
+readingMinutes: 6
+ogImage: "/api/og/blog/jwt-best-practices-in-2026-what-has-changed"
+status: "published"
+definition: "JSON Web Tokens (JWTs) are a compact, URL-safe format for representing claims between two parties. In SaaS authentication, they are used primarily as access tokens and session tokens. The best practices around algorithm selection, token lifetime, key rotation, and revocation have evolved significantly since JWTs became widespread, and many production systems are still running on outdated patterns that create exploitable vulnerabilities."
+faq: [
+  {"q":"Which JWT algorithm should I use in 2026?","a":"RS256 (RSA with SHA-256) or ES256 (ECDSA with P-256) for asymmetric signing, which allows verification without sharing the signing secret. HS256 is acceptable only for systems where the token is both issued and verified by the same service. Never use the 'none' algorithm. Avoid RS512 and HS512 unless you have a specific reason; the security benefit over RS256 and HS256 is marginal and the performance cost is higher."},
+  {"q":"How short should JWT access token lifetimes be?","a":"Fifteen minutes for access tokens is the current recommended maximum. Short-lived access tokens limit the window of exposure if a token is stolen. Pair short-lived access tokens with refresh tokens that have a longer lifetime (hours to days) and are rotated on each use. Refresh token rotation means a stolen refresh token is detectable: if the original user uses the rotated token while the attacker uses the stolen one, both tokens are invalidated."},
+  {"q":"How do you revoke a JWT before it expires?","a":"JWTs are stateless by design, which means they cannot be revoked without server-side state. The practical options are: maintain a token blocklist (a Redis set of revoked token IDs that every validation checks against), use very short token lifetimes so the revocation window is small, or treat JWTs as opaque tokens that are validated against a server-side session store on every request. Each approach trades different costs against revocation capability."},
+  {"q":"What is the 'none' algorithm vulnerability?","a":"The 'none' algorithm in the JWT spec indicates that no signature is required to validate the token. Some early JWT libraries had a bug where an attacker could modify a token, change the algorithm to 'none', remove the signature, and the library would validate it as legitimate. The fix is to always specify which algorithms your library should accept and never include 'none'. Modern libraries handle this by default, but older codebases should verify."},
+  {"q":"Should JWTs be stored in localStorage or httpOnly cookies?","a":"HttpOnly cookies are the current best practice for browser storage of JWTs. LocalStorage JWTs are accessible to JavaScript, which means any XSS vulnerability can steal them. An httpOnly cookie is inaccessible to JavaScript, which eliminates the XSS token theft vector. Use the SameSite=Strict or SameSite=Lax cookie attribute to prevent CSRF attacks. The tradeoff is that cookie-based storage requires CSRF protection in addition to authentication."}
+]
+---
+
+## What you need to know
+
+- The `none` algorithm vulnerability is old but JWT libraries in legacy codebases can still be affected. Explicitly configure accepted algorithms and reject `none`.
+- Access token lifetimes should be short: fifteen minutes maximum. Pair them with refresh token rotation for the right balance of security and usability.
+- Asymmetric algorithms (RS256, ES256) allow token verification without sharing the signing key. Use them for multi-service architectures where different services verify but do not issue tokens.
+- JWT revocation requires server-side state. There is no stateless revocation mechanism. Design your token architecture with revocation in mind from the start.
+- HttpOnly cookies with SameSite attributes are the correct browser storage mechanism for JWTs, not localStorage.
+
+## The core argument
+
+The JWT security landscape in 2026 is defined more by legacy misimplementation than by new vulnerabilities. The patterns that create exploitable JWTs today are mostly the same patterns that were creating vulnerabilities in 2019: accepting the `none` algorithm, storing tokens in localStorage, using long-lived access tokens without revocation, and signing tokens with weak or hardcoded secrets. The difference is that there are now more systems carrying these patterns into production because the incorrect tutorials from five years ago are still the top search results.
+
+The algorithm question has settled. RS256 and ES256 are the correct choices for any architecture where token verification happens at a different service than token issuance. Asymmetric algorithms let you distribute the public key to every service that needs to verify tokens without ever sharing the private key that signs them. This is the architecture that makes microservices and multi-service SaaS products work securely: the auth service holds the private key, every other service gets the public key, and token verification is decentralized without sharing secrets. HS256 is still acceptable for single-service architectures where one server both issues and verifies tokens, but the moment you need to verify tokens across service boundaries, asymmetric signing is the correct approach.
+
+The token lifetime debate has also settled, though many teams still resist it because short-lived tokens feel operationally complex. Fifteen minutes for access tokens forces regular refresh token use, which is where the real security happens. Refresh token rotation is the pattern where each use of a refresh token issues a new refresh token and invalidates the old one. If a refresh token is stolen, the first time the attacker uses it, the legitimate user's next request will fail with an invalid token, triggering re-authentication. Detecting this condition and alerting on it gives you visibility into token theft that long-lived access tokens hide.
+
+## Common mistakes
+
+1. **Storing JWTs in localStorage.** localStorage is readable by any JavaScript on the page. A single XSS vulnerability turns localStorage JWT storage into token theft. Use httpOnly cookies instead. The extra CSRF protection required is a smaller attack surface than the XSS exposure.
+
+2. **Using long-lived access tokens without revocation.** An access token with a 24-hour lifetime that is stolen gives an attacker a 24-hour window that cannot be closed without a blocklist. Shorten access token lifetimes and implement refresh token rotation instead of extending access token lifetimes for convenience.
+
+3. **Hardcoding JWT signing secrets.** A hardcoded JWT secret in source code is a credential leak waiting to happen. Secrets committed to version control reach everyone with repository access. Store signing keys in a secrets manager and rotate them on a schedule.
+
+4. **Not validating the `aud` and `iss` claims.** A JWT signed with your secret but issued by a different service for a different audience should not be valid for your service. Validate `iss` (issuer) and `aud` (audience) claims on every token validation. JWT libraries provide options for these validations; enable them.
+
+5. **Not planning for key rotation.** A JWT signing key that is never rotated is a key that will be compromised eventually. Design the key distribution and rotation process before the first production deployment. For RS256 and ES256, publish a JWKS (JSON Web Key Set) endpoint that services can use to automatically pick up new keys.
+
+## Where to start
+
+1. **Audit your current JWT configuration.** Check the algorithm being used, the token lifetime, where tokens are stored in the browser, and whether claims validation (iss, aud) is enabled. Document the current state and the gaps.
+
+2. **Switch browser storage from localStorage to httpOnly cookies.** This is the change with the highest security impact for most web applications. Add the SameSite and Secure cookie attributes at the same time.
+
+3. **Implement refresh token rotation if you have long-lived access tokens.** Reduce the access token lifetime to fifteen minutes and add a refresh token endpoint that issues a new refresh token on each use. This is a one-time implementation with ongoing security benefit.
+
+## Related reading
+
+- Session Management Security: What Most Teams Get Wrong
+- OWASP Top 10 for SaaS Founders: What Actually Matters
+- [Incident Response for Startups: A Playbook](/blog/incident-response-for-startups-a-playbook)
+- [How to Sell to Enterprise Without a Full Compliance Stack](/blog/how-to-sell-to-enterprise-without-a-full-compliance-stack)

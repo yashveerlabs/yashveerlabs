@@ -1,0 +1,115 @@
+---
+slug: "caching-strategies-for-growing-saas-from-none-to-multi-layer"
+title: "Caching Strategies for Growing SaaS: From None to Multi Layer"
+excerpt: "Early SaaS does not need cache. Growing SaaS does. The progression from no cache to a thoughtful multi layer architecture happens in roughly four stages. Here is the map."
+date: "2026-05-20"
+category: "SaaS Architecture and Scaling"
+tags: ["caching","scaling","redis","performance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/caching-strategies-for-growing-saas-from-none-to-multi-layer"
+status: "published"
+definition: "Caching is the discipline of storing computed or fetched results so subsequent requests do not pay the full cost. SaaS products typically progress through four cache layers as they grow. No cache. Application layer cache. Distributed cache. CDN and edge cache. The right layer to add depends on the bottleneck. The wrong layer adds complexity without solving anything."
+faq: [
+  {"q":"When does a SaaS actually need caching?","a":"When a measurable user facing latency target is being missed or when the cost of recomputing is significant. Early stage products often run fine on the database alone. The pattern is to measure first and cache when there is a clear bottleneck. Premature caching adds complexity without solving anything."},
+  {"q":"What is the first thing to cache?","a":"The data your application reads many times for one user interaction. Configuration, feature flags, user profile, tenant settings. These are read hundreds of times per session and rarely change. In memory cache with a short TTL gives a big win for almost no cost."},
+  {"q":"When do I need Redis?","a":"When you have multiple application servers and you need them to share a cache. Process local cache becomes inconsistent. Redis or Memcached gives shared cache with sub millisecond reads. The operational overhead is small."},
+  {"q":"What about CDN and edge caching?","a":"For static assets, always. For API responses, when the responses are cacheable per public key. For per user data, edge caching is tricky because each user wants different data. The teams that get this wrong cache user data to other users."},
+  {"q":"What is the right TTL?","a":"Shorter than your tolerance for stale data. For feature flags, minutes. For user profile, minutes to hours. For computed reports, hours to days. The TTL should be a deliberate choice, not the framework default."},
+  {"q":"How do I invalidate cache?","a":"Either by TTL or by event. TTL invalidation is simple but stale until the TTL expires. Event based invalidation is precise but more complex. Most products use a combination. TTL for the bulk of data. Event based for the hot data that must be fresh."},
+  {"q":"What is the biggest cache mistake?","a":"Caching data that has tenant or user scope without including the tenant or user in the cache key. The result is one customer seeing another's data. The bug is rare in development and catastrophic in production."}
+]
+---
+
+## What you actually need to know
+
+- The four stage progression is no cache, app cache, distributed cache, CDN.
+- Add caching when you have a measurable bottleneck. Not before.
+- Configuration and tenant data are the highest leverage early caches.
+- Always include tenant and user scope in the cache key.
+- TTL plus event invalidation combined covers most cases.
+
+| Stage | When to add | What it solves |
+|---|---|---|
+| No cache | Early product | Nothing yet |
+| Application cache | Read heavy workloads, configuration | Per process duplication |
+| Distributed cache | Multi server | Cross server consistency |
+| CDN and edge | Static assets, public API responses | Network latency |
+
+## The core argument
+
+Caching is one of those engineering disciplines that follows a predictable progression in growing SaaS. The first stage is no cache. The application is small enough that the database handles every read. The second stage is application layer cache. The product has grown enough that the same data is read many times in one interaction and the database is starting to feel the load. The third stage is distributed cache. The product has scaled to multiple servers and the per process cache is no longer enough. The fourth stage is CDN and edge cache. The product has global users and the network latency itself is the bottleneck.
+
+Each stage adds complexity. Each stage solves a real bottleneck. The mistake is jumping ahead of the bottleneck. Adding Redis when the database is fine. Adding edge caching when the latency is from your own application code. Each premature step adds operational overhead without solving anything.
+
+The right pattern is to measure. Find the actual bottleneck. Add the cache layer that solves that bottleneck. Measure again. Move on. The teams that follow this pattern have clean, efficient caches that solve real problems. The teams that skip it have complex, leaky caches that solve nothing and introduce bugs.
+
+The discipline that matters across every layer is cache key design. The cache key should include enough scope that two different requests do not collide. Tenant ID. User ID where appropriate. The version of the data shape. Skipping the scope produces data leaks between tenants. Skipping the version produces stale data after deploys.
+
+## The four stages with examples
+
+| Stage | Example data |
+|---|---|
+| No cache | Direct database reads, no complexity |
+| Application cache | Feature flags, tenant config, user profile in memory |
+| Distributed cache | Same data plus session, plus computed views in Redis |
+| CDN and edge | Static assets, public API responses, regional caches |
+
+## How much does this cost
+
+| Cache layer | Setup cost | Monthly operating cost |
+|---|---|---|
+| Application memory cache | Hours | Negligible |
+| Redis hosted (Upstash, ElastiCache) | Half a day | 50 to 500 USD |
+| CDN for static assets | Hours | 20 to 300 USD |
+| Edge caching for dynamic content | Days | 100 to 1000 USD |
+| Combined | Sprint to set up | Hundreds to low thousands |
+
+The numbers come from projects I have shipped. The cost is small relative to the latency and throughput improvements.
+
+## Features the cache strategy must have
+
+- Documented cache key conventions.
+- Tenant and user scope in keys where applicable.
+- TTL appropriate to each data type.
+- Event based invalidation for hot data.
+- Metrics on cache hit rate and stale read rate.
+- A way to disable caching for debugging.
+- A clear policy on what should not be cached.
+
+## Expert opinion
+
+> The caches that age well are the ones built deliberately. The team measured the bottleneck. Picked the cache layer that solved it. Wrote the keys with the right scope. Set the TTL with intention. The caches that fail are the ones added in a panic when the database is on fire. The discipline is in the planning. The implementation is mostly mechanical.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client was hitting database CPU limits at peak hours. The instinct was to scale up the database. The metrics showed that the bottleneck was repeated reads of feature flags and tenant configuration. Every request was hitting the database for data that changed daily.
+
+We added application layer caching for the feature flags and tenant config. Five minute TTL. In memory per process. The database CPU dropped by roughly forty percent at peak. The latency improved by a noticeable amount on every endpoint.
+
+Six months later the product had scaled to four application servers. The per process cache produced inconsistencies because each server had a different state. We migrated to Redis. The inconsistencies went away. The latency stayed where it was. The complexity rose modestly.
+
+Eighteen months later we added a CDN for the static assets and a small set of public API responses. The global latency improved for users far from the origin. The bill grew modestly. The architecture has run unchanged for two years since.
+
+For more on the related work, see [the caching hierarchy browser CDN edge application database](/blog/the-caching-hierarchy-browser-cdn-edge-application-database) and [the HTTP caching strategy that most teams get wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong).
+
+## Common mistakes teams make
+
+1. Caching before measuring. Adds complexity without solving anything.
+2. No tenant or user scope in keys. Data leaks.
+3. TTL set to the framework default. Often wrong.
+4. No invalidation strategy. Stale data piles up.
+5. Caching everything. Misses the distinction between hot and cold data.
+6. No metrics on hit rate. Cannot improve.
+7. Caching across tenants in multi tenant products. Compliance risk.
+8. Treating the cache as set and forget. It needs ongoing tuning.
+
+## A 30 day plan to put a cache strategy in place
+
+1. **Week one.** Measure the current bottleneck. Identify the data being read repeatedly.
+2. **Week two.** Add application layer cache for the highest leverage data.
+3. **Week three.** Measure the improvement. Identify the next bottleneck.
+4. **Week four.** Add distributed cache if needed. Wire metrics and invalidation.
+
+For more on the related work, read [the HTTP caching strategy that most teams get wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong) and [CDN cache headers a practical primer](/blog/cdn-cache-headers-a-practical-primer). On the broader scaling side, [scaling from one thousand to one hundred thousand users the invisible database bottlenecks](/blog/scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks) is the natural next read.

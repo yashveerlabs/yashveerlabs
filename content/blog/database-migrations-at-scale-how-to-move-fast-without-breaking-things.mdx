@@ -1,0 +1,116 @@
+---
+slug: "database-migrations-at-scale-how-to-move-fast-without-breaking-things"
+title: "Database Migrations at Scale: How to Move Fast Without Breaking Things"
+excerpt: "Database migrations get harder as the table gets larger. The patterns that worked at one million rows produce locks and outages at one hundred million. Here is the playbook that keeps the migration safe."
+date: "2026-05-22"
+category: "SaaS Architecture and Scaling"
+tags: ["database","migrations","postgres","scale"]
+readingMinutes: 12
+ogImage: "/api/og/blog/database-migrations-at-scale-how-to-move-fast-without-breaking-things"
+status: "published"
+definition: "Database migrations at scale are the schema and data changes that have to ship without taking the application offline. The patterns that worked on a small table produce locks, blocked writes, and outages on a large table. The right playbook uses concurrent operations, backfills in batches, dual writes during transitions, and verification at every step. The discipline is small. The protection from outages is large."
+faq: [
+  {"q":"What is the most dangerous migration?","a":"Adding a NOT NULL column to a large table with a default value. The naive ALTER TABLE rewrites the entire table while holding an exclusive lock. The application stops responding for the duration. Modern Postgres handles this better but older patterns still produce the issue."},
+  {"q":"What is a concurrent index?","a":"CREATE INDEX CONCURRENTLY builds an index without holding a lock that blocks writes. The build takes longer than a normal index but the application stays available. Always use CONCURRENTLY for indexes on large tables in production."},
+  {"q":"How do I add a NOT NULL column safely?","a":"Add the column as nullable. Backfill in batches. Add the NOT NULL constraint with a NOT VALID flag. Run VALIDATE CONSTRAINT separately. The sequence avoids the long lock. The application stays available."},
+  {"q":"How do I rename a column?","a":"Add the new column. Dual write to both. Backfill the new column. Update the application to read from the new column. Stop writing to the old column. Drop the old column. The sequence takes weeks but the application never breaks."},
+  {"q":"What is the dual write pattern?","a":"The application writes to both the old and the new shape for a transition period. Reads can come from either depending on the migration phase. Once the new shape is fully populated, the application switches reads. The old shape can then be deprecated. The pattern is the safest way to migrate columns and tables."},
+  {"q":"How do I batch a backfill?","a":"Process rows in batches of a few thousand to a few tens of thousands. Use a primary key cursor to iterate. Sleep briefly between batches to avoid saturating the database. Monitor lag on read replicas. Stop if anything looks wrong."},
+  {"q":"What is the worst migration mistake?","a":"Running a long migration during business hours without testing on a production sized dataset. The migration takes ten times longer than expected. The application is locked. Customers are angry. The team learns the patterns the hard way."}
+]
+---
+
+## What you actually need to know
+
+- Use CREATE INDEX CONCURRENTLY for indexes on large tables.
+- Add NOT NULL columns as nullable first. Backfill. Add the constraint with NOT VALID.
+- Dual write during column or table renames.
+- Backfill in batches of a few thousand rows.
+- Test on production sized data before the production migration.
+
+| Migration type | Safe pattern |
+|---|---|
+| Add column | NULL default, ALTER ADD COLUMN |
+| Add NOT NULL column | Add nullable, backfill, add constraint NOT VALID, VALIDATE separately |
+| Drop column | Stop writing, deprecate, drop in next deploy |
+| Rename column | Dual write, backfill, switch reads, drop old |
+| Add index | CREATE INDEX CONCURRENTLY |
+| Drop index | DROP INDEX CONCURRENTLY |
+| Change column type | New column, dual write, backfill, switch, drop old |
+| Add foreign key | NOT VALID, then VALIDATE |
+
+## The core argument
+
+Database migrations are the kind of work that goes wrong only at scale. The naive ALTER TABLE that ran in milliseconds on a one thousand row table holds a lock for an hour on a one hundred million row table. The team that has not made the transition learns the patterns by causing an outage.
+
+The fix is to learn the patterns before the table gets large. The Postgres patterns are well documented and consistent. Every long running schema change has a safe alternative that uses concurrent operations, batched backfills, or dual writes. The team that adopts these patterns ships migrations that never block the application.
+
+The discipline is in always reaching for the safe pattern, even when the table is small. The team that uses CREATE INDEX CONCURRENTLY by default never has to remember to switch when the table grows. The team that uses the unsafe pattern by default has to remember and often forgets at the worst time.
+
+The other discipline is testing. The migration that took thirty seconds on a development dataset might take three hours on production. The right approach is to test on a production sized copy of the database before the production migration. The test surfaces the timing reality and any blocking behavior.
+
+## The patterns reference
+
+| Goal | Safe sequence |
+|---|---|
+| Add a nullable column | Single migration. Safe. |
+| Add a NOT NULL column with a default | Add nullable. Backfill in batches. Add constraint NOT VALID. VALIDATE separately. |
+| Drop a column | Deploy app that does not read or write the column. Wait. Drop column in next migration. |
+| Rename a column | Add new column. Dual write. Backfill. Switch reads. Stop writing old. Drop old. |
+| Add an index | CREATE INDEX CONCURRENTLY in its own transaction. |
+| Drop an index | DROP INDEX CONCURRENTLY. |
+| Change a column type | Add new column. Dual write with conversion. Backfill. Switch reads. Drop old. |
+| Split a table | Create new tables. Dual write. Backfill. Switch reads. Drop old. |
+
+## How much does this cost
+
+The cost of the discipline is small. A few extra hours per migration to think through the sequence. The cost of skipping is the outage that the unsafe migration causes. The math is favorable for the discipline.
+
+## Features the migration framework must have
+
+- Concurrent operations as the default.
+- Batched backfill helpers.
+- Dual write support in the application layer.
+- Migration testing on production sized data.
+- Migration timing measurement.
+- Rollback path for every migration.
+- Documentation of the safe patterns.
+- A review process for migrations on large tables.
+
+## Expert opinion
+
+> The teams that have caused a production outage with a database migration never forget. The patterns are well known. The discipline is to apply them by default rather than by exception. The teams that learn this early move fast and break nothing. The teams that learn it through pain spend a quarter rebuilding trust with customers who experienced the outage.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was preparing a migration that added a NOT NULL column to their largest table. The naive ALTER TABLE would have held an exclusive lock for an estimated three hours. The team was prepared to do the migration in a maintenance window.
+
+We restructured the migration. Add the column as nullable. Backfill in batches over a few hours, with each batch under a hundred milliseconds. Add the NOT NULL constraint with NOT VALID. Run VALIDATE in the background.
+
+The new sequence took twelve hours of total wall clock time but never blocked the application. The customers experienced no downtime. The team adopted the pattern as standard for all migrations on large tables.
+
+For more on the related work, see [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) and [schema evolution adding columns without downtime](/blog/schema-evolution-adding-columns-without-downtime).
+
+## Common mistakes teams make
+
+1. Naive ALTER TABLE on large tables.
+2. CREATE INDEX without CONCURRENTLY.
+3. Long migrations during business hours.
+4. No testing on production sized data.
+5. No batched backfill.
+6. No dual write during column rename.
+7. No rollback plan.
+8. Treating migrations as solved. New patterns appear with new Postgres versions.
+
+## A pre migration checklist
+
+1. **Step one.** Estimate the table size and migration duration.
+2. **Step two.** Pick the safe pattern from the reference.
+3. **Step three.** Test on production sized data.
+4. **Step four.** Review with another engineer.
+5. **Step five.** Plan the rollback.
+6. **Step six.** Run during a quiet window with monitoring.
+
+For more on the related work, read [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) and [PostgreSQL performance at scale the tweaks that move the needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle). On the broader change management side, [big bang vs gradual migration a decision map](/blog/big-bang-vs-gradual-migration-a-decision-map) is the natural next read.

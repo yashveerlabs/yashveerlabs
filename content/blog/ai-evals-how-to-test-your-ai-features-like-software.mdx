@@ -1,0 +1,111 @@
+---
+slug: "ai-evals-how-to-test-your-ai-features-like-software"
+title: "AI Evals: How to Test Your AI Features Like Software"
+excerpt: "Most teams ship AI features without a test suite, then patch by vibes. The teams that stay sane have an evaluation harness that runs on every change. Here is what a real one looks like."
+date: "2026-05-18"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","evals","testing","llm"]
+readingMinutes: 12
+ogImage: "/api/og/blog/ai-evals-how-to-test-your-ai-features-like-software"
+status: "published"
+definition: "An AI eval suite is a curated set of inputs with known good outputs, run automatically on every prompt change, model update, and deployment. The teams that have one ship AI features with confidence. The teams that do not have one ship by intuition and break customer trust on the third regression. The work to build the suite is smaller than it looks and pays back the same week."
+faq: [
+  {"q":"What is an AI eval exactly?","a":"A test that runs a real input through your AI feature and compares the output to a known good or known bad result. The comparison can be exact match, scored by a rubric, or scored by another model. The discipline is automating the comparison so it runs on every change."},
+  {"q":"How many evals do I need to start?","a":"Twenty to fifty is a strong baseline. Pick the cases that matter most to the customer, the cases that previously broke, and the edge cases that worry you. Add more over time as you discover new failure modes."},
+  {"q":"Should I use a framework or build my own?","a":"For most teams, a small custom harness is faster to start. Two hundred lines of Python or TypeScript, a CSV of inputs and expected outputs, a CI job that runs them. Frameworks like Promptfoo and LangSmith are useful once you scale past a hundred evals."},
+  {"q":"Can I use AI to grade AI?","a":"Yes, with care. LLM as a judge works well for tasks like summarization quality and tone, where exact match is impossible. It works less well for tasks where the answer is right or wrong. Calibrate the judge against human ratings before you trust it."},
+  {"q":"How often should the evals run?","a":"On every pull request that touches AI code or prompts. On every model version change. Nightly against production. The cadence builds confidence that nothing is regressing silently."},
+  {"q":"What is the most common mistake building evals?","a":"Picking inputs that are too easy. Easy inputs always pass. The eval suite ends up green but tells you nothing. The inputs that earn their place in the suite are the ones that previously broke, the ones that almost broke, and the edge cases that keep the engineers awake at night."},
+  {"q":"How do I know my evals are working?","a":"By watching them catch a regression you did not expect. The first time the eval suite fails on a prompt change you thought was harmless, you will understand why it exists. That moment usually happens within the first month."}
+]
+---
+
+## What you actually need to know
+
+- Without evals, every prompt change is a coin flip. With evals, the team knows whether a change made the product better or worse.
+- A starting eval suite of twenty to fifty cases is enough to catch most regressions.
+- Exact match works for some tasks. Rubric scoring or LLM judging works for the rest.
+- Evals must run on every change. Manual runs do not count.
+- In my experience, the work to build a useful eval suite is two weeks of focused effort. Skipping it costs months of customer trust.
+
+| Eval type | Best for | Watch out for |
+|---|---|---|
+| Exact match | Classification, structured output | Brittle on free form output |
+| Regex or string contains | Specific keywords or fields | False positives, missing the substance |
+| Rubric scoring (human) | Quality assessment at small scale | Expensive, slow, but most accurate |
+| LLM as judge | Summarization, tone, free form output | Needs calibration, can drift |
+
+## The core argument
+
+Traditional software has tests because the behavior of a function is supposed to be deterministic. Pass the same input, get the same output. AI features break that assumption. The same input can produce a different output the next time you run it, especially after a prompt change, a model version update, or a temperature adjustment.
+
+The instinct of engineers used to traditional software is to give up on testing because the determinism is gone. The right move is the opposite. The non determinism is exactly why you need a test suite, not why you can skip one. Without one, you have no way to know whether a change improved the product or regressed it.
+
+An eval suite solves this. You curate a list of inputs that represent the cases you care about. You write down what a good answer looks like for each one. You run the AI feature on every input, compare the output, and produce a pass or fail. The suite runs on every change. The team sees the score move. Decisions about prompt changes, model updates, and architecture choices are now data driven instead of vibes driven.
+
+The teams that build this discipline ship AI features that feel solid. The teams that skip it ship features that feel impressive in the demo and break in week three. The difference is whether the team caught the regression before the customer did.
+
+## The shape of a real eval harness
+
+**Step one. Curate inputs.** Pull twenty to fifty real cases from production, customer support tickets, and edge cases you have already lived through. Each case is one row in a CSV or a JSON file. The case includes the input, the expected output, and a tag describing what it tests.
+
+**Step two. Write the comparison function.** For classification, exact match. For structured output, a JSON schema check. For free form, an LLM as judge that returns a score from one to five with a written rationale. Pick the lightest comparison that works.
+
+**Step three. Wire to CI.** On every PR that touches AI code, run the harness against the current branch. Compare the score to the main branch score. Block the merge if the score drops by more than a threshold.
+
+**Step four. Run nightly against production.** Drift happens. The model provider updates their endpoint, a temperature setting changes, a prompt gets edited without a PR. Nightly runs catch silent regressions that bypass the PR check.
+
+**Step five. Add new cases as you discover them.** Every customer report of a bad output becomes a new eval case. The suite grows. The team gets faster at adding cases, because the harness already exists.
+
+## What it actually costs
+
+| Investment | Cost | Outcome |
+|---|---|---|
+| Skip evals | Zero up front | Two to four regressions in production per quarter, customer trust drift |
+| Manual smoke test | Five hours per release | Catches obvious issues, misses subtle ones |
+| Lightweight harness, 20 to 50 cases | One to two weeks engineering | Catches most regressions, calibrates prompt work |
+| Production grade harness, hundreds of cases, LLM judge | One to three months | Strong confidence, expensive to maintain |
+
+The numbers above come from my own client work and what I hear from teams running AI features at scale. The lightweight harness is the sweet spot for almost every team I encounter. Heavier setups are right only when AI is the core of the product.
+
+## Features to demand from the harness
+
+- Determinism in the harness itself. Same input, same comparison, same result. The harness is the floor.
+- A score that the team can read at a glance. A number, a delta from last run, a breakdown by tag.
+- The ability to inspect failing cases. The output, the expected, the diff.
+- Cost tracking. Each run costs money. The harness should report the cost so you know which prompt experiments are economically viable.
+- A way to quarantine flaky tests, with a date the quarantine expires.
+- A clear path to add a new case. Adding cases must be friction free or it will not happen.
+
+## Expert opinion
+
+> An eval suite is the AI equivalent of a CI test suite. The first time it catches a regression you would have shipped, you stop questioning whether it was worth the work. The teams that resist building one are usually the teams that have not yet shipped the bug that an eval would have caught. They will.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client project that integrated an AI summarization feature, the team had been running blind. Prompt changes went live without verification. The product manager would ship a change on Monday and notice the regression on Thursday. We built an eval suite in eleven working days. The first regression it caught was a prompt change that broke summary length on long documents. The team would have noticed eventually. The eval caught it the same hour. Two months later, the suite was catching one regression a week, all of which would have shipped without it.
+
+The opposite story is a team I declined to take work from until they agreed to add evals. They had a customer facing AI feature that hallucinated sales figures on the third call out of ten. Without evals, every fix made the team feel productive but never actually reduced the rate of hallucination. We agreed to start with twenty real cases drawn from customer reports. Two weeks of work, the regression rate dropped from thirty percent to eight percent, and the team had a baseline for the next round of improvements.
+
+For more on the broader AI engineering process, see [AI failover and fallback patterns](/blog/ai-failover-and-fallback-patterns-when-your-model-stops-working) and [the AI output validation problem](/blog/the-ai-output-validation-problem-why-it-is-bigger-than-you-think). For prompt management discipline, [prompt versioning](/blog/prompt-versioning-a-discipline-most-teams-skip) covers what evals are testing against.
+
+## Common mistakes teams make
+
+1. Skipping evals because the team thinks AI is too non deterministic to test. The non determinism is the reason to test, not the reason to skip.
+2. Picking only easy cases. The suite stays green and tells you nothing.
+3. Running evals manually. If they are not in CI, they will not catch the next regression.
+4. Treating the LLM judge as ground truth. It needs calibration against human ratings, and it drifts as models update.
+5. Building a hundred case suite before twenty has been proven valuable. Start small, grow with discoveries.
+6. Ignoring cost. Each eval run costs API tokens. A suite that costs more than the value it returns will get cut.
+
+## Where to start, a 14 day plan
+
+1. **Day one to day three.** Pull twenty real cases. Write down what a good output looks like for each. Put them in a CSV.
+2. **Day four to day seven.** Write the harness. Read the CSV, run each case through the AI feature, compare the output, print a score.
+3. **Day eight.** Wire to CI. Block PRs that drop the score below the main branch baseline by more than a small threshold.
+4. **Day nine to day ten.** Run nightly against production. Watch for drift.
+5. **Day eleven to day fourteen.** Add the first batch of new cases from customer reports. Train the team on adding cases.
+
+For deeper reading, [AI hallucinations in customer facing products](/blog/ai-hallucinations-in-customer-facing-products-how-to-defend) covers the failure modes evals should be looking for, and [streaming AI responses to users](/blog/streaming-ai-responses-to-users-an-architecture-primer) covers a different but related side of AI engineering discipline.

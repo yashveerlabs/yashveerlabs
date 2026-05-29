@@ -1,0 +1,123 @@
+---
+slug: "wcag-for-founders-a-practical-subset"
+title: "WCAG for Founders: A Practical Subset"
+excerpt: "WCAG has hundreds of pages and most founders do not need most of them. There is a small subset that catches 90 percent of real accessibility problems, and that subset is what your team should ship by default."
+date: "2025-11-17"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/wcag-for-founders-a-practical-subset"
+status: "published"
+definition: "WCAG is the official accessibility standard. It is also long and intimidating. The practical subset that catches most of what matters is: semantic HTML, keyboard navigability, color contrast, alt text, focus indicators, and proper form labels. Get these right and you are accessible enough for most users and most enterprise procurement checks. The rest can come later."
+faq: [
+  {"q":"What is WCAG and which version should I target?","a":"WCAG is the Web Content Accessibility Guidelines, published by the W3C. WCAG 2.1 AA is the practical target in 2026 for most products. It is what most accessibility laws reference and what enterprise procurement will ask about. 2.2 adds a few useful criteria. AAA is rarely the right target outside specialized contexts."},
+  {"q":"Why should a founder care about accessibility?","a":"Three reasons. It is the right thing to do for users who depend on assistive technology. It is increasingly a legal requirement in many markets. And it is a procurement gate for enterprise sales. The first two are sufficient. The third is what gets founders' attention. All three justify the work."},
+  {"q":"What is the cheapest first step?","a":"Use semantic HTML. A button is a button, a heading is a heading, an input has a label. Most accessibility problems in modern web apps come from divs pretending to be buttons. Fix that and you have solved a large class of problems at no real cost."},
+  {"q":"How do I test accessibility myself?","a":"Three things. Try to navigate your app with only a keyboard. Run an automated tool like axe-core or Lighthouse. Test with a screen reader for at least 15 minutes. The automated tools catch the mechanical issues. The keyboard test catches the structural issues. The screen reader catches what was missed."},
+  {"q":"Do I need an accessibility expert?","a":"For initial work, no. The subset that matters is something engineers can learn in a day. For a third-party audit before enterprise sales or compliance, yes. The work to make a product accessible is mostly engineering hygiene. The work to certify it is mostly process."},
+  {"q":"What about ARIA?","a":"Use ARIA when semantic HTML cannot express what you need. Custom widgets like comboboxes, modals, and tabs benefit from ARIA attributes. The rule is: prefer semantic HTML first, reach for ARIA when it is genuinely needed. ARIA misuse causes more problems than it solves."},
+  {"q":"How long does this work take to retrofit?","a":"A small product can be brought to a reasonable WCAG 2.1 AA level in a week or two. A large product takes months. The cost is much higher than building it in from the start, which is why the discipline is to ship accessible from day one rather than retrofit later."}
+]
+---
+
+## What you actually need to know
+
+- The practical subset that matters most: semantic HTML, keyboard navigation, contrast, alt text, focus indicators, form labels.
+- WCAG 2.1 AA is the realistic target. AAA is overkill for most products.
+- Automated tools like axe-core catch the mechanical issues. They do not catch all of them.
+- Keyboard-only testing surfaces structural problems that automated tools miss.
+- Retrofitting is much more expensive than building it in from the start.
+
+| Requirement | What it means | How to catch failures |
+|---|---|---|
+| Semantic HTML | Use the right element for the job | Code review, axe-core |
+| Keyboard navigation | Every interaction reachable via keyboard | Manual keyboard testing |
+| Color contrast | Text meets minimum contrast ratios | Lighthouse, contrast checkers |
+| Alt text | All meaningful images have descriptions | axe-core, manual review |
+| Focus indicators | Visible focus on every focusable element | Tab through the page |
+| Form labels | Every input has an associated label | axe-core, screen reader |
+
+## The core argument
+
+WCAG is real and most founders treat it as either critical or irrelevant. Neither is right. The full standard is long, detailed, and includes criteria that do not affect most products. The subset of WCAG that actually catches accessibility failures is small enough to learn in a day and shippable as a default.
+
+I have seen products fail enterprise procurement because they did not handle keyboard focus. I have seen products lose users with disabilities because a button was a div with an onclick handler. I have seen design teams ship beautiful interfaces that are unusable for anyone who cannot see them. None of this is hard to prevent if the team makes a habit of the basics.
+
+The argument I hear against accessibility is that it slows the team down. That is true if you bolt it on at the end. It is false if you build it in from the start. A button that is semantic from day one costs no more than a div with onclick. An input that has a label is normal HTML. The cost is the discipline, not the work.
+
+The other argument is that nobody on the team has disabilities so the team cannot judge. That is partially true. The fix is to use the tools that exist. Run axe-core. Tab through your interface. Try a screen reader for ten minutes. You will catch most of the issues without expert knowledge. For the issues that need expert knowledge, hire someone for a one-time audit.
+
+## The subset that catches most issues
+
+### Semantic HTML
+
+Use a button for buttons. Use a link for links. Use a heading for headings. Use a label for labels. This is the single most impactful habit. Most of the divs-pretending-to-be-buttons in modern apps are accessibility failures, and the fix is replacing them with actual buttons.
+
+### Keyboard navigation
+
+Every interactive element must be reachable and operable with a keyboard. Tab order must be sensible. Focus must be visible. Trap focus inside modals and release it on close. None of this is exotic; it is just discipline.
+
+### Color contrast
+
+Text against background must meet minimum contrast ratios. 4.5:1 for normal text, 3:1 for large text. Most design systems can be tuned to meet this without losing visual appeal. Run a contrast checker against your palette.
+
+### Alt text
+
+Every meaningful image needs alt text that describes the content or purpose. Decorative images get empty alt attributes so screen readers skip them. This is a five-second decision per image and a constant violation in practice.
+
+### Focus indicators
+
+Browsers ship default focus indicators. Designers often remove them because they look "ugly." Do not do this without providing a custom focus indicator that is at least as visible. Without focus indicators, keyboard users have no idea where they are on the page.
+
+### Form labels
+
+Every input has a label. The label is associated with the input via for/id or by nesting. Placeholder text is not a label. Screen readers do not announce placeholders the way they announce labels.
+
+## How long does it take
+
+| Stage | Time | Notes |
+|---|---|---|
+| Initial education | A day per engineer | Read the practical subset, run the tools |
+| Audit and fix existing product | A week to months | Depends on size and current state |
+| Build accessibility into new work | Negligible per feature | Just discipline |
+| Third-party audit for compliance | A few weeks | Required for some procurement |
+| Ongoing testing in CI | Hours to set up | axe-core in your test suite |
+
+## What to test before shipping
+
+- Tab through every page. Confirm focus is visible and order is sensible.
+- Run Lighthouse or axe-core. Fix the warnings.
+- Use a screen reader for the main flows. NVDA or VoiceOver are free.
+- Check color contrast against your design system.
+- Confirm every form input has a label.
+
+## Expert opinion
+
+> Accessibility is one of those topics where everyone agrees it matters and almost nobody invests in it until forced. The teams that build it in by default ship products that work for everyone, pass procurement, and never have to do an expensive remediation project. The teams that put it off pay back the same cost with interest later. The practical subset is small enough that "we did not have time" is no longer a defensible answer.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client was losing a major enterprise deal because their product failed a basic accessibility review. They asked me how long it would take to "fix accessibility." I ran an automated audit, tabbed through the product, and made a list. The top issues were divs serving as buttons, missing form labels, and removed focus indicators.
+
+We fixed the top 80 percent of issues in a focused two-week sprint. The procurement team retested and signed the contract. The work was not exotic. It was the practical subset, applied with discipline. The product became measurably better for sighted users too because the keyboard navigation improvements helped power users. The related discussion is in [the accessibility audit every web app should pass](/blog/the-accessibility-audit-every-web-app-should-pass) and reinforced by [how to sell to enterprise without a full compliance stack](/blog/how-to-sell-to-enterprise-without-a-full-compliance-stack).
+
+## Common mistakes
+
+1. Using divs as buttons with onclick handlers.
+2. Removing focus indicators because they look "ugly" without replacing them.
+3. Using placeholder text as the only label for an input.
+4. Adding ARIA attributes to fix what semantic HTML would have done better.
+5. Treating automated tools as a complete check. They catch maybe 40 percent of issues.
+6. Skipping the keyboard test because it feels slow.
+7. Deferring accessibility until procurement forces it. The retrofit cost is much higher.
+
+## A 30 day plan to get baseline accessibility
+
+1. **Week one.** Educate the team. Read the practical subset. Set up axe-core in CI.
+2. **Week one.** Audit the current product with the automated tools. List the top issues by severity.
+3. **Weeks two and three.** Fix the structural issues. Replace fake buttons with real buttons. Add focus indicators. Add form labels.
+4. **Week three.** Tab through every page. Fix what the keyboard test surfaces.
+5. **Week four.** Test with a screen reader for the main flows. Fix what it surfaces.
+6. **Ongoing.** Make this part of [the code review process](/blog/the-code-review-that-actually-improves-code). The cost of accessibility caught in review is small. The cost caught after launch is large.

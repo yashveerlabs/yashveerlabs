@@ -1,0 +1,113 @@
+---
+slug: "bundle-size-the-quiet-killer-of-mobile-web-performance"
+title: "Bundle Size: The Quiet Killer of Mobile Web Performance"
+excerpt: "Bundle size is the silent driver of bad mobile experience. The Wi-Fi user does not notice. The 4G user does. Mobile web performance is a bundle size problem more often than any other kind."
+date: "2026-05-20"
+category: "Performance Optimization"
+tags: ["performance","bundle","mobile","javascript"]
+readingMinutes: 12
+ogImage: "/api/og/blog/bundle-size-the-quiet-killer-of-mobile-web-performance"
+status: "published"
+definition: "Bundle size is the total weight of JavaScript and CSS the browser must download and parse before your app becomes interactive. On a fast desktop with broadband, a heavy bundle is barely noticeable. On a mid range Android over 4G, a heavy bundle is the difference between a usable app and one that the user closes. Most mobile web performance work is bundle work."
+faq: [
+  {"q":"What is a reasonable bundle size in 2026?","a":"Under 200 KB compressed JavaScript on initial load for most B2B SaaS. Under 100 KB is excellent. Under 300 KB is acceptable. Over 500 KB on initial load is a problem on mobile. The numbers should be enforced in CI."},
+  {"q":"How do I measure bundle size?","a":"Use the build output from your bundler. Webpack, Rollup, esbuild, and Vite all report bundle sizes. Tools like webpack-bundle-analyzer or Vite's rollup-plugin-visualizer show the breakdown. Measure compressed size after gzip or brotli."},
+  {"q":"What are the biggest contributors to bundle size?","a":"Large libraries imported in full when only a small piece was needed. Date libraries like Moment. Lodash. Icon libraries. Charting libraries. Each of these can add hundreds of KB. The fix is tree shakeable imports and smaller alternatives."},
+  {"q":"What about code splitting?","a":"Split the bundle by route. Each route loads only the code it needs. Heavy components like rich text editors or 3D scenes load only when used. The framework supports this with dynamic import in most modern stacks."},
+  {"q":"What is tree shaking?","a":"The bundler removes code that is not actually used. Tree shaking works only when the imports support it. Side effect free modules. Named imports. ES modules. The wrong import style breaks tree shaking and includes the whole library."},
+  {"q":"How do I keep the bundle small over time?","a":"Set a budget. Enforce it in CI. Block any pull request that pushes the bundle past the budget. The team learns to discuss bundle weight as a real trade off. Without enforcement the bundle grows monotonically."},
+  {"q":"What about the second visit?","a":"The bundle can be cached on second visit. Use long lived cache headers with content hashed filenames. The cost is paid only on the first visit and on changes. The strategy can change the perceived performance dramatically."}
+]
+---
+
+## What you actually need to know
+
+- Mobile web performance is bundle weight more than anything else.
+- Under 200 KB compressed JavaScript on initial load is a reasonable target.
+- Tree shaking, code splitting, and lighter libraries are the levers.
+- Enforce a bundle budget in CI.
+- The second visit can be much faster with the right caching.
+
+| Bundle size | Mobile experience |
+|---|---|
+| Under 100 KB compressed | Excellent everywhere |
+| 100 to 200 KB | Good on 4G, fine on 5G and Wi-Fi |
+| 200 to 300 KB | Acceptable, noticeable on slow networks |
+| 300 to 500 KB | Slow on 4G, problematic on 3G |
+| Over 500 KB | Mobile users close the tab |
+
+## The core argument
+
+Bundle size is the part of web performance that disappears when you are testing on your own laptop with fiber. The dev machine has the bundle cached. The network is fast. The CPU is fast. The bundle weight feels free. Then the customer on a mid range Android over 4G in a coffee shop loads the same page and the experience is brutal.
+
+The cost of a heavy bundle is concentrated in the first visit and on mobile networks. The bundle has to download. The CPU has to parse it. The main thread is blocked until the parse finishes. The user sees a blank screen, then a partial render, then finally something they can interact with. On a slow phone the gap between blank and interactive can be five to ten seconds. That is a churn event.
+
+The teams that take bundle size seriously hit performance targets that the same teams cannot hit when they ignore bundle size. The discipline is mostly mechanical. Code splitting at the route boundary. Dynamic imports for heavy components. Tree shaking that actually works. Lighter libraries where the big ones were not earning their weight.
+
+The cost of the discipline is small. A few hours per pull request to think about what new code adds to the bundle. A CI check that blocks regressions. A quarterly review of the bundle composition. The return is mobile performance that does not deteriorate over time.
+
+## The biggest wins
+
+| Lever | Typical savings | Effort |
+|---|---|---|
+| Replace Moment.js with date-fns or Day.js | 60 to 200 KB | Hours |
+| Replace Lodash with native or per function imports | 60 to 100 KB | Hours |
+| Tree shakeable icon imports | 50 to 200 KB | Hours |
+| Code splitting by route | Variable, often large | Days |
+| Dynamic import of heavy components | Variable, often large | Hours per component |
+| Replace heavy charting library | 100 to 400 KB | Days |
+| Remove unused dependencies | Variable | Hours |
+| Server side render the heavy components | Significant | Days |
+
+## How much does this cost
+
+The investment to put bundle discipline in place is roughly a sprint. The ongoing cost is per pull request awareness. Both are small. The return is faster mobile performance that compounds across every user.
+
+## Features the bundle discipline must have
+
+- A documented bundle budget.
+- CI enforcement of the budget.
+- A bundle analyzer report on every pull request.
+- A list of approved heavy libraries with justification.
+- A quarterly review of the bundle composition.
+- A clear policy on tree shakeable imports.
+- Source maps for production bundles to support analysis.
+- A way to test on slow networks during development.
+
+## Expert opinion
+
+> The teams that ship fast mobile web in 2026 take bundle size seriously the way teams in 2010 took image weight seriously. The discipline is unglamorous. The return is the difference between mobile users who stay and mobile users who close the tab. The investment per pull request is small. The compounding effect is large.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS reported that their mobile conversion was significantly worse than their desktop conversion. The team assumed it was a UX problem. The metrics suggested otherwise. The mobile Largest Contentful Paint was over six seconds. The desktop was under two.
+
+We measured the bundle. The initial JavaScript was 780 KB compressed. The breakdown showed Moment.js, the full Lodash, a charting library used on one page, and an icon library that imported everything.
+
+We replaced Moment with date-fns. We swapped Lodash for per function imports. We dynamic imported the charting library. We migrated the icons to tree shakeable imports.
+
+The bundle dropped to 180 KB compressed. The mobile LCP dropped to 2.4 seconds. The mobile conversion improved by roughly thirty percent over the next quarter. The desktop conversion improved by a smaller amount because it had been less constrained.
+
+For more on the related work, see [largest contentful paint the metric that changes conversions](/blog/largest-contentful-paint-the-metric-that-changes-conversions) and [code splitting strategies for Next js applications](/blog/code-splitting-strategies-for-next-js-applications).
+
+## Common mistakes teams make
+
+1. Testing only on the dev machine with fiber.
+2. No bundle budget. The size grows monotonically.
+3. Importing whole libraries when a function would have sufficed.
+4. No code splitting by route.
+5. Heavy components loaded on every page.
+6. Wrong import style that breaks tree shaking.
+7. No CI enforcement. The budget is theoretical.
+8. Treating bundle size as solved once. It needs ongoing attention.
+
+## A 30 day plan to put bundle discipline in place
+
+1. **Week one.** Measure the current bundle. Identify the top contributors.
+2. **Week two.** Make the easy swaps. Moment to date-fns. Lodash to per function.
+3. **Week three.** Add code splitting by route. Dynamic import heavy components.
+4. **Week four.** Set the budget. Add CI enforcement.
+
+For more on the related work, read [code splitting strategies for Next js applications](/blog/code-splitting-strategies-for-next-js-applications) and [lazy loading the patterns that work and the ones that backfire](/blog/lazy-loading-the-patterns-that-work-and-the-ones-that-backfire). On the broader performance side, [the real numbers behind a fast web app in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026) is the natural next read.

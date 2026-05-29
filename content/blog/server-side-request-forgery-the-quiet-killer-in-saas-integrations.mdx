@@ -1,0 +1,62 @@
+---
+slug: "server-side-request-forgery-the-quiet-killer-in-saas-integrations"
+title: "Server Side Request Forgery: The Quiet Killer in SaaS Integrations"
+excerpt: "SSRF lets attackers make your server request internal resources they cannot access themselves. SaaS products that fetch external URLs are especially vulnerable. Here is how it works and how to prevent it."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/server-side-request-forgery-the-quiet-killer-in-saas-integrations"
+status: "published"
+definition: "Server-Side Request Forgery (SSRF) is a vulnerability where an attacker can cause the server to make HTTP requests to an attacker-controlled destination, which may include internal network resources, cloud provider metadata services, or other backend infrastructure not accessible from the public internet. SSRF is particularly dangerous in SaaS products that accept user-provided URLs (webhook endpoints, image imports, integration callbacks, RSS feed fetchers) because the server's network position grants access to resources the attacker cannot reach directly."
+faq: [
+  {"q":"What are common SSRF attack vectors in SaaS products?","a":"Common SSRF attack vectors in SaaS products: webhook URL registration (the user provides a URL and the product sends POST requests to it); image import or URL preview features (the server fetches a URL to display a preview or import content); integration setup that requires the product to call a user-specified API endpoint; export or import features that accept a source URL; and PDF generation or screenshot services that render user-provided URLs. Any feature where the server makes an outbound HTTP request to a user-controlled URL is a potential SSRF vector."},
+  {"q":"What can an SSRF attacker access that makes it dangerous?","a":"An SSRF attacker can potentially access: the AWS/GCP/Azure instance metadata service (169.254.169.254 for AWS IMDSv1, accessible from EC2 instances, which exposes IAM credentials); internal APIs and services that are not exposed to the public internet (admin APIs, internal databases via HTTP API, monitoring dashboards); internal network resources on private IP ranges (10.x.x.x, 172.16.x.x, 192.168.x.x); other services co-located on the same network segment. The AWS IMDSv1 endpoint is the most commonly exploited SSRF target because it returns IAM credentials that grant cloud infrastructure access."},
+  {"q":"How do you validate user-provided URLs to prevent SSRF?","a":"URL validation for SSRF prevention: resolve the URL to its IP address and check that the IP is not in private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16 for metadata services); validate the URL scheme is http or https (not file://, dict://, gopher://, or other schemes); re-validate after redirect resolution, because a URL may resolve to a public IP initially and redirect to a private IP (DNS rebinding); and use an allowlist of trusted domains for webhook endpoints when the use case permits it. The challenge: validation at URL parse time is insufficient because DNS resolution at request time may return a different IP than validation time."},
+  {"q":"What is DNS rebinding and why does it bypass basic SSRF protections?","a":"DNS rebinding is an attack where an attacker controls a domain that initially resolves to a public IP address (which passes SSRF validation) but then resolves to an internal IP address when the server makes the actual request. This exploits the time gap between DNS validation and request execution. Defenses: re-resolve the hostname immediately before making the request and revalidate the resolved IP; use a network egress proxy that enforces IP-based blocking for internal ranges; or implement a server-side DNS resolver that caches the resolved IP and reuses it for the actual request. Some SSRF libraries handle DNS rebinding by checking the resolved IP at request time rather than validation time."},
+  {"q":"What defense-in-depth measures reduce SSRF risk beyond URL validation?","a":"Defense-in-depth for SSRF: enable AWS IMDSv2 (requires a PUT request with a token before the GET, which HTTP libraries do not automatically follow; prevents simple SSRF exploits against the metadata service); use network egress controls that restrict outbound traffic from application servers to allowed CIDRs (preventing requests to internal IP ranges at the network level); run HTTP fetch operations in an isolated network environment (a separate Lambda or container with no internal network access); and implement request signing for webhooks so that the receiving service can verify the request originated from your infrastructure. No single defense is sufficient; combining validation, network controls, and reduced metadata access is the correct approach."}
+]
+---
+
+## What you need to know
+
+- SSRF lets attackers use your server as a proxy to reach internal resources, including the AWS metadata service that exposes IAM credentials.
+- Any feature that fetches user-provided URLs is an SSRF vector: webhooks, image imports, link previews, integration callbacks.
+- Basic URL validation (blocking private IP ranges) is necessary but insufficient. DNS rebinding bypasses validation performed at parse time.
+- Enable AWS IMDSv2 on all EC2 instances. This is the most impactful single mitigation for SSRF in AWS environments.
+- Defense-in-depth: combine URL validation, network egress controls, and isolated fetch environments.
+
+## The core argument
+
+SSRF is categorized as a high-severity vulnerability in the OWASP Top 10 because the impact is not limited to data disclosure. Successful SSRF against a cloud-hosted application can yield IAM credentials with significant AWS permissions, which translates to the attacker having cloud infrastructure access: reading S3 buckets, querying databases, escalating to administrative privileges. The attack path from SSRF to full cloud compromise is well-documented and has been used in several high-profile breaches.
+
+The reason SSRF is particularly prevalent in SaaS products is that SaaS features are built around integrations. Webhook endpoints, third-party data imports, link preview generation, custom integration callbacks: these features are core to the SaaS value proposition and all involve the server making outbound HTTP requests to user-controlled URLs. The same feature that makes the product useful is the attack surface.
+
+The prevention complexity is real. Simple IP validation does not prevent DNS rebinding. Allowlisting does not scale when the product integrates with any external service the customer chooses. The correct approach is layered: validate URLs before and after resolution, enable cloud provider metadata service protections (IMDSv2), enforce network egress controls that prevent requests to internal ranges, and consider running user-triggered HTTP fetches in an isolated environment without internal network access. This combination is the only approach that addresses the full attack surface.
+
+## Common mistakes
+
+1. **Validating the URL only at parse time before DNS resolution.** The hostname in a user-provided URL resolves to an IP address at request time, not at validation time. An attacker can control a domain that passes validation (public IP) and then redirect to an internal IP (DNS rebinding) after validation passes. Validate the final resolved IP immediately before making the request, not the URL string.
+
+2. **Not enabling IMDSv2 on AWS EC2 instances.** AWS IMDSv2 requires a two-step process to obtain credentials from the metadata service, which prevents the simple GET-based SSRF attack against `169.254.169.254`. Enabling IMDSv2 (and optionally disabling IMDSv1 entirely) is a configuration change in the EC2 instance settings or the Terraform/CloudFormation template. This should be enabled on every EC2 instance that runs application code that fetches user-provided URLs.
+
+3. **Allowing arbitrary URL schemes in user-provided URLs.** Validation that only checks for private IP addresses but allows any URL scheme can be bypassed with file:// (local file access), gopher:// (protocol with raw TCP capabilities), or dict:// (port scanning). Validate that the scheme is http or https before any other validation. Reject all other schemes.
+
+4. **Running URL fetch operations with production database credentials.** The blast radius of an SSRF vulnerability that succeeds in exfiltrating credentials depends on what credentials the compromised process has access to. URL fetch operations should run in a context with minimal credentials: a separate service role, an isolated Lambda function, or a network-segmented container that cannot access the production database directly. This principle of least privilege limits the impact of successful SSRF.
+
+5. **Not logging outbound HTTP requests from application servers.** SSRF attacks are often detectable through outbound request logs: unusual hostnames, requests to IP addresses in private ranges, or requests to the metadata service endpoint. Without outbound request logging, SSRF attacks may go undetected until the consequences become visible. Log all outbound HTTP requests with the destination host, resolved IP, and response status.
+
+## Where to start
+
+1. **Audit all features that make outbound HTTP requests to user-controlled URLs.** Create an inventory of webhook registration, link preview, import from URL, and integration callback features. For each, verify that URL validation is in place and that the validation checks the resolved IP after DNS resolution, not just the URL string.
+
+2. **Enable IMDSv2 on all production EC2 instances today.** This is a one-command AWS CLI change per instance or a Terraform variable change for infrastructure-as-code deployments. It is the single highest-impact SSRF mitigation for AWS environments and requires no application code changes.
+
+3. **Implement outbound request logging and add an alert for requests to RFC 1918 private address ranges.** Log every outbound HTTP request made by application servers including the destination IP (resolved, not just the hostname). Add a security alert for any request to 10.x.x.x, 172.16.x.x, 192.168.x.x, or 169.254.x.x from production application processes. This alert catches both successful and attempted SSRF attacks.
+
+## Related reading
+
+- [Secrets Management for SaaS: Vault, AWS Secrets Manager, Doppler](/blog/secrets-management-for-saas-vault-aws-secrets-manager-doppler)
+- [Secrets in CI: The Patterns That Avoid Leaks](/blog/secrets-in-ci-the-patterns-that-avoid-leaks)
+- [SQL Injection in 2026: Still Happening, Still Preventable](/blog/sql-injection-in-2026-still-happening-still-preventable)
+- [Right to Be Forgotten: How to Implement It Without Pain](/blog/right-to-be-forgotten-how-to-implement-it-without-pain)

@@ -1,0 +1,112 @@
+---
+slug: "connection-pooling-why-defaults-are-wrong-for-most-stacks"
+title: "Connection Pooling: Why Defaults Are Wrong for Most Stacks"
+excerpt: "Every framework ships connection pool defaults. Almost none of them match your actual workload. The defaults are designed for the general case. Your workload is specific. Here is how to pick the right numbers."
+date: "2026-05-20"
+category: "Performance Optimization"
+tags: ["connection-pooling","performance","tuning","database"]
+readingMinutes: 11
+ogImage: "/api/og/blog/connection-pooling-why-defaults-are-wrong-for-most-stacks"
+status: "published"
+definition: "Framework default connection pool sizes are designed for a generic workload. Yours is not generic. The right pool size depends on your concurrency, your database capacity, your query latency, and your worker count. The defaults are usually too small for production loads and sometimes too large for the database to support. Picking the right numbers requires a small amount of measurement and a small amount of math."
+faq: [
+  {"q":"What are the typical defaults?","a":"Node.js pg library defaults to 10. Rails defaults to 5. Django defaults to varying numbers depending on backend. Java HikariCP defaults to 10. The defaults are conservative because they cannot know your workload. They are almost never optimal."},
+  {"q":"How do I pick the right size?","a":"Measure your concurrency. The number of database queries running at once at peak load. Add a small buffer. That is the pool size. Verify the total across servers fits under the database's max_connections."},
+  {"q":"What if my workload is bursty?","a":"Size for the burst, not the average. A pool that handles the average will queue during bursts. The latency from queuing is often the felt slowness customers complain about. Size for the 99th percentile of concurrency."},
+  {"q":"What about long running queries?","a":"They hold connections. If your workload has long queries, the pool needs to be larger relative to the worker count. Or you split the workload so long queries use a different pool with different limits."},
+  {"q":"Should the pool be the same across services?","a":"No. Each service has its own pool. The total across services has to fit under the database limit. The shape of each service determines its pool size. Read heavy versus write heavy have different needs."},
+  {"q":"What about pgbouncer pool mode and pool size?","a":"PgBouncer pool size is the number of real Postgres connections it holds. The application pool size is how many clients can connect to PgBouncer. Both have to be sized. The application can have a large pool. PgBouncer's pool to Postgres should be smaller and sized for total concurrent transactions."},
+  {"q":"What is the worst tuning mistake?","a":"Setting the pool to match the worker count without thinking about concurrency. A server with 4 workers and 100 concurrent requests needs a pool larger than 4. The pool size should reflect the number of concurrent database operations, not the number of OS workers."}
+]
+---
+
+## What you actually need to know
+
+- Framework defaults are conservative and almost never right.
+- Size the pool for your concurrency at the 99th percentile.
+- Verify total connections fit under the database limit.
+- Long queries need a larger pool relative to worker count.
+- Each service has its own pool. Total budget across services matters.
+
+| Stack | Default | Typical correct value |
+|---|---|---|
+| Node.js pg | 10 | 20 to 50 |
+| Rails ActiveRecord | 5 | 15 to 40 |
+| Django | Variable | 15 to 40 |
+| Java HikariCP | 10 | 20 to 50 |
+| PgBouncer transaction mode | Variable | Sized for concurrent transactions |
+
+## The core argument
+
+Framework defaults for connection pooling exist because the framework cannot know your workload. The default is a reasonable starting point for a generic small application. Your application is not generic. Your application is specific to its concurrency, its query patterns, and its database capacity. The default is the starting point. Tuning is the work.
+
+The teams that run on defaults discover the problem when traffic grows. The pool that worked at one hundred concurrent users does not work at one thousand. The application stalls under load. The database is fine. The pool is the bottleneck. The team scales the database. The bottleneck remains because it was never the database. The team is confused and the customers are unhappy.
+
+The right approach is to size the pool deliberately. Measure the concurrency at peak load. Pick a pool size that handles the 99th percentile of concurrency. Verify the total across servers fits under the database's max_connections divided by two. Reserve the other half for migrations, admin queries, and one off operations.
+
+The other piece is the queue behavior. When the pool is full and new requests arrive, what happens. Wait. Time out. Reject. The default is usually wait forever, which produces hung requests. The right behavior is to wait a few seconds then time out, so the failure surfaces quickly rather than appearing as a slow response.
+
+## The tuning workflow
+
+| Step | Detail |
+|---|---|
+| Measure concurrency | Database connections in use at peak load |
+| Estimate growth | Where will concurrency be in six months |
+| Compute pool size | Concurrency at growth peak plus small buffer |
+| Verify database capacity | Total pool across servers under max_connections / 2 |
+| Set acquisition timeout | A few seconds |
+| Set connection lifetime | 30 minutes to a few hours |
+| Add monitoring | Checkout time, queue depth, errors |
+| Test under load | Confirm the new size handles peak |
+
+## How much does this cost
+
+The cost of tuning is engineering time. A few hours to measure and adjust. The infrastructure cost difference is negligible. The savings show up as fewer incidents and lower latency under load.
+
+## Features the pool tuning must have
+
+- A measurement of current concurrency.
+- A pool size set deliberately based on the measurement.
+- An acquisition timeout that surfaces failures quickly.
+- A connection lifetime that prevents stale connections.
+- Monitoring on the three key metrics.
+- An alarm on saturation.
+- A documented review cadence as the workload changes.
+
+## Expert opinion
+
+> The teams that have never tuned their connection pool are usually a traffic spike away from a hard to diagnose incident. The tuning is mechanical and cheap. The incident is expensive and confusing. The discipline of measuring concurrency and sizing the pool deliberately is one of the highest leverage observability practices in any production stack.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was running on the Node.js pg library default pool of 10. They had four application servers. Their Postgres allowed 100 connections. At peak load they were experiencing latency that they had attributed to slow queries.
+
+The pool checkout time at peak was 600 milliseconds. The slow queries were actually fine. The pool was undersized.
+
+We measured concurrency. The peak was around 30 concurrent operations per server. We raised the pool to 40 per server. Total connections were 160 across four servers, which was above the Postgres limit. We added PgBouncer in transaction mode with a pool of 50 to Postgres. The application could have 160 connections to PgBouncer. PgBouncer maintained 50 connections to Postgres.
+
+The latency at peak dropped dramatically. The checkout time fell to under 5 milliseconds. The database was no longer near its connection limit. The fix took a day. The improvement was immediate.
+
+For more on the related work, see [connection pooling the quiet killer of SaaS performance](/blog/connection-pooling-the-quiet-killer-of-saas-performance) and [PostgreSQL performance at scale the tweaks that move the needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle).
+
+## Common mistakes teams make
+
+1. Running on framework defaults.
+2. Sizing the pool to match worker count instead of concurrency.
+3. No measurement before tuning.
+4. No PgBouncer for serverless workloads.
+5. Acquisition timeout set to infinite.
+6. No monitoring on the pool.
+7. Pool total across servers exceeds database limit.
+8. No documented review cadence as load grows.
+
+## A 30 day plan
+
+1. **Week one.** Measure current concurrency at peak.
+2. **Week two.** Compute and apply the right pool size.
+3. **Week three.** Add PgBouncer or equivalent if needed.
+4. **Week four.** Add monitoring and alarms. Test under synthetic load.
+
+For more on the related work, read [connection pooling the quiet killer of SaaS performance](/blog/connection-pooling-the-quiet-killer-of-saas-performance) and [database query performance the five patterns that hurt the most](/blog/database-query-performance-the-five-patterns-that-hurt-the-most). On the broader performance side, [backend performance budgets how to set them](/blog/backend-performance-budgets-how-to-set-them) is the natural next read.

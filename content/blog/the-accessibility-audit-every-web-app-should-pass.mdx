@@ -1,0 +1,91 @@
+---
+slug: "the-accessibility-audit-every-web-app-should-pass"
+title: "The Accessibility Audit Every Web App Should Pass"
+excerpt: "The accessibility audit checklist every web app should run before launch. WCAG AA, keyboard nav, screen readers, and what actually fails in production."
+date: "2025-11-16"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","accessibility"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-accessibility-audit-every-web-app-should-pass"
+status: "published"
+definition: "An accessibility audit is a structured review of whether your web app can be used by people with visual, motor, auditory, or cognitive disabilities. WCAG 2.1 AA is the legal and practical standard in most markets. Most web apps fail it. The failures are not exotic. They are the same twelve issues, repeated across thousands of codebases."
+faq: [
+  {"q":"What is WCAG and which level should I target?","a":"WCAG stands for Web Content Accessibility Guidelines. The levels are A, AA, and AAA. Target AA. It is the legal standard in the EU, UK, US, Canada, and Australia for most commercial apps. AAA is aspirational and often impractical. A is insufficient to avoid legal risk."},
+  {"q":"How long does an accessibility audit take?","a":"For a mid-size web app, a thorough manual audit takes two to four days. Automated tools catch about 30 to 40 percent of WCAG failures in under an hour. The rest require a human with a screen reader and a keyboard. Budget both."},
+  {"q":"Do I need to hire an accessibility specialist?","a":"Not immediately. A senior frontend engineer who knows WCAG can run the first audit. Bring in a specialist before a major compliance review or enterprise sales process. For most startups, internal plus one external review per year is enough."},
+  {"q":"What automated tools are most reliable?","a":"axe-core is the industry standard. Run it via the axe DevTools browser extension or as part of your CI pipeline via jest-axe or playwright-axe. Lighthouse also covers accessibility. Use both. Neither replaces manual testing with a real screen reader."},
+  {"q":"Will fixing accessibility hurt my design?","a":"Rarely. Color contrast adjustments and focus indicators are the most common visual changes. Both are minor. Semantic HTML changes are invisible to sighted users. Keyboard navigation improvements make the app better for power users, not just users with disabilities."}
+]
+---
+
+## What you actually need to know
+
+- WCAG 2.1 AA is the minimum standard. It covers perceivable, operable, understandable, and robust criteria.
+- Automated tools catch 30 to 40 percent of failures. The rest require keyboard and screen reader testing.
+- The most common failures are color contrast, missing alt text, unlabeled form inputs, and broken keyboard navigation.
+- Accessibility is also an SEO signal. Screen readers and crawlers parse the same semantic HTML.
+- Fixing accessibility early is cheap. Retrofitting it after launch is expensive and disruptive.
+
+| Audit Approach | Time Cost | Coverage | Best For |
+|---|---|---|---|
+| Automated only (axe, Lighthouse) | 1 to 2 hours | 30 to 40 percent of issues | Quick CI check, first pass |
+| Manual keyboard + screen reader | 2 to 4 days | 85 to 95 percent | Pre-launch audit, compliance review |
+| Third party specialist | 1 to 2 weeks | Near complete | Enterprise deals, legal requirements |
+
+## The core argument
+
+Accessibility audits have a reputation problem. Teams hear "WCAG" and assume it means expensive consultants, visual redesigns, and months of refactoring. That is not how the work actually plays out. The overwhelming majority of WCAG AA failures come from a short list of issues that any senior frontend engineer can fix in a focused sprint.
+
+The real cost of skipping the audit is not design disruption. It is legal exposure in markets that have accessibility law on the books, and lost enterprise deals where procurement teams run their own accessibility checklist before signing. I have watched a well-built SaaS lose a six-figure contract because the tab order on the pricing page was broken and the enterprise buyer noticed. The fix took forty minutes. The deal took six months to rebuild.
+
+The audit itself has two phases. The automated phase catches the easy failures: missing alt text, color contrast below 4.5:1, form inputs without labels, empty button text. Run axe-core in CI and those disappear fast. The manual phase catches the harder failures: focus traps in modals, keyboard navigation flows that skip interactive elements, screen reader output that does not match what a sighted user sees. That phase takes longer but the fixes are usually simple once you find them.
+
+## The twelve failures that show up everywhere
+
+Most accessibility failures in production web apps are the same twelve issues repeated at scale.
+
+**1. Color contrast below 4.5:1 for normal text.** This is the most common WCAG AA failure by volume. Run the color contrast analyzer on every text color in your design system. Fix at the token level so the fix propagates everywhere.
+
+**2. Images without alt text.** Every `<img>` needs an `alt` attribute. Decorative images get `alt=""`. Informative images get a description. Icons used as buttons need either visible text or an `aria-label`.
+
+**3. Form inputs without labels.** Every input needs a `<label>` associated via `for` and `id`, or an `aria-label`. Placeholder text does not count as a label. It disappears when the user starts typing.
+
+**4. Interactive elements that cannot be reached by keyboard.** Tab through your entire app with a keyboard. Every button, link, input, and custom widget must be reachable. If you built a custom dropdown or date picker, it needs full keyboard support.
+
+**5. Focus indicators that are hidden.** Removing the outline style without replacing it makes keyboard navigation invisible. Add a visible focus indicator to every interactive element. It does not need to be ugly. A 2px gold ring on a dark background is perfectly usable and attractive.
+
+**6. Modal dialogs that trap or lose focus.** When a modal opens, focus must move into it. When it closes, focus must return to the trigger. Keyboard users who cannot escape a modal cannot use the app.
+
+**7. Pages without a logical heading hierarchy.** H1 through H6 are navigation landmarks for screen reader users. One H1 per page. Subheadings in order. No jumping from H2 to H5.
+
+**8. Links with non-descriptive text.** "Click here" and "read more" are useless when a screen reader lists all links on the page. Write link text that makes sense out of context.
+
+**9. Dynamic content that does not announce itself.** Status messages, toast notifications, and form errors need `aria-live` regions so screen readers announce the change without requiring focus movement.
+
+**10. Video without captions.** Any video that includes speech needs synchronized captions. Auto-captions from YouTube or similar tools need human review before publishing.
+
+**11. Custom components without ARIA roles.** If you build a custom checkbox, slider, or tab panel in div elements, you must add the correct ARIA role, state, and property attributes. The browser does not add these automatically.
+
+**12. Missing skip navigation links.** Screen reader and keyboard users navigate by tabbing. A "skip to main content" link at the top of every page saves them from tabbing through the entire header on each page load.
+
+## Common mistakes teams make
+
+1. Running only automated tools and calling the audit done. Automated tools miss the majority of real failures.
+2. Treating accessibility as a one-time project. It needs to be part of the component review process. New components ship with accessibility requirements met.
+3. Removing focus indicators in CSS without a replacement. This breaks keyboard navigation for every user who does not use a mouse.
+4. Using `div` and `span` for interactive elements without ARIA. The browser cannot tell a screen reader that a div is a button.
+5. Forgetting that color alone cannot convey meaning. Error states need more than a red border. They need a text label or icon.
+
+## Where to start: a 3-step audit plan
+
+**Step 1: Run the automated audit.** Install the axe DevTools browser extension. Open every major page in your app. Run the scan. Export the results. Fix every critical and serious issue. This typically takes one to two days and clears the most glaring failures.
+
+**Step 2: Keyboard test every interactive flow.** Unplug your mouse. Tab through signup, login, your core product flow, checkout or whatever your critical path is. Document every point where keyboard navigation breaks, loses focus, or becomes confusing. Fix in order of severity.
+
+**Step 3: Test with a real screen reader.** On macOS, use VoiceOver. On Windows, use NVDA (free) or JAWS. Read your landing page, your core product flow, and your checkout or onboarding sequence. Listen for what is announced. Compare it to what a sighted user would understand. Fix the gaps.
+## Related reading
+
+- [The Frontend Architecture That Survives Three Years of Feature Sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl)
+- [WCAG for Founders: A Practical Subset](/blog/wcag-for-founders-a-practical-subset)
+- [Building Forms That Customers Love](/blog/building-forms-that-customers-love)
+- [The Real Numbers Behind a Fast Web App in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026)

@@ -1,0 +1,62 @@
+---
+slug: "memory-leaks-in-long-lived-web-apps"
+title: "Memory Leaks in Long Lived Web Apps"
+excerpt: "Memory leaks in single-page applications are invisible until the tab slows to a crawl. Here is how they form, how to detect them, and the patterns that eliminate the most common sources in React applications."
+date: "2026-05-23"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 6
+ogImage: "/api/og/blog/memory-leaks-in-long-lived-web-apps"
+status: "published"
+definition: "A memory leak in a web application occurs when memory that is no longer needed is not released by the JavaScript runtime's garbage collector. In long-lived single-page applications where users navigate between views without a full page reload, leaked memory accumulates over time, eventually causing the browser tab to slow down, become unresponsive, or crash. The most common sources are event listeners that are added without being removed, subscriptions that are not cleaned up on component unmount, and closures that hold references to large objects."
+faq: [
+  {"q":"How do I detect a memory leak in a React application?","a":"Open Chrome DevTools and navigate to the Memory tab. Take a heap snapshot, interact with the application for several minutes (navigate between pages, open and close modals, trigger data loads), and take a second snapshot. Compare the two snapshots by viewing objects that grew in count or size. Detached DOM nodes and growing event listener counts are the clearest signals of a leak."},
+  {"q":"What is the most common source of memory leaks in React?","a":"Event listeners and subscriptions that are not cleaned up in useEffect return functions. A useEffect that adds a window event listener or subscribes to a data source without a cleanup function will re-register the listener on every render without removing the previous one. Over time, the leaked listeners accumulate in memory."},
+  {"q":"How does a closure cause a memory leak?","a":"A closure that captures a reference to a large object or a DOM element prevents that object from being garbage collected as long as the closure is reachable. An event listener callback that closes over a component's props or state holds those values in memory even after the component unmounts. The fix is to either remove the listener when no longer needed or ensure the closure captures only the values it requires."},
+  {"q":"Do React's useEffect cleanup functions prevent all memory leaks?","a":"They prevent the leaks from useEffect subscriptions and event listeners when implemented correctly. They do not prevent leaks from global state that accumulates references, from third-party libraries that do not clean up their own resources, or from closures in class component lifecycle methods that are not properly cleared. UseEffect cleanup is necessary but not sufficient for a completely leak-free application."},
+  {"q":"How serious is a memory leak for a typical SaaS web application?","a":"For applications where users typically spend five to fifteen minutes per session, small leaks have minimal impact. For applications where users work for hours at a time, like project management tools, code editors, and data dashboards, even modest leaks cause noticeable degradation. SaaS products where power users have the product open all day are the most affected by memory leaks, and the ones most likely to receive bug reports about performance degrading over time."}
+]
+---
+
+## What you need to know
+
+- Memory leaks in SPAs accumulate over time. A five-minute session may not reveal a leak that becomes obvious after 30 minutes of use.
+- The most common leak pattern in React is an event listener or subscription added in useEffect without a cleanup function.
+- Detached DOM nodes are the diagnostic signal most commonly associated with leaks. They indicate elements that were removed from the DOM but are still referenced in JavaScript memory.
+- Chrome DevTools Memory panel with heap snapshots is the correct tool for diagnosing browser memory leaks. JavaScript profilers and performance monitors do not provide the object-level visibility needed.
+- Fixing leaks requires understanding why the reference is being held, not just that memory is growing.
+
+## The core argument
+
+The memory leak problem in long-lived web applications is a diagnosis problem more than a prevention problem. Most engineers can write correct cleanup logic once they know where the leak is. The difficulty is in detecting that a leak exists at all, identifying which component or interaction causes it, and confirming that the fix actually eliminates the retained memory.
+
+The most common pattern in React applications is the missing useEffect cleanup. An effect that subscribes to a WebSocket connection, registers a window resize listener, or sets up a polling interval creates a resource that must be released when the component unmounts. Without the cleanup return function, each mount of the component adds another subscription or listener. If the component mounts and unmounts repeatedly, say, a modal or a side panel that the user opens and closes, the leaked subscriptions accumulate in memory. The fix is identical every time: return a function from useEffect that removes the listener, cancels the subscription, or clears the interval.
+
+Third-party library leaks are harder to find because they require reading the library's lifecycle documentation rather than just the application code. A chart library that creates a Canvas element and attaches browser event listeners needs a `destroy` method called when the component unmounts. An analytics library that sets up a session with reference-counted state needs an explicit teardown. I have found leaks in production applications at Expert Tutorials and other client projects that were traced to a chart library whose cleanup API was called in the wrong lifecycle phase, resulting in event listeners that survived component unmounts. Finding it required heap snapshot comparison, not code review.
+
+## Common mistakes
+
+1. **Not providing cleanup functions in useEffect hooks that create subscriptions.** Every useEffect that calls `addEventListener`, `setInterval`, `subscribe`, or equivalent must return a cleanup function that undoes that operation. This is not optional for long-lived applications.
+
+2. **Storing component-scoped values in module-level variables.** A module-level Map or Set that grows as components mount and does not shrink as they unmount is a leak. Module-level storage should hold only data with an appropriate lifecycle, not component-instance data.
+
+3. **Not testing memory behavior in long-running sessions.** Short test sessions do not reveal accumulating leaks. Test memory behavior by running the application for 20 to 30 minutes with repeated navigation between the most common routes, opening and closing modals, and triggering data refreshes.
+
+4. **Holding references to large objects in closures unnecessarily.** A callback that closes over an entire component's props object when it only needs one field holds more memory than necessary. Capture the minimum required values in closures, especially in long-lived callbacks.
+
+5. **Not checking for detached DOM nodes after fixing a suspected leak.** After applying a fix, re-run the heap snapshot comparison and verify that detached DOM node count is no longer growing. A fix that reduces growth rate without eliminating it has addressed a symptom, not the source.
+
+## Where to start
+
+1. **Profile the application's memory usage during a 15-minute session.** Use Chrome DevTools Performance tab with memory recording enabled. If the heap size grows monotonically without periods of garbage collection bringing it back down, you have a leak worth investigating.
+
+2. **Take three heap snapshots: at initial load, after 10 minutes of use, and after 20 minutes.** Compare the second and third snapshots for objects that continue to grow. The Constructor column shows which object types are accumulating.
+
+3. **Audit every useEffect in the codebase for missing cleanup functions.** Search for addEventListener, subscribe, setInterval, and setTimeout calls inside useEffect hooks. For each one, verify that a cleanup function returns and undoes the operation.
+
+## Related reading
+
+- [INP: The New Core Web Vital Most Teams Are Failing](/blog/inp-the-new-core-web-vital-most-teams-are-failing)
+- [Frontend Performance Budgets: A Pattern That Sticks](/blog/frontend-performance-budgets-a-pattern-that-sticks)
+- React Server Components vs Client Components: The Real Trade-offs
+- [Lazy Loading: The Patterns That Work and the Ones That Backfire](/blog/lazy-loading-the-patterns-that-work-and-the-ones-that-backfire)

@@ -1,0 +1,118 @@
+---
+slug: "building-apis-that-survive-five-years-of-customer-change-requests"
+title: "Building APIs That Survive Five Years of Customer Change Requests"
+excerpt: "An API that survives five years was designed to. The ones that did not survive were designed for the first customer. Here is the discipline that keeps the API stable while the product evolves underneath it."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["api","design","versioning","longevity"]
+readingMinutes: 12
+ogImage: "/api/og/blog/building-apis-that-survive-five-years-of-customer-change-requests"
+status: "published"
+definition: "An API that survives five years of customer change requests has stable shapes, additive evolution, deliberate versioning, and a clear contract between you and your customers. The discipline starts at design time and never stops. The teams that respect it ship APIs that customers integrate once and keep using. The teams that do not respect it ship APIs that customers integrate and complain about for the entire relationship."
+faq: [
+  {"q":"How do I version an API well?","a":"Major version in the URL path or accept header. Minor changes are additive and require no version bump. Breaking changes are rare and announced months in advance with migration tooling. Most successful APIs go five years on one major version."},
+  {"q":"What is the difference between additive and breaking changes?","a":"Additive changes add fields, endpoints, or query parameters. The existing client continues to work. Breaking changes remove fields, change field shapes, or alter behavior. The existing client breaks. Additive changes are free. Breaking changes are expensive."},
+  {"q":"Should I use REST, GraphQL, or RPC?","a":"REST is the safest default for public APIs. GraphQL wins when the consumers have very different query shapes. RPC wins for internal service to service. The choice matters less than the discipline applied to whichever you pick."},
+  {"q":"How do I deprecate an endpoint?","a":"Three step process. Announce the deprecation with a clear timeline, usually six to twelve months. Add deprecation headers to the response. Provide migration documentation and tooling. Only remove the endpoint after the announced timeline."},
+  {"q":"What is the most common API design mistake?","a":"Designing the API for the first customer's specific use case. The API becomes the wrong shape for the second customer. Refactoring the API later is much harder than getting it right at the start. Design for the typical case, not the first case."},
+  {"q":"How do I handle pagination?","a":"Cursor based pagination for any list that grows. Offset based pagination only for small fixed lists. Cursor based scales. Offset based does not. Document the cursor format. Make it opaque to the client."},
+  {"q":"What about error handling?","a":"Consistent error structure across all endpoints. A field for the error type, a field for the human message, a field for the request ID. The error type is stable. The message can change. The request ID supports debugging."}
+]
+---
+
+## What you actually need to know
+
+- Design the API for the typical case, not the first customer.
+- Additive changes only after launch. Breaking changes are expensive.
+- Cursor based pagination for any growing list.
+- Consistent error structure across all endpoints.
+- Major versions in the URL. Minor changes are additive.
+
+| Discipline | Stable API | Unstable API |
+|---|---|---|
+| Field naming | Consistent across endpoints | Bespoke per endpoint |
+| Pagination | Cursor based | Offset based on growing lists |
+| Versioning | Major in URL, additive minor | Ad hoc |
+| Errors | Consistent shape | Different per endpoint |
+| Deprecation | Announced, gradual | Sudden |
+| Documentation | Current and accurate | Aspirational |
+
+## The core argument
+
+An API that lasts five years is the product of a thousand small disciplines. Each one is unglamorous. The combined effect is an API that customers integrate once and keep using. The teams that skip the disciplines ship APIs that customers complain about for the entire relationship.
+
+The discipline starts at design time. The schema is picked deliberately. The naming is consistent. The endpoints serve the typical case, not the first customer's specific case. The pagination is cursor based from day one because adding it later requires a migration. The error structure is uniform. The versioning is planned.
+
+The discipline continues after launch. Every change is examined for additive versus breaking. The team chooses additive whenever possible. Breaking changes are announced months in advance with migration tooling. The team accepts the cost of additive changes to keep the API stable for customers.
+
+The cost of getting this wrong is hidden until it lands. The first time you have to make a breaking change with no migration plan, every customer integration breaks. The support load spikes. Some customers leave. The lesson lands. The next API the team builds is much better. The trick is to skip the lesson and build the second API the first time.
+
+## Design choices that compound
+
+| Choice | Stable approach |
+|---|---|
+| Resource naming | Plural nouns, kebab case for URLs |
+| Field naming | snake_case or camelCase, consistent across endpoints |
+| IDs | Opaque strings, prefixed by type |
+| Timestamps | ISO 8601 in UTC, end in Z |
+| Money | Integer cents, not floats |
+| Nullable fields | Explicit null, not missing field |
+| Enums | Stable string values, never numeric |
+| Pagination | Cursor based on growing lists |
+| Filtering | Query parameters with documented operators |
+| Sorting | Single field at a time, ascending default |
+
+The choices look small. They compound across every endpoint and every customer integration.
+
+## How much does this cost
+
+The design discipline costs roughly one to two extra weeks at the start of the API project compared to the lazy version. The savings over five years are dramatic. Customer support load that does not exist. Breaking change migrations that do not happen. Engineer time not spent retrofitting consistency. The math is favorable from week one.
+
+The ongoing cost is the review discipline. Every API change is examined for additive versus breaking. Every change to a public endpoint requires documentation update. The cost is real but small for a team that has built the habit.
+
+## Features the API must have
+
+- A schema document that is the source of truth.
+- A versioning strategy that is documented and respected.
+- Deprecation headers and a deprecation policy.
+- A changelog that customers can read.
+- A consistent error structure.
+- A request ID on every response.
+- Rate limit headers on every response.
+- A clear contract for backward compatibility.
+
+## Expert opinion
+
+> The APIs that last are the ones that were designed for longevity. The team accepted the constraints early. The naming is consistent. The shapes are stable. The errors are uniform. The decisions that look pedantic in week one are the decisions that pay off in year five. The teams that skip the discipline build APIs that customers tolerate, not APIs that customers integrate enthusiastically.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had built a public API in their first year with no design discipline. Different endpoints used different field naming conventions. Pagination was offset based. Errors had three different shapes depending on which engineer wrote the endpoint. Customers had to write per endpoint adapters.
+
+We did not break the existing API. We added a v2 namespace that followed strict design rules. New customers used v2. Existing customers were given a year to migrate with full tooling support. The migration finished cleanly.
+
+Three years later the v2 API has had no breaking changes. New endpoints are added monthly. The shape stays consistent. The customer integration cost is dramatically lower than the v1 version. The team has not had to retrofit consistency because it was there from the start of v2.
+
+For more on the related work, see [the API versioning strategy that survives real world use](/blog/the-api-versioning-strategy-that-survives-real-world-use) and [designing an API that customers will not curse in five years](/blog/designing-an-api-that-customers-will-not-curse-in-five-years).
+
+## Common mistakes teams make
+
+1. Designing for the first customer's specific use case.
+2. Inconsistent field naming. Customers write adapters.
+3. Offset based pagination on growing lists.
+4. Different error structures on different endpoints.
+5. Breaking changes without a migration plan.
+6. Missing changelog. Customers cannot tell what changed.
+7. No deprecation headers. The deprecation is invisible.
+8. No request ID. Debugging is a fishing expedition.
+
+## A 30 day API design checklist
+
+1. **Week one.** Pick the conventions. Naming, IDs, timestamps, money, enums.
+2. **Week two.** Design the error structure. Pick the pagination strategy.
+3. **Week three.** Draft the schema. Have it reviewed by a senior engineer.
+4. **Week four.** Write the documentation. Build the changelog.
+
+For more on the related work, read [REST vs GraphQL vs gRPC a decision matrix for founders](/blog/rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders) and [pagination patterns cursor vs offset and why it matters](/blog/pagination-patterns-cursor-vs-offset-and-why-it-matters). On the broader documentation side, [API documentation that developers actually read](/blog/api-documentation-that-developers-actually-read) is the natural next read.

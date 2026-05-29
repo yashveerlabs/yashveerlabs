@@ -1,0 +1,62 @@
+---
+slug: "rate-limiting-algorithms-compared-token-bucket-leaky-bucket-fixed-window"
+title: "Rate Limiting Algorithms Compared: Token Bucket, Leaky Bucket, Fixed Window"
+excerpt: "Rate limiting protects APIs from abuse and overload, but the algorithm choice determines whether users experience smooth degradation or hard cutoffs. Here is how each algorithm behaves and when to use which."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/rate-limiting-algorithms-compared-token-bucket-leaky-bucket-fixed-window"
+status: "published"
+definition: "Rate limiting is the practice of restricting how many requests a client can make to an API within a time window. The algorithm used determines how requests are counted, when limits are enforced, and how burst traffic is handled. Common algorithms include fixed window (simple count per time period), sliding window (count across a rolling time period), token bucket (tokens regenerate at a fixed rate, bursts are allowed up to bucket capacity), and leaky bucket (requests are queued and processed at a fixed rate, smoothing burst traffic)."
+faq: [
+  {"q":"What is a fixed window rate limiter and what is its weakness?","a":"A fixed window rate limiter allows a fixed number of requests per time window (for example, 100 requests per minute). At the start of each minute, the counter resets. The weakness is boundary exploitation: a client can make 100 requests at the end of one window and 100 more at the start of the next, producing 200 requests in a two-second span without violating either window's limit. This burst behavior can overload a backend that is designed for 100 requests per minute as the steady state. Sliding window algorithms eliminate this weakness."},
+  {"q":"How does a token bucket algorithm work?","a":"A token bucket maintains a bucket with a maximum capacity of N tokens. Tokens regenerate at a fixed rate (for example, 10 tokens per second). Each request consumes one token. If the bucket has tokens, the request is allowed. If the bucket is empty, the request is rejected or queued. The token bucket allows bursts up to the bucket capacity as long as tokens have accumulated. A bucket with capacity 100 and regeneration rate of 10 per second allows a burst of 100 requests after 10 seconds of inactivity, then enforces the 10 requests per second steady-state rate."},
+  {"q":"What is the difference between token bucket and leaky bucket?","a":"Token bucket allows bursts up to bucket capacity when tokens have accumulated. Leaky bucket processes requests at a fixed output rate regardless of how quickly requests arrive, smoothing bursty input into steady output. Token bucket is better for APIs where occasional bursts are acceptable. Leaky bucket is better for systems that need predictable output rate regardless of input pattern, such as payment processing APIs where consistent throughput is more important than burst accommodation. Most public APIs use token bucket because it is more user-friendly for clients that make occasional large requests."},
+  {"q":"How do you implement rate limiting in a distributed system?","a":"Rate limiting in a distributed system requires shared state so that requests hitting different servers are counted together against the same limit. Redis is the standard shared state store for distributed rate limiting because it supports atomic increment operations (INCR with EXPIRE for fixed window, sorted sets for sliding window) and is fast enough that rate limit checks do not add significant latency. Alternatively, a rate limiting sidecar or API gateway (Nginx, Kong, Cloudflare) can centralize rate limit enforcement without requiring application code changes."},
+  {"q":"What headers should a rate-limited API return?","a":"Standard rate limit headers from the RateLimit header specification: RateLimit-Limit (the total requests allowed in the window), RateLimit-Remaining (requests remaining in the current window), RateLimit-Reset (Unix timestamp when the window resets). For 429 Too Many Requests responses, the Retry-After header should specify when the client can retry (seconds until reset). Well-implemented rate limit headers allow API clients to implement backoff and retry logic without guessing the limit reset timing."}
+]
+---
+
+## What you need to know
+
+- Fixed window rate limiting is simple to implement but vulnerable to boundary bursts. Sliding window or token bucket prevents the boundary exploit.
+- Token bucket is the most commonly correct choice for public-facing APIs: it allows legitimate burst traffic while enforcing a steady-state rate.
+- Rate limit state must be shared across all instances in a distributed system. Local in-memory counters produce per-instance limits instead of per-user limits.
+- Return standard rate limit headers (RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset) so API clients can adapt their behavior rather than hitting limits blindly.
+- Rate limits should be set by use case, not by system capacity. Distinguish between authenticated users, unauthenticated users, and internal services, each with different limits.
+
+## The core argument
+
+Rate limiting is one of the features teams add quickly without thinking through the algorithm choice, then regret later when they discover their implementation allows boundary bursts or penalizes users unfairly. The algorithm choice is not academic. A fixed window rate limiter that resets at the top of every minute creates a predictable exploitation pattern where clients can double their effective rate by timing requests to the window boundary. A token bucket that regenerates tokens too slowly frustrates users who make legitimate but bursty requests.
+
+The right framing for rate limit algorithm selection is: what traffic pattern do you want to accommodate? If the answer is steady traffic with occasional short bursts (the pattern for most interactive API usage), token bucket is correct. The bucket accumulates tokens during quiet periods and allows burst consumption when needed, while enforcing the steady-state rate over time. If the answer is processing requests at a fixed rate regardless of how they arrive (payment processing, email sending, message publishing), leaky bucket is correct. It queues excess requests and processes them at the configured rate.
+
+For most B2B SaaS APIs I have built, token bucket per-user has been the right choice. The implementation on top of Redis is straightforward: store the last request timestamp and current token count per user key, regenerate tokens based on elapsed time since the last request, and deduct tokens atomically on each request. The sliding window log algorithm (storing each request timestamp in a sorted set with TTL) produces more accurate per-window counts but requires more Redis memory for high-volume users.
+
+## Common mistakes
+
+1. **Implementing rate limiting in application code without shared state.** In-memory rate limiters on individual application servers produce per-server limits rather than per-user limits. A user hitting three different instances can exceed the intended limit by 3x. Rate limit state belongs in Redis or another shared store.
+
+2. **Setting the same limit for all API consumers.** An authenticated enterprise customer making bulk API calls for a legitimate integration has different usage patterns than an unauthenticated scraper. Differentiate rate limits by authentication status, user tier, and endpoint type rather than applying a single global limit.
+
+3. **Not returning informative error responses on limit exceeded.** A 429 response without a Retry-After header or rate limit headers forces clients to implement arbitrary backoff. The Retry-After header tells clients exactly when they can retry. Good 429 responses produce well-behaved clients; opaque 429 responses produce aggressive retry loops.
+
+4. **Rate limiting at the application layer when the gateway layer can do it.** Application-layer rate limiting consumes server resources for requests that should be rejected before reaching the application. API gateways (Kong, Nginx, Cloudflare) can enforce rate limits at the infrastructure layer, returning 429 responses before the request touches application code.
+
+5. **Not testing the rate limiter under burst conditions.** A rate limiter that works correctly under steady traffic may fail under burst conditions due to race conditions in the token regeneration logic. Test with concurrent requests at the limit boundary to confirm the atomic operations work correctly under load.
+
+## Where to start
+
+1. **Choose the algorithm based on the traffic pattern you want to allow.** For interactive API users who make bursty requests: token bucket with a capacity of 2 to 5x the per-second steady-state rate. For background job processing with consistent rate requirements: leaky bucket. For simplicity at low scale: sliding window counter (avoids fixed window boundary issues without full token bucket complexity).
+
+2. **Implement rate limit state in Redis with atomic operations.** For token bucket: use a Lua script to atomically read the current token count, regenerate tokens based on elapsed time, deduct the request cost, and write back the new state. The atomicity prevents race conditions where two simultaneous requests both read the same token count and both succeed when only one should.
+
+3. **Add rate limit headers to all API responses, not just 429 responses.** Clients that can see their remaining request budget make better decisions about request pacing. A client that sees RateLimit-Remaining: 5 on a non-error response will slow down before hitting the limit. A client with no visibility into their budget hits the limit unexpectedly and retries aggressively.
+
+## Related reading
+
+- [Pagination Patterns: Cursor vs Offset and Why It Matters](/blog/pagination-patterns-cursor-vs-offset-and-why-it-matters)
+- [REST vs GraphQL vs gRPC: A Decision Matrix for Founders](/blog/rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)
+- [OWASP Top Ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026)

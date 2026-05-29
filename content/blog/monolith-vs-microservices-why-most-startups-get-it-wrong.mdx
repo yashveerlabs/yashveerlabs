@@ -1,0 +1,62 @@
+---
+slug: "monolith-vs-microservices-why-most-startups-get-it-wrong"
+title: "Monolith vs Microservices: Why Most Startups Get It Wrong"
+excerpt: "Microservices are the architecture that works at Netflix and fails at early-stage startups. Here is why the monolith is the right default, when microservices become rational, and how to make the transition without breaking everything."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/monolith-vs-microservices-why-most-startups-get-it-wrong"
+status: "published"
+definition: "A monolith is a single deployable unit that contains all of a product's application logic. A microservices architecture splits that logic into independently deployable services that communicate over a network. The choice between them determines deployment complexity, operational overhead, and team scaling patterns. Startups default to microservices because of enterprise architecture cargo-culting, and fail because microservices introduce coordination overhead that makes small teams slower."
+faq: [
+  {"q":"Why do startups choose microservices when a monolith would serve them better?","a":"Enterprise architecture cargo-culting is the most common driver. Engineers who worked at large companies where microservices solved real problems at scale apply the same architecture to problems that do not have the same scale. A three-person team shipping a new product does not have the organizational complexity that microservices were designed to solve. The perceived professionalism of microservices architecture outweighs the operational cost until the cost becomes undeniable."},
+  {"q":"When do microservices start making sense?","a":"When the team has grown large enough that independent deployability becomes a meaningful benefit. When one component has scaling requirements dramatically different from the others. When regulatory requirements mandate data isolation between components. The general heuristic: when Conway's Law starts applying, meaning when the org chart reasonably maps to the service boundaries, microservices make organizational sense. This typically happens at ten or more engineers with distinct team boundaries."},
+  {"q":"What is a modular monolith and why is it a good intermediate step?","a":"A modular monolith is a monolithic application structured with internal module boundaries that separate concerns cleanly without splitting them into separate services. The code is organized by domain: user module, billing module, product module. Each module has defined interfaces and cannot directly import from other modules except through those interfaces. This gives many of the code organization benefits of microservices while maintaining the deployment simplicity of a monolith and allows future service extraction along those module boundaries."},
+  {"q":"What is the operational overhead cost of microservices?","a":"Each service requires its own deployment pipeline, health monitoring, alerting, logging configuration, and on-call procedures. Each cross-service call introduces network latency, the possibility of network failure, and additional observability complexity. A distributed transaction across three services requires either saga patterns or distributed locks that do not exist in a monolith. The operational overhead is approximately linear with the number of services."},
+  {"q":"How do you migrate from a monolith to microservices?","a":"The strangler fig pattern: identify a bounded domain that is a natural service boundary, extract it from the monolith behind an interface, and gradually move the implementation to a separate service. The monolith routes calls to the new service through the same interface. Once the service is stable, remove the monolith's implementation of that domain. This incremental approach allows each extraction to be tested in production before committing to the full separation."}
+]
+---
+
+## What you need to know
+
+- A monolith with clean internal module boundaries is the right architecture for most startups through Series A. The operational overhead of microservices consumes engineering bandwidth that should go toward product development.
+- Microservices solve organizational scaling problems, not technical scaling problems. A monolith can be horizontally scaled behind a load balancer to handle significant traffic increases.
+- The modular monolith is the intermediate architecture that provides code organization benefits without operational overhead. It also makes future service extraction straightforward.
+- The transition from monolith to microservices should be driven by specific organizational pain points, not by architectural preference or trend-following.
+- Each additional service requires its own deployment pipeline, monitoring, alerting, and on-call coverage. This cost is real and accumulates with every new service.
+
+## The core argument
+
+The microservices mistake at startups almost always has the same origin story. An engineer who worked at a larger company where microservices solved real coordination and scaling problems joins a ten-person startup and advocates for the architecture they know. The architecture is adopted because it feels professional and scalable. The small team spends the first three months setting up Kubernetes, service discovery, distributed tracing, API gateways, and inter-service authentication instead of building product features. The services communicate over HTTP and occasionally fail in ways that require debugging across three services' logs simultaneously. The team has created enterprise operational overhead for a product that has fewer than 1,000 users.
+
+The argument for starting with a monolith is not about technical capability. A well-designed monolith can handle millions of users. The argument is about team leverage. A two or three-person engineering team that deploys a monolith can iterate on product features in hours. The same team managing a five-service microservices architecture spends a meaningful portion of their time on infrastructure, debugging distributed issues, and coordinating cross-service changes. The opportunity cost is measured in features not shipped and customer needs not addressed.
+
+The modular monolith is the architecture that captures the benefits of both approaches at small scale. Structure the monolith as independent modules with clear interfaces: a user module, a billing module, a notification module. The modules do not import each other's internals; they communicate through defined service interfaces within the same process. This gives the code organization benefits that microservices proponents are genuinely right about while maintaining single-process deployment simplicity. When a module needs to become a service because it has genuine scaling or team independence requirements, the module boundary is already the extraction point.
+
+## Common mistakes
+
+1. **Choosing microservices before the team justifies the operational overhead.** A team of fewer than eight to ten engineers rarely has the independent team boundaries that make microservices coordination costs worthwhile. The infrastructure engineering burden of microservices reduces the team's effective velocity on product work.
+
+2. **Not structuring the monolith with module boundaries.** A monolith without internal structure becomes a ball of mud where every file imports from every other file. This makes future extraction harder and reduces the codebase's maintainability. Structure the monolith with domain modules from day one.
+
+3. **Splitting services along technical layers rather than business domains.** A "frontend service" and a "backend service" are not microservices; they are a distributed monolith. Services should be split along business domain boundaries: the billing domain, the user management domain, the notification domain.
+
+4. **Not considering deployment complexity when designing service boundaries.** A transaction that requires atomic updates across three services requires either saga patterns or distributed locks that are significantly more complex than a database transaction in a monolith. Design service boundaries that minimize cross-service transactional requirements.
+
+5. **Adding services reactively to fix monolith performance problems.** A slow database query in a monolith is not solved by extracting that feature to a separate service. The query is slow regardless of which service calls it. Optimize the monolith before assuming extraction will improve performance.
+
+## Where to start
+
+1. **Audit the current architecture's operational cost.** List every service that exists and the engineering time required to maintain, deploy, and debug each one. If the services were created to solve organizational problems that do not currently exist, document them as consolidation candidates.
+
+2. **Restructure the monolith with domain modules.** If a single-service architecture is the decision, organize the code into domain directories with defined public interfaces. This is a refactoring investment that makes the codebase more maintainable and preserves the option to extract services later.
+
+3. **Define the criteria for future service extraction.** Write down the conditions that would justify extracting a new service: the team has grown to a size where independent deployability has concrete value, a specific component has scaling requirements that differ significantly from the rest of the system, or a regulatory boundary requires isolation. This criteria prevents reactive service creation.
+
+## Related reading
+
+- Multi-Tenant Architecture: Shared vs Isolated Data Models
+- [Infrastructure as Code: Terraform vs Pulumi vs CDK](/blog/infrastructure-as-code-terraform-vs-pulumi-vs-cdk)
+- Docker Compose to Kubernetes: When to Make the Jump
+- Tech Debt: The Real Cost and When to Pay It Down

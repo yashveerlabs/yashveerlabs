@@ -1,0 +1,62 @@
+---
+slug: "how-to-run-a-code-review-when-you-cannot-read-code"
+title: "How to Run a Code Review When You Cannot Read Code"
+excerpt: "Non-technical founders can and should review the code their developers ship. Not the syntax, but the signals: completeness, clarity, and whether the work matches what was agreed."
+date: "2026-05-23"
+category: "Hiring Developers, Freelancers, and Agencies"
+tags: ["hiring","engineering-teams","freelance"]
+readingMinutes: 6
+ogImage: "/api/og/blog/how-to-run-a-code-review-when-you-cannot-read-code"
+status: "published"
+definition: "A non-technical code review is not about reading the syntax. It is about asking the right questions of the person who wrote it and evaluating whether the output meets the agreed standard: does it work end to end, is it documented enough for the next developer to continue, and does it match what was scoped? These questions are answerable without any technical background."
+faq: [
+  {"q":"What does a non-technical founder actually review in a code review?","a":"Behavior, not syntax. Does the feature work as described in the acceptance criteria? Does the documentation explain what was built and why key decisions were made? Are there tests for the core user flows? These are all reviewable without reading the code itself."},
+  {"q":"How do I know if the code is maintainable without reading it?","a":"Ask the developer to walk you through what another developer would need to know to continue this work. The quality of that explanation tells you whether the codebase is documented enough for continuity. A developer who cannot explain their own code to a non-technical person has probably not documented it well."},
+  {"q":"What is a README and why does it matter?","a":"A README is a document in the repository that explains what the code does, how to run it, and what environment variables or configuration it requires. A missing or outdated README means the next developer, or you, cannot understand the system without asking the original developer. This creates dependency you want to avoid."},
+  {"q":"Should I require tests from my developer?","a":"Yes, at minimum for the core user workflow. A test that proves the primary action works end to end is cheap insurance against regressions when future features are built on top of the same code. Ask for it explicitly in the acceptance criteria."},
+  {"q":"What does a good demo after delivery look like?","a":"The developer shares their screen, logs in as a new user, and completes the core workflow without any help from you. They explain what happens on the backend when each action is taken. If they cannot demo the core workflow smoothly or need to explain away errors, the delivery is not complete."}
+]
+---
+
+## What you need to know
+
+- A code review for a non-technical founder is primarily a behavioral review and a documentation review, not a syntax review.
+- The demo is the most reliable signal of whether the feature is complete. A feature that cannot be demonstrated working end to end by the developer is not done.
+- Documentation completeness is checkable by anyone. If the developer cannot explain what they built in plain language, or if the repository lacks the documentation for another developer to continue the work, the delivery is incomplete.
+- Asking for tests on the core user workflows is a reasonable and non-technical requirement. You do not need to read the tests. You need to know they exist and run.
+- The questions you ask in a code review shape the developer's behavior in the next sprint. Ask for clarity, completeness, and documented decisions.
+
+## The core argument
+
+The non-technical founder who avoids code reviews entirely leaves the quality bar entirely to the developer's judgment. That is fine when the developer's judgment is excellent and fully aligned with the product's long-term needs. It becomes a problem when the developer takes shortcuts under time pressure, assumes certain things do not need documentation because they seem obvious, or produces code that works today but is fragile under the changes that will inevitably come. The code review is the moment the founder re-engages with the quality of the output, even if only at the behavioral and documentation level.
+
+The framework I give to non-technical founders for code reviews has four checkpoints. First, the demo: the developer demonstrates the feature working end to end for a real user scenario, including what happens when something goes wrong. Second, the documentation: the developer shows me the documentation they produced for the feature, including any new environment variables, configuration changes, or architectural decisions. Third, the tests: the developer shows me the tests for the core user flow and what happens when they run. Fourth, the questions: I ask two or three questions that came up while they were walking me through the first three. The questions do not need to be technical. They can be about why they made a specific decision, what happens if a third-party service goes down, or how a user would recover from an error state.
+
+This process takes thirty to forty-five minutes per feature and produces a reliable picture of the delivery quality. The developers I have worked with on projects from Dwarka Bricks to Nexli know that this is the expected delivery standard. The ones who produce clean, documented, tested work find the review easy. The ones who cut corners find the review uncomfortable, which is the intended effect.
+
+## Common mistakes
+
+1. **Treating the delivery as done when the feature exists in the codebase.** A feature that exists but has not been demonstrated working end to end has not been delivered. Always require a demo.
+
+2. **Not asking for documentation until the final delivery.** Documentation standards should be part of every sprint acceptance criteria, not a post-delivery request. After-the-fact documentation is always less complete and less accurate.
+
+3. **Accepting a delivery because the developer says it is done.** "It's done" is not a delivery. A demo with a working user flow is a delivery.
+
+4. **Not asking about error handling.** The happy path demo is easy. Ask what happens when the user enters invalid data, when the third-party API returns an error, or when the database connection is slow. The answers reveal whether error handling was considered.
+
+5. **Skipping the review when you trust the developer.** Trust is earned through consistent reviews, not substituted for them. A developer who knows their work will be reviewed consistently produces different work than one who knows it will not.
+
+## Where to start
+
+1. **Add acceptance criteria to every sprint item that include a demo requirement.** "Feature X is complete when the developer can demonstrate a new user completing the primary workflow without assistance" is a testable acceptance criterion that does not require technical knowledge.
+
+2. **Ask for a README update as a deliverable for every sprint.** The README should reflect the current state of the system, including any new configuration or environment variables. This takes fifteen minutes and pays dividends indefinitely.
+
+3. **Run a thirty-minute delivery demo after every sprint.** Developer shares screen, demonstrates the features, explains key decisions, and takes your questions. This is the most valuable thirty minutes of the development process from the founder's perspective.
+
+## Related reading
+
+- [How to Hire a Full Stack Developer Without Getting Burned](/blog/how-to-hire-a-full-stack-developer-without-getting-burned)
+- [Hiring Mistakes That Founders Repeat Endlessly](/blog/hiring-mistakes-that-founders-repeat-endlessly)
+- [The Vetting Framework: How to Verify a Developer's Real Experience](/blog/the-vetting-framework-how-to-verify-a-developers-real-experience)
+- [How to Set Up a Trial Sprint That Reveals Real Skill](/blog/how-to-set-up-a-trial-sprint-that-reveals-real-skill)

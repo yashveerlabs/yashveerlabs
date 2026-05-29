@@ -1,0 +1,65 @@
+---
+slug: "kafka-in-2026-when-you-need-it-and-when-you-do-not"
+title: "Kafka in 2026: When You Need It and When You Do Not"
+excerpt: "Kafka is powerful, but most startups reach for it before they need it. Here is how to decide."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","kafka","message-queues"]
+readingMinutes: 7
+ogImage: "/api/og/blog/kafka-in-2026-when-you-need-it-and-when-you-do-not"
+status: "published"
+faq: [
+  {"q":"Is Kafka overkill for a startup?","a":"For most startups, yes. The throughput ceiling on Redis Streams or SQS is higher than most companies will hit in their first three years. Kafka's real advantage is replay and multi-consumer fan-out at scale. If you do not need those, you are paying Kafka's operating cost without the benefits."},
+  {"q":"What is the alternative to Kafka for background jobs?","a":"Redis Streams, Amazon SQS, Google Pub/Sub, or a Postgres-backed job table with a polling worker. For most SaaS applications, any of these will handle the volume comfortably. The choice between them is mostly about your existing infrastructure and operational familiarity."},
+  {"q":"How much does Kafka cost to run in 2026?","a":"Self-hosted Kafka on three brokers costs you in cloud compute and significant engineering time. Confluent Cloud starts at a base fee and scales with usage. Upstash Kafka charges per message with a free tier. In my experience, the engineering hours to operate self-hosted Kafka are the real cost, not the infrastructure bill."},
+  {"q":"When does Kafka become the right call?","a":"When you have multiple consumers that need to read the same event stream independently, when you need to replay events days or weeks after production, or when your throughput is genuinely in the hundreds of thousands of events per second. If none of those apply, a simpler queue will do the job."},
+  {"q":"What is schema registry and do I need it?","a":"A schema registry enforces the structure of messages published to Kafka topics. Without it, consumers trust that producers send what they promised. At any non-trivial scale with multiple teams publishing events, a schema registry prevents the slow-moving disasters that come from undocumented breaking changes."}
+]
+---
+
+# Kafka in 2026: When You Need It and When You Do Not
+
+**Kafka is a distributed event streaming platform built for high-throughput, fault-tolerant message delivery at massive scale. It processes millions of events per second, stores them durably on disk, and replays them on demand. Most companies do not need this. The ones that do are processing real-time analytics, coordinating between dozens of services, or running systems where losing a single event means losing money.**
+
+## What you need to know
+
+- Kafka shines at throughput above 100k events per second and retention requirements measured in days or weeks
+- For most SaaS startups, Redis Streams, SQS, or a simple Postgres-backed job queue covers 90% of the use cases Kafka gets proposed for
+- Operating Kafka yourself is a significant engineering burden; Confluent Cloud and Upstash reduce this, but add cost
+- The replay capability is Kafka's most underrated feature; raw throughput is what usually gets cited but rarely what teams actually need
+- If your first instinct is Kafka and your team is under 10 engineers, that instinct is probably wrong
+
+## The core argument
+
+I have seen Kafka get proposed in three different contexts across projects I have worked on, and it was the right call exactly once. The other two times it was a combination of "it sounds serious" and "the architecture diagram looks impressive." Neither of those is a reason to run distributed event streaming infrastructure.
+
+The one time it made sense was a pipeline that needed to ingest events from multiple upstream services, process them asynchronously, and make them available for both a real-time dashboard and a historical analytics query. That is a genuine Kafka use case. The data needed to flow to two different consumers with different latency requirements, and it needed to be replayable in case either consumer fell behind.
+
+What it is not a use case for: sending welcome emails, running background jobs, triggering webhooks, processing form submissions, or notifying a single downstream service about a state change. All of those are covered by SQS, Redis Streams, or a Postgres table with a polling worker. When I built the notification pipeline for Nexli, I used a simple Redis-backed queue. No cluster management. No topic partitioning decisions. It works and it runs in production. The pattern I see most often: an engineer reads a blog post about Kafka, adds it to the architecture proposal, and the founder approves it because it sounds enterprise-grade. Six months later, the ops team is debugging replication lag and partition leader elections instead of shipping features. Kafka is not a status symbol. It is a tool with a specific job.
+
+## Common mistakes
+
+1. **Proposing Kafka because the company "will need it eventually."** You might. But adding it before you hit the scale threshold means paying the operations tax on a future that may never come.
+
+2. **Under-provisioning the broker count.** Kafka clusters need at least three brokers for fault tolerance. Developers who start with a single broker for testing end up with that single broker in production when the deadline hits.
+
+3. **Skipping schema management.** Publishing raw JSON without a schema registry works until a consumer reads a field that changed three weeks ago. Avro with the Confluent Schema Registry is not optional at production scale.
+
+4. **Setting retention too short.** The replay capability that justifies Kafka's operational cost only helps if the data is still there when you need it. Default retention settings are often too conservative.
+
+5. **Not monitoring consumer group lag.** Kafka will let your consumers fall behind by millions of events. Without lag monitoring and alerting, you discover this problem when a customer asks why their dashboard is an hour behind.
+
+## Where to start
+
+1. **Map your actual throughput.** Count the events your system produces per minute. If the answer is under 10,000 per minute, SQS or Redis Streams almost certainly covers you. If the answer is genuinely in the millions per minute, Kafka deserves a serious look.
+
+2. **Evaluate managed options first.** If Kafka is the right call, Confluent Cloud or Upstash Kafka will cost more per event but save weeks of engineering time on cluster setup, monitoring, and upgrades. For a startup, that tradeoff almost always favors managed.
+
+3. **Define the replay requirement explicitly.** The most defensible reason to choose Kafka over simpler queues is the ability to replay events to a new consumer. Write down whether you actually need that. If the answer is no, you probably do not need Kafka.
+
+## Related reading
+
+- [Message Queues Compared: SQS, Kafka, RabbitMQ, Redis Streams](/blog/message-queues-compared-sqs-kafka-rabbitmq-redis-streams)
+- [Event Driven Architectures: When They Help and When They Hurt](/blog/event-driven-architectures-when-they-help-and-when-they-hurt)
+- [Background Job Queues: The Architecture Decision Founders Skip](/blog/background-job-queues-the-architecture-decision-founders-skip)
+- [The Outbox Pattern: A SaaS Reliability Cheat Code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code)

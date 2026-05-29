@@ -1,0 +1,125 @@
+---
+slug: "encryption-at-rest-vs-in-transit-what-customers-will-ask"
+title: "Encryption at Rest vs in Transit: What Customers Will Ask"
+excerpt: "Encryption at rest and in transit are the two questions enterprise customers ask first. Both are easy to get right. The teams that have not thought about either stumble on the easiest part of a security review."
+date: "2026-05-22"
+category: "Security, Auth, and Compliance"
+tags: ["encryption","security","compliance","enterprise"]
+readingMinutes: 11
+ogImage: "/api/og/blog/encryption-at-rest-vs-in-transit-what-customers-will-ask"
+status: "published"
+definition: "Encryption at rest protects data stored on disk from being read if the storage is compromised. Encryption in transit protects data being moved across the network from being read if the connection is intercepted. Both are now table stakes for B2B SaaS in 2026. The implementations are straightforward. The teams that have not implemented either are usually the teams that have not been through an enterprise security review yet."
+faq: [
+  {"q":"What does encryption at rest actually mean?","a":"The data on disk is stored encrypted. If someone steals the disk, the data is unreadable without the encryption key. AWS RDS, Aurora, S3, EBS, and most managed services support encryption at rest natively. Turning it on is usually a checkbox at provisioning."},
+  {"q":"What does encryption in transit mean?","a":"The data moving between services or between client and server is encrypted. TLS 1.2 or 1.3 is the standard. Internal service to service traffic should also use TLS or mutual TLS. Plain text over the network is a finding in any security review."},
+  {"q":"Is the default encryption enough?","a":"For most workloads, yes. AWS managed encryption keys are sufficient for SOC 2 and most compliance regimes. Higher tier enterprise customers may require customer managed encryption keys. Plan for CMEK if you sell into regulated industries."},
+  {"q":"What about backup encryption?","a":"Backups must be encrypted at rest. The same encryption keys typically apply. Cross account backup storage adds a layer of protection against compromise of the primary account."},
+  {"q":"What about TLS versions?","a":"Disable TLS 1.0 and 1.1 in 2026. They are deprecated. Use TLS 1.2 minimum and prefer TLS 1.3 where supported. Load balancers and CDNs handle this configuration centrally."},
+  {"q":"What about internal service to service traffic?","a":"Should be encrypted. Service mesh tools like Istio, Linkerd, or AWS App Mesh provide mTLS between services. The configuration is mostly automated. The security review will ask."},
+  {"q":"What is the worst mistake?","a":"Encryption at rest enabled but the keys are stored in the same place as the data. The encryption protects against disk theft but not against an attacker who can read the database. The right pattern uses a separate key management system with audit on every use."}
+]
+---
+
+## What you actually need to know
+
+- Encryption at rest is table stakes. Turn it on at provisioning.
+- TLS 1.2 minimum. TLS 1.3 preferred. Disable older versions.
+- Internal service to service traffic should also be encrypted.
+- Backups must be encrypted. Cross account storage adds protection.
+- Customer managed keys are required for higher tier enterprise.
+
+| Surface | Encryption requirement |
+|---|---|
+| Application database | At rest, AWS or customer managed |
+| Object storage | At rest, server side encryption |
+| Backups | At rest, in a separate account |
+| Public endpoints | TLS 1.2 or 1.3 |
+| Internal API calls | TLS or mTLS |
+| Service mesh traffic | mTLS automated |
+| Cache and queue | At rest where supported |
+| Logs | At rest |
+
+## The core argument
+
+Encryption at rest and in transit are the two questions enterprise security teams ask first. The questions are easy to answer when both are properly configured. The questions are awkward when they are not. The teams that have not implemented either usually have not been through an enterprise security review yet. The review forces the conversation.
+
+The implementation is straightforward in 2026. Managed databases support encryption at rest with AWS or customer managed keys. Load balancers terminate TLS with current versions. Object storage encrypts by default. Service meshes provide mTLS between internal services. The team configures these once and the controls run.
+
+The discipline is in the audit. Verify every storage location is encrypted. Verify every endpoint uses current TLS. Verify the key management is separate from the data. Verify the audit log captures key use. Each verification is minutes. The combination is an encryption posture that survives security review.
+
+The other discipline is in the documentation. The customer security questionnaire asks specifically about encryption. The team has to answer with specifics. Which encryption algorithm. Which key management. Which TLS versions. Which protocols on which ports. The documentation makes the answers fast.
+
+## The audit checklist
+
+| Item | Verify |
+|---|---|
+| Database encryption at rest | Provider confirms enabled |
+| Object storage encryption | Bucket policy requires encryption |
+| Backup encryption | Snapshots encrypted |
+| Disk encryption on instances | EBS volumes encrypted |
+| TLS on public endpoints | Minimum TLS 1.2, prefer 1.3 |
+| Older TLS disabled | TLS 1.0 and 1.1 off |
+| Internal service to service | TLS or mTLS |
+| Key management | Separate KMS with audit |
+| Customer managed key support | If selling enterprise |
+| Documentation | Specific answers for questionnaire |
+
+## How much does this cost
+
+| Component | Cost |
+|---|---|
+| AWS managed encryption | Bundled with managed services |
+| KMS key operations | Pennies per operation |
+| Customer managed keys | Slight premium |
+| Service mesh mTLS | Operational complexity |
+| TLS certificates | Often free with Let's Encrypt or ACM |
+| Documentation work | A few days for initial questionnaire answers |
+
+## Features the encryption setup must have
+
+- Encryption at rest enabled on every storage location.
+- TLS 1.2 minimum on every endpoint.
+- Internal service traffic encrypted.
+- Separate key management with audit.
+- Backup encryption and cross account storage.
+- Documentation for the customer questionnaire.
+- A regular audit cadence.
+- An owner of the encryption posture.
+
+## Expert opinion
+
+> Encryption is the easiest part of an enterprise security review when the team has done the work. The implementations are well documented and largely automated in modern managed services. The teams that have not done the work stumble on the simplest questions. The fix is hours. The cost of skipping is the deal that stalls in security review.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was preparing for SOC 2 Type II. The security questionnaire from their first enterprise prospect arrived with detailed encryption questions. The team was not prepared.
+
+We audited the posture. Database encryption was on. Object storage encryption was inconsistent. TLS configuration was outdated on one service. Internal traffic was unencrypted. Backups were in the same account as the primary.
+
+We fixed each item over three weeks. Documented the answers. The questionnaire returned within a week. The customer's security team approved without follow up questions. The deal closed two weeks later.
+
+For more on the related work, see [customer managed encryption keys enterprise engineering](/blog/customer-managed-encryption-keys-enterprise-engineering) and [secrets management for SaaS Vault AWS Secrets Manager Doppler](/blog/secrets-management-for-saas-vault-aws-secrets-manager-doppler).
+
+## Common mistakes teams make
+
+1. Encryption at rest not enabled on all storage.
+2. Older TLS versions still accepted.
+3. Internal traffic unencrypted.
+4. Keys in the same account as the data.
+5. No audit on key use.
+6. Backups in the same account as the primary.
+7. No documentation. Questionnaire answers are slow.
+8. Treating encryption as the security program rather than as a starting point.
+
+## A one week audit and fix
+
+1. **Day one.** Inventory storage locations. Verify encryption.
+2. **Day two.** Inventory endpoints. Verify TLS versions.
+3. **Day three.** Verify internal traffic encryption.
+4. **Day four.** Verify key management is separate with audit.
+5. **Day five.** Verify backups are encrypted and cross account.
+6. **Days six and seven.** Document the posture for the customer questionnaire.
+
+For more on the related work, read [customer managed encryption keys enterprise engineering](/blog/customer-managed-encryption-keys-enterprise-engineering) and [the customer security questionnaire a strategic asset](/blog/the-customer-security-questionnaire-a-strategic-asset). On the broader compliance side, [SOC 2 Type I vs Type II](/blog/soc-2-type-i-vs-type-ii-a-founders-guide-to-both) is the natural next read.

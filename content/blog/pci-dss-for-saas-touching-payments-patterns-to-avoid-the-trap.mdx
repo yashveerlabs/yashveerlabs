@@ -1,0 +1,62 @@
+---
+slug: "pci-dss-for-saas-touching-payments-patterns-to-avoid-the-trap"
+title: "PCI DSS for SaaS Touching Payments: Patterns to Avoid the Trap"
+excerpt: "PCI DSS compliance is required for any product that processes, transmits, or stores cardholder data. Here is how to reduce your compliance scope to the minimum and which architecture patterns avoid the most expensive compliance requirements."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","saas"]
+readingMinutes: 6
+ogImage: "/api/og/blog/pci-dss-for-saas-touching-payments-patterns-to-avoid-the-trap"
+status: "published"
+definition: "PCI DSS (Payment Card Industry Data Security Standard) is a set of security requirements for organizations that process, transmit, or store payment card data. Compliance scope is determined by the cardholder data environment (CDE): the systems and people who can access cardholder data. The most effective PCI DSS strategy for SaaS products is reducing the CDE to zero by using payment processor tokenization so that card data never touches the application's infrastructure."
+faq: [
+  {"q":"What determines PCI DSS compliance scope for a SaaS product?","a":"The scope is defined by which systems touch cardholder data: card numbers (PAN), card verification codes (CVV/CVC), and magnetic stripe data. Systems that process, transmit, or store any of these are in scope. Systems that handle only payment tokens (the non-reversible reference values returned by payment processors after tokenization) are out of scope. The goal for most SaaS products is to route all card data directly from the user's browser to the payment processor without the card data ever touching the application's servers."},
+  {"q":"What is SAQ A and why does it matter?","a":"SAQ A (Self-Assessment Questionnaire A) is the simplest PCI DSS self-assessment, applicable to merchants who have outsourced all card processing to a third-party processor and whose website does not receive cardholder data directly. An e-commerce site using Stripe.js or Braintree's hosted fields qualifies for SAQ A because the card data is collected by a Stripe or Braintree iframe (hosted by the processor's domain) and never touches the merchant's servers. SAQ A has 22 requirements compared to SAQ D's 326 requirements. The architecture decision that enables SAQ A eligibility is significant enough to plan around."},
+  {"q":"What is tokenization and how does it reduce PCI scope?","a":"Tokenization is the replacement of sensitive card data with a non-sensitive reference value (a token) that is meaningless to an attacker. The payment processor stores the actual card data and returns a token that the merchant uses for future transactions. A Stripe customer ID and payment method ID are tokens. They can be stored in the merchant's database and used to charge the customer, but they cannot be used to extract the actual card number. Tokenization reduces PCI scope because the merchant's systems never hold card data that needs to be protected."},
+  {"q":"What are the common PCI scope mistakes in SaaS applications?","a":"Logging cardholder data, even accidentally. Storing card numbers in a database before tokenizing them, even temporarily. Using a custom payment form that collects card data and sends it to the application's server before forwarding to the processor. Returning card data in API responses. Including payment pages in the same infrastructure as non-payment pages without network segmentation. Any of these expand PCI scope from SAQ A to SAQ D, with corresponding compliance requirements."},
+  {"q":"When does a SaaS product need a formal PCI audit versus self-assessment?","a":"A formal PCI audit by a Qualified Security Assessor (QSA) is required for Level 1 merchants (processing more than six million Visa or Mastercard transactions annually) and for service providers that store, process, or transmit cardholder data on behalf of merchants. Most SaaS startups qualify for self-assessment (SAQ) at launch. The appropriate SAQ level depends on how payments are implemented. Engaging a QSA for a compliance gap assessment before reaching Level 1 thresholds is advisable to avoid surprises."}
+]
+---
+
+## What you need to know
+
+- The best PCI strategy is to make card data never touch your infrastructure. Use hosted payment fields (Stripe.js, Braintree Hosted Fields) that collect card data in a processor-owned iframe.
+- SAQ A eligibility requires that the payment form is a processor-hosted iframe, the application's server never receives card data, and card numbers are not stored anywhere in the application's infrastructure.
+- Tokens (Stripe customer IDs, payment method IDs) are not cardholder data and are out of PCI scope. Store tokens, not card numbers.
+- Logging is the most common accidental PCI scope expansion. Any log that contains a card number, even in an error message, puts that log storage system in scope.
+- PCI DSS applies to service providers too. A SaaS product that stores or transmits payment data on behalf of its customers is a service provider with its own compliance obligations.
+
+## The core argument
+
+PCI DSS compliance is not a single binary question but a scope question. The compliance burden scales with scope: SAQ A has 22 requirements and no on-site assessment; SAQ D has 326 requirements and potentially requires a Qualified Security Assessor. The difference is entirely architectural: a payment integration that keeps card data completely within the processor's infrastructure is SAQ A territory; a payment integration where card data passes through the application's servers even briefly is SAQ D territory. The architecture decision that determines scope is made early and is expensive to change later.
+
+The Stripe.js / Stripe Elements architecture is the standard modern approach for avoiding PCI scope expansion. Stripe provides a JavaScript library that renders an iframe hosted on Stripe's domain. The user types their card number into the Stripe iframe. Stripe tokenizes the card and returns a token to the application. The application never sees the card number; it sees only the token. From a PCI perspective, the application is not in contact with cardholder data at any point in this flow. Stripe's infrastructure is PCI compliant; the application's infrastructure inherits that compliance for the card data processing portion of the transaction.
+
+The failure modes are subtle and expensive. An application that logs all API request bodies for debugging purposes will log the card tokenization request if the card number is included in that request. An application that stores the card data temporarily in a session or cache before forwarding it to Stripe has the card data in scope. An application that passes card numbers through a server-side proxy "to have more control" over the user experience has expanded its PCI scope to include the proxy infrastructure. Each of these is an architectural mistake made for understandable reasons that creates significant compliance overhead.
+
+## Common mistakes
+
+1. **Building a custom payment form that submits card data to the application server.** This is the most impactful scope mistake. Any server that receives a card number in any request is in scope. Switch to hosted fields or Stripe Elements where the card data is collected and tokenized by the processor's infrastructure.
+
+2. **Including request body logging without PCI data filtering.** Application servers that log all request bodies will eventually log card data. Add PCI-sensitive field filtering to the logging layer that redacts card numbers, CVVs, and full names when they appear in log content, regardless of which endpoint received them.
+
+3. **Treating PCI as a one-time assessment.** PCI compliance is ongoing. Systems change, new services are added, logging configurations change, and personnel change. An annual review of the cardholder data environment and scope is necessary to maintain compliance.
+
+4. **Not documenting the data flow.** PCI assessors require a data flow diagram showing where cardholder data enters, moves through, and exits the environment. Applications without documented data flows require significant pre-assessment work to produce one. Document the payment data flow when the integration is built, not when the auditor asks for it.
+
+5. **Assuming the payment processor is responsible for all PCI compliance.** The payment processor is responsible for the data within their systems. The merchant or service provider is responsible for the data within their systems. Using Stripe does not make the application PCI compliant; it limits the PCI scope to the cardholder data environment that the application controls.
+
+## Where to start
+
+1. **Audit the current payment integration for cardholder data touches.** Trace the path of a card number from when the user types it to when the charge is processed. Does it pass through the application server? Is it stored anywhere, even temporarily? Is it included in any API request body that might be logged?
+
+2. **Implement hosted payment fields if not already in use.** Stripe Elements, Braintree Hosted Fields, and Adyen Web Components all provide processor-hosted iframes that remove card data from the application's scope. The implementation change is typically a front-end change (replace a custom form with the processor's component library).
+
+3. **Implement PCI-sensitive field filtering in logging.** Add a logging middleware that detects and redacts patterns matching card numbers (16-digit sequences with specific format), CVVs (3-4 digit sequences in specific contexts), and full names in payment contexts. This is a defensive measure that prevents accidental scope expansion from debugging code.
+
+## Related reading
+
+- [OWASP Top Ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026)
+- [ISO 27001 for Engineering Founders: A Practical Reading](/blog/iso-27001-for-engineering-founders-a-practical-reading)
+- [Personally Identifiable Information in Logs: A Cleanup Playbook](/blog/personally-identifiable-information-in-logs-a-cleanup-playbook)
+- [Logging Customer Data: The Privacy Mistakes That Get You Sued](/blog/logging-customer-data-the-privacy-mistakes-that-get-you-sued)

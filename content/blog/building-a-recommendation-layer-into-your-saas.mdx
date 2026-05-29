@@ -1,0 +1,117 @@
+---
+slug: "building-a-recommendation-layer-into-your-saas"
+title: "Building a Recommendation Layer Into Your SaaS"
+excerpt: "Recommendations are easy to demo and hard to make valuable. The right layer surfaces what the user would have wanted next. Here is the architecture, the cost, and the trap most teams fall into."
+date: "2026-05-20"
+category: "SaaS Architecture and Scaling"
+tags: ["recommendations","ml","personalization","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/building-a-recommendation-layer-into-your-saas"
+status: "published"
+definition: "A recommendation layer in a SaaS product surfaces the action, content, or workflow a user would most likely want next. The implementation can be heuristic, statistical, or model based. The valuable layer is the one that gets clicked. The unused layer is the one that surfaces what looks impressive but does not match the user's intent. The architecture is straightforward. The discipline is harder."
+faq: [
+  {"q":"When should I add a recommendation layer?","a":"When users have enough activity for a recommendation to be informed by their behavior, and when the recommended items have enough variety to be interesting. A SaaS with five core actions and ten customers does not need recommendations. A SaaS with hundreds of resources and thousands of customers does."},
+  {"q":"What is the simplest recommendation that works?","a":"Most recently used. Most frequently used. What similar users in your tenant also use. These three together cover most of the value of more sophisticated recommendations. Start here before reaching for embeddings or ML models."},
+  {"q":"When do embeddings and vector search become worth it?","a":"When the items are content with semantic meaning and the user is searching by intent rather than by exact match. Article recommendations, similar customer suggestions, semantic discovery surfaces. The setup cost is meaningful. The lift is real when the use case fits."},
+  {"q":"How do I measure recommendation quality?","a":"Click through rate on recommended items. Conversion to the recommended workflow. Long term retention of users who interact with recommendations. The first metric is easy. The third is harder and more important."},
+  {"q":"What about cold start?","a":"New users have no behavior to base recommendations on. Use defaults that match the user's segment. Onboarding flows that observe behavior fast. Recommendations from similar tenants. The cold start period should be brief and the recommendations should improve quickly."},
+  {"q":"How do I avoid filter bubbles?","a":"Mix exploration with exploitation. Some recommendations match the user's history. Some are deliberately broader. The broader picks expose the user to capability they would not have found otherwise. The mix changes with tenant maturity."},
+  {"q":"What is the most common failure?","a":"Recommendations that look impressive but do not get clicked. The team ships the ML pipeline, the dashboard, and the recommendations. The users ignore them. The reason is almost always that the recommendations do not match the user's actual intent at the moment."}
+]
+---
+
+## What you actually need to know
+
+- Start with heuristics. Recently used, frequently used, what similar users use.
+- Add embeddings only when the use case demands semantic understanding.
+- Measure click through, conversion, and long term retention.
+- Cold start needs a fallback. Defaults by segment work well.
+- Mix exploration with exploitation to avoid filter bubbles.
+
+| Recommendation type | When to use | Setup cost |
+|---|---|---|
+| Recently used | Always | Hours |
+| Frequently used | After early data | Hours |
+| Tenant peers | After tenant data | Days |
+| Embedding similarity | Semantic content | Weeks |
+| Collaborative filtering | Multi tenant patterns | Weeks |
+| Trained model | High volume specific objective | Months |
+
+## The core argument
+
+Recommendations are one of those features that founders associate with sophistication. The instinct is to reach for embeddings, vector search, and a model. The reality is that most of the value of a recommendation layer comes from heuristics that any engineer can ship in a day. Most recently used. Most frequently used. What similar users in your tenant also use. These three carry the bulk of the value.
+
+The mistake is jumping to embeddings before exhausting the heuristics. The embeddings cost more to set up, more to operate, and produce results that are sometimes worse than the heuristic baseline. The right pattern is to ship the heuristics first, measure, and reach for embeddings only when the heuristics are clearly not enough.
+
+The other mistake is treating recommendations as a self contained feature. The recommendations live inside the product. They appear at the right moments. They use the language of the rest of the product. They get refined based on whether users click them. The recommendations that work feel like the product is helpful. The recommendations that fail feel like a panel of noise.
+
+The discipline is in the measurement. A team that ships recommendations without measuring them never learns whether they are valuable. A team that measures from the first day knows within a quarter what the layer is worth and where it needs work.
+
+## The architecture
+
+The data layer captures user behavior. Events for every action that could inform recommendations. Stored in a way that can be queried by user and by tenant. The events are written async to keep the hot path fast.
+
+The compute layer transforms the events into ranked recommendations. The heuristic version is a few SQL queries. The embedding version is a vector store and a similarity search. The collaborative version is a matrix factorization. The model version is a trained model. Each step up adds capability and cost.
+
+The serving layer exposes the recommendations to the product. A fast endpoint that returns the top N recommendations for a user. Cached aggressively. Refreshed when new behavior arrives. The latency target is under 50 milliseconds for the hot path.
+
+The feedback layer captures whether the recommendations get clicked. The click data flows back into the compute layer. The cycle compounds. Good recommendations get more clicks, which improves their ranking, which produces more good recommendations.
+
+## How much does this cost
+
+| Layer | Setup engineering | Monthly operating cost |
+|---|---|---|
+| Heuristic recommendations on Postgres | A few days | Negligible |
+| Tenant peer recommendations | One sprint | Modest |
+| Embedding based recommendations with pgvector | Two to three sprints | 50 to 500 USD |
+| Pinecone or Weaviate based | Two to three sprints | 100 to 1500 USD |
+| Collaborative filtering | Three to four sprints | Modest |
+| Trained model with periodic retraining | Two to six months | 500 to 5000 USD |
+
+The numbers come from projects I have worked on. The heuristic layer pays back immediately. The embedding layer pays back if the use case fits. The trained model pays back at higher scale where the volume justifies the engineering.
+
+## Features the layer must have
+
+- Cold start defaults by segment.
+- Caching with appropriate invalidation.
+- Mix of exploitation and exploration.
+- Click through tracking from the first day.
+- A way to override recommendations for specific tenants or users.
+- A path to retrain or recompute on a cadence.
+- A clear distinction between personalization and recommendation.
+
+## Expert opinion
+
+> The recommendation layer that works is the one that gets clicked. The team that obsesses over click through rate from day one ends up with a useful layer. The team that obsesses over the algorithm ends up with a sophisticated layer that nobody uses. Measure first. Ship the simplest thing that produces clicks. Iterate.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client wanted to add recommendations to their content surface. The instinct was a custom embedding pipeline with vector search. The team spent six weeks building it. The click through rate was around two percent.
+
+We replaced the layer with a heuristic baseline. Recently viewed, most popular in the tenant, similar to recently viewed by title overlap. The click through rate jumped to roughly nine percent. The cost dropped to near zero.
+
+Six months later we added embeddings for one specific surface where semantic match mattered. Articles related by topic. The embedding layer improved click through on that specific surface from nine to fourteen percent. The rest of the recommendations stayed on heuristics.
+
+For more on the related work, see [AI driven personalization real value or vanity](/blog/ai-driven-personalization-real-value-or-vanity) and [vector databases compared Pinecone Weaviate pgvector Qdrant](/blog/vector-databases-compared-pinecone-weaviate-pgvector-qdrant).
+
+## Common mistakes teams make
+
+1. Jumping to embeddings before exhausting heuristics.
+2. Shipping recommendations without measuring click through.
+3. No cold start path. New users see empty panels.
+4. Pure exploitation. The user gets filter bubbled.
+5. Recommendations that ignore the moment. Wrong context, wrong recommendation.
+6. No feedback loop. The layer never improves.
+7. Caching too aggressively. The recommendations go stale.
+8. Treating recommendations as a sophistication marker rather than a utility.
+
+## A 30 day plan
+
+1. **Week one.** Define the surfaces that will show recommendations. Pick the metrics.
+2. **Week two.** Ship the heuristic baseline. Recently used, frequently used, tenant peers.
+3. **Week three.** Add the click through tracking. Measure for a week.
+4. **Week four.** Iterate based on the data. Decide whether to invest in embeddings.
+
+For more on the related work, read [RAG retrieval augmented generation for SaaS when it helps and when it does not](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not) and [the search problem why adding it late always hurts](/blog/the-search-problem-why-adding-it-late-always-hurts). On the broader personalization side, [AI driven personalization real value or vanity](/blog/ai-driven-personalization-real-value-or-vanity) is the natural next read.

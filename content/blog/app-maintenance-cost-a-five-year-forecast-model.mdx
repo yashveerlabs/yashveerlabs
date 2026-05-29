@@ -1,0 +1,113 @@
+---
+slug: "app-maintenance-cost-a-five-year-forecast-model"
+title: "App Maintenance Cost: A Five Year Forecast Model"
+excerpt: "Building an app is the cheap part. Maintaining it over five years is where the real cost lives. Here is the model I use to project that bill for founders before they commit."
+date: "2026-05-18"
+category: "Software Costs and Budgeting"
+tags: ["cost","saas","budget","maintenance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/app-maintenance-cost-a-five-year-forecast-model"
+status: "published"
+definition: "A reasonable five year forecast for app maintenance is fifteen to twenty five percent of the initial build cost per year for the first two years, dropping to ten to fifteen percent in years three through five if the codebase is healthy. The line items are dependency updates, security patches, platform compatibility, customer driven changes, and the occasional refactor. Founders who model only the initial build cost run out of budget around month nine."
+faq: [
+  {"q":"What percentage of build cost should I budget for maintenance?","a":"Fifteen to twenty five percent per year for the first two years. Ten to fifteen percent per year for the next three. A 60k dollar build typically costs 9k to 15k per year in maintenance for the first two years, dropping after the codebase has stabilized."},
+  {"q":"What are the main maintenance line items?","a":"Dependency and framework upgrades. Security patches. Platform compatibility for iOS and Android updates. Customer driven changes that are small but cumulative. Occasional refactor work to keep tech debt manageable. Plus infrastructure cost which is separate from engineering."},
+  {"q":"Do I need a developer on retainer or hourly?","a":"For an active product, retainer. The relationship is faster and the developer stays in context. For a stable product with sporadic changes, hourly is cheaper. The break even is around eight billable hours per month."},
+  {"q":"Is maintenance more expensive for mobile or web?","a":"Mobile, usually. Apple and Google release platform updates twice a year that can break older code. Web maintenance is steadier. Budget twenty to thirty percent more for mobile maintenance over five years."},
+  {"q":"How do I reduce maintenance cost?","a":"Three things. A clean architecture that minimizes coupling. A real test suite that protects against regressions. Disciplined dependency management. Skipping any of the three increases maintenance cost by between thirty and a hundred percent over five years."},
+  {"q":"What is the most expensive surprise in app maintenance?","a":"A required framework migration. Angular to React, Rails 5 to Rails 8, React Native old architecture to new architecture. These migrations can cost twenty to forty percent of the original build cost in a single quarter."},
+  {"q":"Should I budget for a rewrite in five years?","a":"Not by default. A well built app should not need a rewrite at year five. Plan for incremental refactors instead. A required rewrite at year five usually means the maintenance discipline was missing in years one through four."}
+]
+---
+
+## What you actually need to know
+
+- Maintenance is fifteen to twenty five percent of build cost per year for the first two years.
+- The cost drops by year three if the codebase was built with discipline.
+- Mobile maintenance is more expensive than web maintenance over five years.
+- Framework migrations are the largest surprise line items.
+- In my experience, founders who model maintenance correctly raise less and survive longer.
+
+| Year | Maintenance cost as percentage of build | Why |
+|---|---|---|
+| Year 1 | 20 to 25 percent | Settling, fixing the things customers expose, settling architecture |
+| Year 2 | 15 to 20 percent | Major customer driven additions, first framework upgrades |
+| Year 3 | 10 to 15 percent | Stabilization if the discipline held |
+| Year 4 | 10 to 15 percent | Continued, with occasional refactors |
+| Year 5 | 12 to 20 percent | Often includes a major framework migration |
+
+## The core argument
+
+Software has a maintenance cost that runs roughly in proportion to its complexity. The pitch a founder usually hears focuses on the initial build cost because that is the cost that determines whether the project gets started. The cost that determines whether the project survives is the maintenance cost, and it gets neglected in almost every conversation.
+
+The forecasting model I use on client engagements is simple. Add up the build cost. Multiply by twenty five percent for year one. Multiply by twenty percent for year two. Multiply by fifteen percent for years three through five. That gives you a base maintenance budget. Then add line items for the things that are predictable but lumpy. A framework migration in year three or four. A major refactor in year three. A platform compatibility scramble in year two when iOS and Android each ship a release that breaks something. A security patch sprint when a critical vulnerability lands in a dependency you use.
+
+The model is conservative on purpose. The founders who use it tend to underspend the forecast slightly, which leaves a small reserve for the things you cannot predict. The founders who do not use it tend to underspend the actual cost by two to three times in year one, run out of budget, and either ship a degrading product or pay the cleanup tax in year two.
+
+The reason maintenance gets neglected is that it is invisible during the pitch. The investor asks how much it costs to build the MVP. The founder gives a number. Nobody asks how much it costs to keep it running for five years. That conversation should happen at the same time as the build conversation. Without it, the founder is committing to a five year obligation with one year of visibility.
+
+## The line items in detail
+
+**Dependency upgrades.** Every dependency in your stack will release breaking changes. The cumulative work to keep current adds up to roughly twenty to forty hours of engineering time per quarter on a moderately complex SaaS. Skipping the upgrades for a year usually doubles the work when you finally do them.
+
+**Security patches.** When a critical vulnerability lands in a major dependency, you have between hours and days to ship the patch. Budget two to four sprints per year for this work. Most years it is less. Some years it is more.
+
+**Platform compatibility.** iOS and Android release annually. Each release breaks some apps in subtle ways. Budget one to two weeks of mobile engineering per platform per year just for compatibility work.
+
+**Customer driven changes.** The small features and tweaks customers ask for. Individually small. Cumulatively large. Budget around thirty percent of the maintenance budget for this line.
+
+**Refactor work.** Tech debt repayment. The work that prevents the codebase from degrading. Budget around twenty percent of the maintenance budget for this line.
+
+**Framework migrations.** Once every three to five years on average. Twenty to forty percent of the original build cost in a single quarter when it lands. Plan for it even if you cannot predict exactly when.
+
+## What it actually costs
+
+| Build cost | Year 1 maintenance | Year 2 maintenance | Year 3 through 5 maintenance |
+|---|---|---|---|
+| 20k | 4k to 5k | 3k to 4k | 2k to 3k per year |
+| 60k | 12k to 15k | 9k to 12k | 6k to 9k per year |
+| 150k | 30k to 38k | 23k to 30k | 15k to 23k per year |
+| 400k | 80k to 100k | 60k to 80k | 40k to 60k per year |
+
+The ranges come from my own client work and what I see across other independent engineers. Real numbers will move based on the complexity of the product, the stack chosen, and whether the maintenance is done by senior or junior engineers.
+
+## Features to budget for explicitly
+
+- An ongoing developer relationship. Either retainer or named hourly.
+- Infrastructure budget that scales with usage. Hosting, database, CDN, monitoring.
+- A bug bounty or security review budget. Small but recurring.
+- Training for the team on dependency updates and platform changes.
+- Documentation maintenance. Often neglected and always expensive when ignored.
+- A reserve for the unpredictable. Five to ten percent of the maintenance line above the model.
+
+## Expert opinion
+
+> The founders who survive the year three reality check are the ones who budgeted for maintenance from year one. The founders who do not survive are the ones who treated maintenance as something that would happen if there was money left over. Maintenance is not optional. It is the cost of having shipped the product.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+A founder I worked with on a SaaS budgeted twelve percent of the build cost per year for maintenance. The actual cost in year one was twenty four percent because they had not modeled the dependency upgrade work. They scrambled, and the product survived. They adjusted the model in year two to twenty percent and have stayed close to the forecast since. Three years in, the product is healthy and the founder has a clear view of the five year obligation.
+
+The opposite story is a founder who budgeted nothing for maintenance and assumed the product would maintain itself. By month nine the dependencies were six months behind. By month twelve they had a security incident from an unpatched library. The cleanup cost was higher than the original build. The lesson took a year to land.
+
+For more on the broader cost topic, see [the honest cost of building an app in 2026](/blog/the-honest-cost-of-building-an-app-in-2026-global-breakdown), [maintenance budgets what to expect after launch](/blog/maintenance-budgets-what-to-expect-after-launch), and [the cost of switching developers mid project](/blog/the-cost-of-switching-developers-mid-project).
+
+## Common mistakes founders make
+
+1. Budgeting only for the build.
+2. Underestimating mobile maintenance specifically.
+3. Skipping framework upgrades to save short term money. The long term cost compounds.
+4. No reserve for security patches. They land when they land.
+5. No relationship with the original developer post launch. Switching developers mid maintenance is expensive.
+6. Treating maintenance as optional. It is not.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Compute the forecast. Use the percentages above as a starting point. Adjust for your stack and complexity.
+2. **Week two.** Compare to your current spend if the product is already live. The gap tells you whether you are over or under investing.
+3. **Week three.** Decide on retainer or hourly with your developer. Sign the agreement for the next twelve months.
+4. **Week four.** Communicate the maintenance budget to your finance partner or investor. Update the model. Make it visible.
+
+For deeper reading, [the cost of tech debt a founders worst bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill) and [the true cost of a rewrite when it is worth it](/blog/the-true-cost-of-a-rewrite-when-it-is-worth-it) cover the failure modes of underbudgeted maintenance.

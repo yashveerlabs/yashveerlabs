@@ -1,0 +1,121 @@
+---
+slug: "the-error-budget-sre-for-small-teams"
+title: "The Error Budget: SRE for Small Teams"
+excerpt: "Error budgets are not just for Google. A small team with one or two services can adopt the core SRE idea in a week and spend the rest of the year making better reliability trade offs."
+date: "2025-08-10"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","cost"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-error-budget-sre-for-small-teams"
+status: "published"
+definition: "An error budget is the allowable amount of downtime or failure derived from your SLO. If your SLO is 99.9 percent uptime, your monthly error budget is about 43 minutes. When you spend that budget, you stop shipping features and fix reliability. It is how Google operationalized the trade off between velocity and stability, and it scales down to a two engineer SaaS team."
+faq: [
+  {"q":"What is an error budget and how does a small team calculate one?","a":"An error budget is the inverse of your SLO. A 99.9 percent monthly availability SLO gives you about 43 minutes of allowed downtime per month. Track actual downtime and subtract from that figure. When the budget hits zero, reliability work takes priority over feature work. The math is simple. The discipline is the hard part."},
+  {"q":"Do you need a dedicated SRE team to use error budgets?","a":"No. The SRE practice at Google is large because Google is large. The underlying idea, setting an explicit reliability target and making trade offs against it, works for any team size. A two engineer startup can implement an error budget in a spreadsheet and get most of the benefit without a platform team."},
+  {"q":"What SLO percentage should a small SaaS start with?","a":"Start at 99.5 percent monthly availability unless you have a specific customer contract that demands more. That gives you about three and a half hours of budget. It is honest about where most small teams actually land and gives you room to work. Most teams that claim 99.99 have never measured their actual uptime."},
+  {"q":"How do you measure uptime to track your error budget?","a":"Use an external uptime monitor. Pingdom, Better Uptime, and UptimeRobot all work at low cost. Measure from outside your own network. Internal health checks miss the failure modes that affect customers: DNS, CDN, load balancer. Run checks every minute from at least two regions."},
+  {"q":"What happens when your team burns the error budget before the month ends?","a":"You freeze non critical feature work and focus on reliability improvements until the next budget period starts. This is the entire point. It makes the trade off explicit and forces prioritization. Without the budget mechanic, reliability work always loses to feature work because features have visible stakeholders."},
+  {"q":"How do error budgets interact with on call rotations?","a":"They are connected. When the error budget burns fast, on call is getting paged frequently. The budget gives you the data to have the conversation with the product side: we shipped too fast and the reliability tax is now real. The on call rotation is the human cost of that tax."},
+  {"q":"Can you use error budgets for latency and not just uptime?","a":"Yes, and you should. Define a latency SLO alongside your availability SLO. Something like ninety five percent of requests under 500 milliseconds. Track the percentage that violates that threshold and count it as budget burn. Latency regressions affect customers just as much as outages do, and they are easier to miss."}
+]
+---
+
+## What you actually need to know
+
+- An error budget turns reliability into a number your team can actually reason about.
+- The SLO is the target. The error budget is what you are allowed to spend before reliability work takes over.
+- You do not need a platform team to implement this. A spreadsheet and an external uptime monitor are enough to start.
+- The budget mechanic forces the conversation between shipping speed and stability into the open.
+- Most small teams that think they are reliable have never actually measured their uptime.
+
+| Approach | SLO target | Monthly budget | Team size fit | Tooling needed |
+|---|---|---|---|---|
+| Informal uptime | None | Unlimited | Solo | None |
+| Basic error budget | 99.5% | 3.6 hours | 2-5 engineers | Uptime monitor + spreadsheet |
+| Structured SLO tracking | 99.9% | 43 minutes | 5-15 engineers | Monitoring stack + dashboards |
+| Multi-tier SLOs | 99.9% to 99.99% | 43 min to 4 min | 15+ engineers | Full observability platform |
+
+## The core argument
+
+The original SRE book came from Google at a scale most of us will never approach. That framing has put off a lot of small teams who read the introduction and decide the practice is not for them. That is a mistake. The core idea underneath all the Google specifics is simple: pick a reliability target explicitly, measure against it, and use the remaining budget to decide when to ship features versus fix infrastructure. That idea scales to two people.
+
+The problem most small SaaS teams have is not that they lack reliability practices. It is that they make reliability trade offs implicitly. Someone decides to ship a feature on a Friday. Someone else decides the deployment pipeline is good enough for now. Nobody decides these things; they just happen. The error budget makes the decision explicit.
+
+A 99.9 percent monthly SLO means roughly 43 minutes of allowed downtime. If you had a 20 minute outage last week, you have 23 minutes left for the month. That fact changes decisions in a way that a vague sense of "we need to be more reliable" never does.
+
+I am not arguing for elaborate tooling or a whole new engineering process. The minimum viable version of this is: pick an SLO number, run an external uptime monitor, track your actual uptime in a shared document, and review it in your weekly engineering sync. That takes half a day to set up and costs under thirty dollars a month.
+
+## Defining your SLOs the honest way
+
+The instinct when setting an SLO is to pick a number that sounds good. Founders tend to anchor on 99.9 percent because they have seen it in contracts. Engineers tend to anchor on what they think the platform can deliver. Neither of these is the right starting point.
+
+### Start with measurement, not aspiration
+
+Run your external uptime monitor for thirty days before you commit to a number. Most small teams are surprised by what they find. A deployment with no health check grace period, a database failover that takes four minutes, a scheduled job that blocks the web server, all of these show up when you actually measure.
+
+### Tiered SLOs for tiered surfaces
+
+Not every part of your product needs the same SLO. Your authentication flow probably needs 99.9 percent. Your reporting dashboard probably needs 99.5 percent. Your admin panel probably needs 99 percent. Tiering lets you allocate reliability investment where it actually matters to customers.
+
+### SLO versus SLA
+
+An SLO is an internal target. An SLA is a contractual commitment with financial consequences. Most small teams should operate with SLOs for years before they need to commit to SLAs. Run the internal discipline first. The external commitment can come later when you have the track record to back it.
+
+## How long does it take
+
+| Activity | Time to set up | Ongoing time per week |
+|---|---|---|
+| External uptime monitor | 30 minutes | None after setup |
+| SLO spreadsheet | 2 hours | 15 minutes for weekly review |
+| Basic alerting rules | Half a day | None after tuning |
+| Incident tracking log | 1 hour | 10 minutes per incident |
+| Full error budget review process | 1 week | 1 hour per week |
+
+The investment is small. The payoff is that you stop making reliability decisions by accident.
+
+## What the error budget process needs to work
+
+- An external uptime monitor that checks every minute from at least two regions.
+- A clear definition of what counts as a budget-burning event (outage, latency breach, error rate spike).
+- A shared document or dashboard that the whole team can see, not just the ops person.
+- A rule that when the budget hits zero, feature work stops until reliability work recovers it.
+- A monthly review where the actual numbers are discussed alongside feature progress.
+- An incident log that captures the duration and root cause of every budget-burning event.
+- A mechanism for the product side to trade reliability budget for feature velocity when the trade off is conscious.
+
+## Expert opinion
+
+> Most small teams treat reliability as a feeling. They feel like the system is pretty stable. They feel like the deployment went well. Feelings are not a reliability practice. The error budget forces a number onto the conversation. Once the number exists, the trade offs become explicit, the incidents become learnable, and the team stops making reliability decisions by accident.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had been operating for two years without any formal reliability tracking. The founders believed their uptime was around 99.5 percent. When we ran an external monitor retroactively against their incident log, the actual monthly availability was closer to 98.8 percent. That is roughly five hours of monthly downtime. The product had three enterprise prospects in the pipeline who had asked about SLAs.
+
+We set up a basic error budget process in one week. External monitor, a shared spreadsheet, a weekly review slot. The first month of tracking surfaced three recurring failure patterns: a deployment step that caused a 90 second gap in availability, a cron job that locked a database table under load, and a third-party API timeout that was not being handled gracefully. None of these had been prioritized because nobody had a number to attach to them.
+
+Within two months, the team had fixed all three patterns. Monthly availability moved to 99.7 percent. The enterprise conversations became easier because the team had actual data to present instead of a vague assertion of reliability. For the broader monitoring context, [why your service should have two health checks not one](/blog/why-your-service-should-have-two-health-checks-not-one) is worth reading alongside this. For the incident response side, [the on call rotation that engineers can actually sustain](/blog/the-on-call-rotation-that-engineers-can-actually-sustain) covers how to handle the human cost when the budget burns fast.
+
+## Common mistakes teams make
+
+1. Setting the SLO before measuring actual uptime. You end up committing to a number that has no relationship with reality.
+2. Measuring uptime from inside your own network. Internal health checks miss DNS failures, CDN issues, and load balancer problems that customers feel directly.
+3. Treating the error budget as a reporting exercise rather than a decision-making tool. If the budget number never changes a prioritization decision, you have a vanity metric.
+4. Setting the same SLO for every surface. The authentication flow and the admin settings page do not need the same reliability target.
+5. No clear definition of what burns the budget. Without a precise definition, every incident becomes a debate about whether it counts.
+6. Forgetting latency as a reliability dimension. A page that loads in four seconds is unreliable even if the uptime monitor shows green.
+7. Skipping the retrospective when the budget burns. The point of tracking is to learn and improve, not to produce numbers for a dashboard.
+8. Not sharing the numbers with the product side. The product manager needs to see the error budget to understand why engineering is pausing a feature sprint.
+
+## A 30 day plan to put error budgets in place
+
+1. **Days one and two.** Pick an uptime monitor. Set it up against your three most critical user-facing endpoints. Two regions, one-minute checks.
+2. **Days three and four.** Define your SLOs. One per major surface. Start honest, not aspirational. Check [the three-hour performance audit every team should run quarterly](/blog/the-three-hour-performance-audit-every-team-should-run-quarterly) for a companion baseline exercise.
+3. **Days five through seven.** Build the tracking spreadsheet. Columns for date, incident duration, affected surface, root cause, and budget remaining.
+4. **Days eight through fourteen.** Observe without intervening. Let the first two weeks of data tell you where the actual reliability gaps are.
+5. **Days fifteen through twenty.** Review the data. Identify the top two reliability investments that would recover the most budget.
+6. **Days twenty-one through twenty-five.** Make those two investments. Ship the fixes.
+7. **Days twenty-six through thirty.** Schedule the first monthly error budget review. Walk the team through the numbers. Set the rhythm for the next period.
+
+For the deployment side, [blue green deployments vs canary vs rolling a decision tree](/blog/blue-green-deployments-vs-canary-vs-rolling-a-decision-tree) covers how your deploy strategy connects to how fast you burn budget. For a broader infrastructure foundation, [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) is the natural companion on the database reliability side.

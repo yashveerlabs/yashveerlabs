@@ -1,0 +1,121 @@
+---
+slug: "database-partitioning-strategies-and-pitfalls"
+title: "Database Partitioning: Strategies and Pitfalls"
+excerpt: "Partitioning solves real problems on real large tables. It also creates new problems if used preemptively or with the wrong partition key. Here is the honest read on when and how."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["database","partitioning","postgres","scale"]
+readingMinutes: 12
+ogImage: "/api/og/blog/database-partitioning-strategies-and-pitfalls"
+status: "published"
+definition: "Database partitioning is the technique of splitting one logical table into multiple physical pieces. The pieces can be queried as one but are stored and indexed separately. The pattern fits very large tables where queries naturally filter by the partition key. The pattern hurts tables where the queries do not naturally filter. The right key and the right time are the two decisions that matter most."
+faq: [
+  {"q":"When does partitioning actually help?","a":"When the table is large enough that operations on the whole table are painful and most queries filter by a natural partition key. Time series data partitioned by month. Multi tenant data partitioned by tenant. Event logs partitioned by date. Each of these has the right shape for partitioning to pay off."},
+  {"q":"What is partition pruning?","a":"The query planner uses the partition key in the WHERE clause to skip partitions that cannot contain matching rows. A query that filters on a month touches only the partition for that month. The other eleven months are skipped entirely. The performance gain comes from this pruning."},
+  {"q":"What is the wrong partition key?","a":"A column that queries do not typically filter on. The partition pruning does not apply. The query has to touch every partition. The overhead of partitioning is paid without the benefit. The result is slower than the original unpartitioned table."},
+  {"q":"How many partitions are too many?","a":"Postgres handles thousands of partitions but performance degrades at very high counts. The query planner has more work to do. The right count is enough to make individual partitions a manageable size. Hundreds is usually fine. Many thousands is usually a sign of over partitioning."},
+  {"q":"When should I partition?","a":"When the table is approaching billions of rows or tens of gigabytes per index. Below that, indexes alone usually handle the workload. The decision is not just size. It is also operational pattern. A table where you regularly drop old data benefits from partitioning because dropping a partition is instant."},
+  {"q":"What is the migration cost?","a":"Significant. Partitioning a live table requires careful planning. The table has to be created with the partition structure. Data has to be migrated. The application has to keep working through the migration. Plan a quarter for a meaningful migration."},
+  {"q":"What is the worst partitioning mistake?","a":"Partitioning preemptively before the table is large enough to justify it. The overhead is paid. The benefit is theoretical. The team has a complex setup for a problem they do not yet have."}
+]
+---
+
+## What you actually need to know
+
+- Partitioning fits very large tables where queries filter by a natural key.
+- The wrong partition key produces overhead without benefit.
+- Hundreds of partitions is fine. Many thousands is usually over partitioning.
+- Migrating a live table to partitions is a real project.
+- Preemptive partitioning is the most common mistake.
+
+| Workload | Partition recommendation |
+|---|---|
+| Time series with date range queries | Range partition by date |
+| Multi tenant with tenant scoped queries | Hash or list partition by tenant_id |
+| Event logs you regularly drop | Range partition by date |
+| Generic CRUD without natural filter | Do not partition |
+| Geographic data with region queries | List partition by region |
+| Very small to moderate sized tables | Do not partition |
+
+## The core argument
+
+Partitioning is one of those database techniques that founders read about and want to use before they need it. The pattern sounds powerful. The talks at conferences are excellent. The reality is that partitioning helps a specific shape of problem and hurts most others.
+
+The shape that partitioning helps is large tables where most queries filter by a natural partition key. The query planner uses the key to skip partitions that cannot have matching rows. A query that touches one month of data only reads that month's partition. The other eleven months are skipped. The performance gain is real.
+
+The shape that partitioning hurts is large tables where queries do not naturally filter by a partition key. The query has to touch every partition because the planner cannot prune. The overhead of the multi partition query is paid. The performance is worse than the unpartitioned table.
+
+The decision is mostly about the workload. The team that has time series data with date range queries should partition by date. The team that has multi tenant data with tenant scoped queries should partition by tenant. The team that has generic CRUD without a natural key should not partition.
+
+The timing matters. Partitioning preemptively for a table that is not yet large enough is a common mistake. The overhead is paid without the benefit. The right time is when the table is approaching the scale where unpartitioned operations become painful.
+
+## The partition key decision
+
+| Workload pattern | Partition key |
+|---|---|
+| Most queries filter by created_at range | Date range |
+| Most queries filter by tenant_id | Tenant hash or list |
+| Most queries filter by region | Region list |
+| Most queries filter by status | Often not a good partition key |
+| Most queries filter by user_id | User hash if very many users |
+| Generic application data | Often not a candidate |
+
+## How much does this cost
+
+| Phase | Cost |
+|---|---|
+| Initial design | A few weeks |
+| Migration from unpartitioned | A quarter for a large table |
+| Ongoing operations | Modest. Partition management. |
+| Application changes | Often minimal if the partition key is in queries |
+| Monitoring | Modest |
+
+## Features the partitioning setup must have
+
+- A clear partition key justified by query patterns.
+- A reasonable partition count.
+- A management plan for adding new partitions.
+- A management plan for dropping old partitions.
+- Monitoring on partition sizes and query plans.
+- Indexes on each partition appropriate to the queries.
+- A documented operational runbook.
+- A test that verifies partition pruning is working.
+
+## Expert opinion
+
+> Partitioning is a tool that solves a specific class of problem. The teams that adopt it for the right problem get the scaling capability they need. The teams that adopt it for the wrong problem pay the complexity tax without the corresponding benefit. The discipline is to recognize which class of problem you have before reaching for the tool. The right time is when the unpartitioned table is genuinely struggling.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had an events table that had grown to roughly 2 billion rows. Queries on recent events were slow. The team was considering partitioning. We measured first.
+
+The queries that were slow were filtering by date and by tenant. Both columns were good candidates for partitioning. The events table also had a regular operation to drop events older than ninety days. The drop was taking hours.
+
+We partitioned by month. The events older than ninety days could be dropped by dropping the partition, which is instant. Queries on recent events touched only the recent partitions. The performance improved by an order of magnitude on the slow queries.
+
+The migration took six weeks of careful work. The team has run the partitioned table for two years without significant issues. The decision to partition was right for this specific workload. A different team's table with the same size but different query patterns would have been worse with partitioning.
+
+For more on the related work, see [scaling from one thousand to one hundred thousand users the invisible database bottlenecks](/blog/scaling-from-one-thousand-to-one-hundred-thousand-users-the-invisible-database-bottlenecks) and [sharding strategies for SaaS when to start and when to stop avoiding it](/blog/sharding-strategies-for-saas-when-to-start-and-when-to-stop-avoiding-it).
+
+## Common mistakes teams make
+
+1. Partitioning preemptively before the table is large enough.
+2. Wrong partition key for the query patterns.
+3. Too many partitions. Planner overhead.
+4. No partition management for new and old partitions.
+5. No verification that partition pruning is working.
+6. Migration without planning. Outages follow.
+7. Treating partitioning as a substitute for indexes.
+8. Treating partitioning as a substitute for sharding.
+
+## A decision framework
+
+1. **Step one.** Measure the current table size and growth rate.
+2. **Step two.** Analyze the query patterns. Identify the natural partition key.
+3. **Step three.** Confirm partition pruning would apply to most queries.
+4. **Step four.** Plan the migration carefully.
+5. **Step five.** Migrate. Verify. Adopt the operational practice.
+
+For more on the related work, read [sharding strategies for SaaS when to start and when to stop avoiding it](/blog/sharding-strategies-for-saas-when-to-start-and-when-to-stop-avoiding-it) and [PostgreSQL performance at scale the tweaks that move the needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle). On the broader scaling side, [CockroachDB and TiDB when distributed SQL pays off](/blog/cockroachdb-and-tidb-when-distributed-sql-pays-off) is the natural next read.

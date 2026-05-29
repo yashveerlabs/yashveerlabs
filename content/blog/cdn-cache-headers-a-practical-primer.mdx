@@ -1,0 +1,110 @@
+---
+slug: "cdn-cache-headers-a-practical-primer"
+title: "CDN Cache Headers: A Practical Primer"
+excerpt: "Cache control headers look simple and confuse most engineers. Wrong headers either cache nothing or cache everything for too long. Here is the practical guide that gets it right."
+date: "2026-05-20"
+category: "Performance Optimization"
+tags: ["cdn","cache","headers","http"]
+readingMinutes: 12
+ogImage: "/api/og/blog/cdn-cache-headers-a-practical-primer"
+status: "published"
+definition: "CDN cache headers are the instructions you send with each HTTP response that tell the CDN and the browser how to cache the response. Cache-Control is the primary header. ETag and Last-Modified support validation. Vary controls cache key. A few patterns cover most cases. The wrong headers either prevent caching or cache stale data. The right headers make the difference between a fast page and a slow one."
+faq: [
+  {"q":"What is the difference between Cache-Control max-age and s-maxage?","a":"max-age is for any cache including the browser. s-maxage is for shared caches like CDNs only. Use s-maxage when you want the CDN to cache aggressively but the browser to revalidate. A common pattern is s-maxage=31536000 with max-age=0."},
+  {"q":"What is stale-while-revalidate?","a":"A directive that lets the cache serve a stale response while it asynchronously fetches a fresh one in the background. The user sees fast content immediately. The cache updates without blocking. The pattern is excellent for content that can tolerate brief staleness."},
+  {"q":"What is the right header for static assets?","a":"For content hashed static files like main.abc123.js, use Cache-Control: public, max-age=31536000, immutable. The hash means the URL changes when the content changes. The cache can be aggressive without staleness risk."},
+  {"q":"What about API responses?","a":"Public API responses with caching: Cache-Control: public, s-maxage=60, stale-while-revalidate=300. Per user API responses: Cache-Control: private, max-age=0, must-revalidate. Mutations and sensitive endpoints: Cache-Control: no-store."},
+  {"q":"What is the Vary header?","a":"Vary tells the cache which request headers affect the response. Vary: Accept-Encoding ensures gzipped and uncompressed responses are cached separately. Vary: Authorization splits the cache by auth. Wrong Vary headers either leak content across users or fragment the cache."},
+  {"q":"What about Surrogate-Control?","a":"Some CDNs respect Surrogate-Control as a stronger signal than Cache-Control. It lets you set CDN behavior without affecting browser behavior. Useful when you want long CDN cache but short browser cache. Check your CDN's documentation for support."},
+  {"q":"What is the biggest header mistake?","a":"Cache-Control: no-cache when the team meant Cache-Control: no-store. no-cache permits caching but requires revalidation. no-store forbids caching entirely. The names are confusing and produce real bugs."}
+]
+---
+
+## What you actually need to know
+
+- Cache-Control is the primary header. Pick the right directives for the content.
+- Static hashed assets get aggressive caching with immutable.
+- Public API responses can use s-maxage with stale-while-revalidate.
+- Per user responses must be private or no-store.
+- Vary controls what affects the cache key.
+
+| Content type | Recommended header |
+|---|---|
+| Hashed static asset | public, max-age=31536000, immutable |
+| HTML page (static) | public, s-maxage=3600, stale-while-revalidate=600 |
+| Public API response | public, s-maxage=60, stale-while-revalidate=300 |
+| Per user API response | private, max-age=0, must-revalidate |
+| Sensitive endpoint | no-store |
+| Image with content hash | public, max-age=31536000, immutable |
+| Unhashed asset | public, max-age=600, stale-while-revalidate=3600 |
+
+## The core argument
+
+Cache headers are one of those areas of web engineering where the documentation is dense, the directives are confusing, and the consequences of getting it wrong are slow page loads or cached private data leaking to the wrong users. Most teams never go deep on the topic. They use a framework default and hope it works. Sometimes it does. Often it does not.
+
+The fix is a practical mental model. The static content gets aggressive caching because the URL changes when the content changes. The dynamic content gets short cache or no cache, with the choice depending on whether the response is public or private. The grey area in between uses stale-while-revalidate to give the user fast content with fresh data fetched in the background.
+
+The directives that matter are smaller than the spec suggests. Cache-Control is the primary. ETag or Last-Modified support efficient revalidation. Vary controls the cache key. Surrogate-Control gives CDN specific behavior when needed. Most production traffic fits into a handful of patterns. The patterns are worth memorizing.
+
+The cost of getting this wrong is real. A static asset with no cache header is downloaded on every request. A per user response with public cache leaks to other users. A public response with no cache hits the origin every time. Each is a real production bug. Each is fixable with the right header.
+
+## The patterns that cover most cases
+
+| Pattern | Use case | Cache-Control directive |
+|---|---|---|
+| Immutable hashed asset | JS, CSS, image with content hash in filename | public, max-age=31536000, immutable |
+| Static HTML | Marketing pages, blog posts | public, s-maxage=3600, stale-while-revalidate=600 |
+| Cacheable API | Public data endpoints | public, s-maxage=60, stale-while-revalidate=300 |
+| Private fast | Per user data that can refresh | private, max-age=60 |
+| Private no cache | Per user data that must be fresh | private, max-age=0, must-revalidate |
+| No store | Tokens, sensitive responses | no-store |
+
+## How much does this cost
+
+The cost of getting cache headers right is engineering time, not money. A few hours per surface to pick the right pattern. Some CI testing to confirm the headers are correctly applied. The savings show up in CDN hits, origin load, and user perceived performance.
+
+## Features the header strategy must have
+
+- A documented policy for each content type.
+- Helper functions in the framework that apply the right headers.
+- CI tests that verify the headers on critical endpoints.
+- Monitoring for cache hit rate at the CDN.
+- A clear path to bust the cache when needed.
+- An audit of the Vary headers across the application.
+- A plan for revalidation with ETag where appropriate.
+
+## Expert opinion
+
+> Cache headers are the most underused performance lever in most stacks. The teams that get them right pay a fraction of the origin egress and CDN load that the teams that get them wrong pay. The difference between a fast site and a slow site is often just three lines of header configuration applied with intention. The cost of learning the patterns is one afternoon. The return compounds for the life of the product.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client's marketing site was getting unexpected origin load from a CDN that should have been caching aggressively. Investigation showed the framework was sending Cache-Control: private, max-age=0 by default on all pages because of a server side data fetch. The CDN was treating every request as uncacheable.
+
+We changed the headers. Marketing pages got public, s-maxage=3600, stale-while-revalidate=600. The CDN cache hit rate went from near zero to over ninety percent. The origin load dropped by an order of magnitude. The CDN bill grew slightly because of the increased hits. The origin bill dropped much more. Net cost dropped.
+
+The user perceived performance improved on every page. The stale-while-revalidate meant the user always saw fast content, even when the cache was refreshing in the background.
+
+For more on the related work, see [the HTTP caching strategy that most teams get wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong) and [CDN strategy for a global SaaS in 2026](/blog/cdn-strategy-for-a-global-saas-in-2026).
+
+## Common mistakes teams make
+
+1. Using framework defaults without checking what they emit.
+2. Confusing no-cache with no-store.
+3. Aggressive cache on per user data. Privacy bug.
+4. No cache on static hashed assets. Wasted bandwidth.
+5. Missing Vary headers. Cache key fragmentation or leaks.
+6. No ETag on revalidating responses. More work than needed.
+7. No monitoring on cache hit rate at the CDN.
+8. Treating cache as set and forget. Reality drifts.
+
+## A 30 day plan to audit and fix headers
+
+1. **Week one.** Audit current headers on the top endpoints. Identify the issues.
+2. **Week two.** Document the policy. Pick patterns for each content type.
+3. **Week three.** Apply the headers. Add CI tests.
+4. **Week four.** Monitor the CDN. Adjust based on hit rate and freshness.
+
+For more on the related work, read [the HTTP caching strategy that most teams get wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong) and [caching strategies for growing SaaS from none to multi layer](/blog/caching-strategies-for-growing-saas-from-none-to-multi-layer). On the broader CDN side, [CDN strategy for a global SaaS in 2026](/blog/cdn-strategy-for-a-global-saas-in-2026) is the natural next read.

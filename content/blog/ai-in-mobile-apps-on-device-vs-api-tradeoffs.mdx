@@ -1,0 +1,112 @@
+---
+slug: "ai-in-mobile-apps-on-device-vs-api-tradeoffs"
+title: "AI in Mobile Apps: On Device vs API Tradeoffs"
+excerpt: "Where the AI runs decides what the app can do, what it costs, and how the user feels about privacy. The honest comparison for founders deciding in 2026."
+date: "2026-05-18"
+category: "Cross Platform and Mobile Development"
+tags: ["ai","mobile","ios","android"]
+readingMinutes: 11
+ogImage: "/api/og/blog/ai-in-mobile-apps-on-device-vs-api-tradeoffs"
+status: "published"
+definition: "On device AI runs the model on the phone, with zero network round trips and full privacy. API AI runs the model in the cloud, with more capability but real cost and latency. The right call depends on the feature, the device, and the user expectation. In 2026 the line is moving toward on device faster than most teams expect, but not for every workload."
+faq: [
+  {"q":"Is on device AI ready for production in 2026?","a":"For many use cases yes. Apple Intelligence and Android AI both run useful models locally. Speech to text, summarization of short text, image classification, and small language tasks all work well on device. Heavier tasks like deep reasoning over long context still need API."},
+  {"q":"What does on device cost?","a":"Nothing in API fees. The cost is in app binary size, RAM usage, battery drain, and the engineering time to integrate the local model. Most apps spend two to ten megabytes of model weights and one to two hundred megabytes of RAM during inference."},
+  {"q":"What does API based AI cost?","a":"Anywhere from a fraction of a cent to several cents per request, depending on the model and the token count. For an app with a hundred thousand active users running an AI feature ten times a day, the bill is meaningful. Often two to twenty thousand dollars a month."},
+  {"q":"Which is better for privacy?","a":"On device, by definition. The data never leaves the user's phone. For regulated industries, healthcare, and any product targeting privacy conscious users, this is a real selling point. The flip side is that the user's device has to be capable of the workload."},
+  {"q":"What about latency?","a":"On device wins on latency for the workloads it can handle. No network round trip means a response in fifty to two hundred milliseconds. API latency typically runs eight hundred milliseconds to three seconds. The user feels the difference."},
+  {"q":"Should I use a hybrid?","a":"Yes for most apps. Run cheap, latency sensitive workloads on device. Run capability heavy workloads through API. The architecture has to be cleanly split so the same feature can run either path."},
+  {"q":"What about older phones that cannot run the local model?","a":"Detect the device capability at runtime and fall back to API. Never assume all your users have the latest phone. Your bottom twenty percent of users by device age is still meaningful revenue."}
+]
+---
+
+## What you actually need to know
+
+- On device wins on privacy, latency, and cost for small to medium tasks.
+- API wins on capability, recency of model, and consistency across devices.
+- The right architecture is a hybrid that picks the path at runtime based on the feature and the device.
+- App binary size and battery drain are real costs of on device that founders underestimate.
+- In my experience, the strongest 2026 mobile apps run a hybrid by default.
+
+| Workload | On device | API |
+|---|---|---|
+| Speech recognition | Yes, mature | Yes, slightly more accurate |
+| Image classification | Yes, fast | Overkill |
+| Short text summarization | Yes, capable | Yes, slightly better quality |
+| Long context reasoning | Limited | Required |
+| Image generation | Possible on flagship devices | Higher quality, more reliable |
+| Multimodal understanding | Limited | Required for now |
+
+## The core argument
+
+For five years the default assumption in AI mobile features was that the model lives in the cloud and the phone is the client. The 2025 generation of on device models changed that. Apple Intelligence and Google's on device Gemini both run capable language models locally. iPhones from a few generations back can summarize a long email without a network call. The line that defined which features needed an API is moving.
+
+The architectural implication is that the question is no longer "should we use AI in our mobile app." The question is "where should the AI run for each feature." That is a real decision that shapes cost, privacy, performance, and the user experience.
+
+The answer is usually a hybrid. Workloads where speed and privacy matter most run on device. Workloads where capability and recency matter most run through API. The product code chooses the path at runtime based on the feature, the device, and sometimes the user's settings.
+
+I have shipped both sides on client projects. The on device side wins on speed and customer trust. The API side wins on the cases where you really need the most capable model. The teams that pick a side and never revisit the decision miss the wins they could have had on the other side. The teams that build a clean abstraction can move features between paths as the models and devices evolve.
+
+## When on device is the right call
+
+The workload runs frequently enough that API cost would add up. The latency matters to user perception. The data is sensitive and the user notices. The model needed for the task fits in your binary size budget. The target devices are recent enough to run the model with acceptable battery cost.
+
+Specific examples that work well on device today. Live transcription of voice notes. Summarization of selected text. Classification of images for search and tagging. Smart suggestions for short replies. Spelling and grammar refinement. Each of these is a workload where the user runs the feature many times per session, expects fast response, and would not love their data going to a third party.
+
+## When API is the right call
+
+The workload is rare enough that cost is manageable. The model needed for the task is too large for on device. The output quality is the dominant constraint. The user is willing to wait a second or two for the response.
+
+Examples that still belong in the cloud. Long context reasoning over hundreds of pages. Image generation at high quality. Complex multi step agentic workflows. Anything where the user types one query and expects the best possible answer, not the fastest.
+
+## What it actually costs
+
+| Architecture | Engineering effort | Cost at 100k MAU |
+|---|---|---|
+| API only, one provider | One to two weeks per feature | 5k to 30k dollars per month depending on usage |
+| API only, multi provider | Two to four weeks per feature | Same as above, plus failover engineering |
+| On device only | Two to six weeks per feature | App size grows, infrastructure cost near zero |
+| Hybrid with runtime selection | Three to eight weeks per feature | Lower than API only, more engineering |
+
+The hybrid path costs more engineering but pays back through lower API spend and better user experience on most workloads. The exact breakeven depends on usage volume.
+
+## Features to demand from the architecture
+
+- A clear abstraction at the application layer so the same feature can run either path.
+- Runtime detection of device capability. New iPhones get on device, older devices and Android variants get API.
+- A way to override the path per user. Privacy conscious users can pin everything to on device.
+- Telemetry that separates on device usage from API usage. You need to know which path is doing the work.
+- A fallback path when on device is not available. Never tell the user the feature is unsupported when an API path exists.
+- A cost dashboard for the API side, broken down by feature.
+
+## Expert opinion
+
+> The apps that win on AI in 2026 are not the apps with the biggest API bill. They are the apps that picked the right path for each feature. Most users do not care which model is running. They care that the feature feels fast and respects their data.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client iOS app I shipped last year, the transcription feature ran on device. The summarization of long documents ran through API. Users opened the app dozens of times a day, ran transcription almost every session, and summarization only occasionally. The on device path absorbed ninety percent of the AI workload. The API bill was small. The privacy story was strong. The team did not have to choose between cost and capability.
+
+The opposite story is a competitor app that put every AI feature through API. Their bill at fifty thousand active users was over fifteen thousand dollars a month. Their transcription latency was over two seconds. Privacy conscious users complained. They eventually rebuilt the architecture to support on device, which took more effort than building it that way from the start would have.
+
+For more on the broader mobile architecture decisions, see [Flutter vs React Native vs Native in 2026](/blog/flutter-vs-react-native-vs-native-in-2026-a-founder-decision-matrix) and [Apple Intelligence and Android AI building for the new platforms](/blog/apple-intelligence-and-android-ai-building-for-the-new-platforms). For the API cost side, [the cost of running LLMs in production](/blog/the-cost-of-running-llms-in-production-a-realistic-budget) covers the economics.
+
+## Common mistakes teams make
+
+1. Assuming all users have the latest flagship device.
+2. Picking one path and never revisiting the choice as models and devices evolve.
+3. Underestimating app binary size growth from on device model weights.
+4. Underestimating API cost growth when usage scales.
+5. Building features without telemetry to track which path is running. The team cannot tune what it cannot see.
+6. Ignoring battery drain from on device inference. Users will notice and complain.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Inventory every AI feature in your app. Tag each as "frequent and small," "rare and large," or "in between."
+2. **Week two.** Design the abstraction that lets a feature run either path. Wire the runtime device check.
+3. **Week three.** Pick one frequent and small feature. Implement on device. Ship behind a flag.
+4. **Week four.** Measure. Latency, battery, customer feedback. Adjust the architecture before adding more features.
+
+For deeper reading, [the privacy and data boundary problem in AI integrations](/blog/the-privacy-and-data-boundary-problem-in-ai-integrations) covers the legal frame, and [AI customer risk](/blog/ai-customer-risk-why-some-buyers-avoid-ai-heavy-products) covers the segment of users that will actively prefer on device.

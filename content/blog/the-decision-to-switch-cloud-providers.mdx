@@ -1,0 +1,94 @@
+---
+slug: "the-decision-to-switch-cloud-providers"
+title: "The Decision to Switch Cloud Providers"
+excerpt: "When switching cloud providers is worth the migration cost and when it is a distraction from the engineering work that actually matters."
+date: "2025-10-14"
+category: "Founder Decision Frameworks"
+tags: ["founders","cloud","aws","gcp","azure","infrastructure","decision-frameworks"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-decision-to-switch-cloud-providers"
+status: "published"
+definition: "Switching cloud providers means migrating all infrastructure, data, and services from one cloud platform to another. The migration takes three to twelve months for a typical SaaS product, consumes significant engineering capacity, introduces migration risk, and often produces cost savings that are smaller than projected. The decision is justified when the current provider creates a hard technical limitation, a contractual problem, or a cost structure that genuinely cannot be optimized within the current provider."
+faq: [
+  {"q":"What are the most common reasons companies switch cloud providers?","a":"Cost reduction (actual or perceived), a specific technical service available only on another provider, enterprise customer requirements for a specific cloud, compliance requirements in regulated industries, or a contractual issue with the current provider. Cost is the most common stated reason but rarely the actual driver once migration costs are factored in."},
+  {"q":"How long does a cloud migration take?","a":"For a typical SaaS product with a primary database, several services, and production traffic, a migration takes 6 to 12 months. Simple products with minimal services can move in 3 to 6 months. Enterprise products with complex compliance requirements can take 12 to 18 months. Plan realistically."},
+  {"q":"How do I migrate without downtime?","a":"Run both environments in parallel during the migration. Migrate services one at a time. Use DNS cutover for the final switch. The parallel running period costs more than the single-provider state, but it eliminates the risk of a big-bang migration that causes extended downtime."},
+  {"q":"Will switching cloud providers actually save money?","a":"Often less than expected. Direct service costs may decrease, but migration engineering time, staff retraining, and the productivity loss during the migration period usually offset the savings for 12 to 24 months. Calculate the total cost of the migration before the projected savings, not just the annual cost difference."},
+  {"q":"What is the biggest technical risk in a cloud migration?","a":"Data migration. Moving the primary database between cloud providers is the highest-risk step. Ensure the migration plan includes: a complete backup before starting, a tested rollback procedure, a validation step after migration that confirms data integrity, and a defined SLA for the acceptable data loss window."}
+]
+---
+
+## What you actually need to know
+
+- Migration engineering time typically offsets projected savings for 12 to 24 months. Calculate total cost before deciding.
+- The migration takes longer than planned. Add 50 percent to whatever timeline the engineering team estimates.
+- Data migration is the highest-risk step. Back up everything. Test the rollback. Validate data integrity before cutting over.
+- Run both environments in parallel during migration. Big-bang migrations are unnecessarily risky.
+- Most cloud provider limitations can be worked around without a full migration. Exhaust workarounds before committing to the switch.
+
+| Migration Driver | Cost-Benefit | Recommendation |
+|---|---|---|
+| Cost reduction | Often offset by migration cost for 12-24 months | Calculate total cost before deciding |
+| Specific service need | May be achievable through abstraction layer | Evaluate workaround first |
+| Customer requirement | Usually non-negotiable if enterprise deal depends on it | Migrate only the required components |
+| Compliance requirement | Non-negotiable | Migrate the specific workloads requiring compliance |
+| Contract issue | Depends on severity | Legal review first, migration if necessary |
+
+## The core argument
+
+Cloud provider migration is one of the most frequently debated and least frequently necessary infrastructure decisions in SaaS engineering. The debates happen in engineering teams across the world: AWS is too expensive, GCP has a better ML platform, Azure is required for our enterprise customer. Most of these debates produce months of planning and occasionally a migration that consumes an enormous amount of engineering capacity for returns that could have been achieved with a fraction of the effort spent on optimization.
+
+The honest assessment of most cloud migration proposals: the cost savings could be achieved within the current provider through instance rightsizing, reserved instance purchases, and storage optimization. The specific technical service needed on another provider could be accessed through an abstraction layer or a multi-cloud configuration without a full migration. The enterprise customer requirement could be satisfied by running a specific workload in the customer's required cloud while keeping the rest of the infrastructure on the primary provider.
+
+I am not saying cloud migrations are never justified. They sometimes are. But the migration should be the last resort after the alternatives have been genuinely evaluated, not the first response to an unfavorable AWS bill or a product manager asking about a feature that exists on GCP.
+
+## When a migration is genuinely necessary
+
+There are real cases where a migration is the right answer. They share specific characteristics.
+
+**Hard technical limitation.** A specific capability that the current provider cannot replicate and that is genuinely required for the product's roadmap. Not a nice-to-have. A hard requirement that cannot be achieved through an abstraction layer or multi-cloud configuration.
+
+**Enterprise customer contractual requirement.** An enterprise customer with a signed contract that specifies a particular cloud provider, or a potential deal that cannot close without it. In this case, the migration cost is weighed against the deal value. Often the right answer is a hybrid configuration rather than a full migration.
+
+**Regulatory requirement.** In specific regulated industries, data residency or sovereignty requirements mandate a specific provider. This is a non-negotiable and the migration scope is defined by the regulatory requirement.
+
+**Provider relationship breakdown.** A contractual dispute, a support failure at critical scale, or a fundamental change in the provider's pricing model that cannot be negotiated. This is rare but real.
+
+## How to plan a migration that does not break production
+
+The migration architecture that works: run both providers in parallel, migrate services in stages, cut over traffic gradually, and maintain a rollback path for each stage.
+
+**Stage 1: Non-critical services.** Start with services that do not handle user traffic directly. Internal tools, batch jobs, analytics pipelines. These build team confidence in the migration process without customer-facing risk.
+
+**Stage 2: Stateless application services.** Move application servers, API services, and worker processes. These are easier to migrate because they carry no persistent data. Deploy new instances on the target provider and route a percentage of traffic to them using load balancer rules.
+
+**Stage 3: Database migration.** This is the hardest and most risky step. Use database replication to keep the old and new databases in sync during the transition. Migrate to the new database instance. Validate data integrity. Update connection strings. Cut over. Maintain the old database for 72 hours as a fallback.
+
+**Stage 4: Final cutover and cleanup.** Remove old provider resources after the migration is confirmed stable. The cleanup should be deliberate. Orphaned resources on the old provider continue to generate cost if not explicitly terminated.
+
+## Common mistakes teams make in cloud migrations
+
+1. Migrating without a complete inventory of what needs to move. Orphaned services discovered mid-migration delay the timeline and add scope.
+2. Not planning for the parallel running cost. Running both environments doubles the infrastructure cost during the migration period. Factor this into the total cost calculation.
+3. Moving too fast on the database migration. This is the step that requires the most caution and the most testing. Do not rush it to hit a deadline.
+4. Not testing the rollback before starting. Every migration stage needs a tested rollback. If you cannot roll back, you cannot proceed safely.
+5. Underestimating the staff retraining cost. The engineering team knows the current provider's tools, dashboards, and deployment patterns. The new provider requires learning. Factor this into the timeline.
+
+## Where to start: a 3-step migration decision
+
+**Step 1: Exhaust the optimization alternatives on the current provider.** Rightsize instances. Purchase reserved capacity for predictable workloads. Optimize storage and egress. Get an AWS or GCP cost optimization review. Determine how much of the projected savings can be achieved without migrating.
+
+**Step 2: Calculate the total migration cost.** Engineering hours at loaded cost. Parallel running infrastructure cost during migration. Staff retraining time. Productivity loss during the distraction period. Compare to the annual savings after migration. If the payback period is over 24 months, the migration economics are weak.
+
+**Step 3: If proceeding, scope the migration to the minimum required.** If the driver is an enterprise customer requirement, migrate only the workloads that customer requires. If the driver is a specific technical service, use a multi-cloud configuration for that service only. Full migrations are rarely necessary when the driver is narrow.
+
+## The Infrastructure Knowledge Behind the Writing
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The infrastructure decisions I write about are ones I make when designing systems for clients. Cloud provider selection, hybrid configurations, migration scoping, and cost optimization are all part of the architecture work. If you are evaluating a cloud migration and need a technical perspective on whether the alternatives have genuinely been exhausted, that is a conversation I can have concretely.
+
+## Related reading
+
+- [The Decision to Build Your Own Platform vs Use Someone Else's](/blog/the-decision-to-build-your-own-platform-vs-use-someone-elses)
+- [The Decision to Switch Tech Stack](/blog/the-decision-to-switch-tech-stack)
+- Zero Downtime Deployments: How to Ship Without Outages
+- [The Database Migration Without Downtime](/blog/the-database-migration-without-downtime)

@@ -1,0 +1,103 @@
+---
+slug: "backend-performance-budgets-how-to-set-them"
+title: "Backend Performance Budgets: How to Set Them"
+excerpt: "A backend performance budget is a written commitment to specific latency targets for specific endpoints. Without one, performance is whatever shipped last. With one, regressions get caught in CI."
+date: "2026-05-19"
+category: "Performance Optimization"
+tags: ["performance","backend","latency","slo"]
+readingMinutes: 12
+ogImage: "/api/og/blog/backend-performance-budgets-how-to-set-them"
+status: "published"
+definition: "A backend performance budget is a documented latency target for each user facing endpoint, measured at the 95th and 99th percentile, with an owner and a remediation process when the budget is breached. It is the equivalent of a service level objective scoped to performance. Teams that operate with budgets ship faster and catch regressions earlier. Teams without them discover slowness in production after the customer noticed."
+faq: [
+  {"q":"How do I pick the budget for an endpoint?","a":"Start from the user experience. Interactive endpoints should respond under 200 milliseconds at the 95th percentile. Background actions can be 500 to 1500 milliseconds. Long running operations should be async with a status check. The budget is the threshold below which the experience feels right."},
+  {"q":"What percentiles should I measure?","a":"P50, P95, and P99. The mean hides the worst experiences. P95 catches most user complaints. P99 catches the long tail that crashes apps and breaks integrations. Track all three. Set the budget at P95."},
+  {"q":"How do I enforce the budget?","a":"Three layers. Continuous monitoring with alerts when the budget is breached for more than five minutes. Load testing in CI that fails the build when a regression crosses the threshold. A weekly review of trends. Without enforcement the budget is a wish."},
+  {"q":"What about endpoints that have no budget today?","a":"Start with the top ten by traffic. The pareto applies. Ten endpoints often cover ninety percent of requests. Set budgets there first. Expand to the rest over the next quarter."},
+  {"q":"How do I handle endpoints with variable cost?","a":"Define the budget as a function of input size. A search endpoint with a hundred results has a different target than one with ten thousand. Document the formula. Measure against the input class, not a flat number."},
+  {"q":"What is the most common mistake?","a":"Setting budgets that are too loose. A 2000 millisecond budget for a login endpoint is not a budget. It is a permission slip for poor performance. The budget should reflect what good looks like, not what the current implementation does."},
+  {"q":"How does this interact with SLOs?","a":"A performance budget is an internal commitment. An SLO is a customer commitment. The performance budget should be tighter than the SLO. The SLO is the customer facing promise. The budget is the engineering target that keeps the SLO from being breached."}
+]
+---
+
+## What you actually need to know
+
+- The budget is a written target per endpoint, measured at P95 and P99.
+- Top ten endpoints by traffic usually cover ninety percent of requests.
+- Enforcement requires monitoring, CI regression tests, and a weekly review.
+- The budget should be tighter than the customer facing SLO.
+- Without enforcement the budget is theater.
+
+| Endpoint type | P95 target | P99 target | Justification |
+|---|---|---|---|
+| Authentication | 200 ms | 500 ms | Critical path, no perceivable wait |
+| Read of own data | 150 ms | 400 ms | Common, must feel instant |
+| Search | 300 ms | 800 ms | Common, slight tolerance |
+| Write of own data | 400 ms | 1000 ms | Less frequent, action driven |
+| Reports and exports | 1500 ms async | Status check | Long running, must be async |
+
+## The core argument
+
+Most backend teams treat performance as a thing they deal with when a customer complains. The customer reports a slow page, the engineer adds an index or a cache, the metric improves, and the team moves on. The pattern works at small scale. It does not work at meaningful scale. The customers who complain are the ones who notice. Many do not. They just churn.
+
+The teams that ship consistently fast products run on performance budgets. Every user facing endpoint has a documented latency target. The target is monitored continuously. Regressions are caught in CI. The budget itself is reviewed quarterly. The discipline is not glamorous. It pays back in the form of products that feel fast and customers who do not churn quietly.
+
+The cost of setting up the budget is small. The cost of operating without one compounds. A team that lets performance drift for a year often has to spend a full quarter recovering. A team that catches regressions weekly never reaches that point.
+
+The hardest part is not the technology. The hardest part is the discipline. The team has to agree that a budget breach blocks the build, not just emits a warning. The team has to spend time on remediation when the trend goes the wrong way. The team has to resist the urge to relax the budget because the current implementation cannot meet it.
+
+## How to set the budget
+
+Three inputs. The user experience target. The competitive baseline. The technical floor.
+
+The user experience target comes from product. What feels right for this interaction. Login should not feel like a wait. Search should not feel like a wait. A report can take a moment if the user understands they are running a report. The target is the latency above which the experience starts to feel slow.
+
+The competitive baseline comes from observation. What do peer products deliver. The baseline keeps you honest about market expectations.
+
+The technical floor comes from architecture. What is the irreducible cost of this endpoint. Network round trip plus database query plus serialization. The budget cannot be tighter than the floor without architectural change. If the budget you want is below the floor, you have an architecture problem, not a measurement problem.
+
+## How to enforce the budget
+
+| Layer | What it does | Tools |
+|---|---|---|
+| Continuous monitoring | Alerts when P95 breaches for five minutes | Datadog, New Relic, Sentry Performance |
+| Synthetic checks | Verifies budget compliance from the outside | Checkly, Datadog Synthetics |
+| Load tests in CI | Fails the build on regression | k6, Locust, Artillery |
+| Trace sampling | Identifies the slow operations | OpenTelemetry, Honeycomb |
+| Weekly review | Catches trends before they breach | Internal dashboard |
+
+## Expert opinion
+
+> The teams that take performance seriously treat the budget the same way they treat the test suite. A failing test blocks the build. A breached budget blocks the build. The cultural shift is harder than the technical one. Once the team agrees that performance is a feature, the budget enforces itself.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client was experiencing growing churn that they attributed to feature gaps. The customer interviews told a different story. Customers said the product felt slow. The team had no performance budget and no consistent measurement.
+
+We set budgets for the top fifteen endpoints. Five of them were already over budget. Two were significantly over. We spent six weeks tuning the worst offenders. Indexes added, queries rewritten, payloads reduced, edge caching enabled.
+
+The P95 latency across the top fifteen endpoints dropped from 950 milliseconds to 280 milliseconds. The next quarterly churn measurement was the lowest the company had ever recorded. The customers who had been complaining stopped. The customer interviews shifted to features again, which is the right kind of complaint to be hearing.
+
+For more on the broader performance work, see [the real numbers behind a fast web app in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026) and [API response times how to track what matters](/blog/api-response-times-how-to-track-what-matters).
+
+## Common mistakes teams make
+
+1. Setting the budget at the current implementation's performance. The budget should reflect the target, not the present.
+2. Measuring only the mean. The mean hides the worst experiences.
+3. Treating a breach as a warning instead of a blocker.
+4. No CI regression test. The team only learns about regressions in production.
+5. No owner for each endpoint. The budget without an owner is a wish.
+6. Ignoring the long tail. P99 catches the failures that destroy trust.
+7. Mixing internal and customer facing endpoints in the same budget.
+8. No weekly review. Trends compound.
+
+## A 30 day plan to put budgets in place
+
+1. **Week one.** Inventory the top twenty endpoints by traffic. Measure current P50, P95, P99.
+2. **Week two.** Pick a target for each. Get product and engineering sign off.
+3. **Week three.** Set up continuous monitoring and synthetic checks. Wire alerts.
+4. **Week four.** Add load tests to CI. Fail the build on regression. Schedule the weekly review.
+
+For more on the related work, read [API response times how to track what matters](/blog/api-response-times-how-to-track-what-matters) and [the slow query log a discipline every SaaS team should practice](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice). On the trace side, [profiling production how to do it without causing incidents](/blog/profiling-production-how-to-do-it-without-causing-incidents) is the natural next read.

@@ -1,0 +1,113 @@
+---
+slug: "database-indexes-a-practical-primer-for-saas-engineers"
+title: "Database Indexes: A Practical Primer for SaaS Engineers"
+excerpt: "Most database performance problems in SaaS are missing indexes. The fix is mechanical. The discipline is to know which indexes to add and which to skip. Here is the primer."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["database","indexes","postgres","performance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/database-indexes-a-practical-primer-for-saas-engineers"
+status: "published"
+definition: "A database index is a data structure that speeds up query lookups. The right index turns a query from seconds to milliseconds. The wrong index slows writes and wastes storage without helping reads. Most SaaS performance problems are missing indexes. The fix is mechanical. The discipline is to recognize which indexes to add and which to skip. The primer is small. The impact is large."
+faq: [
+  {"q":"What is the simplest sign that I need an index?","a":"A slow query log entry where the query is doing a sequential scan on a large table. The EXPLAIN output shows the seq scan. Adding the right index turns the seq scan into an index scan. The query latency drops by orders of magnitude. The pattern is consistent across most slow queries in SaaS."},
+  {"q":"What columns should I index?","a":"Columns used in WHERE clauses. Columns used in JOIN conditions. Columns used in ORDER BY when the result set is large. Foreign keys for fast lookups. Each of these is a candidate. The decision is which combination is worth the write cost."},
+  {"q":"What is a composite index?","a":"An index on multiple columns. The order matters. The leftmost prefix of the index can be used for lookups. An index on (tenant_id, created_at) can serve queries that filter by tenant_id alone and queries that filter by both. It cannot serve queries that filter by created_at alone."},
+  {"q":"What is the cost of an index?","a":"Storage and write performance. Each index has to be updated on every write to the indexed columns. Many indexes slow writes. The trade off is to add indexes that help meaningful reads and skip indexes that do not."},
+  {"q":"What is a partial index?","a":"An index with a WHERE clause that limits which rows are included. Useful when most queries filter on a specific value. An index on status WHERE status equals active is smaller and faster than a full status index, when most queries care about active status."},
+  {"q":"What is the worst index mistake?","a":"Indexing every column because you might need it. The writes slow down. The storage balloons. The query planner has more options to choose from but the wrong ones. The discipline is to add indexes based on measured query patterns, not on speculation."},
+  {"q":"How do I find queries that need indexes?","a":"Postgres pg_stat_statements. Slow query log. APM tools like Datadog or New Relic. Each surfaces the queries that are slow or frequent enough to deserve attention. Pick the worst offenders and apply EXPLAIN ANALYZE."}
+]
+---
+
+## What you actually need to know
+
+- Index columns used in WHERE, JOIN, and ORDER BY clauses.
+- Composite index order matters. Leftmost prefix wins.
+- Partial indexes are smaller and faster for specific filters.
+- The cost of an index is write performance and storage.
+- Find queries to optimize through pg_stat_statements and EXPLAIN ANALYZE.
+
+| Query pattern | Index recommendation |
+|---|---|
+| WHERE tenant_id equals X | (tenant_id) |
+| WHERE tenant_id equals X AND created_at > Y | (tenant_id, created_at) |
+| WHERE status equals active AND ... | partial index on status equals active |
+| JOIN on foreign key | (foreign_key_column) |
+| ORDER BY created_at on a large table | (created_at) |
+| GROUP BY on a column | (group_by_column) |
+| LIKE prefix search | (column text_pattern_ops) for LIKE |
+
+## The core argument
+
+Most database performance problems in SaaS are missing indexes. The pattern is consistent. A query that worked at one hundred customers is slow at ten thousand. The team tries to add servers. The team tries to add caching. The team tries to scale up the database. None of it helps because the actual problem is a missing index that turns a sequential scan into an index scan.
+
+The fix is mechanical and the discipline is small. Identify the slow queries. Run EXPLAIN ANALYZE on them. The output shows whether the query is using an index. If it is doing a sequential scan on a large table, the right index will fix it. The new index goes in. The query latency drops by orders of magnitude.
+
+The discipline is in not adding indexes that do not help. Each index has a write cost. Each index uses storage. A team that adds indexes speculatively for queries that might happen ends up with a database that writes slowly and stores a lot of index data for no benefit.
+
+The right pattern is to add indexes for measured query patterns. The slow query log surfaces real queries. The pg_stat_statements extension shows query frequency and total cost. The indexes that earn their keep are the ones that target the queries that are actually being run.
+
+## The index types worth knowing
+
+| Type | Use case |
+|---|---|
+| Single column B-tree | Default for equality and range queries |
+| Composite B-tree | Multiple columns. Order matters. |
+| Partial | Subset of rows. Smaller and faster. |
+| Expression | Index on a function of a column |
+| Covering (INCLUDE) | Index that serves a query without table lookup |
+| GIN | Full text search, JSONB queries, arrays |
+| GiST | Geospatial, range types |
+| BRIN | Very large tables with naturally ordered data |
+| Hash | Equality only. Rarely used in 2026. |
+
+## How much does this cost
+
+Index storage is roughly 10 to 30 percent of the indexed columns' storage. Write performance impact is 5 to 15 percent per index for write heavy tables. The savings on read performance is often orders of magnitude. The math is favorable for indexes that target real query patterns and unfavorable for indexes that do not.
+
+## Features the index discipline must have
+
+- A method to find slow queries.
+- A practice of running EXPLAIN ANALYZE on slow queries.
+- A discipline to add indexes based on measurement, not speculation.
+- A periodic audit of unused indexes.
+- A migration framework that supports concurrent index creation.
+- Monitoring on query latency to catch regressions.
+- A documented index naming convention.
+
+## Expert opinion
+
+> Most database performance work is index work. The team measures, identifies the missing index, adds it, measures again, moves on. The discipline is the same on every project. The teams that do this regularly have responsive databases. The teams that do not have the same database that gets slower with growth. The work is unglamorous. The compounding effect is large.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS was experiencing growing query latency on their main dashboard. The team had been considering scaling up the database. The pg_stat_statements output showed that four specific queries accounted for most of the total query time.
+
+We ran EXPLAIN ANALYZE on each. All four were doing sequential scans on large tables. We added the appropriate indexes. The total query time on those four dropped by roughly two orders of magnitude. The database CPU dropped by half. The scaling that had been planned was unnecessary.
+
+The team adopted index discipline as standard practice. New features included index design in the implementation phase. The slow query log was reviewed weekly. The database has not needed major scaling work since.
+
+For more on the related work, see [query optimization in PostgreSQL real examples from real projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects) and [EXPLAIN ANALYZE a tour of PostgreSQLs best diagnostic tool](/blog/explain-analyze-a-tour-of-postgresqls-best-diagnostic-tool).
+
+## Common mistakes teams make
+
+1. No indexes on foreign key columns.
+2. Indexes added speculatively without measurement.
+3. Wrong composite index order.
+4. No partial indexes where they would help.
+5. Indexes on low cardinality columns where they do not help.
+6. No periodic audit of unused indexes.
+7. Migrations that lock tables when concurrent creation was available.
+8. Treating indexes as solved. New queries need new indexes.
+
+## A 30 day database tuning plan
+
+1. **Week one.** Enable pg_stat_statements. Identify the top queries by total time.
+2. **Week two.** Run EXPLAIN ANALYZE on the worst. Identify missing indexes.
+3. **Week three.** Add the indexes. Measure the improvement.
+4. **Week four.** Set up a weekly review cadence.
+
+For more on the related work, read [query optimization in PostgreSQL real examples from real projects](/blog/query-optimization-in-postgresql-real-examples-from-real-projects) and [PostgreSQL performance at scale the tweaks that move the needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle). On the broader query side, [the N+1 query problem detection prevention and refactoring](/blog/the-n-1-query-problem-detection-prevention-and-refactoring) is the natural next read.

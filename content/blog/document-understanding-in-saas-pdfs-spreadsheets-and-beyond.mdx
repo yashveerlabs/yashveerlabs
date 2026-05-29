@@ -1,0 +1,120 @@
+---
+slug: "document-understanding-in-saas-pdfs-spreadsheets-and-beyond"
+title: "Document Understanding in SaaS: PDFs, Spreadsheets, and Beyond"
+excerpt: "AI has made document understanding suddenly cheap. The teams that ship it well integrate it into specific workflows. The teams that ship it badly produce demos that nobody uses."
+date: "2026-05-22"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","documents","ocr","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/document-understanding-in-saas-pdfs-spreadsheets-and-beyond"
+status: "published"
+definition: "Document understanding in SaaS is the capability to extract structured information from unstructured or semi structured documents. PDFs. Spreadsheets. Scanned forms. Contracts. Receipts. Modern AI has made this dramatically cheaper and more accurate than the previous OCR plus rules approach. The teams that ship it well embed it into specific workflows. The teams that ship it badly build a generic upload box."
+faq: [
+  {"q":"What is the state of document understanding in 2026?","a":"LLMs with vision capability handle most document understanding well. GPT-4o, Claude with vision, and Gemini all read PDFs, scanned images, and structured documents with high accuracy. The cost has dropped to pennies per document at modest volumes. The previous OCR plus rules approach has largely been superseded."},
+  {"q":"What still requires specialized OCR?","a":"High volume continuous workflows where the per document cost matters. Specialized layouts that the general models struggle with. Documents requiring extremely high accuracy with low tolerance for errors. Each of these benefits from purpose built tools like AWS Textract, Google Document AI, or Mathpix for specific cases."},
+  {"q":"How do I extract structured data from a document?","a":"Pass the document to the model with a prompt that defines the expected structure. The model returns JSON matching the structure. Validate the JSON. The pattern works for receipts, invoices, contracts, forms, and most structured documents."},
+  {"q":"How do I handle errors?","a":"Validate the model's output against a schema. Surface fields the model could not extract for human review. Mark confidence per field. The hybrid pattern handles the common case automatically and routes the unusual cases to humans."},
+  {"q":"What about spreadsheets?","a":"LLMs handle small spreadsheets directly. Larger spreadsheets benefit from sampling or chunking. The team has to design the workflow around the spreadsheet size and the questions being asked. Generic upload of any size spreadsheet usually does not work well."},
+  {"q":"How do I evaluate document understanding quality?","a":"A representative set of documents with known correct extractions. Run the model on each. Compare to the ground truth. The accuracy can be measured per field. The eval suite is what keeps quality from drifting."},
+  {"q":"What is the worst common mistake?","a":"Building a generic document upload that promises to handle anything. The promise is too broad. Some documents work. Many do not. The customer experience is unpredictable. The right pattern is to specialize for specific document types."}
+]
+---
+
+## What you actually need to know
+
+- Modern LLMs handle most document understanding well.
+- Specialized OCR still wins for high volume or specific layouts.
+- Define the expected output structure and validate the response.
+- Hybrid pattern routes uncertain cases to humans.
+- Specialize for specific document types. Avoid the generic upload.
+
+| Document type | Recommended approach |
+|---|---|
+| Invoices | LLM with structured prompt |
+| Receipts | LLM or specialized OCR for high volume |
+| Contracts | LLM with chunking for long documents |
+| Forms | LLM with field schema |
+| Spreadsheets (small) | LLM directly |
+| Spreadsheets (large) | Chunk or sample |
+| Tables in PDFs | LLM with vision |
+| Specialized layouts | Purpose built OCR |
+| Math content | Mathpix or specialized |
+
+## The core argument
+
+Document understanding used to be hard. OCR was expensive and inaccurate. Rules engines were brittle. The combination required specialized teams and significant investment per document type. The economics limited document understanding to high value workflows like invoice processing at scale.
+
+Modern LLMs with vision capability have changed the economics. A document with a clear structure can be read by the model with a single API call. The accuracy is high. The cost is pennies per document at modest volumes. The previous specialized stack has largely been superseded for most use cases.
+
+The teams that ship document understanding well take advantage of this by integrating into specific workflows. The customer uploads an invoice and the system extracts the line items. The customer uploads a contract and the system surfaces the renewal date. The customer uploads a receipt and the system categorizes the expense. Each workflow is specific. The model extracts the structure the workflow needs.
+
+The teams that ship document understanding badly build the generic upload box. The customer can upload anything. The system tries to extract something useful. The result is unpredictable because the system was not designed for the customer's specific document. The user experience suffers.
+
+## The architecture
+
+| Layer | Role |
+|---|---|
+| Upload and storage | Customer uploads document. Store in object storage. |
+| Document type detection | Optional. Classify the document type. |
+| Extraction prompt | Specific to the document type. Defines output schema. |
+| Model call | LLM with vision capability. Returns structured JSON. |
+| Validation | Verify the JSON matches the schema. Mark confidence per field. |
+| Human review surface | Route low confidence extractions to a reviewer. |
+| Storage of results | Save the extracted data with audit trail. |
+| Eval suite | Test on representative documents. |
+
+## How much does this cost
+
+| Volume | Monthly cost |
+|---|---|
+| 100 documents per day with LLM | 50 to 200 USD |
+| 1000 documents per day with LLM | 500 to 2000 USD |
+| 10000 documents per day | Consider specialized OCR. 1000 to 5000 USD per month |
+| Very high volume | Specialized OCR is much cheaper at scale |
+
+## Features the document understanding must have
+
+- Specific document types each with their own extraction prompt.
+- Schema validation on every extraction.
+- Confidence scoring per field.
+- Human review surface for low confidence cases.
+- Eval suite per document type.
+- Storage of original document and extracted data.
+- Audit trail of who reviewed what.
+- A clear path from upload to value.
+
+## Expert opinion
+
+> Document understanding is one of the AI capabilities that has matured fastest. The teams that take advantage of it integrate it into specific workflows and ship features that would have required ML teams two years ago. The teams that build generic upload boxes ship demos that customers try once. The discipline is to specialize the workflow and validate the output rigorously.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client wanted to add receipt processing to their expense management product. The previous version used a specialized OCR vendor that cost 0.30 USD per document and required manual cleanup for roughly thirty percent of receipts.
+
+We rebuilt with Claude vision. Specialized prompt for receipts. Schema with merchant, date, total, tax, category. Validation on every field. Human review for low confidence cases.
+
+The cost dropped to roughly 0.02 USD per receipt. The accuracy on the common cases improved. The human review rate dropped to roughly eight percent. The customers got faster turnaround on their expense reports. The team kept the specialized OCR for the small percentage of unusual receipts where it still outperformed.
+
+For more on the related work, see [building an AI powered search that actually works](/blog/building-an-ai-powered-search-that-actually-works) and [RAG retrieval augmented generation for SaaS when it helps and when it does not](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not).
+
+## Common mistakes teams make
+
+1. Generic upload box that promises to handle anything.
+2. No schema validation on the model's output.
+3. No confidence scoring. Bad extractions go through.
+4. No human review surface for uncertain cases.
+5. No eval suite. Quality drifts.
+6. Using LLMs at scales where specialized OCR is much cheaper.
+7. Not specializing prompts per document type.
+8. Treating document understanding as solved once shipped.
+
+## A 60 day plan to ship a document feature
+
+1. **Weeks one and two.** Pick the document type. Define the schema.
+2. **Weeks three and four.** Build the extraction prompt. Iterate against representative documents.
+3. **Weeks five and six.** Add validation and confidence scoring.
+4. **Weeks seven and eight.** Build the human review surface. Ship.
+
+For more on the related work, read [building production grade AI features without an ml team](/blog/building-production-grade-ai-features-without-an-ml-team) and [AI evals how to test your AI features like software](/blog/ai-evals-how-to-test-your-ai-features-like-software). On the broader AI integration side, [building AI agents that do real work beyond the demo](/blog/building-ai-agents-that-do-real-work-beyond-the-demo) is the natural next read.

@@ -1,0 +1,111 @@
+---
+slug: "backup-restore-and-drill-practice-a-saas-disaster-recovery-guide"
+title: "Backup, Restore, and Drill Practice: A SaaS Disaster Recovery Guide"
+excerpt: "A SaaS disaster recovery plan is three documents, two restores, and a quarterly drill. Everything else is theater. Here is how to put it together without slowing down product work."
+date: "2026-05-19"
+category: "SaaS Architecture and Scaling"
+tags: ["disaster-recovery","backup","restore","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/backup-restore-and-drill-practice-a-saas-disaster-recovery-guide"
+status: "published"
+definition: "A SaaS disaster recovery plan covers what is backed up, how to restore it, how often it is drilled, and what the recovery time and recovery point objectives are. The document set is small. The discipline is what matters. A team that drills quarterly recovers in hours. A team that has never drilled recovers in days, if at all."
+faq: [
+  {"q":"What is the difference between RTO and RPO?","a":"RTO is the recovery time objective. The maximum acceptable time to restore service. RPO is the recovery point objective. The maximum acceptable data loss measured in time. A typical B2B SaaS targets an RTO of four hours and an RPO of fifteen minutes. Different surfaces can have different targets."},
+  {"q":"What should be backed up?","a":"The application database, customer files in object storage, configuration and environment variables, secrets and certificates, and the infrastructure as code that recreates the environment. Many teams remember the database and forget the rest."},
+  {"q":"How long should backups be retained?","a":"At minimum, seven days of point in time recovery, thirty days of daily snapshots, and twelve months of monthly snapshots. Longer retention is required for some compliance regimes. Tier hot and cold storage to control cost."},
+  {"q":"Where should backups live?","a":"In a different account or region from the primary environment. A ransomware attack or compromised credential should not be able to delete the backups along with the primary. Cross account backup with restrictive access is the right shape."},
+  {"q":"How often should we test the recovery?","a":"Quarterly for most B2B SaaS. Monthly for products with significant compliance scope. The drill is what turns the backup from a checkbox into a control. A backup that has never been restored is not a backup."},
+  {"q":"What is the minimum viable disaster recovery plan?","a":"Three documents. The backup inventory. The restore runbook. The drill schedule and history. Two automated processes. Backup creation and backup verification. One quarterly exercise. The restore drill."},
+  {"q":"How does this connect to multi region?","a":"Multi region is a different control. It addresses availability during a regional outage. Backup and restore address data loss and longer term recovery. Most B2B SaaS does not need multi region. Almost every B2B SaaS needs a good backup and restore story."}
+]
+---
+
+## What you actually need to know
+
+- The plan is small. Three documents, two automated processes, one quarterly drill.
+- RTO and RPO are commitments. Pick them deliberately and measure against them.
+- Backups live in a different account or region from the primary.
+- The drill is what proves the plan is real.
+- Multi region is a different problem from backup and restore.
+
+| Recovery objective | Typical B2B SaaS target | Enterprise tier target |
+|---|---|---|
+| RTO (recovery time) | 4 hours | 1 hour |
+| RPO (recovery point) | 15 minutes | 5 minutes |
+| Backup verification cadence | Daily | Hourly |
+| Drill cadence | Quarterly | Monthly |
+| Retention | 12 months total | 7 years for regulated |
+
+## The core argument
+
+A SaaS disaster recovery plan is one of the simplest pieces of operational infrastructure to build well and one of the most commonly underbuilt. The reason is psychological. The work pays off only when something goes wrong. Founders who have not yet been through a real recovery event assume the backups they have are sufficient. Founders who have been through one always invest more in drills than they did before.
+
+The plan does not need to be long. The teams that recover well do not have hundreds of pages of documentation. They have a clear inventory of what is backed up, a runbook that any senior engineer can execute, and a drill schedule with results. The documentation is shorter than most product specs. The discipline is what makes the difference.
+
+The plan does need to be specific. Vague commitments to recovery do not survive contact with a real incident. A specific RTO of four hours with a specific RPO of fifteen minutes gives the team a target to design against. The plan should commit to numbers that are achievable and meaningful.
+
+The plan also needs to acknowledge what is not in scope. A SaaS that targets a four hour RTO is not promising the same recovery during a regional cloud provider outage as during a database corruption. The plan should be honest about which scenarios it covers.
+
+## What to back up
+
+| Surface | Frequency | Retention |
+|---|---|---|
+| Application database | Continuous point in time, daily snapshot | 12 months |
+| Customer files in object storage | Versioned, replicated cross region | 12 months minimum |
+| Configuration and secrets | Versioned in git or secret manager | Lifetime of repo |
+| Integration credentials | Documented in runbook, re issuable | N/A |
+| Infrastructure as code | In git | Lifetime of repo |
+| Audit logs | Append only store | 12 to 84 months |
+
+## How much does this cost
+
+For a B2B SaaS at modest scale, the all in cost of a good disaster recovery setup is 100 to 500 USD per month in cloud storage and replication fees, plus four to twelve engineering hours per quarter for drills. The cost rises with retention and replication choices but is small compared to the value of being able to recover.
+
+For products with significant compliance scope, expect 500 to 3000 USD per month for the same setup with longer retention, encrypted backup vaults, and more frequent drills. The marginal cost above the basic setup buys defensible compliance posture for enterprise customers.
+
+## Features the plan must have
+
+- A named owner for the plan and for each drill.
+- A backup inventory in version control.
+- A restore runbook in version control.
+- Automated backup verification that fails loudly.
+- Cross account or cross region backup storage.
+- Documented RTO and RPO with measurement.
+- A quarterly drill schedule with results stored.
+- A trust portal entry that customers can reference.
+
+## Expert opinion
+
+> Most disaster recovery work is invisible until it is not. The teams that take it seriously are not paranoid. They are the ones who have been through one real recovery and decided never to do it without practice again. The cost of the plan is small. The cost of operating without one is the kind of bill you do not get to negotiate.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client experienced a database corruption caused by a poorly tested migration. The corruption was discovered eighteen hours after the migration ran. The team had backups but had never done a full restore drill.
+
+The recovery took seventy two hours. The team had to figure out the runbook in real time. They lost roughly six hours of customer data because the most recent clean point in time recovery available was older than expected. Two enterprise customers churned over the incident.
+
+After the incident, we built the disaster recovery plan together. Three documents. Quarterly drills. Cross account backup. The next drill ran in six hours. The drill after that in four. The next real incident, six months later, was a smaller corruption with a four hour recovery and no customer churn.
+
+For more on the related work, see [backup and restore drills a compliance asset most teams skip](/blog/backup-and-restore-drills-a-compliance-asset-most-teams-skip) and [incident response for startups a playbook](/blog/incident-response-for-startups-a-playbook).
+
+## Common mistakes teams make
+
+1. Backups in the same account as the primary.
+2. No verification that the backup is restorable.
+3. No drill schedule. Backups untested for years.
+4. Vague RTO and RPO commitments.
+5. Database backed up but configuration, secrets, and files forgotten.
+6. Retention that does not match compliance requirements.
+7. Single person responsibility for recovery.
+8. No trust portal evidence. The work happened but cannot be proven to customers.
+
+## A 30 day plan to put disaster recovery in place
+
+1. **Week one.** Build the backup inventory. Identify what is backed up and what is not.
+2. **Week two.** Fix the gaps. Add the missing backups. Move to cross account storage.
+3. **Week three.** Write the restore runbook. Document the RTO and RPO commitments.
+4. **Week four.** Run the first drill. Measure. Retrospect. Schedule the cadence.
+
+For more on the related work, read [backup and restore drills a compliance asset most teams skip](/blog/backup-and-restore-drills-a-compliance-asset-most-teams-skip) and [the customer security questionnaire a strategic asset](/blog/the-customer-security-questionnaire-a-strategic-asset). On the broader compliance side, [SOC 2 Type I vs Type II](/blog/soc-2-type-i-vs-type-ii-a-founders-guide-to-both) is the natural next read.

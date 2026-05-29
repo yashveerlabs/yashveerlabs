@@ -1,0 +1,62 @@
+---
+slug: "resend-vs-postmark-vs-sendgrid-vs-mailgun"
+title: "Resend vs Postmark vs SendGrid vs Mailgun"
+excerpt: "Four credible transactional email services with different strengths. Resend leads on developer experience, Postmark on deliverability consistency, SendGrid on feature breadth, and Mailgun on price at mid-volume. Here is how to choose."
+date: "2026-05-23"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026","ai"]
+readingMinutes: 6
+ogImage: "/api/og/blog/resend-vs-postmark-vs-sendgrid-vs-mailgun"
+status: "published"
+definition: "Resend, Postmark, SendGrid, and Mailgun are transactional email services used to send programmatically triggered emails: authentication emails, purchase receipts, notification emails, and onboarding sequences. They differ in API design, deliverability guarantees, email template tooling, analytics capabilities, and pricing at different volume tiers. The choice among them is primarily determined by the engineering team's stack and preferences, the required deliverability tier, and the email volume that determines which pricing model is most favorable."
+faq: [
+  {"q":"What is Postmark and why do companies choose it for deliverability?","a":"Postmark is a transactional email service that separates transactional and bulk email onto different sending infrastructure. The transactional sending streams have no marketing email on them, which means their IP reputation is maintained by transactional email patterns only. Postmark's deliverability for time-sensitive transactional emails (password resets, authentication codes) is consistently among the highest in independent tests. Postmark is the right choice when deliverability consistency for authentication and security emails is a product requirement, not just a nice-to-have."},
+  {"q":"What is SendGrid and when does it make sense?","a":"SendGrid (now part of Twilio) provides transactional and marketing email in a single platform with extensive analytics, audience segmentation, and campaign management features. SendGrid is the right choice when the team needs both transactional and marketing email from the same service, or when the analytics and reporting requirements are significant. SendGrid's API and documentation are mature, and there are SDKs for most programming languages. The main drawback is that SendGrid's pricing has increased over the years and its interface has grown complex. Teams with simple transactional needs often find SendGrid over-engineered for their use case."},
+  {"q":"How does Resend compare to Postmark for developer experience?","a":"Resend and Postmark are both developer-friendly, but their designs reflect different eras. Resend was built in 2023 with modern developer experience as the primary design goal: a REST API with predictable responses, a React Email integration for building templates, and documentation written for the current Next.js and React ecosystem. Postmark was built in 2009 and has accumulated features over time; the API is reliable but reflects older design conventions. For teams in the React/Next.js ecosystem, Resend's React Email integration is a significant productivity advantage. For teams with a plain HTML or template-based email approach, the difference is smaller."},
+  {"q":"What are Postmark message streams and why do they matter?","a":"Postmark message streams are separate sending channels within the same account, each with its own sending reputation. The default configuration provides a transactional stream (for authentication and notification emails) and an outbound stream (for bulk or marketing emails). This separation prevents marketing email activity from affecting the deliverability of transactional emails. Teams can create additional streams for specific use cases (onboarding sequences, billing notifications) to further isolate reputation and analytics. Message streams are Postmark's most distinctive architectural feature and the primary reason teams choose Postmark for deliverability."},
+  {"q":"What is the pricing difference between these services at 10,000 emails per month?","a":"At 10,000 emails per month (a common early-stage SaaS volume): Resend Pro is $20 per month (includes 50,000 emails). Postmark is approximately $15 per month on the base plan. SendGrid Essentials starts at $19.95 per month for up to 50,000 emails. Mailgun starts at $35 per month for up to 50,000 emails on the Foundation plan. All four are comparable at this volume. The pricing difference becomes more significant at 100,000 emails per month and above, where AWS SES ($10 per 100,000 emails) becomes significantly cheaper than all four managed services."}
+]
+---
+
+## What you need to know
+
+- Resend is the best choice for React/Next.js teams building new products. React Email integration, clean API, competitive pricing.
+- Postmark is the best choice when time-sensitive email deliverability is critical: authentication codes, security alerts, password resets. Message streams keep transactional reputation clean.
+- SendGrid is the best choice when transactional and marketing email must come from a single vendor with full campaign management.
+- Mailgun is the reliable general-purpose choice for teams without a strong preference for React Email or Postmark's stream architecture.
+- At high volume (500,000+ emails per month), AWS SES becomes significantly cheaper than all four and is worth the setup overhead.
+
+## The core argument
+
+The four services are all production-ready with good deliverability. The decision is about fit: which service's design aligns best with how the team builds software and what the product's email requirements are.
+
+The two decisions that distinguish these services in practice are email template strategy and deliverability sensitivity. For email template strategy: Resend's React Email integration is a genuine productivity improvement for teams that build in React. Writing email templates as React components with live preview, type-safe props, and component reuse is materially better than writing tables-within-tables HTML. For teams that are not in the React ecosystem, Resend's template advantage disappears, and Postmark or Mailgun's template management systems are adequate.
+
+For deliverability sensitivity: Postmark's message stream architecture is the strongest deliverability guarantee for transactional email because it completely isolates transactional and bulk sending reputation. For a product where a delayed or spam-filtered password reset email causes user support tickets or conversion abandonment, Postmark's deliverability consistency is worth the slightly higher price. For products where email deliverability is table stakes but not a differentiating requirement, Resend or Mailgun are sufficient.
+
+## Common mistakes
+
+1. **Choosing an email service based on free tier without evaluating production pricing.** Free tiers are useful for development but are not representative of production costs. Evaluate the pricing at the expected production volume before committing to a service. Switching transactional email providers at scale is disruptive because it involves DNS record changes and IP warming.
+
+2. **Not separating transactional and marketing email.** Sending marketing campaigns through the same sending infrastructure as authentication emails degrades deliverability for both. Use Postmark's message streams, SendGrid's dedicated IP configuration, or separate services for transactional and marketing email.
+
+3. **Sending password reset and authentication code emails without monitoring delivery.** If an authentication email is delayed or delivered to spam, the user cannot log in. Monitor the delivery latency and spam placement for authentication email specifically, not just aggregate delivery statistics.
+
+4. **Not implementing email template versioning.** Email templates change frequently: branding updates, content changes, compliance requirements. Without template versioning, it is impossible to roll back a template change that degraded deliverability or produced rendering issues. Store templates in version control and deploy them the same way application code is deployed.
+
+5. **Ignoring the unsubscribe and suppression list management requirements.** Even transactional emails have users who want to opt out (marketing notifications embedded in receipts, for example). Failing to honor suppression lists is a CAN-SPAM violation. All four services provide suppression list management and global unsubscribe handling; configure them before sending to any user.
+
+## Where to start
+
+1. **Decide on template strategy first.** If the team builds in React and wants the best email template authoring experience: choose Resend and implement with React Email. If deliverability is the primary concern: choose Postmark and configure message streams for transactional vs bulk. If both transactional and marketing email are needed from one vendor: choose SendGrid and configure separate sending IP for transactional email.
+
+2. **Configure authentication records immediately.** Regardless of which service is chosen, configure SPF, DKIM, and DMARC DNS records within the first hour of setup. These records need 24 to 48 hours to propagate. Sending before authentication is configured results in worse initial deliverability.
+
+3. **Send a test email to all major email clients before going to production.** Test the authentication email, purchase receipt, and notification email in Gmail, Apple Mail, Outlook, and on mobile. Check both inbox placement and rendering. Fix rendering issues in staging, not in production.
+
+## Related reading
+
+- [Resend vs AWS SES vs Mailgun for Transactional Email](/blog/resend-vs-aws-ses-vs-mailgun-for-transactional-email)
+- [Push Notifications: The Architecture Most Apps Get Wrong](/blog/push-notifications-the-architecture-most-apps-get-wrong)
+- [Renewals and Expansion Revenue Automation](/blog/renewals-and-expansion-revenue-automation)
+- [Lead Pipeline Automation: From Form to CRM Without Touching It](/blog/lead-pipeline-automation-from-form-to-crm-without-touching-it)

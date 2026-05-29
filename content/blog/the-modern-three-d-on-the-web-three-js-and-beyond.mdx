@@ -1,0 +1,184 @@
+---
+slug: "the-modern-three-d-on-the-web-three-js-and-beyond"
+title: "The Modern Three D on the Web: Three.js and Beyond"
+excerpt: "Three.js, React Three Fiber, and WebGPU: when 3D on the web is worth the complexity, and when a CSS animation is the right answer."
+date: "2025-12-02"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","webgl","3d","performance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-modern-three-d-on-the-web-three-js-and-beyond"
+status: "published"
+definition: "Three-dimensional rendering on the web uses WebGL (or the newer WebGPU) to draw GPU-accelerated 3D graphics in a browser canvas element. Three.js is the dominant JavaScript library for WebGL, providing a scene graph, camera system, lighting model, and material system that abstracts the raw WebGL API. React Three Fiber (R3F) integrates Three.js with React's component model, allowing 3D scenes to be composed with JSX and managed with React's state and lifecycle. The decision to add 3D to a web product is a significant performance and complexity tradeoff that is appropriate for specific use cases and inappropriate for most."
+faq: [
+  {"q":"When does 3D on the web actually improve user outcomes?","a":"In three specific contexts: product visualization (letting users rotate and inspect a physical product reduces purchase uncertainty -- used effectively in e-commerce for furniture, shoes, watches), interactive data visualization (three-dimensional data representations where the third dimension adds meaningful information, not decoration), and interactive marketing experiences (3D hero sections that demonstrate product capability in a way that video cannot). In most other contexts -- background animations, decorative elements, and 3D for visual differentiation -- the performance cost exceeds the engagement benefit. CSS animations and WebGL-based 2D canvas are the right tool for most cases that initially seem to call for 3D."},
+  {"q":"What is the performance cost of Three.js on mobile?","a":"Significant. A Three.js scene that renders smoothly at 60fps on a MacBook will render at 15-30fps on a mid-range Android phone. WebGL on mobile has meaningful hardware limitations: smaller GPU memory, slower fill rate, and thermal throttling that reduces performance after the device warms up. The performance cost must be measured on actual mobile hardware, not desktop hardware. The practical implication: any 3D feature that is not critical to the product must be disabled or heavily reduced for mobile users. Device performance detection and graceful fallback (a static image when the device is too slow for smooth 3D rendering) are required for production 3D on the web."},
+  {"q":"What is React Three Fiber and when should it be used instead of raw Three.js?","a":"React Three Fiber (R3F) is a React renderer for Three.js that allows building 3D scenes with React components and JSX. It is the right choice when: the 3D scene is part of a React application (so it shares state and lifecycle management), the scene is composed of reusable components that benefit from React's component model, and the team has React expertise but limited Three.js experience. Raw Three.js is the right choice for: complex simulations where imperative control over the render loop is required, performance-critical scenes where React's reconciler overhead matters, and projects where the 3D component is self-contained and does not need to share React state."},
+  {"q":"What is WebGPU and should I use it instead of WebGL?","a":"WebGPU is the successor to WebGL, providing lower-level GPU access, compute shaders, and better multi-threading support. Browser support in 2026: Chrome and Edge (stable), Safari (behind a flag), Firefox (in development). For production use, WebGL is still the safer choice due to broader compatibility. WebGPU is appropriate for: new projects targeting Chrome-first users, compute-intensive tasks (machine learning inference, physics simulations), and cases where the application's performance is limited by WebGL's overhead. Three.js and R3F support WebGPU as an experimental renderer via the `three-gpu-webgpu` package."},
+  {"q":"How do I measure the performance impact of a 3D element on a web page?","a":"Three metrics: frames per second (fps) during the 3D animation (target 60fps, accept 30fps minimum), main thread blocking during scene initialization (measured with Chrome Performance tab -- should not block for more than 100ms), and impact on LCP (Largest Contentful Paint) from the canvas element initialization. Use Chrome's Device Simulation mode with a 4x CPU slowdown to approximate mid-range Android performance. Three.js's performance cost is primarily on the GPU, not the main thread -- a scene that is GPU-bound on mobile cannot be fixed with JavaScript optimizations alone."}
+]
+---
+
+## What you actually need to know
+
+- 3D on the web has a real performance cost, especially on mobile. A scene that runs at 60fps on desktop may run at 15fps on a mid-range Android phone.
+- CSS animations and 2D canvas cover most visual effects that initially seem to call for 3D. Use WebGL 3D only when the third dimension provides meaningful user value.
+- React Three Fiber makes Three.js accessible to React developers but adds reconciler overhead. For performance-critical scenes, raw Three.js gives more control.
+- Device performance detection and graceful fallback (static image when the device is too slow) are required for production 3D.
+- WebGPU is the future but WebGL is the present. Use WebGL for production; evaluate WebGPU for Chrome-targeted new projects.
+
+| Use Case | Right Tool | 3D Appropriate? | Performance Cost |
+|---|---|---|---|
+| Product visualization (e-commerce) | Three.js / R3F | Yes | Medium -- user-initiated |
+| Background animation | CSS / Lottie | No | 3D overkill |
+| Data visualization (3D scatter) | Three.js / D3 | Sometimes | High |
+| Hero section animation | CSS / WebGL 2D | Rarely | CSS has zero cost |
+| Interactive marketing demo | R3F + Drei | Yes | Medium |
+| Game / simulation | Three.js (raw) | Yes | High |
+
+## The core argument
+
+The majority of requests for 3D on the web are not actually for 3D -- they are for "something more impressive than what we have now." The team that wants a 3D floating background animation usually wants a more dynamic homepage, not specifically a three-dimensional scene. The team that wants a 3D product viewer sometimes wants a better product image experience. The question to ask before starting a 3D project is not "how do we build this in Three.js?" but "what is the user outcome we are trying to improve, and is 3D the right mechanism?"
+
+In the specific cases where 3D is the right mechanism, Three.js and React Three Fiber are mature, capable tools. A product visualizer for an e-commerce site that lets users rotate a furniture item is a clear case: the third dimension is essential to the use case, the user interaction is intentional (not background noise), and the performance budget is reasonable because the user is already engaged with the product page. A 3D hero section that plays an animation the user did not request, on a page where the primary goal is to convert visitors, is a case where the performance cost -- visible page weight, animation jank on mobile, delayed interactivity -- almost certainly costs more than the visual differentiation gains.
+
+This is not an argument against 3D on the web. It is an argument for honesty about when 3D serves the product and when it serves the designer's portfolio.
+
+## Three.js fundamentals
+
+Three.js requires three core elements to render anything: a scene, a camera, and a renderer.
+
+```javascript
+import * as THREE from 'three';
+
+// Renderer: handles GPU drawing
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // cap at 2x
+document.body.appendChild(renderer.domElement);
+
+// Scene: container for all 3D objects
+const scene = new THREE.Scene();
+
+// Camera: defines the viewpoint
+const camera = new THREE.PerspectiveCamera(
+  75,  // field of view
+  window.innerWidth / window.innerHeight,  // aspect ratio
+  0.1,  // near plane
+  100   // far plane
+);
+camera.position.z = 5;
+
+// Geometry + Material = Mesh (an actual 3D object)
+const geometry = new THREE.BoxGeometry(1, 1, 1);
+const material = new THREE.MeshStandardMaterial({ color: 0x0070f3 });
+const cube = new THREE.Mesh(geometry, material);
+scene.add(cube);
+
+// Lighting (required for MeshStandardMaterial to be visible)
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(1, 2, 3);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+// Render loop
+function animate() {
+  requestAnimationFrame(animate);
+  cube.rotation.x += 0.01;
+  cube.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+animate();
+```
+
+The render loop (`requestAnimationFrame`) runs 60 times per second. Every computation in the loop runs 60 times per second. Keep the loop lean: no DOM queries, no garbage-creating allocations, no synchronous API calls.
+
+## React Three Fiber
+
+React Three Fiber wraps Three.js in a React component model. The same cube in R3F:
+
+```tsx
+import { Canvas, useFrame } from '@react-three/fiber';
+import { useRef } from 'react';
+import type { Mesh } from 'three';
+
+function RotatingCube() {
+  const meshRef = useRef<Mesh>(null);
+  
+  useFrame((state, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x += delta;
+      meshRef.current.rotation.y += delta * 0.5;
+    }
+  });
+
+  return (
+    <mesh ref={meshRef}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#0070f3" />
+    </mesh>
+  );
+}
+
+export function Scene() {
+  return (
+    <Canvas camera={{ position: [0, 0, 5] }}>
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[1, 2, 3]} intensity={1} />
+      <RotatingCube />
+    </Canvas>
+  );
+}
+```
+
+The `Canvas` component initializes the Three.js renderer. JSX elements like `<mesh>`, `<boxGeometry>`, and `<meshStandardMaterial>` map to Three.js constructors. `useFrame` provides access to the render loop without managing `requestAnimationFrame` manually.
+
+The Drei library (`@react-three/drei`) adds helper components: `<OrbitControls>` for user camera interaction, `<Environment>` for HDR lighting, `<Text>` for 3D text, and many more. For most R3F projects, Drei reduces the amount of Three.js imperative code significantly.
+
+## Performance optimization for production 3D
+
+**Pixel ratio cap.** `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` prevents rendering at 3x or 4x pixel density on high-DPI devices. The visual difference between 2x and 3x is minimal; the GPU cost is significant.
+
+**Geometry and material reuse.** Create geometries and materials once and reuse them across multiple meshes (`THREE.InstancedMesh` for many identical objects). Creating new geometry or material objects inside the render loop creates garbage that the JavaScript GC must collect -- causing frame drops.
+
+**Level of detail.** `THREE.LOD` reduces triangle count for objects far from the camera. A complex 10,000-polygon object near the camera can be a 500-polygon approximation at a distance, without the user noticing.
+
+**Device capability detection.** Detect GPU capability before rendering and choose a quality preset:
+
+```javascript
+const gl = canvas.getContext('webgl2');
+const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info');
+const renderer = debugInfo
+  ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+  : 'unknown';
+
+// Fall back to static image for very low-end devices
+const isLowEnd = renderer.toLowerCase().includes('mali-4') || 
+                 renderer.toLowerCase().includes('adreno 3');
+```
+
+## Common mistakes teams make with web 3D
+
+1. Not measuring performance on mobile before shipping. The GPU that handles a 60fps Three.js scene on desktop may be 4-8x faster than a mid-range Android GPU. Test on real hardware, not just Chrome's DevTools device simulation.
+2. Running physics calculations or pathfinding in the Three.js render loop. The render loop runs 60 times per second; heavy computation here drops frames. Move expensive calculations to a Web Worker.
+3. Loading large GLTF model files without optimization. GLTF files from 3D modeling tools are often 10-50MB. Use Draco compression (Three.js has a Draco loader) and compress textures before shipping. A product model should be under 2MB for reasonable mobile load times.
+4. Not implementing a canvas fallback. When WebGL is not available (very old browsers, some embedded environments), the canvas element is blank. Provide a fallback image or message.
+5. Treating a 3D decoration as "free." Every Three.js scene has initialization cost (shaders must compile on first load) that blocks the main thread for 100-500ms. This delay is visible as a pause in page interactivity, which affects Core Web Vitals and user perception of page speed.
+
+## Where to start: a 3-step 3D web project decision
+
+**Step 1: Define the user outcome the 3D feature is intended to improve.** If the outcome is not measurable (not "reduce product uncertainty for furniture buyers by 20 percent" but just "looks more impressive"), the project is a style decision, not a product decision. Style decisions should have commensurately smaller performance budgets.
+
+**Step 2: Test the performance impact on a mid-range Android device before committing to the implementation.** A quick prototype that renders the intended scene complexity in Three.js, tested on an actual Android device, surfaces the performance limitations before the implementation is complete.
+
+**Step 3: Implement the graceful fallback before the 3D feature.** The static image or simpler alternative that appears when the device is too slow should be built before the 3D scene. This forces the clarity about what the minimum viable experience is, and ensures the fallback exists before it is needed.
+
+## The Dimension That Earns Its Cost
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I have been asked to add 3D to three client projects. In two cases, a careful conversation about the intended user outcome produced a different solution: one needed a product video (easier to produce, better mobile performance, equivalent user information), and one needed a better photograph (the 3D model would have been 15MB and rendered at 10fps on the target user demographic's devices). In the third case -- a real estate platform where buyers needed to explore floor plans spatially -- 3D was the right answer, and the implementation used Three.js with a performance-tiered renderer that showed a 2D floor plan SVG on devices below the WebGL performance threshold. The 3D that earns its cost is the 3D that provides something the alternative cannot -- and the alternatives are usually underconsidered.
+
+## Related reading
+
+- [The Frontend Build System: Why It Matters More Than Founders Think](/blog/the-frontend-build-system-why-it-matters-more-than-founders-think)
+- [The Mobile Web Experience That Converts](/blog/the-mobile-web-experience-that-converts)
+- [The Hot Path: Finding and Optimizing It](/blog/the-hot-path-finding-and-optimizing-it)
+- [The Frontend Architecture That Survives Three Years of Feature Sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl)

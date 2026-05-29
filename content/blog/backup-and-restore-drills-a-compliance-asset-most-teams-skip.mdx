@@ -1,0 +1,112 @@
+---
+slug: "backup-and-restore-drills-a-compliance-asset-most-teams-skip"
+title: "Backup and Restore Drills: A Compliance Asset Most Teams Skip"
+excerpt: "A backup is only as good as the last successful restore drill. Most teams have backups. Few teams run drills. The drill is what turns the backup from a checkbox into a real control."
+date: "2026-05-19"
+category: "Security, Auth, and Compliance"
+tags: ["backup","restore","compliance","disaster-recovery"]
+readingMinutes: 12
+ogImage: "/api/og/blog/backup-and-restore-drills-a-compliance-asset-most-teams-skip"
+status: "published"
+definition: "A backup and restore drill is a scheduled exercise where the team restores from backup, validates the restored data, and measures the time to recover. It is the only way to know if the backups are real. Compliance frameworks like SOC 2, ISO 27001, and HIPAA all expect evidence of drills. The drill is also the cheapest insurance against the worst day a SaaS can have."
+faq: [
+  {"q":"How often should I run a restore drill?","a":"Quarterly at minimum for a small SaaS. Monthly for products with significant compliance scope. Weekly for the most critical surfaces. The cadence should match the cost of being wrong. A product that holds healthcare data drills more than a product that holds marketing analytics."},
+  {"q":"What should the drill measure?","a":"Recovery time objective (how long the restore takes) and recovery point objective (how much data is lost). Both numbers should be measured, documented, and compared against the policy commitment. A drill that does not produce these numbers is not a drill."},
+  {"q":"Where should I restore to?","a":"Never to production. Restore to a clean isolated environment that mirrors production. The drill should not be able to affect customers. The data should be sanitized before any access by non production roles."},
+  {"q":"Who should run the drill?","a":"Rotate the responsibility across the engineering team. The drill should not be a single person's tribal knowledge. The runbook should be clear enough that any senior engineer can execute it without context."},
+  {"q":"How long should the drill take?","a":"A few hours for a small SaaS. A full day for products with complex data. The drill should not run during peak business hours. The team should treat it as planned engineering work, not as an emergency."},
+  {"q":"What is the most common drill failure?","a":"The restore finishes but the application cannot start because some configuration or external dependency was not in the backup. The fix is to drill the entire recovery, not just the database restore."},
+  {"q":"How does this connect to compliance?","a":"SOC 2, ISO 27001, HIPAA, and PCI DSS all require evidence of backup and recovery testing. The drill is the evidence. Auditors will ask for the schedule, the runbook, and the latest results. A team that has not drilled in twelve months will struggle with the question."}
+]
+---
+
+## What you actually need to know
+
+- A backup that has never been restored is not a backup. It is a guess.
+- The drill measures recovery time and recovery point against policy.
+- The restore target is a clean isolated environment.
+- Rotate the responsibility. The runbook must be runnable by anyone senior.
+- Compliance auditors will ask for the schedule, the runbook, and the latest results.
+
+| Drill cadence | Best fit | Why |
+|---|---|---|
+| Weekly | Healthcare, finance, critical infrastructure | Cost of failure is highest |
+| Monthly | B2B SaaS with enterprise customers | Compliance requirement |
+| Quarterly | Small SaaS, B2C, low scope products | Minimum credible cadence |
+| Annually | Internal tools only | Below this is not a drill |
+
+## The core argument
+
+Every SaaS founder I have worked with thinks they have backups. Most do. Few have ever restored from one. Even fewer have measured how long the restore takes or how much data they lose in the process. The gap between "we have backups" and "we can restore in four hours with under fifteen minutes of data loss" is enormous.
+
+The drill closes the gap. It is not a complicated exercise. Pick a date. Pick a team. Pick a recent backup. Restore it into a clean environment. Bring the application up against the restored data. Verify a customer record. Measure how long the whole thing took.
+
+The first drill is always the longest. The runbook is wrong in places. The restore depends on a credential that was never documented. The application needs an environment variable that was not in the backup. The team learns more from the first drill than from a year of operating without one.
+
+The fifth drill takes a fraction of the time. The runbook is sharp. The credentials are in the right place. The recovery is something the team has done together. That is the value. The drill is not just about proving the backups work. It is about practicing the recovery so it does not have to be improvised in production.
+
+## What to drill
+
+| Surface | Drill scope | Frequency |
+|---|---|---|
+| Application database | Full restore plus point in time recovery | Monthly |
+| Customer files in object storage | Random sample restore | Quarterly |
+| Configuration and secrets | Documented runbook walkthrough | Quarterly |
+| Integration tokens | Re issue and reconnect | Annually |
+| DNS and networking | Tabletop | Annually |
+
+## How much does this cost
+
+The infrastructure cost of running a drill is small. A restore target that exists for a day, a few hours of engineering time, the temporary compute and storage for the restored environment. A typical drill costs under 200 USD in cloud bills and four to eight hours of engineering time.
+
+The cost of not drilling is larger and only visible when it bites. A team that has never drilled and faces a real recovery typically takes three to ten times longer than a drilled team. The customers notice. The investors notice. The compliance auditor flags it as a deficiency.
+
+## Features to demand from the drill setup
+
+- An isolated restore target that mirrors production.
+- A documented runbook in version control.
+- Measurement of recovery time and recovery point.
+- A named owner for the drill schedule.
+- A retrospective after each drill.
+- Evidence stored for the auditor.
+- Rotation of who runs the drill.
+
+## Expert opinion
+
+> The drill is the cheapest insurance a SaaS team has access to. The fifth drill almost always finds a problem the first four did not. The pattern is consistent. The fix is always cheaper to apply during a planned drill than during a real incident. Teams that drill quarterly recover from real incidents like teams that have practiced. Teams that do not drill recover like teams that are improvising.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had documented backups but no drill schedule. They came to me when a customer asked detailed questions about their disaster recovery posture during a security review. The team had backups in S3 but had never restored from them.
+
+We set up a quarterly drill cadence. The first drill found three problems. The application configuration file was not in the backup. The Redis state was not backed up. The database restore took ninety minutes longer than expected because the encryption keys were in a separate vault that the runbook did not mention.
+
+We fixed all three. The second drill ran in forty minutes. The third drill ran in twenty five minutes. The team published the drill results in their customer trust portal. The next security review went smoothly. The recovery time commitment in the contract moved from twenty four hours to four, which was worth meaningful revenue at the enterprise tier.
+
+For more on the broader operations work, see [backup restore and drill practice a SaaS disaster recovery guide](/blog/backup-restore-and-drill-practice-a-saas-disaster-recovery-guide) and [incident response for startups a playbook](/blog/incident-response-for-startups-a-playbook).
+
+## Common mistakes teams make
+
+1. Backups that have never been tested.
+2. Drills that restore only the database, not the application.
+3. No measurement of recovery time and recovery point.
+4. Restore environment that touches production.
+5. Single person responsibility. Tribal knowledge.
+6. No retrospective. The lessons evaporate.
+7. No evidence for the auditor. The drill happened but cannot be proven.
+8. Annual drills only. The gap is too long to be useful.
+
+## A 60 day plan to put drills in place
+
+1. **Week one.** Inventory what is backed up. Database, files, configuration, secrets, integrations.
+2. **Week two.** Build the isolated restore target. Document the runbook.
+3. **Week three.** Run the first drill. Measure everything. Write the retrospective.
+4. **Week four.** Fix the gaps the first drill exposed.
+5. **Week five.** Run the second drill. Confirm the fixes.
+6. **Week six.** Schedule the cadence. Assign rotating owners.
+7. **Week seven.** Publish the trust portal evidence.
+8. **Week eight.** Walk the drill with the customer success team so they can speak to it.
+
+For more on the related work, read [backup restore and drill practice a SaaS disaster recovery guide](/blog/backup-restore-and-drill-practice-a-saas-disaster-recovery-guide) and [the post mortem culture that improves security](/blog/the-post-mortem-culture-that-improves-security). On the auditor side, [audit logs that pass real audits](/blog/audit-logs-that-pass-real-audits) is the natural next read.

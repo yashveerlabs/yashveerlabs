@@ -1,0 +1,95 @@
+---
+slug: "the-decision-to-add-a-free-plan"
+title: "The Decision to Add a Free Plan"
+excerpt: "When a free plan accelerates growth and when it cannibalizes revenue, and how to tell the difference before you ship it."
+date: "2025-10-24"
+category: "Founder Decision Frameworks"
+tags: ["founders","pricing","strategy","freemium","decision-frameworks"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-decision-to-add-a-free-plan"
+status: "published"
+definition: "Adding a free plan is a distribution decision, not a pricing decision. Done right, it creates a self-serve acquisition channel where users try the product, see value, and convert to paid without needing a sales call. Done wrong, it fills your user base with people who will never pay, increases your support burden, and signals to serious buyers that the product is not worth paying for."
+faq: [
+  {"q":"What is the difference between freemium and a free trial?","a":"A free trial gives full access for a limited time. Freemium gives limited access with no time limit. Trials create urgency. Freemium creates habit. Trials work better when the value of the product is immediately clear. Freemium works better when value accumulates over time."},
+  {"q":"When does a free plan make sense for a B2B SaaS product?","a":"When the product has a strong viral or collaborative component, when word-of-mouth drives acquisition naturally, and when the cost to serve a free user is low. Slack, Notion, and Figma all benefit from free plans because their value grows when colleagues join."},
+  {"q":"How do I design a free plan that converts to paid?","a":"Limit on something that grows with value. Storage, seats, or output volume are natural limits. Do not limit on features that are core to the product experience. A free plan that makes the product feel broken does not convert. A free plan that makes the product feel limited in proportion to usage does."},
+  {"q":"What is the biggest risk of a free plan?","a":"Cannibalizing paid revenue. If your free plan is generous enough that users have no reason to upgrade, you have reduced your revenue without reducing your costs. The free plan must have a natural conversion trigger: a point where the user needs more than the free plan allows."},
+  {"q":"Should I add a free plan to attract enterprise buyers?","a":"No. Enterprise buyers do not start on free plans. They evaluate products through security questionnaires, demos, and pilots. A free plan does not accelerate enterprise sales. It serves a different buyer entirely. If your goal is enterprise, invest in the enterprise sales motion, not a free plan."}
+]
+---
+
+## What you actually need to know
+
+- A free plan is a distribution strategy, not a revenue strategy. Evaluate it on user acquisition cost and conversion rate, not on the free users themselves.
+- Free plans work when the product has collaborative or network effects. They do not work when the product's value is individual and private.
+- Limit on usage volume (storage, seats, API calls), not on core product features. Limiting features makes the product feel broken.
+- The conversion trigger is the key design decision. If there is no clear moment when a free user must upgrade, they will not.
+- Calculate the cost to serve a free user before launching the free plan. If it is more than a few dollars per month, freemium economics become difficult.
+
+| Free Plan Model | Conversion Rate | Acquisition Cost | Risk |
+|---|---|---|---|
+| Fully featured, time-limited (trial) | High (25 to 40%) | None | Low, clear deadline |
+| Freemium with usage limits | Medium (3 to 8%) | Low | Medium, limit must be well-designed |
+| Freemium with feature limits | Low (1 to 4%) | Low | High, can feel like a broken product |
+| No free option | Low inbound | High | Low for B2B, high for PLG |
+
+## The core argument
+
+The decision to add a free plan usually comes from one of two sources: competitive pressure or acquisition anxiety. Either competitors have free plans and it feels wrong not to match them, or the paid conversion numbers are low and the free plan seems like a way to get more people in the door. Neither of these is a good reason.
+
+A free plan is worth building when it creates a self-reinforcing acquisition loop. A user joins for free. They use the product. They invite a colleague. The colleague joins for free. Now there are two users. One of them hits the usage limit and upgrades. Now there is a paying customer who brought another potential paying customer. This loop works when the product is collaborative, when inviting others increases value, and when the conversion trigger is natural and well-designed.
+
+The same free plan in a product without these properties does none of this. The free user uses the product. They do not invite anyone because there is no benefit to doing so. They hit the limit and leave instead of upgrading because the cost of upgrading does not feel proportional to the value they are getting. The free plan generated a support ticket, consumed server resources, and produced nothing.
+
+Before adding a free plan, answer three questions: What is the cost to serve one free user per month? What is the conversion rate from free to paid for products like mine? What is the natural conversion trigger in my product? If the math works and the trigger exists, the free plan is worth exploring.
+
+## Designing the conversion trigger
+
+The conversion trigger is the moment when a free user faces a choice: pay or stop. The design of this trigger determines whether the free plan converts.
+
+A good conversion trigger is proportional to value. The user has been getting value from the product. They want more. The limit they hit is the limit on getting more value, not a limit on getting the value they already have.
+
+Storage limits work well because they grow with use. A free user who has stored 1 GB of data has demonstrated that they value the product enough to keep using it. Asking them to pay for more storage at that point is a natural ask.
+
+Seat limits work well for collaborative products. The team starts with one or two seats. The product becomes part of their workflow. When the third person needs access, the upgrade is obvious.
+
+API call limits work for developer tools. A developer who is making 10,000 API calls per month is building something. They need more calls. The upgrade is the cost of continuing to build.
+
+What does not work: limiting core features that are necessary to understand whether the product is worth paying for. If the free plan cannot demonstrate the product's value, it will not convert. Free users who cannot see the value will not pay for it.
+
+## The economics of freemium
+
+Before launching a free plan, calculate the unit economics. What does it cost to store, compute, and serve one free user per month? Include hosting, bandwidth, support time, and email costs. This number matters.
+
+If your product costs $5 per user per month to serve and your free-to-paid conversion rate is 5%, you need to serve 20 free users to get one paying customer. If that paying customer pays $30 per month, the free plan costs you $100 per month to acquire a $30 per month customer. The numbers do not work.
+
+If your product costs $0.50 per user per month to serve, the same math produces a paying customer acquisition cost of $10 for a $30 per month customer. The numbers work.
+
+The cost to serve is mostly a function of whether your product is compute-intensive or storage-intensive per user. If it is, freemium economics are hard. If the marginal cost per user is low, freemium economics can be very good.
+
+## Common mistakes founders make with free plans
+
+1. Adding a free plan because a competitor has one. Competitors' pricing models are designed for their specific customer mix, acquisition channels, and unit economics. Copy the decision only if the underlying logic applies to you.
+2. Designing the limit on features rather than on usage. A free plan that removes important features makes the product feel broken. Limits on usage volume are more natural and convert better.
+3. Not designing the upgrade flow carefully. If the upgrade path from free to paid is confusing, adds friction, or requires contacting sales, conversions drop. The upgrade should be one click.
+4. Not measuring free-to-paid conversion rate by cohort. Free users who have been on the free plan for 30 days convert very differently from those who have been on it for 6 months. Understand the conversion curve before drawing conclusions.
+5. Not limiting support for free users. If free users get the same support response time as paid users, your support cost per revenue dollar goes up significantly. Set expectations on support access in the free plan terms.
+
+## Where to start: a 3-step free plan decision process
+
+**Step 1: Calculate the cost to serve and the required conversion rate.** Take your target Customer Acquisition Cost. Divide by the cost to serve one free user per month. That is how many free users you need to convert one paid customer. Is your product category's typical free-to-paid conversion rate higher or lower? If it is lower, the economics do not work without changes.
+
+**Step 2: Identify the natural conversion trigger in your product.** Walk through the product as a free user. At what point does growth or continued use require upgrading? If you cannot find a natural trigger, the free plan design is not finished. Build the trigger before launching the plan.
+
+**Step 3: Launch to a small group first.** Before opening the free plan to all visitors, run it as an invite-only beta for 90 days. Track the conversion rate, the support burden, and the cost. Only then decide whether to make it public.
+
+## On Building Things That Work
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The pricing decisions I write about are ones I have worked through with real products. The frameworks here are what I use when a founder asks me whether to add a free plan. If the question is live for you and the stakes are high, that is a conversation worth having in detail. The contact page is there.
+
+## Related reading
+
+- [The Decision to Add Enterprise Sales](/blog/the-decision-to-add-enterprise-sales)
+- [How to Sell to Enterprise Without a Full Compliance Stack](/blog/how-to-sell-to-enterprise-without-a-full-compliance-stack)
+- [The Decision to Build a Second Product](/blog/the-decision-to-build-a-second-product)
+- [Pricing for SaaS: A Founder's Framework](/blog/saas-pricing-for-founders-a-cost-to-build-to-sell-framework)

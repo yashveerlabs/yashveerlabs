@@ -1,0 +1,124 @@
+---
+slug: "the-migration-from-heroku-a-step-by-step"
+title: "The Migration From Heroku: A Step By Step"
+excerpt: "How to migrate off Heroku without downtime: the sequence, the gotchas, and the platforms worth considering in 2026."
+date: "2025-08-18"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","heroku","migration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-migration-from-heroku-a-step-by-step"
+status: "published"
+definition: "The Heroku migration is the process of moving an application from Heroku's managed platform-as-a-service to an alternative hosting provider. The migration is usually motivated by cost (Heroku's pricing increased significantly after Salesforce's 2022 free tier removal), by the need for features Heroku does not provide (persistent storage, custom compute configurations, specific database options), or by the desire for more infrastructure control. The most common migration targets are Railway, Render, Fly.io, and AWS/GCP managed services."
+faq: [
+  {"q":"What are the best alternatives to Heroku in 2026?","a":"For developer-experience parity: Railway (easiest migration path, PostgreSQL and Redis included, pay-per-use pricing), Render (managed services for web apps and background workers, PostgreSQL with automatic backups), and Fly.io (container-based, better for apps with specific runtime requirements or geographic distribution needs). For teams ready to move to cloud infrastructure: AWS Elastic Beanstalk (closest to Heroku's abstraction on AWS), AWS ECS, or Google Cloud Run. The right choice depends on team size, technical complexity, and budget."},
+  {"q":"How long does a Heroku migration take?","a":"For a simple web application with a PostgreSQL database and no Heroku-specific add-ons: 1-3 days for a competent engineer familiar with the target platform. The majority of the time is database migration planning and DNS cutover. For applications with many Heroku add-ons, complex dynos configurations, or Heroku-specific environment assumptions, add 1-2 days of investigation and remediation. For applications with significant traffic that cannot afford downtime, add another day for the blue-green deployment or DNS-based cutover strategy."},
+  {"q":"How do I migrate my Heroku PostgreSQL database with minimal downtime?","a":"The recommended pattern: provision the target database on the new platform, restore a Heroku database backup to the target, then use Heroku's pg:copy feature or a logical replication tool to sync changes during the migration window. At cutover, stop write traffic to the Heroku database (maintenance mode or DNS switch), let the final sync complete (minutes to hours depending on data volume), switch the connection string, and re-enable write traffic. This produces a cutover window of minutes rather than the hours required for a full offline migration."},
+  {"q":"What Heroku features have no direct equivalent on other platforms?","a":"Heroku Review Apps (automatic preview deployments for pull requests) have equivalents on Railway and Render but require more configuration. Heroku's add-on marketplace (one-click third-party service provisioning) has no exact equivalent -- on Railway or Render, add-ons are provisioned separately and connection strings are added manually. Heroku's release phase (a command that runs before the new version receives traffic, often used for database migrations) is supported by Railway and Render as a predeploy command but needs configuration."},
+  {"q":"How do I handle Heroku-specific environment variables and configs?","a":"Export all Heroku config vars with `heroku config --json` and import them to the target platform. Heroku-specific variables (DATABASE_URL, REDIS_URL, DYNO) will need to be replaced with the target platform's equivalents. DATABASE_URL format may differ between platforms -- Heroku's format uses `postgres://` while some platforms use `postgresql://`. Check the application's database client for URI compatibility. The most common issue: applications that read Heroku-specific environment variables that do not exist on the target platform and do not have graceful fallbacks."}
+]
+---
+
+## What you actually need to know
+
+- The Heroku migration is mostly about the database -- getting data out of Heroku Postgres and into the new provider without unacceptable downtime is the hardest part.
+- Railway is the lowest-friction migration path for most Heroku apps: familiar config model, `heroku config` vars import cleanly, PostgreSQL and Redis included.
+- The migration from Heroku's add-on model to manually provisioned services is the main source of unexpected work. Each add-on needs to be replaced individually.
+- The release phase (predeploy command) is critical for applications that run database migrations before deployment -- verify this works on the target platform before cutting traffic.
+- DNS-based cutover with a short TTL is the downtime-minimization strategy for most migrations. Lower the TTL 24 hours before the migration window.
+
+| Platform | Closest Heroku Parity | Key Difference | Starting Cost |
+|---|---|---|---|
+| Railway | Very high | Pay-per-use, no fixed dyno sizes | ~$5-10/month |
+| Render | High | Fixed service sizes, good for predictable load | $7+/month |
+| Fly.io | Medium | Container-based, more flexibility | $0 + usage |
+| AWS Elastic Beanstalk | Medium | More AWS complexity, more control | Variable |
+| Google Cloud Run | Medium | Serverless containers, auto-scale to zero | Per-request |
+
+## The core argument
+
+The Heroku migration became a standard engineering task after Salesforce removed the free tier in November 2022. Teams that had been running development and staging environments on Heroku's free dynos faced a sudden cost: $7/month per dyno, $5/month for the smallest Postgres plan, and $3/month for Redis. For a startup with three environments and a few add-ons, the previously-free Heroku bill became $60-100/month -- enough to motivate looking at alternatives.
+
+The migration is not technically complex for most applications. Heroku's platform is PostgreSQL, environment variables, buildpacks (for language runtime), and add-ons (for third-party services). Every modern hosting platform supports PostgreSQL and environment variables. Buildpacks have equivalents or are not needed (the target platform detects the runtime automatically). Add-ons are replaced by directly provisioning the equivalent service.
+
+The complexity that surprises people is the operational knowledge encoded in Heroku's abstractions: the Procfile defines how to start the application, the release phase runs migrations before deployment, Review Apps create preview environments for pull requests. These features have equivalents elsewhere but require deliberate configuration instead of convention.
+
+## The migration sequence
+
+**Step 1: Audit the add-ons and configuration.** Run `heroku addons` to list all add-ons and `heroku config --json` to export all configuration variables. For each add-on, identify the equivalent on the target platform. Common add-ons and their equivalents: Heroku Postgres (Railway/Render PostgreSQL, or a managed provider like Neon or Supabase), Heroku Redis (Railway/Render Redis, or Upstash for serverless), Heroku Scheduler (cron on the target platform, or a dedicated job scheduler like Trigger.dev or Inngest), Sendgrid (Resend, Postmark, or keep using Sendgrid directly -- it is not Heroku-specific).
+
+**Step 2: Provision the target infrastructure.** On Railway or Render, create the equivalent services: a web service for the application, a PostgreSQL database, and a Redis instance if needed. Configure the environment variables from the exported config, replacing Heroku-specific values (DATABASE_URL, REDIS_URL) with the new platform's values.
+
+**Step 3: Test the application on the target platform.** Deploy the application to the target platform without switching DNS. Verify that the application starts correctly, database connections work, and background jobs run. This step catches the Heroku-specific assumptions before the cutover.
+
+**Step 4: Migrate the database.** This is the critical step with the most downtime risk.
+
+**Step 5: Cut over DNS.** Lower the TTL 24 hours before, switch DNS at the migration window, verify, and watch.
+
+## The database migration in detail
+
+For a PostgreSQL database, the recommended migration path for most Heroku applications:
+
+**Create a backup on Heroku:**
+```bash
+heroku pg:backups:capture
+heroku pg:backups:download
+```
+
+This produces a `latest.dump` file (pg_dump format) that can be restored to any PostgreSQL instance.
+
+**Restore to the target database:**
+```bash
+pg_restore --verbose --clean --no-acl --no-owner \
+  -h <target-host> -U <target-user> -d <target-db> latest.dump
+```
+
+**For low-downtime migration (live applications):** Use `heroku pg:copy` to copy the database to an external provider, or configure logical replication between the Heroku database and the target database. Logical replication is more complex but keeps the target database continuously synced with the Heroku database during the migration period, reducing the cutover window to the time required for the final flush.
+
+For applications with small databases (under 1GB), the backup/restore approach with a brief maintenance window is the simplest option. For applications with large databases or strict uptime requirements, investigate logical replication or a database migration service.
+
+## The Heroku-specific configuration patterns
+
+**The Procfile.** Heroku uses a `Procfile` to define how the application starts:
+```
+web: node server.js
+worker: node worker.js
+```
+
+On Railway and Render, the equivalent is configuring the start command in the platform UI or a `railway.json`/`render.yaml` configuration file. The `Procfile` format is also supported by Railway directly.
+
+**The release phase.** Many Heroku applications run database migrations before deployment using the release phase in the Procfile:
+```
+release: node_modules/.bin/knex migrate:latest
+web: node server.js
+```
+
+On Railway, this is configured as a "Start Command" with a deploy hook. On Render, it is configured as a "Pre-Deploy Command." Verify this works before the DNS cutover -- migrations that fail in the release phase prevent the new version from deploying, which is the correct behavior.
+
+**The DATABASE_URL format.** Heroku Postgres uses `postgres://` in the connection URI. Some PostgreSQL clients require `postgresql://`. Check whether the application's database client handles both formats, and whether any connection pooler (PgBouncer) needs to be configured on the new platform.
+
+## Common mistakes teams make during Heroku migrations
+
+1. Not accounting for add-on replacement time. The migration plan that says "migrate the database and switch DNS" is missing the work required to replace each Heroku add-on individually. Audit every add-on before estimating migration time.
+2. Not testing the release phase on the target platform before cutover. The application that depends on a Heroku release phase for database migrations will fail to deploy correctly on the new platform if the equivalent is not configured and tested.
+3. Migrating during peak traffic hours. Even a brief downtime during peak traffic has more impact than a longer maintenance window during off-peak hours. Schedule the DNS cutover for the lowest-traffic period.
+4. Not verifying database connection pool settings. Heroku's managed PostgreSQL has specific connection limits per tier. The new platform may have different limits. Applications that were not connection-pool-optimized on Heroku may hit connection limits on a smaller managed database tier.
+5. Forgetting to migrate Heroku Scheduler jobs. Background jobs running on Heroku Scheduler do not automatically move to the new platform. Each job needs to be replicated as a cron job or scheduled task on the target platform.
+
+## Where to start: a 3-step Heroku migration
+
+**Step 1: Run `heroku addons` and `heroku config --json` and document every dependency.** For each add-on, identify the equivalent on Railway or Render and estimate the configuration time. This audit surfaces the actual scope of the migration before any infrastructure is provisioned.
+
+**Step 2: Provision the target environment and deploy the application without switching DNS.** Get the application running on the new platform with production data (restored from a Heroku backup) and verify that all features work correctly. This is the testing phase, not the live migration.
+
+**Step 3: Lower the Heroku DATABASE_URL DNS TTL to 60 seconds 24 hours before the migration window.** At the migration window: take a final backup, restore to the target database, switch all environment variables to point to the new infrastructure, and update the DNS record. With a 60-second TTL, traffic shifts to the new platform within a minute of the DNS change.
+
+## The Migration That Is Simpler Than It Looks
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I ran a Heroku-to-Railway migration for a client's Node.js API with a PostgreSQL database and a Redis cache. The migration took two days: one day to provision Railway, test the deployment, and verify the database connection, and one day for the database backup/restore and DNS cutover. The most time-consuming step was finding and replacing the Heroku-specific DATABASE_URL and REDIS_URL references in the application configuration -- they were scattered across four environment-specific config files rather than read from a single source. The actual cutover window was 12 minutes, including the database restore. Heroku migrations are not technically hard; they are operationally detailed, and the detail is in the add-on inventory and the configuration audit, not in the deployment itself.
+
+## Related reading
+
+- The DevOps Stack Every SaaS Needs
+- [The Hidden Cost of Free Tools: Vendor Lock-In Math](/blog/the-hidden-cost-of-free-tools-vendor-lock-in-math)
+- The Cloud Cost Control Plan
+- The CI/CD Pipeline for a Solo Developer

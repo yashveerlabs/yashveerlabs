@@ -1,0 +1,121 @@
+---
+slug: "timeouts-the-setting-most-engineers-get-wrong"
+title: "Timeouts: The Setting Most Engineers Get Wrong"
+excerpt: "Working notes on timeouts: the setting most engineers get wrong. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-05-03"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 11
+ogImage: "/api/og/blog/timeouts-the-setting-most-engineers-get-wrong"
+status: "published"
+definition: "A timeout is the maximum time your code is willing to wait before giving up and doing something else. Most engineers set them once, forget them, and discover they were wrong during an incident. The correct value depends on the operation, the SLA of the dependency, and what happens to the user or the data when the timeout fires. Getting it right requires thinking about all three, not just copying a number from a tutorial."
+faq: [
+  {"q":"What is the right timeout value for a database query in a backend API?","a":"There is no universal answer. The right value is slightly above your p99 query latency under normal load. If your slowest normal queries complete in 800 milliseconds, set the timeout at 1500 milliseconds. This catches genuinely stuck queries without killing healthy slow ones. Measure first, set second. A timeout set without data is a guess."},
+  {"q":"What is the difference between a connection timeout and a request timeout?","a":"A connection timeout is how long you wait to establish a TCP connection to a server. A request timeout is how long you wait after the connection is established for the response to arrive. Both need to be set independently. A missing request timeout means a connected but unresponsive server will hold your thread or connection slot indefinitely."},
+  {"q":"How do timeouts relate to circuit breakers in distributed systems?","a":"A timeout is passive: it fires when one request takes too long. A circuit breaker is active: it monitors timeout and error rates over a window and stops sending requests altogether when the dependency looks unhealthy. They are complements, not alternatives. Timeouts are the mechanism. Circuit breakers are the policy that acts on repeated timeout events."},
+  {"q":"What happens if I set my timeout too low in a high traffic backend service?","a":"You get false positive failures. Requests that would have succeeded within a few hundred more milliseconds get cancelled. The cancelled requests may retry, increasing load on an already slow dependency, which causes more timeouts, which causes more retries. This is a timeout-driven thundering herd. Setting timeouts slightly above the realistic p99 avoids this without leaving the system exposed to genuinely stuck requests."},
+  {"q":"How should I handle a timeout error in a backend service so the user experience does not break?","a":"Return a clear, typed error response that the client can handle gracefully. For operations that modified state before timing out, return a resolvable identifier so the client can poll for the result rather than retrying blindly. For read operations, a cached or slightly stale response is often better than an error. The worst outcome is a timeout that manifests to the user as a blank screen with no explanation."},
+  {"q":"Do I need separate timeout values for different environments like development and production?","a":"Yes. Development timeouts can be longer because the purpose is debugging, not resilience. Production timeouts should be tuned to actual latency data. Staging should match production. The common mistake is copying development timeouts to production and not noticing until a slow dependency causes cascading failures."},
+  {"q":"What is a cascading timeout failure and how do I prevent it?","a":"A cascading timeout happens when one slow service causes its callers to time out, which causes their callers to accumulate waiting requests, which exhausts connection pools or thread pools, which takes down services that had nothing to do with the original slowness. Prevention requires setting timeouts at every layer, using circuit breakers on the inter-service calls that are most likely to be slow, and shedding load proactively when queues start to grow."}
+]
+---
+
+## What you actually need to know
+
+- A missing timeout is a silent resource leak. The thread, connection, or file descriptor is held until the OS eventually kills it or the process runs out of resources.
+- Timeouts need to be set at every layer: database connections, HTTP clients, cache clients, external API calls, job queue consumers.
+- The correct value is calibrated to actual latency data, not chosen from documentation examples.
+- A timeout that fires should be handled explicitly, not caught by a generic exception handler and swallowed.
+- In my experience, most production incidents that look like availability problems trace back to a missing or misconfigured timeout somewhere in the dependency chain.
+
+| Timeout type | Where it lives | What happens without it | Typical starting value |
+|---|---|---|---|
+| TCP connect timeout | HTTP client, DB client | Hangs waiting for SYN-ACK indefinitely | 2 to 5 seconds |
+| Request / read timeout | HTTP client | Hangs after connection, waiting for response | 5 to 30 seconds, calibrated to p99 |
+| Database query timeout | ORM or DB driver | Locks held, connection pool exhausted | 5 to 15 seconds |
+| Database connection timeout | DB connection pool | Pool exhausted waiting to connect | 2 to 5 seconds |
+| External API timeout | Third-party HTTP client | Dependent on the vendor's behavior | 10 to 30 seconds |
+| Job / worker timeout | Job queue | Zombie workers consuming slots | 2x expected job duration |
+
+## The core argument
+
+Most engineers understand what a timeout is. Fewer actually set them. The default in many HTTP client libraries is no timeout at all, or a very large one. The default in many ORMs is no query timeout. The result is that in normal operation, everything works fine. During a slow or partial failure in a dependency, resources start accumulating. Threads wait. Connection pool slots fill. Memory grows. The monitoring shows high latency. Engineers look at the database. They look at the application code. They do not check whether any of their external calls have a timeout configured.
+
+When they do check, they often find timeouts set to the library default, which may be ninety seconds or infinite. A database query that should take fifty milliseconds is allowed to run for ninety seconds, holding a connection slot, before the application gives up. If one slow query per second does this, the connection pool is exhausted in under two minutes.
+
+Setting a timeout does not fix the slow dependency. What it does is let the application fail fast, release the resource, and respond to the user with an error rather than a hang. Fast failures are more recoverable than silent hangs. An error can be handled, retried with backoff, surfaced to the user, and alerted on. A hang accumulates silently until everything falls over.
+
+The second part of the problem is that timeouts, when they do exist, are often copied from documentation without measurement. A tutorial says "set the timeout to 30 seconds" and the engineer sets it to 30 seconds for every HTTP call in the application. The payment provider call that should complete in 500 milliseconds now waits 30 seconds before failing. The internal microservice call that should complete in 50 milliseconds waits 30 seconds. The external email API call where 5 seconds is reasonable waits 30 seconds. One configuration, applied everywhere, wrong everywhere.
+
+## Setting timeouts correctly
+
+### Measure first
+
+The right timeout value for any operation is a function of that operation's actual latency distribution. Pull the p99 latency for the operation from your observability stack. If you do not have that data, add instrumentation before you add timeouts. A timeout set without latency data is a guess that may be too tight (causing false failures) or too loose (providing no real protection).
+
+A reasonable starting point: set the timeout at two to three times the p99 latency. If the p99 is 400 milliseconds, set the timeout at 800 to 1200 milliseconds. This absorbs natural latency variation without leaving the application exposed to a genuinely stuck request.
+
+### Layer them everywhere
+
+Timeouts need to be set at every I/O boundary in the application. The HTTP server timeout on incoming requests. The HTTP client timeout on outgoing requests. The database connection pool timeout and the query execution timeout. The cache client timeout. The message queue consumer timeout. External API call timeouts, configured per vendor based on their documented SLA.
+
+The missing one is almost always the query timeout. Database drivers often default to no timeout because the database library authors did not want to interfere with long-running analytical queries. Application code almost never sets one explicitly. The result is that a single slow query can hold a connection and block the rest of the application from accessing the database.
+
+### Handle timeouts explicitly
+
+A timeout is a failure mode, not an exception to be caught by the global error handler. When a timeout fires on a write operation, the application does not know whether the write succeeded. The timeout could have fired after the write committed but before the response was sent. The handler for a write timeout needs to either look up the result, return a resolvable identifier to the client, or treat the operation as potentially successful and handle accordingly.
+
+Read timeouts are simpler. The operation did not complete. Return a typed error or a cached fallback. Do not retry immediately without backoff. Immediate retry after a timeout adds load to a dependency that is already struggling.
+
+## What it actually requires
+
+| Task | Effort | Impact |
+|---|---|---|
+| Audit existing timeout settings | Half a day | High: often reveals missing timeouts everywhere |
+| Add latency instrumentation to all I/O calls | 1 to 2 days | Required for data-driven timeout values |
+| Set timeouts per I/O type with calibrated values | 1 day | Direct availability improvement |
+| Add explicit timeout error handling | 1 to 2 days | Prevents silent hangs becoming visible outages |
+| Add circuit breakers on high-risk dependencies | 2 to 4 days | Prevents cascading timeout failures |
+
+## Features to demand from your infrastructure
+
+- Configurable per-call timeouts, not global defaults, in every HTTP and database client library.
+- Latency histograms (p50, p95, p99) for every external I/O call in your observability stack.
+- Alerting on elevated timeout rates before they become outages.
+- An explicit error type for timeouts that is distinct from other failure modes, so the handler can respond appropriately.
+- Per-environment timeout configuration so development and production can be tuned independently.
+- Documentation of the timeout value for every external dependency, reviewed at least annually as dependencies change.
+
+## Expert opinion
+
+> The engineers who set timeouts correctly share a common habit: they pull the p99 latency for every external call and then set the timeout at two or three times that number. That is it. It is not complicated. What makes it rare is that it requires actually measuring something before configuring it, which most teams skip when they are moving fast. The measure-then-configure habit is worth building early. An incident at two in the morning over a missing HTTP client timeout will build it for you, but that is a more expensive way to learn.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client's SaaS platform experienced a total outage every time their third-party email delivery service had a slow period. The email service was not down. It was responding, just slowly. The HTTP client making email API calls had no timeout configured. Slow responses held threads. After about eight minutes of the email service being slow, all available threads were occupied waiting for email API responses. New requests from users received no response. The entire application appeared down.
+
+The fix was a ten-line configuration change: set the HTTP client timeout on email API calls to five seconds, add a specific timeout error handler that queued failed emails for retry with exponential backoff, and add an alert on elevated email timeout rates. The next time the email provider had a slow period, it produced a small spike in email queue depth and no user-visible impact.
+
+The broader audit that followed found seven other external API calls in the codebase with no timeout configured. The database query timeout was also missing. We set both and added p99 instrumentation via the [outbox pattern](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) for async recovery flows, which handles the case where a write succeeds but the response times out. For the full context on how service health checks interact with timeout behavior, the [service health check post](/blog/why-your-service-should-have-two-health-checks-not-one) covers how to distinguish a service that is alive but slow from one that is actually down.
+
+## Common mistakes
+
+1. Not setting a timeout at all. The library default is usually too long or infinite.
+2. Copying a timeout value from documentation without measuring actual latency.
+3. Setting the same timeout for every HTTP call regardless of the operation or the dependency.
+4. Catching a timeout exception in a generic error handler and returning a generic 500 response, losing the semantic information that a timeout is recoverable.
+5. Retrying immediately after a timeout with no backoff, which amplifies load on a struggling dependency.
+6. Setting timeouts in development but not in production, or vice versa.
+7. Ignoring job worker timeouts. A zombie worker occupying a slot in the job queue pool for hours is a timeout problem, not a worker problem.
+8. Not alerting on elevated timeout rates. By the time a timeout causes an outage, you should have been paged for elevated rates twenty minutes earlier.
+
+## A 2 week plan
+
+1. **Days 1 to 3.** Audit every external I/O call in the application: HTTP clients, database clients, cache clients, job queue consumers. List each one and check whether it has an explicit timeout configured. Document the value and whether it came from data or from a guess.
+2. **Days 4 to 7.** Add p99 latency instrumentation to every I/O call that lacks it. For any existing timeout that was set without data, note it as a calibration target.
+3. **Days 8 to 10.** Set or recalibrate timeouts for each I/O call based on the p99 data. Prioritize the ones with no timeout or with a timeout over thirty seconds.
+4. **Days 11 to 14.** Add explicit timeout error handlers for the most critical paths, particularly write operations. Add alerting on timeout rate spikes. Review the changes with the team so the rationale is shared knowledge.
+
+For deeper reading on what happens when timeouts are not enough to stop cascading failures, [the error budget post](/blog/the-error-budget-sre-for-small-teams) covers how to think about acceptable failure rates. [The replication lag post](/blog/the-replication-lag-problem-how-to-detect-and-defend) covers a related class of latency problems that can interact badly with tight timeout settings.

@@ -1,0 +1,116 @@
+---
+slug: "when-to-refactor-an-mvp-and-when-to-throw-it-away"
+title: "When to Refactor an MVP and When to Throw It Away"
+excerpt: "The decision between refactoring and rewriting is one of the most expensive calls a startup makes. Here is how I think through it, with real examples from both sides."
+date: "2024-06-18"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/when-to-refactor-an-mvp-and-when-to-throw-it-away"
+status: "published"
+definition: "Most founders ask whether to refactor or rewrite too late, when the codebase has already become expensive to change. I look at three signals: whether the architecture can support the next six months of features, whether the team who built it is still available, and whether the cost of change is growing or holding steady. Two signals pointing at rewrite usually means rewrite."
+faq: [
+  {"q":"How do I know when an MVP codebase needs a full rewrite instead of refactoring?","a":"When three or more of these are true: adding any new feature breaks an existing one, the original developer is gone and the code has no documentation, the architecture cannot support the next six months of planned features, and the cost estimate for the next sprint keeps surprising you upward. One or two is refactor territory. Three or more is rewrite territory."},
+  {"q":"What is the real cost difference between refactoring and rewriting an MVP?","a":"Refactoring a moderate MVP codebase costs roughly twenty to forty percent of the original build cost over three to six months. A full rewrite costs sixty to one hundred twenty percent of the original build cost, depending on scope. Rewriting is more expensive but also cleaner. The choice depends on whether the architecture can survive the next twelve months."},
+  {"q":"Should I refactor while shipping new features or stop everything for a cleanup sprint?","a":"Both at once is the worst path. It doubles the work and halves the discipline. Pick one: a dedicated three to four week cleanup sprint where nothing new ships, or a rolling refactor policy where every sprint allocates thirty percent of time to cleanup. The rolling policy is slower but keeps momentum. The sprint is faster but harder to sell to stakeholders."},
+  {"q":"How long does a full MVP rewrite usually take compared to the original build?","a":"Between sixty and ninety percent of the original timeline, if the scope is the same. Rewrites feel faster because you already know what to build. They are not dramatically faster because the actual coding and testing time does not compress much. The time savings come from skipping early discovery and from not repeating the architectural mistakes of the first version."},
+  {"q":"What are the signs that an MVP was built by a low quality developer and needs to be replaced?","a":"No automated tests, no deployment pipeline, secrets stored in plain text, database with no indexes on queried columns, authentication rolled by hand, and a README that describes a different product than the one running in production. Any two of these together means the codebase is a liability. Any four means it is cheaper to restart than to fix."},
+  {"q":"Can I refactor an MVP without losing the data users have already put in?","a":"Yes, with a migration plan. Data migrations are a standard part of any refactor. The risk is low if the developer writes reversible migrations and tests them against a copy of production data before running on live. The risk becomes high when migrations are written once and never tested. Always test migrations on a production clone."},
+  {"q":"Is it worth paying a new developer to refactor code they did not write?","a":"Often yes, with one condition. The new developer needs two weeks to read the codebase before quoting the refactor cost. A quote based on reading the code is reliable. A quote based on a verbal description of the product is guesswork. Any developer who quotes a refactor without reading the code is not accounting for the surprises that will come."}
+]
+---
+
+## What you actually need to know
+
+- A refactor that takes longer than the original build is a rewrite with extra paperwork. Call it what it is.
+- The right time to make this decision is before you hire the next developer, not after.
+- Founders who refuse to rewrite to protect sunk cost end up paying twice: once for the original build and once for the refactor that never quite finishes.
+- A codebase with no tests and no documentation is not an asset with technical debt. It is a liability with a hosting bill.
+- The decision is not technical. It is economic. Which path produces a working product faster for the budget you have left.
+
+| Scenario | Recommended path | Time cost | Budget cost |
+|---|---|---|---|
+| Architecture is sound, code is messy | Refactor over two to three sprints | 30 to 50% of original timeline | 20 to 40% of original cost |
+| Architecture is broken, code is readable | Refactor architecture, keep logic | 50 to 70% of original timeline | 40 to 60% of original cost |
+| Architecture is broken, code is unreadable | Rewrite | 60 to 90% of original timeline | 60 to 120% of original cost |
+| Team who built it is still available | Either, with team | Faster than estimate | Lower than estimate |
+
+## The core argument
+
+Founders almost always come to this question too late. The MVP launched eight months ago. The developer who built it is gone. New features are taking twice as long as they should. Every change breaks something else. The founder wants to know whether to fix what exists or start over.
+
+The honest answer is that the delay in asking the question has already made the decision more expensive. A codebase that was awkward to change three months ago is now genuinely painful to change. The refactor estimate will be higher than it would have been, and the rewrite estimate will not have gone down.
+
+The framework I use is three questions. Can the current architecture support the next six months of planned features without a fundamental redesign? Is the cost of each new feature going up, holding steady, or going down over the last three sprints? Is the developer who built it available and willing to work on it? Two yes answers point toward refactor. Two no answers point toward rewrite.
+
+This is not a permanent decision. A well-executed refactor can restore a codebase to health. A poorly scoped refactor can make things worse. The key is to make the call once, commit to the path, and execute it cleanly instead of getting stuck in a half-refactor that leaves the codebase in a worse state than either option would have.
+
+## Reading the codebase honestly
+
+The worst outcome is a founder who is told the codebase needs a refactor, approves a two-month budget, and then receives a product that looks cleaner but behaves the same. This happens when the developer refactors the visible layer without touching the architectural problems underneath.
+
+A real refactor changes how the system is organized, not just how the code is named. A real rewrite replaces the architecture with something that can support the product's next stage. If neither of those is happening, the work is maintenance, not improvement.
+
+### Signals that point to refactor
+
+The core architecture is sound. A framework was chosen and used consistently. Data models make sense. The main flow works without touching the problematic areas. The issues are in isolated modules, specific API endpoints, or inconsistent patterns that a new developer introduced halfway through. These are real problems but they are surgical. A focused sprint can fix them without touching what works.
+
+### Signals that point to rewrite
+
+The original developer made a fundamental architectural choice that the product has now outgrown. A monolith that needs to be split. A database schema that cannot support multi-tenancy without a ground-up redesign. An authentication system that was built by hand and now needs to be replaced with something auditable. These are not bugs. They are load-bearing walls that are in the wrong place. You cannot fix them without moving them.
+
+## How much does it cost
+
+| Work type | Typical cost range | Timeline |
+|---|---|---|
+| Code cleanup and documentation only | 10 to 15% of original build cost | 2 to 3 weeks |
+| Module-level refactor of problem areas | 20 to 40% of original build cost | 4 to 8 weeks |
+| Architectural refactor with data migration | 40 to 70% of original build cost | 8 to 16 weeks |
+| Full rewrite, same scope | 60 to 120% of original build cost | 10 to 20 weeks |
+
+These ranges assume a single senior developer doing the work. They compress slightly with a two-person team and expand significantly with a developer who did not write the original code and has no documentation to work from.
+
+## What to look for when evaluating the codebase
+
+- Whether automated tests exist and pass. A codebase with no tests cannot be safely refactored without introducing regressions.
+- Whether the deployment pipeline is automated. Manual deploys indicate that the developer was the only person who understood the system.
+- Whether the data model can be read without talking to the original developer.
+- Whether a senior developer reviewing the code for two hours can explain what it does without significant guessing.
+- Whether the most recent features took longer to ship than the earliest features. This is the clearest signal that the architecture is fighting the product.
+
+## Expert opinion
+
+> I have rescued three MVP codebases that were described to me as 'just needing cleanup.' In every case, the cleanup turned into a partial rewrite once we understood what we were dealing with. The founders who fared best were the ones who budgeted for the rewrite possibility upfront and were genuinely relieved when the audit said refactor. The ones who fared worst had budgeted only for cleanup and ran out of money in the middle.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder brought me a codebase that had been built by three different developers over fourteen months. The first developer had built a solid core. The second had added three features in a way that worked but created inconsistencies. The third had been trying to fix the inconsistencies and had made them worse. The founder wanted a quote to "clean it up."
+
+Two weeks of reading the code told a different story. The first developer's core was genuinely good. The second developer's additions were isolated enough to refactor cleanly. The third developer's fixes had introduced a data integrity issue that was actively corrupting one table at a low rate. We refactored the second developer's work, rewrote the third developer's changes entirely, and migrated the corrupted data. Total time was eight weeks, not the two weeks the founder had expected. But the result was a codebase that a new developer could work in without confusion.
+
+For context on what the healthy version of an MVP codebase looks like structurally, [the modular MVP post](/blog/the-modular-mvp-building-so-you-can-pivot-without-burning-everything) covers the architectural patterns that make future refactors cheaper. For the economic framing of technical debt, [the cost of tech debt post](/blog/the-cost-of-tech-debt-a-founders-worst-bill) puts the numbers in terms founders can use.
+
+## Common mistakes
+
+1. Treating a refactor as a background task that happens alongside feature development. It does not. The two work streams contaminate each other.
+2. Starting a refactor without a written plan. The plan does not need to be long but it needs to name what will change and what will not.
+3. Underestimating data migration risk. Moving data from a broken schema to a clean one is the riskiest part of any refactor and the step most often underscoped.
+4. Rewriting without keeping the original running until the new version is verified. Never cut over to a rewrite on launch day.
+5. Hiring the cheapest developer to do the refactor because the project is "just cleanup." A refactor done badly is harder to fix than the original problem.
+6. Letting the founder scope-creep the refactor with new features. A refactor is a repair job. New features come after.
+7. Not telling users about the maintenance window. Users are more tolerant of downtime they were warned about than downtime that surprises them.
+8. Declaring the refactor done before writing the documentation the next developer will need.
+
+## A ten-week refactor plan
+
+1. **Week one.** Two-day code audit. A senior developer reads the full codebase and produces a written assessment: what is working, what is broken, and what is the recommended path.
+2. **Week two.** Decision meeting. Founder and developer review the audit together and pick refactor or rewrite. Budget is adjusted to match.
+3. **Weeks three and four.** Set up automated test coverage for the parts of the code that will not change. You cannot safely change what you cannot verify.
+4. **Weeks five and six.** Refactor or rewrite the first problem area. Deploy to staging. Verify manually and with tests.
+5. **Weeks seven and eight.** Second problem area. Data migration plan written and tested against a copy of production.
+6. **Week nine.** Staged cutover. Run old and new in parallel for three to five days. Watch for discrepancies.
+7. **Week ten.** Final cutover. Old system decommissioned. Documentation written. New developer can onboard without talking to the person who wrote the code.
+
+For the hiring decision that often follows a refactor, [the vetting framework for developers](/blog/the-vetting-framework-how-to-verify-a-developers-real-experience) covers how to check whether a candidate has actually done this kind of rescue work before. For the broader decision of whether the product is worth saving at all, [the MVP postmortem questions](/blog/the-mvp-postmortem-questions-to-ask-yourself-six-months-in) are the right frame before committing to either path.

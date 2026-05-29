@@ -1,0 +1,123 @@
+---
+slug: "the-multi-year-refactor-cultural-patterns-that-make-it-stick"
+title: "The Multi Year Refactor: Cultural Patterns That Make It Stick"
+excerpt: "The team behaviors that turn a multi-year refactor from a stalled wishlist into steady, measurable progress -- without stopping product work."
+date: "2025-09-23"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","engineering-leadership","culture"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-multi-year-refactor-cultural-patterns-that-make-it-stick"
+status: "published"
+definition: "A multi-year refactor is a large-scale improvement to a codebase that cannot be completed in a single sprint or project -- it runs in parallel with ongoing product development over months or years. The technical challenge is manageable; the cultural challenge is not. Teams that succeed at multi-year refactors have specific behavioral patterns: they break the work into small, deployable increments; they protect capacity from sprint-to-sprint interruption; they measure progress visibly; and they have engineering leadership that treats the refactor as a business investment, not a tax on product velocity."
+faq: [
+  {"q":"Why do most multi-year refactors fail to complete?","a":"Not because the technical work is too hard, but because the capacity for the work keeps getting reallocated. A two-year refactor with 10 percent engineering capacity needs consistent protection of that 10 percent. The teams that fail consistently re-prioritize product features over refactor work when capacity is tight -- which is always. The teams that succeed treat the refactor capacity as a fixed allocation that is protected in the same way as on-call rotation: the business depends on it, so it is not negotiable when sprint priorities shift."},
+  {"q":"What is the right allocation of engineering capacity for an ongoing refactor?","a":"10-20 percent of total engineering capacity as a protected allocation. Below 10 percent, the work does not build momentum and is easily displaced by product priorities. Above 25 percent, product velocity drops enough to cause stakeholder concern that erodes support for the refactor. The 10-20 percent allocation is sustainable, visible, and large enough to produce measurable progress on a quarterly basis. For a 5-engineer team, this is 0.5-1 engineer equivalent working on refactor work each sprint."},
+  {"q":"How should refactor progress be measured and communicated?","a":"With a metric that non-engineers can understand. 'We migrated 40 percent of API routes to the new authentication system' is understandable. 'We reduced technical debt by 200 story points' is not. The metric should be specific (what is being migrated), measurable (what percentage is complete), and connected to a business outcome (what problem the migration solves). Monthly updates to engineering leadership and quarterly updates to product and business stakeholders keep the refactor visible and funded."},
+  {"q":"What does the 'strangler fig' pattern mean in practice for a refactor?","a":"The strangler fig pattern replaces the old system incrementally, with new code wrapping or replacing specific parts of the old system while both run simultaneously in production. For a type migration: add TypeScript types to new functions first, then incrementally add types to modified functions, and eventually remove the last untyped files. For an API migration: add the new API endpoint alongside the old one, migrate clients one at a time, and deprecate the old endpoint when all clients have migrated. The strangler fig never requires a stop-the-world migration and always keeps the system in a deployable state."},
+  {"q":"How do you prevent 'refactor drift' -- where the refactor slowly loses priority and stalls?","a":"Two mechanisms: a visible progress metric on the engineering team's dashboard (the sprint review shows refactor progress alongside feature delivery), and a quarterly review where the refactor's scope and priority are explicitly re-evaluated. The quarterly review is not an opportunity to kill the refactor -- it is a structured check that the current scope still reflects the right priorities and that the capacity allocation is being honored. Teams that do not have an explicit review mechanism see the refactor drift as product priorities compete and no one advocates for the refactor work."}
+]
+---
+
+## What you actually need to know
+
+- Multi-year refactors fail culturally before they fail technically. The technical work is usually clear; the capacity protection is not.
+- A 10-20 percent protected engineering capacity allocation is the minimum for sustained progress. Below 10 percent, the work stalls when any product priority competes with it.
+- The strangler fig pattern -- incremental replacement while both old and new systems run in production -- is the only refactoring approach that survives contact with ongoing product development.
+- Progress must be measurable with a metric non-engineers can understand. "40 percent of routes migrated" is meaningful; "technical debt reduced" is not.
+- Quarterly reviews of the refactor scope and capacity protect against drift, which is the slow death of refactor projects that no one explicitly kills.
+
+| Cultural Pattern | What It Prevents | Who Is Responsible |
+|---|---|---|
+| Protected capacity allocation | Refactor work displaced by product sprints | Engineering lead |
+| Visible progress metric | Invisible progress, implicit de-prioritization | Engineering lead |
+| Strangler fig approach | All-or-nothing migrations that stall | Tech lead / senior engineers |
+| Quarterly scope review | Drift and unstated de-prioritization | Engineering + product leads |
+| Post-completion celebration | "It was never finished" narrative | Engineering lead |
+
+## The core argument
+
+The multi-year refactor that fails is almost always one that was never explicitly protected. It was on the engineering team's radar. It was mentioned in planning sessions. Engineers worked on it when product capacity allowed. But it was never a protected allocation, never a visible progress metric, and never explicitly reviewed to confirm that the business still valued the investment. Slowly, sprint by sprint, product features took priority. The refactor reached 60 percent complete and stalled. New features were built on top of the old system because the refactor was "almost done but not yet." Two years later, the system is more complex than before the refactor started, because the old and new approaches both exist in the codebase simultaneously.
+
+This is not a failure of technical skill. It is a failure of the organizational pattern that sustains long-running technical investment. The teams that complete multi-year refactors have made specific behavioral commitments that are different from the teams that do not: explicit capacity protection, visible progress metrics, and regular reviews that either advance or explicitly retire the refactor work.
+
+## Protected capacity allocation
+
+The capacity protection mechanism is simple: a sprint planning rule that reserves 10-20 percent of engineering capacity for refactor work before product stories are added. For a 5-engineer team running 2-week sprints, this is 5-10 engineer-days per sprint that go to refactor work before any product story is considered.
+
+This allocation is not flexible. "We will do refactor work if we have capacity" is not capacity protection -- it is wishful thinking. The allocation is protected in the same way as on-call rotation or CI maintenance: it is a fixed cost of operating a healthy engineering team, not a discretionary investment.
+
+Engineering leadership communicating this to product stakeholders: "10 percent of our engineering capacity is allocated to infrastructure health work. This allocation is what prevents the velocity degradation we have seen on similar codebases. It is not negotiable during sprints, but it is subject to quarterly review of its scope and priority."
+
+The framing matters. "We are spending engineering time on tech debt" invites the response "why aren't you spending it on features?" "We are investing 10 percent of capacity to maintain the infrastructure that the next two years of features will run on" invites a different conversation.
+
+## The strangler fig in practice
+
+The strangler fig pattern is the practical technique that makes the capacity protection sustainable. It means every increment of refactor work produces a deployable result -- there is no "work in progress" that blocks deployment.
+
+**Example: migrating from a callback-based API to async/await.**
+
+Do not: rewrite all handlers at once in a branch that grows for three weeks and produces merge conflicts with ongoing product development.
+
+Do: migrate one handler per sprint, deploy after each migration, and track progress as "handlers migrated this sprint" in the sprint review. After 20 sprints, all handlers are migrated.
+
+**Example: migrating from JavaScript to TypeScript.**
+
+Do not: convert all files to TypeScript in a two-week project.
+
+Do: configure TypeScript to allow both `.js` and `.ts` files, convert files to TypeScript when they are modified for product reasons, and periodically convert orphan files that have not changed recently. Track progress as "percentage of files with TypeScript coverage." The migration runs alongside product development -- every feature change is an opportunity to migrate the files it touches.
+
+**Example: migrating from a legacy auth system to a new one.**
+
+Do not: replace the entire auth system in one deployment.
+
+Do: implement the new auth system alongside the old one, migrate endpoints one at a time using feature flags, monitor error rates after each migration, and retire the old system when all endpoints have been migrated.
+
+The strangler fig means the refactor never requires a "stop product work for two weeks" conversation. Every increment is small enough to ship in a sprint, and every increment moves the metric.
+
+## The visibility mechanism
+
+The refactor metric should appear in every sprint review, alongside feature delivery. The format:
+
+- **Sprint 14 refactor progress:** TypeScript migration: 67% of files (up from 61%). Auth migration: 45% of endpoints migrated (up from 38%). Remaining estimate: 8 sprints.
+
+This visibility has two effects: it keeps the refactor work from becoming invisible (and therefore from becoming the first thing cut when sprint priorities compete), and it gives engineering leadership the data to communicate progress to product stakeholders who are paying for the allocation.
+
+The metric should be chosen before the refactor starts and should be durable -- the same metric tracked for the duration of the refactor, not changed when it is inconvenient. "Lines of legacy code remaining" is a bad metric because it can decrease without meaningful progress. "Percentage of endpoints migrated to the new auth system" is a good metric because it directly measures the completion of the defined work.
+
+## Quarterly scope review
+
+Every quarter, the engineering lead and the tech lead review the refactor:
+
+1. Is the capacity allocation being honored? If refactor work was displaced in more than two sprints this quarter, why, and what changes to prevent recurrence?
+2. Is the technical approach still correct? Have we learned something about the codebase that suggests a different approach would be faster or lower-risk?
+3. Has the business context changed in a way that affects the priority? Is there a new product direction that makes this refactor more or less valuable?
+4. What is the updated completion estimate, and is the remaining work still worth the investment?
+
+The quarterly review is the mechanism for making explicit decisions about refactor investment rather than letting the refactor drift to zero by accumulated implicit de-prioritization. If the review concludes that the refactor is no longer worth the investment, the decision is made explicitly and the work is formally retired -- leaving the team to focus on other priorities without the weight of an unfinished refactor.
+
+## Common mistakes teams make with multi-year refactors
+
+1. Starting the refactor without a visible progress metric. A refactor with no metric has no accountability. The work continues until it does not, and nobody can say definitively whether progress was made.
+2. Making the refactor a "background task" rather than an explicit allocation. "Engineers can work on refactor when they have spare capacity" is equivalent to "the refactor will not be completed." Spare capacity rarely accumulates in a product-focused engineering team.
+3. Planning the refactor as a single project with a defined end date instead of a continuous investment. The "we will spend Q3 cleaning up the codebase" approach stalls when Q3 arrives with a product deadline. The continuous 10-percent allocation survives product priority changes because it is never a large enough commitment to be cut entirely.
+4. Not communicating progress to product stakeholders. A refactor that is invisible to product leadership is easily de-prioritized when capacity conversations happen. Monthly or quarterly progress updates translate the technical work into business terms that protect the allocation.
+5. Declaring victory before the old system is fully retired. A refactor that is 90 percent complete but leaves the old and new systems running in parallel doubles the maintenance surface area. The last 10 percent of completion is the most important -- it is when the old system is retired and the benefit is realized.
+
+## Where to start: a 3-step multi-year refactor launch
+
+**Step 1: Define the completion metric before writing a line of refactor code.** "Percentage of modules using the new data access layer" or "percentage of endpoints with TypeScript type coverage" are measurable and durable. Define what 100% looks like and baseline the current percentage.
+
+**Step 2: Secure the capacity allocation in the sprint planning process before the first sprint.** Write it into the team's working agreement: "10 percent of engineering capacity is reserved for infrastructure health work each sprint." If the capacity cannot be protected in sprint planning, the refactor will not complete -- address this organizational question before starting the technical work.
+
+**Step 3: Schedule the first quarterly review for 90 days after the refactor starts.** Put it on the calendar now. The review forces the first accountability conversation at a time when progress is measurable and adjustments are still inexpensive.
+
+## The Refactor That Finishes
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I was brought in to advise on a JavaScript-to-TypeScript migration that had been "in progress" for 18 months and was 35 percent complete. The technical work was not the problem -- the engineers knew how to write TypeScript. The problem was that the migration had no protected allocation (it was done when capacity allowed), no visible metric (the 35 percent estimate came from a quick grep, not a tracked dashboard), and no quarterly review (it had never been formally assessed since it started). We introduced a 15 percent sprint allocation, a tracked metric on the sprint review dashboard, and a quarterly review schedule. Eight months later, the migration was at 94 percent -- more progress in 8 months than in the prior 18 months. The 18 months of slow progress were not caused by insufficient technical effort. They were caused by absent organizational structure. Adding the structure was not glamorous; it was the entire solution.
+
+## Related reading
+
+- [The Legacy Codebase: A Senior Engineer's Five Day Audit](/blog/the-legacy-codebase-a-senior-engineers-five-day-audit)
+- [The Migration That Ate the Roadmap](/blog/the-migration-that-ate-the-roadmap)
+- The Tech Debt Conversation: How to Explain It to Non-Technical Stakeholders
+- The Incremental Refactor: How to Modernize Without Stopping

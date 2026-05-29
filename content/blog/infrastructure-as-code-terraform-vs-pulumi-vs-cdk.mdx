@@ -1,0 +1,62 @@
+---
+slug: "infrastructure-as-code-terraform-vs-pulumi-vs-cdk"
+title: "Infrastructure as Code: Terraform vs Pulumi vs CDK"
+excerpt: "Terraform, Pulumi, and CDK all solve the same problem differently. The right choice depends on your team's language preferences, cloud targets, and how much you trust HCL. Here is a practical breakdown."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/infrastructure-as-code-terraform-vs-pulumi-vs-cdk"
+status: "published"
+definition: "Infrastructure as code is the practice of defining cloud resources in version-controlled files rather than through manual console clicks. Terraform, Pulumi, and AWS CDK are the three dominant tools for doing this, each with a different philosophy: Terraform uses its own declarative language, Pulumi uses general-purpose programming languages, and CDK uses TypeScript or Python to generate CloudFormation."
+faq: [
+  {"q":"Which IaC tool has the largest ecosystem in 2026?","a":"Terraform has the largest provider ecosystem, covering every major cloud and most third-party services. If you need to manage infrastructure across AWS, GCP, Azure, and tools like Cloudflare or Datadog in a single configuration, Terraform's provider library is the most complete option available."},
+  {"q":"When does Pulumi make more sense than Terraform?","a":"When your team is already writing TypeScript or Python and finds HCL syntax friction-heavy. Pulumi lets engineers write real code with loops, conditionals, and abstractions from the start. In my experience, teams that are already strong in a general-purpose language ship infrastructure faster with Pulumi than they do learning HCL."},
+  {"q":"Is AWS CDK only useful for AWS?","a":"Yes, CDK is AWS-native. It synthesizes to CloudFormation, which means it can only manage resources that CloudFormation supports. If you are fully committed to AWS and want to use TypeScript or Python with strong AWS constructs and L2 abstractions, CDK is excellent. If you have any multi-cloud requirements, it does not apply."},
+  {"q":"How does Terraform state management work and why does it matter?","a":"Terraform stores a state file that maps your configuration to the real cloud resources it created. The state file must be stored remotely and locked during applies to prevent concurrent modifications. In practice this means setting up an S3 bucket and DynamoDB table for state, or using Terraform Cloud. State management is the part of Terraform that trips up new teams most often."},
+  {"q":"Can I mix IaC tools in the same project?","a":"Yes, though it adds complexity. Some teams use Terraform for foundational infrastructure like VPCs, databases, and IAM roles, while using CDK or Pulumi for application-layer resources that change more frequently. The tools can coexist as long as they are managing different resources and not trying to modify the same ones."}
+]
+---
+
+## What you need to know
+
+- Terraform is the default choice for teams that need multi-cloud coverage, a large provider ecosystem, and broad community support. HCL is a tradeoff: simpler for infrastructure descriptions, but limited for complex logic.
+- Pulumi is the right choice when your team finds HCL limiting and wants to write real programming logic against cloud APIs. It supports TypeScript, Python, Go, and others.
+- AWS CDK is a strong choice for AWS-only shops that want to write TypeScript or Python and leverage the L2 construct library, which provides sensible defaults for complex resources like ECS services and RDS clusters.
+- State management is the operational overhead that all three tools require. The tooling for managing and protecting state differs and should be evaluated as part of the adoption decision.
+- The switching cost between these tools is significant. Choose based on your team's existing strengths and long-term cloud strategy, not hype cycles.
+
+## The core argument
+
+The IaC decision is really a language decision wrapped in an infrastructure question. All three tools can provision the resources you need. The practical differences are in how you express your intent, how readable the result is for a team member who did not write it, and how well the tool handles the complexity of your environment six months from now when the infrastructure has grown substantially.
+
+Terraform's HCL is purpose-built for infrastructure descriptions. It is readable, declarative, and forces a clean separation between resource definitions and logic. The limitation is that HCL is not a general-purpose language, so when you need conditional logic, dynamic resource counts, or shared abstractions, you end up in module and workspace patterns that become complex. The state management workflow is also its own operational responsibility: you need a remote backend, locking, and careful discipline around plan and apply commands in a team environment. That said, the provider ecosystem is unmatched, and if you are working with more than one cloud provider or many third-party services, Terraform covers the surface area that Pulumi and CDK do not.
+
+Pulumi and CDK both use real programming languages, which means the full capability of those languages is available for expressing infrastructure: typed interfaces, loops, functions, and libraries. In my experience, teams that already know TypeScript adopt CDK or Pulumi faster than they learn HCL, and they end up with infrastructure code that follows the same conventions as their application code. CDK specifically has a strong advantage on AWS: the L2 constructs package sensible defaults for complex resources and significantly reduce the boilerplate compared to writing CloudFormation directly. If your team is AWS-only and TypeScript-first, CDK is the most productive path. If you need multi-cloud or want to avoid CloudFormation's limitations, Pulumi gives you the same language benefits without the AWS lock-in.
+
+## Common mistakes
+
+1. **Storing Terraform state locally.** Local state works for solo experimentation but is unusable for a team. Set up remote state in S3 with DynamoDB locking before the first shared infrastructure apply. Retrofitting remote state after the fact is a painful migration.
+
+2. **Not using workspaces or stacks for environment separation.** Production and staging infrastructure should live in separate state contexts. A single Terraform workspace or Pulumi stack covering multiple environments is a blast radius problem waiting to happen.
+
+3. **Importing existing resources instead of rebuilding them with IaC.** The import workflow is useful for adopting IaC incrementally, but importing complex manually-created resources often results in state that is difficult to reason about. Rebuild new resources with IaC where possible and import only what you cannot recreate.
+
+4. **Over-abstracting with modules too early.** Custom Terraform modules and CDK constructs add complexity. Build flat, explicit configurations for the first version. Abstract when the repetition is clear and stable, not in anticipation of hypothetical reuse.
+
+5. **Not pinning provider and tool versions.** An infrastructure apply that uses a different provider version than the one that originally created the resource can produce unexpected diffs or errors. Pin provider versions in the configuration and update them deliberately.
+
+## Where to start
+
+1. **Pick the tool based on your team's language affinity and cloud targets.** AWS-only and TypeScript team: CDK. Multi-cloud or GCP/Azure heavy: Terraform. Team that knows Python well and wants flexibility: Pulumi. Do not pick the tool you read about last week; pick the one your team will maintain.
+
+2. **Set up remote state before writing any real infrastructure.** For Terraform: S3 bucket plus DynamoDB table, configured in the backend block before the first apply. For Pulumi: the Pulumi Cloud backend or an S3-backed self-hosted option. This step is required for team use.
+
+3. **Start with the networking layer.** VPC, subnets, security groups, and IAM roles are the foundation everything else depends on. Getting these right in IaC first establishes the pattern for the rest of the infrastructure.
+
+## Related reading
+
+- Docker Compose to Kubernetes: When to Make the Jump
+- CI/CD Pipeline Design That Scales Past Ten Engineers
+- Cloud Cost Optimization: A Practical Checklist
+- Monorepo vs Multi-Repo: A Decision Framework

@@ -1,0 +1,62 @@
+---
+slug: "routing-patterns-that-survive-real-world-use"
+title: "Routing Patterns That Survive Real World Use"
+excerpt: "Routing decisions made in the first week of a project affect the application for years. Here are the patterns that hold up as requirements grow and the anti-patterns that produce messy rewrites."
+date: "2026-05-23"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 6
+ogImage: "/api/og/blog/routing-patterns-that-survive-real-world-use"
+status: "published"
+definition: "Web application routing is the system that maps URLs to the components or pages that should be rendered, and manages navigation state between pages. Routing patterns determine how URLs are structured, how route parameters are typed and validated, how nested layouts are shared across routes, how loading and error states are handled during navigation, and how route guards (authentication, authorization) are applied. Good routing patterns are navigable by URL, bookmarkable, shareable, and consistent with the user's browser navigation expectations."
+faq: [
+  {"q":"What makes a URL structure good versus bad?","a":"A good URL structure is: predictable (users can guess the URL for a resource), hierarchical (URLs reflect the data model or application hierarchy), stable (URLs do not change when the backend changes), and human-readable (words, not UUIDs in paths). An order detail page at /orders/123 is better than /app/d?id=123&type=order. The first URL is bookmarkable, shareable, works with browser history, and can be linked from support tickets. The second breaks frequently, is not human-readable, and does not work as a deeplink. Establishing URL structure conventions early prevents the URL chaos that accumulates in long-lived applications."},
+  {"q":"How should authentication guards be implemented in a React Router application?","a":"Authentication guards should redirect unauthenticated users to the login page with the intended destination URL preserved (redirect to /login?next=/dashboard so they return to the right page after login). In React Router v6, this is typically implemented as a wrapper component that checks the authentication state and renders either the protected routes or a Navigate component. The guard should be applied at the layout level so all nested routes are protected without repeating the check on every individual route. Session expiration handling (detecting a 401 response and redirecting to login) should also be in the route guard, not in individual page components."},
+  {"q":"What is nested routing and why does it improve code organization?","a":"Nested routing allows child routes to render within a parent route's layout, sharing the parent's navigation, sidebar, header, and other structural elements without duplicating them on every child page. In React Router v6 and Next.js App Router, nested layouts are a first-class feature: a dashboard layout can define the sidebar and top navigation, and all /dashboard/* routes render their content within that layout. This eliminates the repetition of layout components on every page and ensures consistent navigation across the application. Without nested routing, layout components are either duplicated or centralized in a single layout file that becomes a God component."},
+  {"q":"How do you handle route parameters and query strings consistently?","a":"Route parameters (/users/:userId) should be used for resources that identify specific entities. Query strings (?filter=active&sort=name) should be used for search parameters, filters, and sort state that modify what is shown without identifying a specific resource. Treat query string state as derived view state that should survive a page refresh: if the user refreshes the page with filters applied, the filters should be preserved. Libraries like nuqs (for Next.js) and the useSearchParams hook provide tools for managing URL query string state with type safety and serialization. Avoid storing volatile UI state (whether a modal is open, which accordion panel is expanded) in the URL; use URL for persistent, shareable state only."},
+  {"q":"What are the performance implications of client-side routing versus server-side rendering?","a":"Client-side routing (SPA-style navigation) transitions between pages without a full page reload, which provides fast navigation but requires the entire application bundle to be loaded upfront. Server-side rendering (Next.js App Router, Remix) renders each page on the server, which reduces the initial JavaScript bundle size and improves LCP for first-time visitors but requires a network round trip for navigation. The hybrid approach (Next.js with partial hydration) renders pages on the server for the initial load and uses client-side routing for subsequent navigation. For most SaaS products, the hybrid approach provides the best combination of initial load performance and subsequent navigation speed."}
+]
+---
+
+## What you need to know
+
+- URL structure should reflect the data hierarchy and be stable. URLs that change when the backend changes break bookmarks, links, and user trust.
+- Authentication guards belong at the layout level, not repeated on every page component. Use the route structure itself to define protected areas.
+- Nested routing enables shared layouts without code duplication. Use it for any section of the app with a consistent navigation structure.
+- Query string state should be synchronized with the URL for any filter, sort, or view state the user expects to survive a page refresh or share via link.
+- Routing conventions established early are hard to change later. Agree on URL structure and parameter conventions before the first feature is built.
+
+## The core argument
+
+Routing is one of the foundational decisions in a web application that compound over time. An application with inconsistent URL structure (some pages use query strings for IDs, others use path parameters, some are nested, others are flat) accumulates navigation bugs, deeplink failures, and analytics inconsistencies that are expensive to fix after they are entrenched.
+
+The routing decisions that matter most are the early ones. URL structure conventions (how IDs appear in paths, how filters appear in query strings, how nested routes are organized) are visible in every link, every bookmark, every analytics event, and every support ticket. Changing them after users have linked to them breaks those links. Establishing the right conventions at the start is one of the highest-leverage architectural decisions in a web application.
+
+The pattern that works well for SaaS applications: path-based routing for resource hierarchy (/dashboard, /users/:id, /orders/:id/items), query string state for view configuration (?filter=active&sort=created_at), persistent layout components at the route group level, authentication guards at the protected route group level, and loading states handled by the route's suspense boundaries or loading components rather than scattered through individual page components.
+
+## Common mistakes
+
+1. **Using numeric IDs in URLs without considering ID enumeration.** A URL like /orders/12345 exposes that there are at least 12,345 orders and allows enumeration of sequential IDs. Use UUID or random IDs in public URLs for resources that should not be enumerable. Sequential IDs are acceptable for internal admin tools where enumeration is not a security concern.
+
+2. **Storing authentication state in localStorage and checking it client-side only.** Authentication that is only checked in client-side JavaScript allows users to bypass the check by manipulating localStorage. Authentication guards should verify the session server-side (in middleware, API routes, or getServerSideProps) in addition to any client-side redirect. Client-side guards are a UX convenience; server-side guards are the security boundary.
+
+3. **Not preserving the destination URL after login.** An authentication guard that redirects to the login page without preserving the intended destination forces users to navigate back to where they were after logging in. Preserve the intended URL in a redirect query parameter and use it after successful authentication to send the user to the right place.
+
+4. **Using the same route for create and edit operations.** Routes like /users/new and /users/:id/edit can share a form component, but they represent different operations with different data loading requirements (new has no existing data, edit must load the existing record). Route-level separation makes the data loading intent explicit and prevents subtle bugs where the edit form renders before the data loads.
+
+5. **Not handling 404 and error routes.** Every web application needs a 404 route for URLs that do not match any route, and error boundaries for routes that fail to load. Default browser 404 pages and unhandled route errors produce jarring user experiences. Implement custom 404 and error pages that match the application's design and provide navigation back to functional areas.
+
+## Where to start
+
+1. **Define the URL structure for the core application entities before writing routes.** For each major entity (users, orders, products, whatever your domain has), decide: what is the list URL, what is the detail URL, what is the edit URL, and how are filters and sort state represented. Document this as a routing convention reference before building the first route.
+
+2. **Create route groups for protected and public areas.** In Next.js App Router, route groups (folders with names in parentheses) allow applying different layouts and middleware to different sections of the application without affecting the URL structure. Create protected and public route groups from the start, even if the protected group only contains the dashboard initially.
+
+3. **Implement loading and error states at the route level, not the component level.** React Router's loaders and Next.js App Router's loading.tsx and error.tsx files handle loading and error states for entire routes. Using these route-level constructs instead of per-component loading states produces consistent loading behavior and reduces the amount of loading state management code in individual components.
+
+## Related reading
+
+- [Next.js vs Remix vs Astro vs Nuxt in 2026](/blog/next-js-vs-remix-vs-astro-vs-nuxt-in-2026)
+- [React Query vs SWR vs RTK Query](/blog/react-query-vs-swr-vs-rtk-query)
+- [OAuth 2.0 Without Tears: A Founder Engineer's Guide](/blog/oauth-2-0-without-tears-a-founder-engineers-guide)
+- [Real Time Collaboration: A Web App Engineering Primer](/blog/real-time-collaboration-a-web-app-engineering-primer)

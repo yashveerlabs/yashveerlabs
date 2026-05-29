@@ -1,0 +1,78 @@
+---
+slug: "the-bug-bounty-decision-when-you-are-ready-when-you-are-not"
+title: "The Bug Bounty Decision: When You Are Ready, When You Are Not"
+excerpt: "How to decide if your SaaS is ready for a bug bounty program, what readiness actually looks like, and what happens when you launch one too early."
+date: "2025-05-16"
+category: "Security, Auth, and Compliance"
+tags: ["security","bug-bounty","compliance","vulnerabilities"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-bug-bounty-decision-when-you-are-ready-when-you-are-not"
+status: "published"
+definition: "A bug bounty program invites security researchers to find vulnerabilities in your system in exchange for payment or recognition. Run one when you are ready and it strengthens your security posture. Run one before you are ready and you are paying people to find problems you already knew existed. The readiness decision is the decision."
+faq: [
+  {"q":"What is the minimum security posture before launching a bug bounty?","a":"You need a completed internal security audit, a documented vulnerability disclosure process, the ability to triage and respond to reports within 72 hours, and a budget for bounty payouts. If any of these are not in place, a bug bounty program will create obligations you cannot fulfill, which damages your reputation with security researchers."},
+  {"q":"What is the difference between a vulnerability disclosure program and a bug bounty?","a":"A vulnerability disclosure program (VDP) tells researchers how to report vulnerabilities to you. A bug bounty pays researchers for valid findings. Most companies should start with a VDP. A bug bounty adds financial incentive and is appropriate once you have validated that your internal triage process works."},
+  {"q":"How much should I pay for bug bounty findings?","a":"Scope the payout to the severity of the finding. Critical vulnerabilities (remote code execution, authentication bypass, data exposure) warrant 1000 to 10000 dollars. High vulnerabilities (CSRF, stored XSS, IDOR) warrant 500 to 2500 dollars. Medium and low findings warrant 100 to 500 dollars. Set the ranges before you launch and publish them."},
+  {"q":"Should I use a managed bug bounty platform or run my own?","a":"Start with a platform for the first 12 months. HackerOne, Bugcrowd, and Intigriti provide researcher vetting, report management, and legal protection that is expensive to build yourself. Move to a self-managed program only once you have the internal processes to handle 50 or more reports per month."},
+  {"q":"What do I do when a researcher finds a critical vulnerability through the program?","a":"Fix it within 24 hours, notify the researcher, and schedule a disclosure date 90 days out. The 90-day window is industry standard. It gives you time to fix, test, and communicate to affected customers before the researcher goes public."}
+]
+---
+
+## What you actually need to know
+
+- A bug bounty program is not a substitute for internal security testing. It is a complement to it.
+- Launch a VDP (vulnerability disclosure program) first. Add payment when the internal process is proven.
+- The readiness signal is: can you triage and respond to security reports within 72 hours? If not, wait.
+- Out-of-scope vulnerabilities need to be defined explicitly before launch. Scope confusion wastes researcher time and damages the program.
+- Platforms like HackerOne and Bugcrowd provide infrastructure that is worth the fee for programs under two years old.
+
+| Program Type | Cost | Researcher Volume | Management Burden |
+|---|---|---|---|
+| No program | Zero | Zero | Zero |
+| Vulnerability disclosure program | Zero | Low | Low |
+| Managed bug bounty platform | Platform fee plus payouts | Medium | Low |
+| Private bug bounty | Payouts only | Low to medium | Medium |
+
+## The core argument
+
+Bug bounty programs have a reputation for being a sign of security maturity. That reputation is earned when the program is run well and misleading when it is not. A public bug bounty program that receives reports and responds slowly, or that has poorly defined scope, or that has no triage capacity, is worse for the company's security posture than having no program at all. Researchers who report to a poorly run program move on to other targets. The vulnerabilities they would have found remain unfound.
+
+The decision to run a bug bounty is a commitment to respond. Every report that comes in needs triage within 72 hours: is it valid? Is it in scope? What is the severity? The triage decision determines the reward, which determines whether the researcher trusts your program. Researchers who feel respected submit more reports. Researchers who feel ignored do not come back and sometimes disclose publicly without waiting for the fix.
+
+The right sequence is: internal security audit, then VDP, then bug bounty. The internal audit catches the obvious vulnerabilities before you invite external researchers. The VDP proves that the internal process can handle reports without paying for them. The bug bounty adds financial incentive once the process is validated.
+
+## The readiness checklist
+
+Before launching a bug bounty program, confirm these conditions are met.
+
+**Internal audit complete.** At least one structured security review of the application, covering OWASP Top Ten, authentication, authorization, and data access controls. External pen test preferred but not required.
+
+**Triage capacity.** At least one person who can review security reports and respond within 72 hours. Not after the report is 5 days old. Within 72 hours.
+
+**Documented scope.** A clear in-scope and out-of-scope definition. What systems are in scope? What vulnerability classes are in scope? What is the responsible disclosure window? What is excluded?
+
+**Budget approved.** A line item in the budget for bug bounty payouts. Estimate based on the severity ranges you publish and the likely volume for your application's attack surface.
+
+**Legal review complete.** Safe harbor language that protects researchers who act in good faith. Consult a lawyer. The exact language matters.
+
+## Common mistakes teams make
+
+1. Launching a public bug bounty before completing an internal security audit. Researchers will find the same issues the audit would have found, except you will pay for them.
+2. Setting a vague or overly broad scope. "Our entire application" is not useful scope. List the specific domains and systems that are in scope.
+3. Not having a response SLA defined. If you say you will respond in 72 hours, hold that commitment. Missed SLAs are how you lose researcher trust.
+4. Not publishing payout ranges before the program launches. Researchers want to know what they are working for before they invest time.
+5. Treating security reports like support tickets. Security reports need a dedicated queue, a dedicated triage owner, and a different response velocity.
+
+## Where to start: a 3-step bug bounty launch plan
+
+**Step 1: Launch a VDP this month.** Write a simple security.txt file at your domain's /.well-known/security.txt. Publish a security disclosure policy on your website. This tells researchers how to reach you and sets expectations. It costs nothing and creates no obligations.
+
+**Step 2: Triage the first three reports manually.** When reports come in through the VDP, triage them manually. How long does it take? How difficult is the process? If you can consistently respond in under 72 hours, your process is ready for a paid program.
+
+**Step 3: Set the scope and payout table before you launch the paid program.** Write the in-scope and out-of-scope definitions. Write the payout table with severity ranges and dollar amounts. Have legal review the safe harbor language. Then launch on a platform.
+## Related reading
+
+- [Vulnerability Disclosure Programs: Why Even Small Teams Need One](/blog/vulnerability-disclosure-programs-why-even-small-teams-need-one)
+- [Building a Security Program From Zero: A Twelve Month Plan](/blog/building-a-security-program-from-zero-a-twelve-month-plan)
+- [Penetration Testing for Startups: Cost, Scope, and Cadence](/blog/penetration-testing-for-startups-cost-scope-and-cadence)
+- [The Security Gap: How One Missing SOC 2 Control Kills Your Enterprise Deal](/blog/the-security-gap-how-one-missing-soc-2-control-kills-your-enterprise-deal)

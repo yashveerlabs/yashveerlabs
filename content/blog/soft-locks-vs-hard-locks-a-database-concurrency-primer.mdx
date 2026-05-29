@@ -1,0 +1,67 @@
+---
+slug: "soft-locks-vs-hard-locks-a-database-concurrency-primer"
+title: "Soft Locks vs Hard Locks: A Database Concurrency Primer"
+excerpt: "Concurrency bugs are among the hardest to reproduce and the most expensive to fix. Here is how locking actually works."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["database","concurrency","saas","postgres","locking"]
+readingMinutes: 7
+ogImage: "/api/og/blog/soft-locks-vs-hard-locks-a-database-concurrency-primer"
+status: "published"
+faq: [
+  {"q":"What is a lost update?","a":"Two transactions read the same value (say, a balance of 100), both decide to deduct 10, and both write back 90. The correct result is 80. This is the lost update problem: one transaction's modification is silently overwritten by the other."},
+  {"q":"When should I use SELECT FOR UPDATE vs optimistic locking?","a":"Use SELECT FOR UPDATE when the conflict is expensive to retry (payments, inventory deductions, resource allocation). Use optimistic locking when conflicts are rare and retry is cheap (collaborative editing, settings updates, bulk operations)."},
+  {"q":"Does PostgreSQL Serializable isolation handle all concurrency cases?","a":"Serializable isolation prevents all write-skew anomalies but at the cost of more aborted transactions and retry overhead. It is the safest option but requires your application to handle serialization failures by retrying. It is appropriate for financial systems where correctness is non-negotiable."},
+  {"q":"What is a deadlock and how do you recover from one?","a":"A deadlock occurs when two transactions are each waiting for the other to release a lock. PostgreSQL detects deadlocks and aborts one transaction automatically (the one with the lighter write load). Your application needs to catch the deadlock error and retry."},
+  {"q":"Can Redis be used for locking instead of the database?","a":"Redis distributed locks (Redlock pattern) are appropriate for coordinating work across application instances in scenarios where database-level locking does not apply (rate limiting, job deduplication, webhook processing). They should not replace database-level locks for operations that modify database state, because the Redis lock and the database write are not atomic."}
+]
+---
+
+# Soft Locks vs Hard Locks: A Database Concurrency Primer
+
+**Optimistic locking (often called "soft locking") assumes conflicts are rare and validates at commit time by checking whether data changed since it was read. Pessimistic locking (often called "hard locking") assumes conflicts are common and acquires an exclusive lock when reading, blocking other transactions from modifying the row until the lock is released. Most SaaS applications benefit from optimistic locking for most operations and pessimistic locking for a small number of high-contention scenarios.**
+
+## What you need to know
+
+- Optimistic locking uses a version number or timestamp to detect conflicting updates; if two users update the same row simultaneously, one wins and the other gets a conflict error
+- Pessimistic locking uses SELECT FOR UPDATE to hold a row lock; other transactions trying to update the same row block until the lock is released
+- Deadlocks occur when two transactions each hold a lock the other needs; proper lock ordering and short transaction durations prevent most deadlocks
+- PostgreSQL's default transaction isolation level (Read Committed) does not prevent all race conditions; write-skew anomalies require Serializable isolation or explicit locking
+- The most common SaaS concurrency bug is the "lost update": two reads of the same data followed by two writes, where the second write silently overwrites the first
+
+## The core argument
+
+Most SaaS teams do not think about concurrency until they have their first concurrency bug in production. The bug usually surfaces as inconsistent data: an inventory count that goes negative, a double-booking in a scheduling system, a credit balance that was charged twice. The root cause is almost always the same pattern: two transactions read the same data, both decide to modify it, and the second write silently overwrites the first.
+
+The optimistic approach adds a version column to rows that need conflict protection. When you read a row, you read the version. When you write it back, your UPDATE includes WHERE id = ? AND version = ?. If another transaction modified the row between your read and your write, your version check fails and you get zero rows updated. You then retry with the fresh data or surface an error to the user. This is the right approach for most collaborative editing scenarios, where conflicts are possible but not the common case.
+
+The pessimistic approach holds a database-level lock from the moment you read the row until the transaction commits or rolls back. In PostgreSQL: SELECT id, credits FROM accounts WHERE id = 1 FOR UPDATE. Any other transaction that tries to SELECT FOR UPDATE the same row will wait. This is the right approach for operations where the window for a conflict is very short and retrying is expensive. Payment processing is the classic example: when you debit an account, you want to hold the lock while you verify the balance, debit it, and record the transaction. The brief blocking is acceptable; a double-debit is not.
+
+For Nexli's fee processing logic, I use pessimistic locking. When a school processes fee payments, the code acquires a FOR UPDATE lock on the fee record before modifying it. The window where a concurrency bug could create a double-payment is too expensive to handle with optimistic retry. The lock is held for milliseconds during a single transaction; the blocking risk is negligible compared to the integrity risk.
+
+## Common mistakes
+
+1. **Assuming database transactions solve all concurrency problems.** They do not. Read Committed isolation (Postgres default) still allows lost updates. You need optimistic or pessimistic locking for operations where concurrent modification is a correctness concern.
+
+2. **Holding long transactions while doing non-database work.** Pessimistic locks are held for the duration of a transaction. Calling an external API, sending an email, or doing CPU-intensive work inside a locked transaction holds the lock for the full duration. This blocks other transactions and degrades throughput.
+
+3. **Not handling optimistic lock conflicts gracefully.** Optimistic locking only works if the conflict is handled: retry with fresh data, or surface a "someone else modified this" message to the user. Silently ignoring the conflict error means treating an update failure as a success.
+
+4. **Lock ordering inconsistency causing deadlocks.** If Transaction A locks row 1 then row 2, and Transaction B locks row 2 then row 1, you get a deadlock. Consistent lock ordering (always lock in the same order across transactions) prevents most deadlocks.
+
+5. **Using application-level locks instead of database locks.** Redis distributed locks or in-memory mutexes do not protect against concurrent database writes from multiple application instances. Database locks are enforced at the storage layer and are the only reliable option for database concurrency control.
+
+## Where to start
+
+1. **Identify the write operations in your codebase that could produce inconsistent results if two transactions ran simultaneously.** Payment processing, inventory adjustment, credit allocation, counter increments. These are the candidates for locking.
+
+2. **Add a version column to tables where optimistic locking applies.** Rows that multiple users might edit simultaneously (documents, records, settings) benefit from a version column and an optimistic update pattern.
+
+3. **Audit for lost update patterns.** Look for code that follows the read-modify-write pattern without a version check or FOR UPDATE. Each instance is a latent concurrency bug waiting for enough traffic to reproduce.
+
+## Related reading
+
+- [The Idempotency Problem: Why It Is Bigger Than You Think](/blog/idempotency-in-api-design-why-it-matters-more-than-you-think)
+- [Database Query Performance: The Five Patterns That Hurt the Most](/blog/database-query-performance-the-five-patterns-that-hurt-the-most)
+- [PostgreSQL Performance at Scale: The Tweaks That Move the Needle](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle)
+- [ACID vs BASE: When Each Belongs in Your Architecture](/blog/acid-vs-base-when-each-belongs-in-your-architecture)

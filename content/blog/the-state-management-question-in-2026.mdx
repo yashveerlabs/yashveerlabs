@@ -1,0 +1,121 @@
+---
+slug: "the-state-management-question-in-2026"
+title: "The State Management Question in 2026"
+excerpt: "Working notes on the state management question in 2026. Written for founders, engineers, and operators who want a clear read on web app and frontend development from someone who has shipped the work."
+date: "2025-11-06"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-state-management-question-in-2026"
+status: "published"
+definition: "State management in React has fragmented into several credible answers, each suited to a different kind of problem. The choice in 2026 is not Redux versus Zustand. It is a question of what kind of state you have, where it lives, and whether a library is even the right tool. Most teams over-architect this early and pay for it later."
+faq: [
+  {"q":"Do I still need Redux for a new React project in 2026?","a":"For most new projects, no. Redux earned its place in large apps with complex shared state and time-travel debugging needs. Zustand and Jotai cover most of those cases with less boilerplate. Redux Toolkit has made Redux less painful, but the mental model overhead is rarely worth it for greenfield work at startup scale."},
+  {"q":"What is the difference between Zustand and Jotai for React state management?","a":"Zustand is store-centric. You define a store object and components subscribe to slices of it. Jotai is atom-centric. You define individual atoms of state and compose them. Zustand fits apps that think in terms of global stores. Jotai fits apps that want fine-grained reactivity without re-render sprawl."},
+  {"q":"Should I use React Query or SWR for server state in 2026?","a":"Both are solid. React Query has more features, better devtools, and handles mutations and cache invalidation in a more explicit way. SWR is lighter and has a simpler API. For most apps, React Query is the stronger default. For apps that mostly need data fetching with automatic revalidation, SWR does the job cleanly."},
+  {"q":"When is React Context the right tool for state management?","a":"Context is good for state that changes infrequently and is consumed by many components: theme, locale, current user, feature flags. It is not good for high-frequency state updates because it re-renders every consumer. Teams that use Context for form state or filter state usually regret it within a few months."},
+  {"q":"How does the App Router change the state management question?","a":"Significantly. Server Components own more of the data fetching layer. Client-side state management shrinks because more state lives on the server and flows down as props or streaming HTML. The apps that lean into Server Components genuinely need less client-side state tooling. The apps that stay client-heavy still need the full toolkit."},
+  {"q":"What state management library should I use with Next.js App Router?","a":"Zustand for global client state, React Query or SWR for server state you need on the client, and URL state via useSearchParams for filters and pagination. React Context for app-wide config that changes infrequently. The stack is lighter than what most teams were running five years ago."},
+  {"q":"How do I prevent unnecessary re-renders when using global state in React?","a":"Use selectors. In Zustand, subscribe to only the slice of the store a component needs. In Jotai, use derived atoms. In Context, split contexts by update frequency. The root cause of re-render sprawl is almost always components subscribing to more state than they use."}
+]
+---
+
+## What you actually need to know
+
+- Server Components have genuinely shrunk the client-side state problem for App Router apps.
+- Zustand and Jotai have replaced Redux for most new projects. The mental model is lighter and the results are the same.
+- React Query and SWR own server state. Mixing server state into a global store is a pattern worth avoiding.
+- URL state is real state. Filters, pagination, and sort order belong in the URL, not in a store.
+- In my experience, most teams over-invest in state tooling early and spend months undoing it.
+
+| Tool | Best for | Watch out for |
+|---|---|---|
+| Zustand | Global client state, cross-component sharing | Not a server state solution; keep it for UI state |
+| Jotai | Fine-grained atom state, derived state without re-renders | Atom proliferation can get messy without discipline |
+| Redux Toolkit | Large teams, established codebases, strong devtools need | Overhead rarely justified on new greenfield apps |
+| React Query / SWR | Server state, caching, background revalidation | Not a replacement for global UI state |
+| React Context | App config, theme, auth, infrequently changing values | Re-render cost kills it for high-frequency state |
+| URL state | Filters, pagination, tab selection, search | Needs discipline to keep in sync with UI |
+
+## The core argument
+
+State management is a category, not a tool. The question is not which library to use. The question is what kind of state you have. Server state and client state are different problems. Routing state and ephemeral form state are different problems. A team that answers the category question first makes better library choices.
+
+Server state is state that lives on the server and gets fetched over the network. It has a loading state, an error state, a stale state, and a refetch requirement. React Query and SWR were built for this. Putting server state into a global store like Redux or Zustand is not wrong, exactly, but it forces you to manage cache invalidation, loading states, and background refresh by hand. That is wheel re-invention.
+
+Client state is state that lives in the browser and is not persisted to a server. Modal open or closed. Selected tab. Sidebar collapsed. Filter values that affect display but not the URL. This is what Zustand and Jotai are built for. The libraries are light. The APIs are simple. There is no ceremony.
+
+URL state is the most underused category. The URL is the oldest global state store in web development. Filters, pagination, search queries, and tab selections belong in the URL because they survive page refresh, can be bookmarked, and can be shared. Teams that keep these values in a client store produce pages that reset on refresh and cannot be linked. The fix is to move them to URL params, which in Next.js means useSearchParams and router.replace.
+
+Context is not a state management solution. It is a dependency injection mechanism. It gets misused as a poor-person's Redux, and the re-render cost eventually becomes visible. Theme, locale, current user, and feature flags are the natural fit. Form state, filter state, and anything that updates on user input are not.
+
+## How state splits across a modern Next.js app
+
+### Server state
+
+Data fetched from an API or database. In App Router, much of this lives in Server Components and never touches the client state layer at all. For the data you do need on the client, React Query is the clearest answer in 2026. The devtools are good. The mutation patterns are explicit. The cache invalidation story is coherent.
+
+### Global UI state
+
+Things that multiple components care about: the current user's preferences, whether a modal is open, the state of a shared panel. Zustand is the right tool for this. A small store. Selectors to avoid unnecessary re-renders. No reducers, no dispatch.
+
+### Local component state
+
+useState and useReducer. Most state lives here and should stay here. The biggest mistake teams make is lifting state too early. If only one component needs a value, that component owns it.
+
+### Form state
+
+React Hook Form or TanStack Form. Neither belongs in a global store. Forms have their own lifecycle. The validation, submission, and error state are co-located with the form component. Lifting form state into a global store creates coupling that eventually breaks.
+
+## What it actually requires
+
+| State category | Recommended tool | Setup cost |
+|---|---|---|
+| Server data fetching | React Query or SWR | Low, one provider at the app root |
+| Global UI state | Zustand | Very low, one file per store |
+| Atom-based fine-grained state | Jotai | Very low, no provider needed |
+| URL filters and pagination | useSearchParams + router | Zero, built into Next.js |
+| Form state | React Hook Form | Low, per form |
+| Auth and config | React Context | Low, one context at the app root |
+
+## Features to demand from your state layer
+
+- Clear separation between server state and client state. They have different shapes and different tools.
+- Selectors everywhere. Components should subscribe to only the state they use.
+- Devtools support. Zustand has them. React Query has them. If you cannot inspect state in the browser, debugging is harder than it needs to be.
+- A clear owner for URL state. One hook or utility that all filter components use to read and write URL params.
+- A rule about Context. What goes in it, what does not, and why.
+- Documentation that a new team member can read in twenty minutes and understand the state boundaries.
+
+## Expert opinion
+
+> The teams that get state management right are the ones that ask "does this need to be global?" before reaching for a library. Most state does not. A surprising amount of what teams put into stores would be cleaner as URL state or local state. The complexity of a state layer grows with the number of things it manages. Keep it small on purpose.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+On a SaaS dashboard I built in late 2025, we started with Zustand for everything. Two months in, the store had grown to include server data, form state, filter values, and UI state. The component re-renders were frequent and the debugging sessions were long. We spent a week splitting it. Server data moved to React Query. Filter values moved to URL params. Form state moved into React Hook Form. The Zustand store shrank to about four UI flags. The app was faster and easier to reason about.
+
+For a different project, a marketing site with some interactive elements, the answer was no library at all. useState for the interactive bits, URL params for the filter, and Server Components for the data. The whole thing took an afternoon to wire up. The lesson was that the right state tool is sometimes no state tool.
+
+For more context on the broader architecture, [the App Router versus Pages Router migration decision](/blog/app-router-vs-pages-router-the-migration-decision) covers how the router choice affects the state question directly, and [the frontend architecture that survives three years of feature sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl) covers the broader sustainability frame.
+
+## Common mistakes teams make
+
+1. Using a global store for server state. Server state has its own lifecycle. A dedicated library handles it better.
+2. Putting form state into a global store. Forms are self-contained. The coupling breaks things later.
+3. Using Context for high-frequency updates. The re-render cost is real and it compounds.
+4. Not using URL state for filters and pagination. The result is pages that reset on refresh.
+5. Using Redux on a greenfield project because the team already knows it. Familiarity is a reason to choose a tool, but the overhead is worth examining before committing.
+6. No selectors in Zustand stores. Components that subscribe to the whole store re-render on every change.
+7. Lifting state too early. Local state should stay local until there is a concrete reason to move it.
+
+## A 30 day plan
+
+1. **Week one.** Audit the current state layer. List every piece of state by category: server, global UI, form, URL, local. Mark which tool currently owns it and whether that is the right tool.
+2. **Week two.** Move server data to React Query or SWR if it is currently in a global store. This is almost always the biggest win and the cleanest separation.
+3. **Week three.** Move filter and pagination values to URL params. Write one shared hook that all filter components use. Test that links are shareable and pages survive refresh.
+4. **Week four.** Clean up the remaining store. Add selectors to every store subscription. Document the state boundaries for the team.
+
+For deeper reading, [zustand vs redux vs jotai vs recoil vs context](/blog/zustand-vs-redux-vs-jotai-vs-recoil-vs-context) covers the library comparison in detail, and [tRPC vs REST vs GraphQL on the frontend](/blog/trpc-vs-rest-vs-graphql-on-the-frontend) covers the data fetching side of the same architecture question.

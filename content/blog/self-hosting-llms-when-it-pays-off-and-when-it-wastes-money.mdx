@@ -1,0 +1,62 @@
+---
+slug: "self-hosting-llms-when-it-pays-off-and-when-it-wastes-money"
+title: "Self Hosting LLMs: When It Pays Off and When It Wastes Money"
+excerpt: "Self-hosting LLMs sounds like cost control but often produces higher total cost and lower capability than commercial APIs. Here is when the economics work, when they do not, and what self-hosting actually requires in practice."
+date: "2026-05-23"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 6
+ogImage: "/api/og/blog/self-hosting-llms-when-it-pays-off-and-when-it-wastes-money"
+status: "published"
+definition: "Self-hosting LLMs refers to running open-source large language models (Llama, Mistral, Qwen, Gemma) on infrastructure controlled by the organization, rather than using commercial API services (OpenAI, Anthropic, Google). Self-hosting provides control over data residency, eliminates per-token API costs at high volume, and allows fine-tuning on proprietary data. The trade-off is GPU infrastructure cost, operational complexity, and typically lower model capability compared to frontier commercial models."
+faq: [
+  {"q":"What does self-hosting an LLM actually require in terms of infrastructure?","a":"Self-hosting a 7B parameter model requires a GPU with at least 16GB VRAM for inference in 4-bit quantization (a single A10G or RTX 3090). A 70B parameter model requires 80 to 160GB of VRAM, typically a multi-GPU setup or an A100/H100. Beyond the GPU, you need: an inference server (vLLM, Ollama, or TGI), a serving layer for request routing and scaling, monitoring for GPU utilization and inference latency, and operational capacity to manage the infrastructure. The GPU cost is the dominant factor: an A100 on AWS costs roughly $3 per hour; running 24/7 costs about $2,200 per month per GPU."},
+  {"q":"At what API usage volume does self-hosting become cheaper than commercial APIs?","a":"The break-even analysis depends on the model tier and usage pattern. For GPT-4-class models, commercial API pricing is roughly $5 to $15 per million input tokens. A self-hosted 70B model on a single A100 at $2,200 per month produces roughly 30 to 50 million tokens per month at moderate utilization. If the application uses more than 200 to 400 million tokens per month at GPT-4 pricing, self-hosting the equivalent-quality model saves money. For GPT-3.5-class tasks, the break-even is higher because commercial pricing for smaller models is significantly cheaper. Most SaaS products at under $50,000 per month in API costs are not saving money by self-hosting."},
+  {"q":"What are the data residency use cases that justify self-hosting regardless of cost?","a":"Data residency requirements that justify self-hosting: healthcare products where patient data cannot leave the organization's infrastructure under HIPAA; financial products where transaction data is subject to data localization laws; government or defense applications where data must remain in a specific jurisdiction; enterprise products where customers contractually require that their data not be processed by third-party AI services. In these cases, self-hosting is not a cost decision; it is a compliance decision. The relevant comparison is not self-hosting vs commercial API cost, but self-hosting vs losing the deal."},
+  {"q":"How do open-source models compare to frontier commercial models for production SaaS use cases?","a":"For most SaaS application use cases in 2026, well-quantized 70B open-source models (Llama 3.3 70B, Qwen 2.5 72B) perform comparably to GPT-3.5-class models on structured tasks, summarization, classification, and Q&A against provided context. For complex reasoning, multi-step agentic tasks, and code generation at frontier quality, commercial frontier models (GPT-4o, Claude Opus, Gemini Ultra) still lead. The practical question for each use case: what is the acceptable quality level? If GPT-3.5-class quality is sufficient, a self-hosted 70B model may be viable. If the use case requires frontier model quality, self-hosting is not a substitute."},
+  {"q":"What is fine-tuning and when does it justify the self-hosting investment?","a":"Fine-tuning trains a pre-existing model on domain-specific data to improve performance on narrow tasks without the cost of training from scratch. Fine-tuning a 7B model for a specific classification or extraction task can produce results that significantly outperform a much larger general-purpose model on that specific task. Self-hosting becomes economical for fine-tuning when: the application has a high-volume narrow task (tens of millions of requests per month), the domain is specialized enough that fine-tuning produces meaningful improvement, and the team has ML engineering capability to manage the fine-tuning pipeline. Without these conditions, prompt engineering against a commercial model is more cost-effective than fine-tuning infrastructure."}
+]
+---
+
+## What you need to know
+
+- Self-hosting LLMs is a GPU infrastructure project, not a configuration change. It requires dedicated GPU hardware, an inference server, and operational capacity.
+- The cost break-even vs commercial APIs is typically above $50,000 per month in equivalent commercial API spend for most SaaS products.
+- Data residency compliance is the strongest justification for self-hosting regardless of cost comparison.
+- Open-source 70B models are GPT-3.5-class for structured tasks. Frontier commercial model quality requires commercial APIs in 2026.
+- Fine-tuning justifies the infrastructure investment when the application has high-volume narrow tasks and the team has ML engineering capability.
+
+## The core argument
+
+The instinct to self-host LLMs usually comes from one of two places: wanting to avoid API costs, or wanting control over data. Both are legitimate motivations, but both are often addressed with the wrong solution. The cost motivation is undermined by the GPU infrastructure cost, which typically exceeds the API cost at the scale most SaaS products operate at. The data control motivation is legitimate, but for many products, contractual data processing agreements with commercial API providers may satisfy the requirement without the infrastructure overhead.
+
+The economics become clearer with numbers. A product spending $5,000 per month on OpenAI API calls would spend roughly $2,200 per month on a single A100 instance, plus engineering time to manage the inference infrastructure, plus the quality degradation from using a smaller model. The comparison is not simply cost per token; it is total cost of ownership including infrastructure management time. For a product at $5,000 per month in API spend, the financial case for self-hosting is weak. For a product at $50,000 per month, it begins to make sense with the right workload.
+
+The workloads where self-hosting makes practical sense in my experience: high-volume text classification and extraction where a fine-tuned smaller model outperforms a general model at lower latency; products with genuine data residency requirements that cannot be satisfied by commercial API data processing agreements; and teams that have specific fine-tuning use cases where the domain specialization produces measurable quality improvement that justifies the infrastructure investment.
+
+## Common mistakes
+
+1. **Choosing self-hosting to avoid the appearance of vendor dependency without modeling the actual costs.** The GPU infrastructure creates its own vendor dependency (AWS, GCP, or on-premises hardware providers) while adding operational complexity. Before committing to self-hosting, model the full cost: GPU instance cost, inference server engineering time, monitoring and maintenance, and the performance gap versus the commercial model being replaced.
+
+2. **Starting with a 70B model when a 7B model would suffice.** Many SaaS application use cases (classification, summarization of structured data, simple Q&A with provided context) are handled adequately by 7B and 13B models, which require dramatically less GPU hardware. Start with the smallest model that meets quality requirements, not the largest model available. The cost difference between hosting a 7B and a 70B model is roughly 8 to 10x in GPU memory requirements.
+
+3. **Not benchmarking the self-hosted model against the commercial baseline before committing to infrastructure.** Run the application's actual use cases against the candidate self-hosted model before provisioning the infrastructure. If the quality is acceptable for the use case, proceed. If it is not, the infrastructure investment produces a worse product at potentially higher cost. Benchmark first, infrastructure second.
+
+4. **Underestimating inference latency for user-facing features.** Self-hosted inference on moderately sized GPU hardware is slower than commercial API responses, which route to purpose-built inference clusters. For user-facing real-time features (chat, autocomplete, instant search augmentation), the latency difference matters. Measure time-to-first-token and token generation speed on the target hardware before designing user-facing features around self-hosted inference.
+
+5. **Not planning for model updates and version management.** Commercial APIs update models with backward-compatible improvements. Self-hosted models require the team to decide when to update to a new model version, test the new version, redeploy, and manage the transition. This operational overhead is ongoing. Plan for model version management as a recurring task, not a one-time setup.
+
+## Where to start
+
+1. **Run the cost analysis for the current commercial API spend.** Pull the last three months of API spend. Calculate what the equivalent GPU infrastructure would cost at cloud spot instance rates. Factor in 20 to 30 percent engineering time overhead for infrastructure management. If self-hosting is not clearly cheaper at current volume, the motivation for self-hosting should be quality, data residency, or fine-tuning, not cost.
+
+2. **Test the candidate model on the application's actual prompts before investing in infrastructure.** Use a managed service (Replicate, Together.ai, Groq) to run the target open-source model against the application's prompts for a week. This produces quality comparison data and cost data (managed inference is more expensive than self-hosted but less expensive than frontier commercial APIs) without the infrastructure investment. If the quality is acceptable, the self-hosting investment is justified by the managed service cost reduction.
+
+3. **Start with Ollama on a single GPU instance for the first three months.** Ollama provides the simplest path to running open-source models in production. Start with one GPU instance, one model, one use case. Learn the operational patterns (model loading, inference throughput, memory pressure) before scaling the infrastructure. This limits the downside of a self-hosting decision that turns out to be wrong.
+
+## Related reading
+
+- [RAG (Retrieval Augmented Generation) for SaaS: When It Helps and When It Does Not](/blog/rag-retrieval-augmented-generation-for-saas-when-it-helps-and-when-it-does-not)
+- [Serverless vs Containers vs Bare Metal: A Cost and Flexibility Map](/blog/serverless-vs-containers-vs-bare-metal-a-cost-and-flexibility-map)
+- [Self Hosting on Hetzner vs AWS: The Real Tradeoffs](/blog/self-hosting-on-hetzner-vs-aws-the-real-tradeoffs)
+- [SaaS Pricing for Founders: A Cost to Build to Sell Framework](/blog/saas-pricing-for-founders-a-cost-to-build-to-sell-framework)

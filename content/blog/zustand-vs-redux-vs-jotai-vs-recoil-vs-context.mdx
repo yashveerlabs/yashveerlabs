@@ -1,0 +1,130 @@
+---
+slug: "zustand-vs-redux-vs-jotai-vs-recoil-vs-context"
+title: "Zustand vs Redux vs Jotai vs Recoil vs Context"
+excerpt: "Five ways to share state in React, with very different tradeoffs and very different teams that should use each. The choice should be driven by the actual shape of your state, not by which library is trending."
+date: "2025-11-07"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react","ai"]
+readingMinutes: 12
+ogImage: "/api/og/blog/zustand-vs-redux-vs-jotai-vs-recoil-vs-context"
+status: "published"
+definition: "React state management in 2026 is no longer a debate about Redux. It is a question of what shape your state has. Zustand for simple global stores. Redux Toolkit for large apps that need devtools and time travel. Jotai or Recoil for atomic state. Context for narrow scopes. Picking right depends on the actual access patterns of your state, not on library popularity."
+faq: [
+  {"q":"Is Redux still relevant in 2026?","a":"Yes, but Redux Toolkit, not the old hand-written Redux. RTK eliminates most of the boilerplate that made classic Redux painful. For large apps with complex state, deep undo/redo requirements, or strict separation of concerns, Redux still earns its keep. For smaller apps it is overkill, and Zustand or Context is usually right."},
+  {"q":"What makes Zustand good?","a":"It is small, has no boilerplate, and works the way React developers expect. You write a function that returns state and actions, you call a hook to use it, and that is the whole API. For global state that does not need devtools or time travel, Zustand is hard to beat. Most apps that pick Zustand do not regret it."},
+  {"q":"What is atomic state and when do I want it?","a":"Atomic state means each piece of state is a small independent unit that components subscribe to individually. Jotai and Recoil are the main libraries here. The win is that components re-render only when the specific atoms they read change, which scales well for apps with many small pieces of independent state. The cost is conceptual: you think differently about state."},
+  {"q":"Why is Context not enough?","a":"Context is great for narrow scopes like a theme or a current user. It is not great for state that changes frequently because every consumer re-renders on every change, with no way to subscribe selectively. For frequently changing state with many consumers, Context becomes a performance problem fast."},
+  {"q":"What about TanStack Query / React Query?","a":"That is server state, which is a different problem. React Query manages data that lives on a server: caching, refetching, optimistic updates. It is complementary to client state management. Most modern React apps use React Query for server state and one of the others for true client state."},
+  {"q":"Which is fastest?","a":"For most apps the answer is irrelevant because state management is not the bottleneck. The differences in performance only matter if you have many components subscribing to frequently-changing state. In that regime Zustand and atomic libraries like Jotai outperform Context. Redux Toolkit is also fast when used with selectors."},
+  {"q":"Can I mix them in one app?","a":"Yes, and many apps do. Context for narrow scopes, Zustand or Redux for global state, React Query for server state. The mistake is using one tool for everything regardless of fit. Each tool exists for a reason. Use each where it fits."}
+]
+---
+
+## What you actually need to know
+
+- Server state and client state are different problems. React Query handles the first. The others handle the second.
+- Context is great for narrow, slowly-changing scopes and bad for everything else.
+- Zustand is the right default for global client state in most apps in 2026.
+- Redux Toolkit still earns its keep on large apps that need devtools, middleware, and strict patterns.
+- Jotai and Recoil are excellent for apps with many independent small pieces of state.
+
+| Library | Best for | Boilerplate | Re-render control |
+|---|---|---|---|
+| Context | Theme, current user, narrow scopes | None | None |
+| Zustand | Global client state in small to medium apps | Tiny | Built-in selectors |
+| Redux Toolkit | Large apps, devtools, complex patterns | Moderate | Selectors |
+| Jotai | Atomic state, independent units | Tiny | Atom-level |
+| Recoil | Atomic state with derived/async | Moderate | Atom-level |
+
+## The core argument
+
+The React state management discussion has been the same fight for ten years and most of it has been about the wrong question. The right question is what shape your state has, who reads it, and how often it changes. The answer to that determines the tool. The tool does not determine the answer.
+
+Most apps have three kinds of state. Server state, which is data fetched from an API. Client state, which is genuinely owned by the client and changes in response to user actions. Ephemeral UI state, which lives in one component and never leaves.
+
+Server state belongs in React Query or a similar library. The fact that it changes from the outside, that it needs caching and refetching, that you want optimistic updates, all of that is what React Query is built for. Trying to manage server state in Redux is how teams build their own slower version of React Query.
+
+Client state is where the libraries we are comparing live. The right pick depends on how much state you have, how it is structured, and how many components need it.
+
+Ephemeral UI state belongs in useState. Do not over-engineer it.
+
+## Where each library actually shines
+
+### Context
+
+Context is for narrow scopes that change rarely. The current theme. The current user. The current locale. These do not update on every click and the cost of every consumer re-rendering when they do change is acceptable because changes are rare.
+
+Reach for Context when the scope is bounded and the update frequency is low. Do not reach for it for state that updates dozens of times a second.
+
+### Zustand
+
+Zustand is the right default for most apps in 2026. It has minimal boilerplate, a hook-based API, and built-in selector support. You write a small store, components subscribe to slices of it, and re-renders happen only when those slices change.
+
+The tradeoff is that Zustand has fewer batteries included. No middleware ecosystem like Redux. No devtools as polished. For most apps these are not blockers. For a few they are.
+
+### Redux Toolkit
+
+Redux Toolkit is what Redux should have been from the start. The boilerplate is mostly gone. Slices, the createApi pattern, and the immer integration make it pleasant. The devtools are still the best in the React ecosystem. For large apps with complex state, time-travel debugging, or strict patterns enforced across many engineers, RTK still earns its keep.
+
+The reason to pick RTK over Zustand is usually size. A team of twenty engineers benefits from the conventions RTK enforces. A team of two does not need them.
+
+### Jotai
+
+Jotai's atom model is genuinely different. Each piece of state is an atom. Components subscribe to specific atoms. The re-render granularity is at the atom level. For apps with many small pieces of independent state, this is the best performance model available.
+
+The cost is that you have to think differently. Atoms compose, but composition takes practice. For teams new to atomic state, Jotai is an investment.
+
+### Recoil
+
+Recoil is similar to Jotai but with a richer feature set including derived selectors and async selectors built in. It is more complex to learn but more capable out of the box. The library's future has been uncertain at times, which is worth knowing when picking it for a new project.
+
+## How long does it take to set up
+
+| Library | Setup time | First store |
+|---|---|---|
+| Context | 5 minutes | A useState wrapped in a provider |
+| Zustand | 10 minutes | A function that returns state and setters |
+| Redux Toolkit | An hour or two | Configure store, create a slice, wire provider |
+| Jotai | 15 minutes | Define atoms and provider |
+| Recoil | An hour | Set up RecoilRoot, define atoms and selectors |
+
+The setup cost is small in all cases. The long-term cost is what matters: code volume, learning curve, and whether the library scales with your app.
+
+## What to weigh before picking
+
+- The size of your app. Smaller favors Zustand. Larger may favor RTK.
+- The complexity of your state. Independent units favor atomic libraries.
+- Your team's familiarity. A team that knows Redux deeply may be faster in RTK.
+- Whether you need devtools and middleware. RTK is the king there.
+- Whether your bottleneck is re-renders. Atomic libraries help here.
+
+## Expert opinion
+
+> The right state management library for most apps in 2026 is Zustand for client state, React Query for server state, and useState for everything that does not leave a component. That covers 80 percent of cases. The other 20 percent is where the more specialized libraries earn their keep. The wrong answer is picking the library you used last year by reflex. The right answer is matching the tool to the shape of the state you actually have.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS team I worked with had built everything in Redux because it was the default when they started. The store had grown to over a hundred slices. Every developer hated it. Every feature took longer than it should because the boilerplate had become a tax.
+
+We did not migrate everything. We adopted React Query for the 60 percent of state that was server state, which dropped a huge chunk of Redux. We left the genuinely client-state pieces in RTK. The codebase shrunk by about 30 percent and feature velocity improved measurably the next quarter. For a related comparison on the API side, see [trpc vs rest vs graphql on the frontend](/blog/trpc-vs-rest-vs-graphql-on-the-frontend). For the broader state management framing, [the state management question in 2026](/blog/the-state-management-question-in-2026) is the longer essay.
+
+## Common mistakes
+
+1. Using Redux for server state instead of React Query.
+2. Using Context for frequently changing state and getting render storms.
+3. Picking Redux for a small app because it is "the safe choice."
+4. Picking Zustand for a 50-engineer team and missing the conventions Redux Toolkit provides.
+5. Mixing patterns inconsistently so each developer picks differently.
+6. Treating state management as the cause of performance issues without measuring.
+7. Migrating between libraries because of trend pressure rather than measured need.
+
+## A 30 day plan to pick or migrate
+
+1. **Day one.** Inventory your state. Categorize as server, client, or ephemeral.
+2. **Days two to four.** Move server state to React Query. This is usually the biggest win.
+3. **Week two.** Pick a client state library based on your app's size and shape.
+4. **Weeks two and three.** Migrate or set up. Establish team conventions.
+5. **Week four.** Document the decision in [an ADR](/blog/the-architecture-decision-record-a-lightweight-discipline) so the next engineer knows why the codebase looks like it does.
+6. **Ongoing.** Resist the urge to migrate again the moment the next library trends. The cost of churn is bigger than the gain. The pattern is the same as in [why most rewrites fail](/blog/why-most-rewrites-fail).

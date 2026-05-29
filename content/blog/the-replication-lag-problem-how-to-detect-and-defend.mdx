@@ -1,0 +1,148 @@
+---
+slug: "the-replication-lag-problem-how-to-detect-and-defend"
+title: "The Replication Lag Problem: How to Detect and Defend"
+excerpt: "Working notes on the replication lag problem: how to detect and defend. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-04-16"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-replication-lag-problem-how-to-detect-and-defend"
+status: "published"
+definition: "Replication lag is the delay between a write being committed on the primary database and that write becoming visible on a replica. In most systems it stays under a second and nobody notices. When it grows to seconds or minutes, features that read from replicas show stale data in ways that look like bugs. I treat replication lag as an observable metric with alerting, not a background condition to ignore."
+faq: [
+  {"q":"How do you measure replication lag in PostgreSQL and what is an acceptable threshold?","a":"In Postgres, the primary view pg_stat_replication shows the write, flush, and replay lag for each connected replica. The replica's pg_last_xact_replay_timestamp() minus now() gives the current lag in wall clock time. Acceptable thresholds depend on the workload. For transactional SaaS, anything over two seconds is worth investigating. For analytical replicas, ten to thirty seconds is often acceptable. The key is to set the threshold based on what your application actually tolerates, not a generic rule."},
+  {"q":"What causes replication lag to spike on a database that has been stable for months?","a":"The most common causes are a bulk write or migration on the primary that creates a large replication backlog, a long-running transaction on the replica that blocks replay, a network bandwidth or latency issue between primary and replica, or a hardware bottleneck on the replica that cannot keep up with the write rate. Identifying which cause applies requires looking at both sides of the replication channel simultaneously when the spike occurs."},
+  {"q":"How do you prevent a user from reading their own stale write when the app uses a read replica?","a":"The standard pattern is read-after-write consistency. After a write succeeds, route the user's next read for that resource to the primary for a short window, typically a few seconds or until the replication lag is known to have closed. Some teams use a session token that expires after a write, forcing primary reads. Others track the last write timestamp per user and compare it to the replica lag metric before routing."},
+  {"q":"What happens to a read replica under a heavy migration on the primary database?","a":"The migration generates a large volume of WAL records that the replica must replay. If the migration is fast, the replica catches up quickly after it completes. If the migration runs for minutes or hours, the replica may fall minutes behind. Any application reads routed to the replica during this window see pre-migration data. For long migrations, temporarily routing all reads to the primary, or pausing features that use the replica, is the safer approach."},
+  {"q":"Can you use a read replica as a failover target for high availability?","a":"Yes, but with caveats. Promoting a replica to primary is straightforward in most managed services. The risk is that if the replica is lagging when the primary fails, some committed writes on the primary may not yet be on the replica and will be lost on promotion. Synchronous replication eliminates this risk but adds latency to every primary write. Most teams choose asynchronous replication and accept a small potential data loss window, documented as the recovery point objective."},
+  {"q":"What is the difference between replication lag and write amplification?","a":"Replication lag is a time delay. Write amplification is a volume problem. Lag is the gap between when the primary commits a write and when the replica applies it. Write amplification is when one logical write in the application produces many physical writes in the database, increasing the WAL volume the replica must process. Both can cause a replica to fall behind, but the fixes are different. Lag from network latency is a connectivity problem. Lag from write amplification is a schema or query design problem."},
+  {"q":"How should you alert on replication lag in a production SaaS system?","a":"Two thresholds. A warning alert at the lag level where some features start showing stale data, typically two to five seconds for transactional replicas. A critical alert at the lag level where the replica is effectively useless for its intended workload, typically thirty seconds or more. The critical alert should page someone because at that point reads routed to the replica are returning data that may be many transactions stale."}
+]
+---
+
+## What you actually need to know
+
+- Replication lag is normal in asynchronous replication. Unmonitored replication lag is a reliability gap.
+- The failure mode is invisible to developers until a user reports seeing data that does not match what they just saved.
+- The two most common causes are bulk writes on the primary and long-running transactions on the replica.
+- Read-after-write consistency is the application-layer defense. Without it, a write-then-immediate-read pattern will sometimes show stale data.
+- In my experience, teams that have never measured their replica lag are surprised by how often it exceeds one second under normal load.
+
+| Scenario | Lag behavior | Risk | Recommended defense |
+|---|---|---|---|
+| Normal transactional load | Under 100 milliseconds | Low | Monitor, alert at 2 seconds |
+| Bulk insert or migration on primary | Spikes to seconds or minutes | High | Route reads to primary during migration |
+| Long-running transaction on replica | Blocks replay, lag grows | High | Time out long transactions on replica |
+| Network partition between primary and replica | Lag grows until reconnection | High | Alert at 10 seconds, failover procedure ready |
+| Write-heavy spike | Lag grows during spike, recovers after | Medium | Alert at threshold, reduce replica read routing |
+
+## The core argument
+
+Adding a read replica is straightforward. The managed database services handle the setup in a few clicks. What the setup wizard does not tell you is that you have now introduced a consistency gap into your application that needs to be measured, managed, and communicated to the engineering team.
+
+Replication in Postgres is asynchronous by default. The primary commits a write and returns success to the application. At some point later, that write is applied to the replica. The gap is usually milliseconds. Under load, during migrations, or when something goes wrong on the replica, the gap grows. If your application reads from the replica after a write and the write has not replicated yet, the user sees old data.
+
+This is not a bug in replication. It is the documented behavior. The mistake is building an application that routes reads to replicas without any mechanism to handle the lag, and then being surprised when users report that their changes disappear and come back a second later.
+
+The fix has two parts. First, measure the lag continuously and alert when it exceeds your application's tolerance. Second, implement read-after-write consistency for any operation where a user writes data and immediately reads it back. Neither is difficult. Both require deliberate engineering.
+
+## How to detect lag
+
+### Primary-side measurement
+
+In Postgres, the `pg_stat_replication` view on the primary shows the current write, flush, and replay lag for each replica.
+
+```sql
+SELECT
+  application_name,
+  write_lag,
+  flush_lag,
+  replay_lag
+FROM pg_stat_replication;
+```
+
+This is the most direct measurement. Replay lag is the number you care about. It is the gap between the last WAL record the primary sent and the last one the replica applied.
+
+### Replica-side measurement
+
+On the replica, `pg_last_xact_replay_timestamp()` returns the timestamp of the last transaction replayed. Comparing it to `now()` gives the lag in wall clock time.
+
+```sql
+SELECT now() - pg_last_xact_replay_timestamp() AS replication_lag;
+```
+
+This is the metric to export to your monitoring system. Export it every ten seconds. Alert at your defined threshold.
+
+### Managed service metrics
+
+AWS RDS and Aurora, Google Cloud SQL, and Supabase all surface replica lag as a managed metric. Connect it to CloudWatch or your observability stack and set alerts there. The managed metric is slightly less granular than the Postgres view but requires no custom instrumentation.
+
+## How to defend against lag in the application
+
+### Read-after-write consistency
+
+After a user writes data, route their next read for that resource to the primary for a short window. Two common approaches:
+
+**Session-based routing.** After a write, set a short-lived flag in the user's session. While the flag is set, the application sends reads to the primary. The flag expires after a few seconds or after the lag metric drops below the threshold.
+
+**Replication watermark.** Record the primary's current LSN (log sequence number) after a write. Before routing a read to the replica, compare the LSN to the replica's last applied LSN. If the replica is behind, route to the primary instead.
+
+The session-based approach is simpler. The watermark approach is more precise. For most SaaS products, session-based routing is sufficient.
+
+### Lag-aware routing
+
+Route reads by workload type, not randomly. Transactional reads that follow a recent write go to the primary. Analytical reads, dashboard aggregations, and background report queries go to the replica. This separation reduces the number of code paths that need read-after-write consistency, because only the transactional reads carry the risk.
+
+## What it actually costs to ignore vs. defend
+
+| Approach | Engineering time | Ongoing risk | User experience impact |
+|---|---|---|---|
+| No monitoring, no defense | Zero | High | Occasional unexplained stale data |
+| Monitoring only | Half a day | Medium | Known when lag spikes, no automatic protection |
+| Session-based read-after-write | 1 to 2 days | Low | Consistent reads after write |
+| Watermark-based routing | 3 to 5 days | Very low | Precise, minimum primary load |
+| Synchronous replication | Configuration change | Near zero | No lag, but every write is slower |
+
+## What to look for in a defended replica setup
+
+- Replication lag exported as a metric with a named alert threshold.
+- A documented read-write split policy that every engineer on the team can find.
+- Read-after-write consistency implemented for any write-then-read user flow.
+- Long-running query timeouts set on the replica to prevent blocking replay.
+- A runbook for lag spikes that covers when to route all reads to primary and how to confirm the replica has caught up.
+- Replica promotion tested in staging, not discovered for the first time during a primary failure.
+
+## Expert opinion
+
+> Replication lag is one of those problems that feels theoretical until it is not. A team ships the read replica, routes some queries to it, and ships the feature. Six months later a support ticket arrives from a user who saves a setting and sees the old value. The engineer cannot reproduce it in local testing because local has no replica. The root cause is a two-second lag spike during a deployment. The fix is half a day of work. The damage to user trust takes longer to repair than the code does.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client running a B2B project management tool had added a read replica to handle their growing dashboard query load. Three months later the support team started receiving tickets from users who reported that creating a new project did not show up in the project list. The list showed the state from before the create. Refreshing after a few seconds fixed it.
+
+The root cause was a bulk data migration a teammate had run during business hours, which created a replication lag spike of twelve seconds. During that window, users who created projects were being routed to the replica for the list read, and the replica had not yet applied their write.
+
+We added replica lag monitoring with a two-second alert, implemented session-based read-after-write routing for the project create flow, and added a policy that bulk operations on the primary require a maintenance window. The user reports stopped immediately. The lag monitoring has since fired four times, all during deployments that ran database migrations. Each time we temporarily increased routing to the primary and the lag closed within a minute of the migration completing.
+
+For the broader read strategy context, see [the read heavy workload: strategies that move the needle](/blog/the-read-heavy-workload-strategies-that-move-the-needle). For how consistency guarantees interact with replica behavior, see [ACID vs BASE: when each belongs in your architecture](/blog/acid-vs-base-when-each-belongs-in-your-architecture).
+
+## Common mistakes
+
+1. Adding a read replica without monitoring its lag. You will discover the lag problem from a user support ticket.
+2. Routing all reads to the replica including reads that immediately follow writes. This is the most common source of the "my changes disappeared" bug.
+3. Running heavy migrations on the primary during business hours without temporarily reducing replica routing.
+4. No alert on lag at all. The replica can fall minutes behind before anyone notices.
+5. Not testing replica promotion before you need it. The first time you promote under pressure is not the time to learn the procedure.
+6. Using the replica for sessions or authentication reads. Those are write-read pairs by nature and belong on the primary.
+7. Setting no timeout on long-running queries on the replica. A slow analytical query on the replica can block WAL replay and cause lag to grow while the query runs.
+
+## A 30-day plan
+
+1. **Week one.** Add replication lag monitoring. Export the lag metric from the replica every ten seconds. Set a warning alert at two seconds and a critical alert at thirty seconds.
+2. **Week two.** Audit your application's read routing. Document every code path that routes reads to the replica. Identify any that follow a user write.
+3. **Week three.** Implement session-based read-after-write for any write-then-read user flows. Deploy and verify that the stale-data bug class is gone.
+4. **Week four.** Write a runbook for lag spikes. Define the threshold at which all reads route to primary, how to confirm the replica has caught up, and who is responsible for making the call.
+
+For the write-side of database reliability, see [zero-downtime database migrations: a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide). For the broader reliability patterns around background jobs and event delivery, see [why your SaaS should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one).

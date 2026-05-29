@@ -1,0 +1,116 @@
+---
+slug: "blue-green-deployments-vs-canary-vs-rolling-a-decision-tree"
+title: "Blue Green Deployments vs Canary vs Rolling: A Decision Tree"
+excerpt: "Rolling for the daily case. Canary when the risk is asymmetric. Blue green when the cost of a bad cutover is unacceptable. Here is the decision tree I use with clients, with the actual trade offs."
+date: "2026-05-19"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["deployment","blue-green","canary","rolling","devops"]
+readingMinutes: 12
+ogImage: "/api/og/blog/blue-green-deployments-vs-canary-vs-rolling-a-decision-tree"
+status: "published"
+definition: "Rolling deployments replace instances one at a time. Canary deployments send a small percentage of traffic to the new version, then ramp. Blue green keeps the old and new environments alive in parallel and cuts over by switching the router. Each one solves a different shape of risk. Most SaaS teams run rolling by default, layer canary on the highest risk releases, and reserve blue green for the changes that cannot fail."
+faq: [
+  {"q":"What is the simplest deployment strategy for a startup?","a":"Rolling deployments. Most managed platforms like ECS, Kubernetes, Vercel, and Fly.io provide them by default. The team writes deployment configuration once and gets safe deploys forever. For most early SaaS this is enough."},
+  {"q":"When should I use canary deployments?","a":"For changes with asymmetric risk. A change that could break payments or auth. A change to a hot path that handles most of your traffic. A change that interacts with third party APIs in ways you cannot fully test. The canary lets you observe real production behavior before committing."},
+  {"q":"When should I use blue green deployments?","a":"When the cost of a bad cutover is unacceptable, when the rollback needs to be instant, or when you have a stateful migration that needs to happen in lockstep with the deploy. Blue green is heavier but provides the cleanest rollback."},
+  {"q":"What is the cost difference?","a":"Rolling is the cheapest because it reuses the same infrastructure. Canary adds some traffic shaping but minimal compute cost. Blue green doubles the infrastructure during the cutover window and is the most expensive. The cost is justified when the risk is high enough."},
+  {"q":"How long should the canary window be?","a":"Long enough to see the failure modes you care about. For most issues, fifteen to sixty minutes catches the obvious ones. For issues that depend on customer behavior or daily cycles, four to twenty four hours is more honest."},
+  {"q":"Can I combine these strategies?","a":"Yes, and many mature teams do. Canary the highest risk releases inside a rolling deployment. Blue green the database migration while rolling the application. The strategies compose."},
+  {"q":"What is the most common deployment mistake?","a":"Treating deployment safety as solved by the cloud provider. The platform gives you the mechanism. The team has to design the strategy. Default to rolling but layer canary or blue green where the risk demands."}
+]
+---
+
+## What you actually need to know
+
+- Rolling is the right default for most SaaS deployments.
+- Canary is the right layer for asymmetric risk changes.
+- Blue green is the right call when the rollback needs to be instant.
+- The strategies compose. Most mature teams use all three.
+- The platform gives you the mechanism. The team designs the strategy.
+
+| Strategy | Best fit | Rollback time | Cost overhead |
+|---|---|---|---|
+| Rolling | Default for everything | Minutes | None |
+| Canary | High risk changes | Seconds during canary, minutes after | Minimal |
+| Blue green | Critical cutovers | Seconds | Doubles infra during cutover |
+| Combined canary plus blue green | Highest stakes | Seconds | Significant |
+
+## The core argument
+
+Deployment strategy is one of those decisions that founders delegate by accident and inherit by surprise. The platform makes the easy choice for you. Vercel deploys rolling. Kubernetes deploys rolling. ECS deploys rolling. The team ships features and never thinks about deployment strategy until the day a bad deploy takes down the product.
+
+The right framing is not which strategy is best. The right framing is which risk each strategy mitigates and which strategy fits the change in front of you. Rolling mitigates the risk of taking down all instances at once. Canary mitigates the risk of catastrophic regressions in production traffic. Blue green mitigates the risk of unrecoverable cutovers.
+
+The fail mode is using the same strategy for every change. A team that always rolls discovers in production that the payment service has a regression that affects three percent of transactions. The rolling deploy already replaced all instances. The rollback is possible but slow. A canary would have caught the issue at one percent of traffic.
+
+The opposite fail mode is over engineering. A team that requires blue green for every deploy pays the operational cost on every release. The cost is real. The benefit is only real on the changes that warrant it. Most changes do not warrant it.
+
+## The decision tree
+
+| Question | Rolling | Canary | Blue green |
+|---|---|---|---|
+| Is the change low risk and well tested? | Yes | No | No |
+| Could the change cause subtle production regressions? | No | Yes | No |
+| Does the rollback need to be instantaneous? | No | No | Yes |
+| Is there a coupled stateful change like a schema migration? | No | Sometimes | Yes |
+| Is the change to a hot path serving most traffic? | No | Yes | Sometimes |
+| Is the cost of a bad deploy measured in customer hours? | No | Yes | Yes |
+
+The honest read is that most changes answer the first question yes. Rolling is enough. The question that pushes you to canary is the second. The question that pushes you to blue green is the third.
+
+## How much does this cost
+
+| Strategy | Engineering setup | Ongoing operational cost |
+|---|---|---|
+| Rolling | Provided by platform | Negligible |
+| Canary | One to two sprints to set up traffic shaping and observability | Modest |
+| Blue green | Two to four sprints to set up parallel environments and cutover automation | Doubles infra during cutover |
+| All three combined | One quarter | High |
+
+The numbers come from projects I have worked on. The investment in canary infrastructure pays back the first time it catches a regression that would have shipped in a rolling deploy.
+
+## Features the deployment pipeline must have
+
+- Health checks that gate the deployment.
+- Traffic shaping for canary releases.
+- Observability on real signals during the canary window.
+- Automated rollback on health check failure.
+- Database migration coordination with the application deploy.
+- A clear runbook for the on call engineer.
+- A pre deploy checklist for the release captain.
+
+## Expert opinion
+
+> The deployment strategy is the most under invested area of engineering for most growing SaaS. The team treats the cloud provider's default as the answer. The first bad deploy that should have been a canary changes their mind. The teams that take deployment seriously catch regressions before customers do. The teams that do not catch regressions after customers have already churned.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS shipped a regression in their payment processing that affected two percent of transactions. The bug had passed code review and the test suite. The rolling deploy spread it across all instances within fifteen minutes. The team detected it forty minutes later when revenue alerts triggered. The cleanup took three days.
+
+We added canary deployments. Every change to the payment service now goes to five percent of traffic for thirty minutes before ramping. The next month, a similar regression was caught in the canary window. The bug affected the same percentage of transactions but only on the canary slice. The rollback was instant. The customer impact was contained.
+
+The team kept rolling for everything else. The canary layer is reserved for the payment service, the auth service, and any change to a hot path. Blue green is reserved for major version cutovers and database migrations that need coordinated cutovers. The combined strategy adds maybe two percent operational overhead and has prevented at least three significant incidents.
+
+For more on the related work, see [feature flags as a deployment strategy](/blog/feature-flags-as-a-deployment-strategy) and [CI CD pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library).
+
+## Common mistakes teams make
+
+1. Using rolling for everything regardless of risk.
+2. Using blue green for everything regardless of cost.
+3. Skipping the canary window because it slows the release.
+4. No automated rollback on health check failure.
+5. Canary windows that are too short to catch the failure modes.
+6. Database migrations that are not coordinated with the deploy strategy.
+7. No observability during canary. The traffic moves blind.
+8. Treating the platform default as the strategy.
+
+## A 60 day plan to put a layered strategy in place
+
+1. **Weeks one and two.** Identify the high risk surfaces. Payment, auth, hot paths.
+2. **Weeks three and four.** Set up canary infrastructure for those surfaces.
+3. **Weeks five and six.** Test the canary path with a non risky change. Confirm the observability.
+4. **Weeks seven and eight.** Identify the critical cutover surfaces that need blue green.
+
+For more on the broader operational work, read [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) and [the deployment pipeline that survives real world pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure). On the platform side, [GitHub Actions vs CircleCI vs Buildkite in 2026](/blog/github-actions-vs-circleci-vs-buildkite-in-2026) is the natural next read.

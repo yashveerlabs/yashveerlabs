@@ -1,0 +1,116 @@
+---
+slug: "building-internal-apis-vs-public-apis-different-disciplines"
+title: "Building Internal APIs vs Public APIs: Different Disciplines"
+excerpt: "Internal APIs and public APIs share a name and almost nothing else. The disciplines are different, the constraints are different, and the worst engineering decisions in SaaS often come from treating them the same."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["api","internal","public","architecture"]
+readingMinutes: 12
+ogImage: "/api/og/blog/building-internal-apis-vs-public-apis-different-disciplines"
+status: "published"
+definition: "An internal API connects services inside your own system. The consumers are your own engineers. The contract can change quickly. The optimization is for development velocity and operational efficiency. A public API is consumed by customers and partners. The contract is binding for years. The optimization is for stability and ergonomics. Treating one like the other produces brittle internal coupling or unstable customer integrations. The disciplines are different."
+faq: [
+  {"q":"What is the main difference between internal and public APIs?","a":"The audience and the contract. Internal APIs serve your own engineers. The contract is whatever you and the consuming service agreed last week. Public APIs serve customers. The contract is binding for years. The difference cascades into every design decision."},
+  {"q":"Should internal APIs be REST?","a":"Often no. Internal service to service traffic is often better served by RPC or gRPC. The performance is higher. The contract is enforced by code generation. The trade off is that the API is not usable by people typing into curl. For internal it usually does not matter."},
+  {"q":"Can I version internal APIs less strictly?","a":"Yes. Internal APIs can move faster because you control both sides. Breaking changes are easier because you can coordinate. The discipline is to keep both sides on the same version. Public APIs have many sides you do not control."},
+  {"q":"What about authentication for internal APIs?","a":"Service to service authentication using short lived tokens or mutual TLS. The auth model is different from public APIs because the consumers are services not users. Build it once and use it everywhere."},
+  {"q":"When does an internal API become public?","a":"When external consumers depend on it. This can happen accidentally if customers reverse engineer the calls your frontend makes. The fix is to have a clear separation between the internal API your frontend uses and the public API you offer. Confusing the two is a common trap."},
+  {"q":"Should I document internal APIs?","a":"Yes, but lightly. Internal documentation can live in code comments, OpenAPI specs generated from the implementation, or a simple internal wiki. Less polish than public documentation. More currency."},
+  {"q":"What is the biggest mistake?","a":"Treating internal APIs with the same stability constraints as public APIs. The team moves slowly because every internal change feels like a breaking change. Or treating public APIs with the freedom of internal APIs. Customers break. Both mistakes cost real velocity."}
+]
+---
+
+## What you actually need to know
+
+- Internal APIs serve your engineers. Public APIs serve customers.
+- Internal APIs can evolve quickly. Public APIs need stability.
+- Internal often gRPC or RPC. Public usually REST or GraphQL.
+- Authentication patterns differ. Service to service versus user.
+- The biggest mistake is treating them the same.
+
+| Property | Internal API | Public API |
+|---|---|---|
+| Consumer | Your engineers | Customers, partners |
+| Contract stability | Weeks to months | Years |
+| Versioning | Lightweight | Major versions, deprecation |
+| Authentication | Service tokens or mTLS | API keys, OAuth |
+| Documentation | Generated, current | Polished, curated |
+| Format | gRPC, RPC, or REST | REST or GraphQL |
+| SLA | Internal expectation | Contractual |
+| Performance | Often higher priority | Usually fine at REST level |
+
+## The core argument
+
+The pattern that hurts SaaS teams is treating internal and public APIs as the same kind of object. They look similar from a distance. They are different in almost every dimension that matters once you start operating them.
+
+The internal API is a contract between two services you own. The contract can change as fast as you can coordinate the change. The optimization is for development velocity. Service A talks to service B over a path that should be fast, observable, and easy to evolve. The constraint that matters is whether engineers can move quickly through the joint surface.
+
+The public API is a contract with people you do not control. The contract is binding for years. The optimization is for stability and ergonomics. The consumer cannot redeploy when you change the shape. They wrote integration code months ago and they expect it to keep working. The constraint that matters is whether the API survives across the years of customer integration.
+
+The teams that mix these constraints either move too slowly internally or break customers externally. The fix is to clarify which kind of API you are looking at on each call. The discipline diverges from there.
+
+## Design choices that differ
+
+| Choice | Internal | Public |
+|---|---|---|
+| Protocol | gRPC, RPC, internal REST | REST, GraphQL |
+| Versioning | Per release, light | Major versions, deprecation |
+| Naming | Match codebase conventions | Customer friendly |
+| Error format | Match codebase conventions | Strict, stable, documented |
+| Pagination | If needed | Cursor based on growing lists |
+| Authentication | Service tokens or mTLS | API keys, OAuth, fine grained scopes |
+| Rate limiting | Internal traffic shaping | Strict, customer visible |
+| Documentation | Generated, internal | Polished, public |
+| Change announcements | Slack message | Multi week notice, migration tooling |
+
+## How much does this cost
+
+The investment to keep them separate is small. A clear internal API namespace versus a public API namespace. Different auth middlewares. Different versioning rules. Different documentation paths. The setup takes a sprint. The ongoing discipline is mostly a habit, not a cost.
+
+The cost of mixing them is large and hidden. Engineers slow down on internal changes because they treat them like public ones. Customers break on public changes because the team treated them like internal ones. The two failure modes can coexist on the same codebase, which is the worst case.
+
+## Features the separation must have
+
+- Different URL namespaces for internal and public.
+- Different authentication middleware.
+- Different versioning policies documented.
+- Different documentation tooling.
+- Different deprecation policies.
+- A clear policy on what data goes through which.
+- Reviews for any change that crosses the boundary.
+
+## Expert opinion
+
+> The teams that respect the difference between internal and public APIs move faster internally and break customers less externally. The teams that conflate them carry the cost in both directions. The cost is invisible until the day a customer integration breaks because someone refactored an internal endpoint and forgot it was reachable from outside.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had a single API namespace for both their internal services and their public customer integrations. The team was reluctant to refactor internal endpoints because they assumed customers might depend on them. The team was also reluctant to add features to public endpoints because they assumed internal services might break.
+
+We split the namespace. Internal endpoints moved to /internal with service token authentication. Public endpoints stayed at /api/v1 with API key authentication and full versioning discipline. The frontend used the internal namespace for its work.
+
+The team's internal velocity improved because they could refactor freely. The public API stability improved because changes there were now deliberate. The two surfaces evolved independently. The customers did not notice the change because their integrations continued to work. The engineers noticed immediately because their work got easier.
+
+For more on the related work, see [building APIs that survive five years of customer change requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests) and [the public API decision when to build one when to resist](/blog/the-public-api-decision-when-to-build-one-when-to-resist).
+
+## Common mistakes teams make
+
+1. Single namespace for internal and public.
+2. Same versioning discipline for both. Internal moves slowly, public breaks fast.
+3. Customers reverse engineering internal endpoints because they are reachable.
+4. No documented separation policy.
+5. Same auth model for both.
+6. Public API surface that exposes internal data models accidentally.
+7. Treating gRPC as too exotic for internal services. Often it is the right call.
+8. Treating REST as the only public API option. GraphQL sometimes wins.
+
+## A 30 day plan to separate them
+
+1. **Week one.** Inventory the current endpoints. Classify each as internal or public.
+2. **Week two.** Pick the namespaces. Move the internal endpoints. Update frontends.
+3. **Week three.** Set up the versioning and deprecation policies for public.
+4. **Week four.** Document the separation. Train the team.
+
+For more on the related work, read [building APIs that survive five years of customer change requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests) and [REST vs GraphQL vs gRPC a decision matrix for founders](/blog/rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders). On the broader public API side, [the public API decision when to build one when to resist](/blog/the-public-api-decision-when-to-build-one-when-to-resist) is the natural next read.

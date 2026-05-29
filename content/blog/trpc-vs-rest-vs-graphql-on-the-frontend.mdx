@@ -1,0 +1,120 @@
+---
+slug: "trpc-vs-rest-vs-graphql-on-the-frontend"
+title: "tRPC vs REST vs GraphQL on the Frontend"
+excerpt: "Working notes on trpc vs rest vs graphql on the frontend. Written for founders, engineers, and operators who want a clear read on web app and frontend development from someone who has shipped the work."
+date: "2025-11-09"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 13
+ogImage: "/api/og/blog/trpc-vs-rest-vs-graphql-on-the-frontend"
+status: "published"
+definition: "The choice between tRPC, REST, and GraphQL on the frontend is mostly a question of who controls the backend and how much the frontend needs to own its data shape. tRPC wins when you own both ends of the wire. GraphQL wins when the frontend needs flexible queries against a shared graph. REST wins when you need broad compatibility, external consumers, or an existing API."
+faq: [
+  {"q":"Is tRPC better than REST for a Next.js full stack app in 2026?","a":"For apps where the frontend and backend are in the same codebase or the same team, tRPC has a real advantage. End-to-end type safety with no code generation, a great developer experience, and tight integration with React Query. For apps that need external consumers or must expose a public API, REST is still the cleaner default."},
+  {"q":"When does GraphQL make sense for a startup frontend?","a":"GraphQL earns its place when multiple clients need different shapes of the same data, or when the team is querying a large graph with complex relationships. If you have one client and one backend team, GraphQL adds more overhead than it removes. The payoff is real for mid to large teams with diverse frontend surfaces."},
+  {"q":"What are the biggest downsides of tRPC for frontend development?","a":"tRPC requires TypeScript on both ends and is tightly coupled to a Node.js backend. It does not produce a public API surface. It is not suitable for third-party consumers. If the team ever needs to expose the API externally, tRPC adds a migration step. Within those constraints it is excellent."},
+  {"q":"Can I use React Query with tRPC?","a":"Yes. The tRPC client wraps React Query and exposes the same useQuery and useMutation hooks. This means you get tRPC's type safety and React Query's caching, background refetch, and devtools at the same time. It is one of the better DX combinations available in 2026."},
+  {"q":"Should I migrate my REST API to GraphQL for a new frontend?","a":"Probably not just for the frontend. The migration cost is real, the mental model shift is significant, and the gains depend on how complex your data graph is. The better path is to evaluate whether GraphQL solves a concrete problem you have right now, not a theoretical future flexibility."},
+  {"q":"What is the best data fetching approach for a Next.js App Router project?","a":"Server Components for data that can be fetched on the server, React Query for client-side data that needs caching and background revalidation, and Server Actions for mutations. tRPC integrates cleanly with this model. REST and GraphQL both work but require slightly more wiring."},
+  {"q":"How do I decide between tRPC and REST when starting a new full-stack project?","a":"If the project is TypeScript end to end, the team owns both frontend and backend, and there are no plans for external API consumers, start with tRPC. If the project needs a public API, has mixed language backends, or serves multiple consumer types, start with REST. GraphQL is a third path worth evaluating when the data graph is genuinely complex."}
+]
+---
+
+## What you actually need to know
+
+- tRPC gives end-to-end type safety with zero code generation, but only if you own both ends and you are using TypeScript.
+- GraphQL gives flexible querying and a shared schema, but adds real complexity for small teams.
+- REST is the most compatible, most familiar, and the right default when external consumers exist.
+- The question is not which is best in the abstract. It is which fits the shape of your project.
+- In my experience, most teams pick GraphQL because it sounds sophisticated and then spend months managing its overhead.
+
+| Approach | Best for | Watch out for |
+|---|---|---|
+| tRPC | TypeScript monorepos, full-stack Next.js, teams owning both ends | No external API, TypeScript-only, Node.js backend required |
+| REST | External consumers, public APIs, multi-language backends, broad compatibility | Manual type sync, over-fetching and under-fetching with complex data shapes |
+| GraphQL | Multiple clients needing different data shapes, complex graphs, large federated backends | Schema management, caching complexity, N+1 queries, learning curve |
+| Server Actions | Mutations in Next.js App Router with no separate API layer | Not suitable for external consumption, limited to the Next.js app |
+
+## The core argument
+
+The frontend does not care about the architecture philosophy behind the API. The frontend cares about three things. Can I get the data I need without extra round trips? Can I make changes without breaking the type contract? Can I debug this when something goes wrong?
+
+REST answers those questions adequately for most apps. The developer writes a fetch call or uses React Query with a URL. The response shape is documented or inferred. It works. The friction comes when the frontend needs to combine data from multiple endpoints, or when the data shape from the server does not match what the component needs.
+
+GraphQL was invented for that friction. The idea is that the frontend declares what it needs and the server delivers exactly that. The payoff is real on apps where many different clients query a large shared graph. It is less clear on a single-page app backed by one team's API, where the endpoint can just return the right shape to begin with.
+
+tRPC is a different framing entirely. Instead of designing an API surface that the frontend calls, you write TypeScript functions on the server and call them from the client as if they were local. The type inference flows through automatically. No schema to write, no codegen to run. The cost is that you have to own both ends, and you have to be in TypeScript.
+
+For a Next.js app where the team is the same people shipping the API and the frontend, tRPC is often the cleanest choice. For a startup that needs to eventually expose a developer API to customers, REST is the cleaner foundation to build on.
+
+## How the choice plays out in practice
+
+### tRPC in a full-stack Next.js app
+
+The typical tRPC setup in an App Router project puts procedures in a server directory and calls them from the client with the tRPC React Query integration. The type safety is end-to-end. If the server changes a return type, the client gets a compile error. There is no intermediate schema, no code generation, no type drift.
+
+The limitation is tight coupling. The client and server must be in the same TypeScript environment. Versioning the API for backward compatibility requires the same discipline as any other API, but there are fewer guardrails. Teams that grow and need to split the frontend and backend monorepo sometimes find tRPC's tight coupling is a cost they did not plan for.
+
+### GraphQL on a product with multiple clients
+
+GraphQL earns its overhead when the same backend graph is queried by a web app, a mobile app, and third-party integrations, each needing different slices. The schema is a contract that all clients share. Changes to the schema are managed. Deprecations are visible. The graph lets each client ask for exactly what it needs.
+
+The overhead that surprises small teams is the operational side. Schema management, persisted queries, caching at the edge, and the N+1 query problem all require deliberate architecture. Libraries like Apollo Server and Pothos reduce the friction, but the complexity budget is higher than REST or tRPC.
+
+### REST as a stable foundation
+
+REST works everywhere. Every language, every framework, every third-party tool. The learning curve is flat. The contract between client and server is a URL and a JSON shape. OpenAPI keeps the types in sync when teams commit to it.
+
+The practical friction is over-fetching and under-fetching. A single REST endpoint returns a fixed shape. If the client only needs a subset, it still receives the full response. If the client needs data from multiple resources, it makes multiple requests. For most apps this is fine. For apps with complex, deeply related data, it becomes visible.
+
+## What it actually costs
+
+| Approach | Setup cost | Operational cost | Type safety |
+|---|---|---|---|
+| tRPC | Low, one package and a router | Low, zero schema management | Automatic end-to-end |
+| REST with OpenAPI | Moderate, schema definition and codegen | Moderate, keeping schema in sync | Opt-in via codegen |
+| GraphQL | High, schema, resolvers, client setup | High, caching, N+1 defense, versioning | Schema-driven via codegen |
+| Server Actions only | Very low, built into Next.js | Very low | Automatic within Next.js |
+
+## Features to look for in your data layer
+
+- Type safety without manual maintenance. Whether that is tRPC's inference, GraphQL codegen, or OpenAPI, hand-maintained types drift.
+- A caching story. React Query handles this for REST and tRPC. Apollo Client and URQL handle it for GraphQL.
+- Devtools. The ability to inspect requests, see cache state, and debug mutations in the browser.
+- A mutation pattern that handles optimistic updates, error recovery, and loading states cleanly.
+- A clear answer to authentication. How does the API token or session travel from the client to the server?
+- A versioning or backward-compatibility story if the API will have external consumers.
+
+## Expert opinion
+
+> Teams that pick GraphQL because it sounds serious usually wish they had started with something simpler. Teams that pick tRPC for a project that later needs a public API wish they had started with REST. The right pick requires being honest about what the project actually needs, not what might be needed in a hypothetical future. Most startups ship a REST API, use React Query on the frontend, and are fine.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+On a B2B SaaS product, the original team chose GraphQL because the founders had seen it at larger companies. The schema grew to cover six months of product development. The operational overhead was real: schema migrations, cache invalidation bugs, N+1 query incidents. When I joined to accelerate the product, the team had two engineers whose primary job was keeping the GraphQL layer healthy. We did not rewrite it. The graph was embedded in everything. But for new surfaces we added REST endpoints, and the developer velocity was noticeably faster.
+
+On a newer project, a founder-engineer building a Next.js SaaS alone, tRPC was the right call. One person, both ends of the stack, TypeScript throughout. The productivity gain was real. When the product grew and needed webhooks for third-party integrations, we added a thin REST layer for those specific endpoints. The tRPC procedures stayed for the internal app surface.
+
+For more context, [the state management question in 2026](/blog/the-state-management-question-in-2026) covers the client-side data story that plugs into these API choices, and [app router vs pages router the migration decision](/blog/app-router-vs-pages-router-the-migration-decision) covers how the Next.js architecture shapes which of these patterns fit best.
+
+## Common mistakes teams make
+
+1. Picking GraphQL because it seems serious, without accounting for the operational overhead on a small team.
+2. Using tRPC on a project that will need a public API or external consumers. The coupling creates a migration later.
+3. Not using React Query with REST. Manual fetch calls in useEffect are harder to maintain and harder to cache.
+4. Schema drift in REST APIs. The endpoint returns one thing, the TypeScript type says another, and bugs appear at runtime.
+5. N+1 queries in GraphQL. The resolver-per-field model produces database queries proportional to the result set size without DataLoader or batching.
+6. Server Actions for everything including large data fetches. Server Actions are optimized for mutations, not queries.
+7. Migrating an existing REST API to GraphQL as a refactor project. The cost is almost always higher than the gain at startup scale.
+8. No versioning strategy. The API changes, a client breaks, the team scrambles.
+
+## A 14 day plan
+
+1. **Day one to two.** Map the current data fetching in the app. List every API call by type: server data, mutations, real-time, external. Categorize what kind of state each one produces.
+2. **Day three to five.** If you are on REST without React Query, add it. Wrap existing fetch calls in useQuery. The caching and devtools alone are worth the migration.
+3. **Day six to nine.** If the project is TypeScript end-to-end and is a single team, evaluate tRPC for new endpoints. Port one section of the API as a proof of concept.
+4. **Day ten to fourteen.** Establish a type contract discipline. If staying on REST, set up OpenAPI or Zod schemas on the API responses. If using tRPC, confirm that compile errors propagate correctly end to end.
+
+For the broader frontend architecture picture, [the frontend architecture that survives three years of feature sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl) covers how these data layer choices fit into a longer time horizon, and [server components in practice a founder engineer story](/blog/server-components-in-practice-a-founder-engineer-story) covers how the App Router changes the data fetching model at the root.

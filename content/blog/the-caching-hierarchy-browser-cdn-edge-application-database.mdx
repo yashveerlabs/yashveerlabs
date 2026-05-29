@@ -1,0 +1,61 @@
+---
+slug: "the-caching-hierarchy-browser-cdn-edge-application-database"
+title: "The Caching Hierarchy: Browser, CDN, Edge, Application, Database"
+excerpt: "Every web application has five caching layers. Understanding which one to use for which data is how fast applications stay fast at scale."
+date: "2026-05-24"
+category: "Performance Optimization"
+tags: ["performance", "caching", "cdn", "database", "optimization"]
+readingMinutes: 7
+ogImage: "/api/og/blog/the-caching-hierarchy-browser-cdn-edge-application-database"
+status: "published"
+faq: [
+  {"q":"What is the difference between edge caching and CDN caching?","a":"They are often the same thing, delivered by CDN providers like Cloudflare, Fastly, or AWS CloudFront. \"Edge\" refers to computation or caching done at network nodes geographically close to the user. Some frameworks distinguish between pure caching (no computation) at the CDN layer and edge functions (computation) at the edge layer."},
+  {"q":"How do I handle cache invalidation for user-specific data?","a":"Cache user-specific data with a key that includes the user ID. When user data changes (profile update, settings change), invalidate the specific key for that user. Pattern-based cache deletion (invalidating all keys matching `user:*`) is useful but should be used carefully; it can produce cache stampede effects at scale."},
+  {"q":"Should I use Redis for session storage?","a":"Yes. Redis is the standard for session storage in distributed applications because it is fast, persistent across restarts, and horizontally scalable. The alternative, in-process session storage, breaks in multi-server deployments where requests from the same user can be routed to different servers."},
+  {"q":"What is a cache stampede and how do I prevent it?","a":"A cache stampede occurs when a popular cache key expires and many concurrent requests all miss the cache simultaneously, all querying the database at the same time. Prevention: use probabilistic early expiration (refresh the cache slightly before it expires), use mutex locks around cache population (only one request populates the cache, others wait), or use stale-while-revalidate patterns."},
+  {"q":"How do I know when to add more caching versus when to optimize the underlying query?","a":"Profile first. If a slow page has a database query that runs in 10ms, caching is appropriate. If the query runs in 2,000ms, fix the query. Application caches that hide slow queries are a performance debt that accumulates. The query optimizer and indexes are the first line of defense; the cache is the second."}
+]
+---
+
+# The Caching Hierarchy: Browser, CDN, Edge, Application, Database
+
+**Caching is the practice of storing computed results closer to where they are needed so future requests avoid the cost of recomputing them. Every modern web application has at least five caching layers: browser cache, CDN cache, edge cache, application cache, and database query cache. Each layer has different characteristics, different invalidation strategies, and different failure modes. Understanding which layer to use for which data is the difference between a fast application and one that is fast until it is not.**
+
+## What you need to know
+
+- Each caching layer has different latency characteristics; browser cache is the fastest, database query cache is the slowest
+- Cache invalidation is harder than caching; most cache bugs are invalidation bugs, not population bugs
+- The wrong cache layer for a data type creates correctness problems that are harder to debug than performance problems
+- Stale data from caching is a correctness issue, not just a freshness preference; budget for this in your data model decisions
+- Adding more caching does not always improve performance; caching the wrong things wastes memory and masks underlying problems
+
+## The core argument
+
+The caching hierarchy is best understood as a series of decisions about trade-offs between freshness, speed, and consistency. At the bottom of the hierarchy is the browser cache, which is the fastest because it requires no network request at all. Cache-Control headers tell the browser how long to serve a resource from local storage before revalidating. For static assets (JavaScript, CSS, images) with content-addressed filenames, a one-year max-age is correct. For HTML documents, no-cache or short max-age is usually correct because you want users to see fresh page content.
+
+The CDN sits above the browser cache in latency terms but below your origin server. A CDN edge node in London serving a user in London is orders of magnitude faster than a request to your origin server in Virginia. CDNs are best suited to cacheable responses: static assets, semi-static API responses like pricing pages or product catalogs, and in some architectures, personalized pages with edge personalization. The invalidation story with CDNs is the critical operational decision: most CDNs have a 30 to 60 minute propagation time for cache purges, which means content that must be invalidated immediately (a security patch, a pricing error) requires explicit purge calls to the CDN API before you can trust the cache is cleared.
+
+Application-level caching (Redis, Memcached, in-process memory) is where most engineering decisions live. Redis is the standard choice for distributed applications: it is fast, supports multiple data structures, and survives application restarts. The pattern is simple: before executing a database query, check Redis for a cached result. If found, return it. If not, execute the query, store the result in Redis with a TTL, and return it. The critical design decisions are the TTL (how stale can this data be?) and the invalidation strategy (how do you clear the cache when the underlying data changes?). TTL-based expiration is simpler but accepts staleness. Event-driven invalidation is more complex but keeps the cache current. For Nexli, critical data like user session state uses event-driven invalidation; less critical data like dashboard statistics uses TTL-based expiration with a five-minute window.
+
+## Common mistakes
+
+1. **Caching at the application layer before optimizing the database query.** An application cache that returns a slow query result in 5ms instead of 500ms is still returning the result of a slow query. Fix the query first. Cache the result second.
+2. **Setting cache TTLs without thinking about the staleness tolerance for that data.** A user's profile can tolerate five minutes of staleness. A user's account balance cannot. Different data types require different TTLs. Do not apply a single default TTL across all cached data.
+3. **Not planning for cache invalidation at the design stage.** The invalidation problem is harder than the caching problem. "We will add cache invalidation later" produces bugs that are difficult to diagnose because they appear as data inconsistency, not as errors.
+4. **Over-caching and running out of memory.** Redis has a finite memory budget. Caching large result sets with long TTLs fills it quickly. Use Redis eviction policies (LRU is standard) and monitor memory usage. A Redis instance that evicts cache entries due to memory pressure provides worse performance than one that never fills up.
+5. **Not monitoring cache hit rates.** A cache that is never hit is providing no value. A cache that is hitting 99 percent of the time is hiding a potentially expensive miss path. Monitor hit rates per cache key pattern and investigate outliers.
+
+## Where to start
+
+**Step 1: Audit your current caching stack and identify which layers you are actually using.** Most teams use only one or two of the five layers. Map what you have before deciding what to add.
+
+**Step 2: Add Cache-Control headers to your static assets first.** This is the highest-return, lowest-risk caching investment. A long max-age on content-addressed static assets requires zero infrastructure and delivers immediate performance improvement for returning visitors.
+
+**Step 3: Identify your three most expensive database queries and evaluate whether they are cacheable.** Look at queries that run frequently with the same parameters and return data that changes infrequently. These are the best candidates for Redis application caching. Start there before adding caching infrastructure for queries that actually need freshness.
+
+## Related reading
+
+- [Caching Strategies for Growing SaaS: From None to Multi-Layer](/blog/caching-strategies-for-growing-saas-from-none-to-multi-layer)
+- [The HTTP Caching Strategy That Most Teams Get Wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong)
+- [CDN Cache Headers: A Practical Primer](/blog/cdn-cache-headers-a-practical-primer)
+- [Why Your App Got Slower After You Added Users](/blog/why-your-app-got-slower-after-you-added-users)

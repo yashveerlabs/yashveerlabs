@@ -1,0 +1,124 @@
+---
+slug: "feature-flags-as-a-deployment-strategy"
+title: "Feature Flags as a Deployment Strategy"
+excerpt: "Feature flags are not just a release tool. Used well, they are the deployment strategy. The team that deploys to production multiple times a day with confidence does it with flags."
+date: "2026-05-22"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["deployment","feature-flags","devops","strategy"]
+readingMinutes: 11
+ogImage: "/api/og/blog/feature-flags-as-a-deployment-strategy"
+status: "published"
+definition: "Feature flags as a deployment strategy means using flag based rollout as the primary mechanism for getting new code in front of users. The deploy puts the code in production. The flag controls who sees it. The combination gives the team continuous deploy plus targeted release plus instant rollback. Used well, this is the deployment strategy that supports high velocity teams in 2026."
+faq: [
+  {"q":"How does this differ from blue green or canary?","a":"Blue green and canary control infrastructure routing. Feature flags control application behavior. The two compose. A team can canary deploy code that is then flag rolled to users. Feature flags are the layer above infrastructure deploy."},
+  {"q":"What does the deployment cycle look like?","a":"Code merges to main. CI builds and deploys to production. The code is in production but the feature is behind a flag. The team enables the flag for internal users, then for beta customers, then for a percentage of customers, then for everyone. The full rollout happens over days or weeks. Deploys and releases are separate events."},
+  {"q":"How does this change rollback?","a":"Rollback becomes flag toggle. Problem detected. Flag disabled. Problem resolved. The disable is instant. The infrastructure rollback that previously took minutes to half an hour is unnecessary. The flag toggle is seconds."},
+  {"q":"What is the role of canary deploy?","a":"Still useful for changes that cannot be flagged. Infrastructure changes. Cross cutting refactors. Library upgrades. The combination of canary deploy plus flag based release covers most situations cleanly."},
+  {"q":"How do I handle database migrations?","a":"Migrations are the part that flag based deployment does not cleanly handle. Migrations ship as part of the deploy. They are not flagged. The migration discipline of separate deployments for migrations versus application code becomes more important."},
+  {"q":"What is the cost?","a":"The cost is the flag service or the homegrown flag system. The cost is the discipline of removing flags when features are fully rolled out. The cost is the testing of multiple flag states. Each is real but manageable. The benefit is dramatically more capable deployment."},
+  {"q":"What is the worst feature flag deployment mistake?","a":"Deploying with the flag on. The flag was supposed to be a safety net. The team enabled the flag at deploy time and missed the rollout discipline. The first signal of a problem is in production. The rollback is harder than it would have been with the flag off as the default."}
+]
+---
+
+## What you actually need to know
+
+- Feature flags decouple deploy from release.
+- Rollback becomes flag toggle. Instant.
+- Canary deploy still useful for changes that cannot be flagged.
+- Migrations are separate from flag based release.
+- New features ship with flag off as the default.
+
+| Stage | What happens |
+|---|---|
+| Code merge | Triggers CI |
+| CI | Builds and runs tests |
+| Deploy | Code in production behind flag (off) |
+| Internal test | Flag on for internal users |
+| Beta | Flag on for selected customers |
+| Ramp | Flag percentage increases |
+| Full | Flag on for all customers |
+| Cleanup | Flag and old code removed |
+
+## The core argument
+
+Feature flags as a deployment strategy is the pattern that supports the highest velocity engineering teams in 2026. The team ships code to production continuously. The features go through a controlled rollout via flags. The release is independent of the deploy. The team has continuous shipping plus targeted release plus instant rollback.
+
+The mental shift is significant. The team that uses flags as the deployment strategy treats deploys as cheap and releases as deliberate. The code goes to production many times a day. The feature enables for users over days. The two are decoupled because the flag stands between them. The decoupling is what enables the velocity.
+
+The rollback story changes. Previously a problem with a new feature required an infrastructure rollback. The deploy of the previous version. The DNS or load balancer update. The minutes of cleanup. With flags, the rollback is the toggle. The flag disables. The feature stops appearing. The infrastructure is unchanged. The total recovery time is seconds.
+
+The combination with canary deploy is powerful. The canary deploy validates that the new code is structurally healthy. The flag rollout validates that the new feature is product healthy. The two layers protect against different failure modes. Both are valuable.
+
+The discipline that matters is flag hygiene. The flag exists to control rollout. The flag does not exist forever. The flag has a planned end. The flag is removed when the feature is fully rolled out. Without this discipline the codebase accumulates flag debt that slows everything else.
+
+## The deployment cycle in detail
+
+| Phase | Detail |
+|---|---|
+| Code merge to main | Triggers CI |
+| CI build and test | Verifies code health |
+| Production deploy | Code in production behind flag off |
+| Internal verification | Internal users have flag on |
+| Beta verification | Selected customers have flag on |
+| Gradual ramp | Percentage increases day by day |
+| Full release | All customers have flag on |
+| Stabilization | Flag remains on for a period to confirm |
+| Cleanup | Flag and old code path removed |
+
+## How much does this cost
+
+| Investment | Cost |
+|---|---|
+| Flag service or homegrown | Days to weeks |
+| Per feature flag work | Hours per feature |
+| Flag cleanup discipline | Hours per feature |
+| Testing multiple flag states | Variable |
+| Monitoring of flag evaluations | Modest |
+| Documentation per flag | Minutes per flag |
+
+## Features the deployment strategy must have
+
+- A flag service with runtime evaluation.
+- Targeting by user, tenant, percentage.
+- Logging of flag evaluations.
+- A clear default for unknown evaluation.
+- A removal process for old flags.
+- A documented playbook for rollouts.
+- Monitoring during ramp.
+- A clear distinction between release flags and permission flags.
+
+## Expert opinion
+
+> Feature flags as the deployment strategy is the pattern that produces the highest velocity engineering teams I have worked with. The code ships continuously. The features release deliberately. The rollback is instant. The combination is dramatically more capable than the alternative of branching, big releases, and infrastructure rollbacks. The investment in flag discipline pays back across every deploy.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client engineering team was shipping every two weeks with anxiety. Production incidents happened on about half the releases. The rollback process took thirty to ninety minutes per incident.
+
+We adopted feature flags as the deployment strategy. Every feature shipped behind a flag. The deploy cadence increased to multiple per day. The rollouts happened through flags over days. The rollback became flag toggle.
+
+The next quarter had one production incident from a release versus the previous quarter's eight. The incidents that did happen were resolved in seconds rather than half hours. The team's confidence in deploys rose. The customer experience improved.
+
+For more on the related work, see [feature flags a SaaS engineers best friend](/blog/feature-flags-a-saas-engineers-best-friend) and [blue green deployments vs canary vs rolling a decision tree](/blog/blue-green-deployments-vs-canary-vs-rolling-a-decision-tree).
+
+## Common mistakes teams make
+
+1. Deploying with the flag on as default.
+2. No targeting capability. All or nothing rollout.
+3. No flag cleanup. Debt accumulates.
+4. Mixing release flags and permission flags.
+5. No monitoring during ramp.
+6. No documentation per flag.
+7. No testing of multiple flag states.
+8. Treating flags as a substitute for testing rather than as deployment control.
+
+## A 30 day adoption plan
+
+1. **Week one.** Pick or build the flag service.
+2. **Week two.** Establish the convention. Every new feature ships behind a flag.
+3. **Week three.** Adopt the rollout playbook. Internal then beta then ramp then full.
+4. **Week four.** Build the cleanup discipline. Audit and document.
+
+For more on the related work, read [feature flags a SaaS engineers best friend](/blog/feature-flags-a-saas-engineers-best-friend) and [CI cd pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library). On the broader deployment side, [the deployment pipeline that survives real world pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure) is the natural next read.

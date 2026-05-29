@@ -1,0 +1,117 @@
+---
+slug: "background-job-queues-the-architecture-decision-founders-skip"
+title: "Background Job Queues: The Architecture Decision Founders Skip"
+excerpt: "Most SaaS products need background jobs from day one. Most founders treat the queue as an afterthought. The wrong queue choice compounds for years. The right choice runs quietly in the background and stays out of your way."
+date: "2026-05-19"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","background-jobs","architecture","queues"]
+readingMinutes: 12
+ogImage: "/api/og/blog/background-job-queues-the-architecture-decision-founders-skip"
+status: "published"
+definition: "A background job queue is the system that runs work asynchronously from the user request. It is the right place for sending email, processing files, calling external APIs, generating reports, and anything that should not block the response. The queue choice determines the failure model, the retry semantics, the observability story, and the operational tax of the product for years. Most founders pick by accident. The ones who pick by design save quarters of work."
+faq: [
+  {"q":"When do I need a background job queue?","a":"Day one for almost any SaaS. The first email, the first webhook, the first file upload all want to be async. Adding a queue later is significantly more painful than starting with one. Most modern stacks have a built in option that works for early scale."},
+  {"q":"What is the simplest queue I can start with?","a":"Postgres backed queues like Graphile Worker, River, or pg-boss. They run on your existing database, give you transactional guarantees, and have negligible operational overhead. They scale to roughly ten thousand jobs per minute before the database becomes the bottleneck."},
+  {"q":"When should I move off Postgres for queues?","a":"When you cross roughly five thousand jobs per minute and the database becomes a real bottleneck. The migration to Redis based queues like BullMQ or Sidekiq is straightforward. The migration to a dedicated queue like SQS, Inngest, or Trigger.dev is more involved."},
+  {"q":"What is the difference between a queue and a workflow engine?","a":"A queue runs individual jobs. A workflow engine like Temporal, Inngest, or AWS Step Functions runs multi step processes with state, retries per step, and durable execution. Use a queue for simple background work. Use a workflow engine for processes that span minutes to days."},
+  {"q":"How do I handle retries?","a":"Exponential backoff with a maximum attempt count and a dead letter destination. The job should be idempotent so retries do not duplicate side effects. The queue should expose the failure metadata to the developer."},
+  {"q":"What about scheduled jobs?","a":"Most modern queues support scheduled jobs. The dedicated alternative is a scheduler like cron or a managed service like Cloud Scheduler. For SaaS the in queue option is usually fine because it integrates with the rest of the job semantics."},
+  {"q":"How do I monitor a queue?","a":"Track the queue depth, the job throughput, the failure rate, and the latency from enqueue to start. Alert on queue depth above a threshold and on failure rate above a threshold. A queue that is silent is not necessarily healthy."}
+]
+---
+
+## What you actually need to know
+
+- Almost every SaaS needs a background queue from day one.
+- Postgres backed queues are the right starting point for most teams.
+- Move to Redis based or dedicated queues when scale demands.
+- Workflow engines are a different tool for multi step processes.
+- Idempotency, retries, and dead letter handling are non negotiable.
+
+| Queue option | Best fit | Scale ceiling | Operational tax |
+|---|---|---|---|
+| Postgres queue (Graphile, River, pg-boss) | Most early SaaS | 5k to 10k jobs per minute | Negligible |
+| Redis queue (BullMQ, Sidekiq) | Growing SaaS | 50k to 100k jobs per minute | Low |
+| SQS or RabbitMQ | High scale or specific routing needs | Hundreds of thousands per minute | Medium |
+| Inngest, Trigger.dev | Teams that want managed | Vendor scales | Lowest |
+| Temporal, Step Functions | Multi step workflows | High | Higher operational overhead |
+
+## The core argument
+
+Every SaaS I have rescued had a queue problem. The pattern is consistent. The team did not pick a queue. They picked the first thing that worked. The first thing that worked was usually a setTimeout, a hand rolled cron, or a Sidekiq install with no monitoring. The product worked at small scale. At meaningful scale, the queue became the source of incidents.
+
+The right queue is the one that matches the workload, the team size, and the operational appetite. A team of two engineers should not be running Kafka for background jobs. A team of fifty engineers should not be running a single Postgres table. The choice changes as the product grows.
+
+The mistake is treating the queue as a low value decision. The queue is one of the three or four architectural choices that compound. Get it right and the product grows quietly. Get it wrong and the team spends a year unwinding the choice while the product stalls.
+
+The good news is that the modern landscape has good defaults. For most early stage SaaS, a Postgres backed queue is the right call. The operational tax is near zero. The scale is sufficient for the first few thousand customers. The migration path to something heavier is well understood.
+
+## Picking the right queue for the workload
+
+Three workload shapes. Steady state low volume. Bursty high volume. Long running stateful.
+
+Steady state low volume is the easy case. A few hundred jobs per minute, predictable. Almost any queue works. Pick the one that integrates cleanly with your stack.
+
+Bursty high volume is where the queue choice matters. The queue has to absorb the burst without dropping jobs and process them as fast as the worker pool allows. Redis based queues handle this well. Postgres based queues hit limits earlier.
+
+Long running stateful is the workflow engine case. A job that runs across multiple steps over hours or days, with retries per step and the ability to resume after a worker restart. Temporal, Inngest, and Step Functions are the right tools. A simple queue is the wrong tool.
+
+## How much does this cost
+
+| Option | Engineering setup | Monthly cost at modest scale | Notes |
+|---|---|---|---|
+| Postgres queue | A few hours | Negligible | Runs on your existing database |
+| Redis queue | Half a day | 50 to 200 USD for Redis | Add Redis to the stack |
+| SQS | Half a day | Under 50 USD | AWS specific |
+| Inngest | Half a day | Free to 200 USD | Managed |
+| Trigger.dev | Half a day | Free to 200 USD | Managed |
+| Temporal Cloud | One to two days | Higher | Workflow engine |
+
+## Features the queue must have
+
+- Idempotent job design as a first class concern.
+- Exponential backoff with maximum retry count.
+- Dead letter destination for terminal failures.
+- Observability for queue depth, throughput, failure rate, and latency.
+- Schedule support for cron style jobs.
+- Worker concurrency control to prevent resource exhaustion.
+- A clear path from development to production.
+
+## Expert opinion
+
+> The queue is the part of the system that runs in the dark. It does not have a UI. It does not have a request log. It does not surface its failures unless you wire them up. The teams that take the queue seriously from day one get a quiet, reliable layer. The teams that treat it as an afterthought get the loudest incidents of their year.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had been running their background work on a hand rolled cron loop that processed a database table. The system worked for the first three thousand customers. At seven thousand customers the cron loop was missing windows and producing duplicate work. The team had spent six weeks trying to patch it.
+
+We migrated to a Postgres backed queue with idempotent jobs and exponential backoff retries. The migration took eight working days. The queue depth dropped from a backlog of hundreds of thousands of stuck jobs to a steady state of under a thousand. The duplicate work stopped.
+
+Eighteen months later, at thirty thousand customers, we migrated the highest volume job class to a Redis queue. The migration was contained because the abstraction over the queue had been built correctly the first time. The team did not have to rewrite job logic.
+
+For more on the related architecture work, see [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) and [async job failure recovery patterns that actually work](/blog/async-job-failure-recovery-patterns-that-actually-work).
+
+## Common mistakes teams make
+
+1. No queue at all. Long running work in the request thread.
+2. Hand rolled cron loops over a database table.
+3. Jobs that are not idempotent. Retries duplicate side effects.
+4. No dead letter handling. Failed jobs disappear into the void.
+5. No observability. The queue is a black box.
+6. Mixing job priorities in one queue. A low priority job blocks a high priority one.
+7. Treating the queue as the workflow engine. Multi step state belongs elsewhere.
+8. Picking Kafka for background jobs. Wrong tool for the workload.
+
+## A two week plan to put a queue in place
+
+1. **Day one.** Inventory the candidate background work. Email, webhooks, exports, scheduled tasks.
+2. **Days two and three.** Pick the queue. Postgres backed for most early SaaS.
+3. **Days four to six.** Migrate the first job. Send the welcome email through the queue.
+4. **Days seven to nine.** Migrate the rest. Make every job idempotent.
+5. **Day ten.** Wire observability. Queue depth, throughput, failure rate.
+6. **Days eleven and twelve.** Set up alerts. Define the runbook.
+7. **Days thirteen and fourteen.** Load test. Confirm the queue handles the expected burst.
+
+For more on the related infrastructure work, read [background jobs at scale Inngest Trigger Cron and beyond](/blog/background-jobs-at-scale-inngest-trigger-cron-and-beyond) and [workflow engines when you need Temporal when you need Cron](/blog/workflow-engines-when-you-need-temporal-when-you-need-cron). On the reliability side, [why your SaaS should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one) is the natural next read.

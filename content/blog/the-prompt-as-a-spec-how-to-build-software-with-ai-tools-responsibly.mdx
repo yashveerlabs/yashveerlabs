@@ -1,0 +1,114 @@
+---
+slug: "the-prompt-as-a-spec-how-to-build-software-with-ai-tools-responsibly"
+title: "The Prompt as a Spec: How to Build Software With AI Tools Responsibly"
+excerpt: "Teams that get consistent results from AI coding tools treat the prompt like a specification document. Teams that get inconsistent results treat it like a search query. The difference is in the discipline, not the tool."
+date: "2024-12-20"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-prompt-as-a-spec-how-to-build-software-with-ai-tools-responsibly"
+status: "published"
+definition: "Using a prompt as a spec means writing the context, constraints, and expected behavior into the prompt the same way you would write a technical specification. The model then generates code against a defined target rather than guessing intent from a few words. Teams that do this get reproducible, reviewable output. Teams that skip it get code that works once and breaks under any variation. The discipline is cheap. The alternative is not."
+faq: [
+  {"q":"What should a good prompt spec include for code generation?","a":"At minimum: the language and framework, the existing pattern in the codebase you want to match, the specific input and output types, any constraints on dependencies or external calls, and what a correct result looks like. If you would write those things in a Jira ticket for a junior engineer, they belong in the prompt. Vague prompts produce vague code."},
+  {"q":"Is prompt engineering a real engineering discipline?","a":"Yes, in the same way that writing clear technical requirements is a real skill. It is not glamorous and most engineers resist treating it seriously. The ones who do invest the time write shorter prompts that get better results because they have learned how to specify intent precisely. That precision carries over to every other kind of written communication on a team."},
+  {"q":"How do I use a prompt as a spec for a feature I do not fully understand yet?","a":"Start with the spec writing process rather than the prompt. Write out what the feature needs to do, what data it touches, and what the edge cases are. The act of writing that usually clarifies the parts you did not understand. Then the prompt follows naturally from the spec. If you cannot write the spec, you are not ready to prompt for code yet."},
+  {"q":"What is the biggest mistake teams make when using AI for software development?","a":"Treating the AI output as done rather than as a first draft. AI generated code needs the same review as a junior engineer's pull request. It needs tests, edge case consideration, and architectural review. Teams that skip review because the code looks right in isolation ship bugs that only appear under production load or adversarial input."},
+  {"q":"How do you version control prompts used in software development?","a":"Store them in the repo as markdown files alongside the code they generated. This gives you a history of what instruction produced what output. If the generated code needs to be regenerated after a dependency update, you have the original spec. If a new engineer needs to extend the feature, they can see the original intent."},
+  {"q":"Can you use AI tools responsibly without slowing down the team?","a":"Yes, and responsible use is usually faster in the medium term. The overhead of writing a clear prompt spec takes maybe twenty minutes. The overhead of debugging code that came from a vague prompt, reviewing an AI PR that wandered outside scope, or explaining to a senior engineer why a dependency was introduced without discussion takes days."},
+  {"q":"What is the difference between vibe coding and responsible AI coding?","a":"Vibe coding is generating code from a feeling, iterating until it seems to work, and shipping without a clear understanding of what was built. Responsible AI coding starts with a specification, uses the AI to generate against that spec, reviews the output like any other PR, and leaves behind artifacts that explain the intent. The first approach works for demos. The second works for products."}
+]
+---
+
+## What you actually need to know
+
+- A prompt is a specification. If the prompt is vague, the output is vague. The discipline of writing a clear prompt is the same discipline as writing a clear technical requirement.
+- AI coding tools do not know your codebase, your team's conventions, or the edge cases in your data. You have to supply that context explicitly in the prompt.
+- The code an AI tool generates needs the same review process as code from a junior engineer. Skipping review because it looked right on first read is how bugs get shipped.
+- Storing prompts in version control alongside generated code is a practice that most teams skip and almost all teams eventually wish they had adopted.
+- The failure mode is not that the AI produces bad code. The failure mode is that the team produces bad specs and then blames the AI for the result.
+
+| Prompting approach | Output quality | Reviewability | Reproducibility |
+|---|---|---|---|
+| Single sentence, no context | Varies widely | Difficult | Low |
+| Multi sentence with framework and pattern | Consistent for simple cases | Moderate | Medium |
+| Full spec with constraints and examples | Consistent across variations | High | High |
+| Spec stored in repo and versioned | Consistent and recoverable | Highest | Highest |
+
+## The core argument
+
+The premise that AI coding tools will replace software specifications is wrong. They have done the opposite. They have made the quality of your specification the single biggest factor in the quality of your output. A senior engineer who knows how to write a tight specification gets dramatically better results from these tools than a junior engineer who types a sentence and hopes. The gap between those two outputs is not the AI. It is the spec.
+
+I have seen this in my own work on client codebases. The teams getting genuine productivity gains from AI coding tools have developed a discipline around prompt writing that looks a lot like requirement writing. They specify the framework, the pattern they want to follow, the inputs and outputs, the edge cases they care about, and sometimes a worked example from an existing part of the codebase. The AI generates against that specification. The result is code that fits the codebase and handles the cases that matter.
+
+The teams that are not getting value, or worse, generating technical debt faster than before, are using one sentence prompts and then iterating through confusion until the code compiles. That process produces working code in the same way that a random walk eventually gets you somewhere. The destination is not reliably useful.
+
+There is a second dimension to responsible use: what happens after the code is generated. The teams that treat AI output as a draft subject to full review are building better software. The teams that merge AI output without review because it passed tests are shipping systems nobody understands. That second category is the origin story of most vibe-coded codebases.
+
+## The prompt spec discipline
+
+### What belongs in every prompt for code generation
+
+The language and version. The framework and any relevant library constraints. The specific function or component you are asking for, with types if applicable. The pattern from the existing codebase you want to match, with an example if the codebase is complex. Any constraints on what the code should not do: no additional dependencies, no external calls, no state mutation outside defined boundaries. What a correct result looks like for a simple input.
+
+That is approximately two hundred words of context for most tasks. It takes five to ten minutes to write. Engineers who do it consistently report that their rework rate on AI generated code drops significantly after the first week.
+
+### How to handle the parts of the spec you do not know yet
+
+If you cannot write the constraint, you do not know it yet. That is useful information. Writing the prompt forces the same clarifying work that a good specification forces. If I cannot write down what the edge cases are, I have not thought about them. The prompt writing process is also a design review process. Engineers who treat it that way build better habits than engineers who use it to skip thinking.
+
+### Storing prompts in the repo
+
+I keep a directory called `prompts` or `ai-specs` in the repo for any feature where the generated code is substantial. Each file contains the prompt, the date, the model, and the file that was generated. When the generated code needs to be updated, I have the original intent. When a new engineer extends the feature, they can read why it was built the way it was. This costs almost nothing and has rescued me from two situations where significant refactoring was needed and the original intent was otherwise lost.
+
+## What it requires
+
+| Practice | Time investment | Impact on output quality |
+|---|---|---|
+| Writing a full prompt spec before generating | 5 to 15 minutes per feature | High |
+| Storing prompts in version control | Setup once, 2 minutes per use | High for maintainability |
+| Reviewing AI output like a junior PR | 15 to 30 minutes per PR | Critical |
+| Running the full test suite on generated code | Automated after setup | Required for confidence |
+| Adding edge case tests for generated logic | 30 to 60 minutes per feature | High for production reliability |
+
+## What to look for when reviewing AI generated code
+
+- Does the generated function match the signature and typing conventions of the rest of the codebase?
+- Are all external dependencies already present in the project, or did the AI introduce something new?
+- Are the edge cases handled, or does the code only work for the happy path the prompt described?
+- Is there any logic that the reviewer cannot explain? That is a signal to understand before merging.
+- Does the generated code duplicate something that already exists in the codebase?
+- Are there any hardcoded values that should be configuration?
+- Does it handle errors, or does it assume everything succeeds?
+
+## Expert opinion
+
+> The engineers I have worked with who get the most out of AI coding tools are the ones who write the best specs. That is not a coincidence. The discipline of specifying precisely what you want is the same discipline whether you are writing for a human engineer or a language model. The tool did not create that discipline, it just made the quality of the specification more visible in the output.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A team I worked with was building a document processing pipeline. They had been using an AI coding assistant for three months and were frustrated that the output quality varied so much between engineers on the team. One engineer's PRs from the AI were clean and merged quickly. Another's consistently required significant rework. The difference was not the tool. The first engineer was writing two hundred word prompt specs that described the pattern to follow and the edge cases to handle. The second was writing one sentence prompts and iterating.
+
+We ran a half day workshop where the whole team wrote prompt specs together for a new feature, following the discipline of the first engineer. The output from the workshop prompts required about forty percent less review time than the team's average for AI generated PRs. The team adopted a simple template for prompt specs, stored them in the repo, and made it part of their PR process. Within a month the variance across engineers had dropped noticeably. For the related question of what happens when teams skip this discipline and inherit a vibe-coded codebase, see [vibe coding rescue](/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt). For the code review side, [AI assisted code review](/blog/ai-assisted-code-review-a-process-that-actually-helps) covers how to structure the review pass on top of the generation step.
+
+## Common mistakes
+
+1. Writing a one sentence prompt and iterating through confusion instead of writing the spec first.
+2. Treating the first AI output that compiles as done. It is a first draft.
+3. Letting the AI introduce dependencies without checking whether they are already in the project or whether a simpler alternative exists in the existing stack.
+4. Not storing the prompt alongside the generated code, which leaves future engineers with no record of why something was built the way it was.
+5. Generating the same type of function multiple times without creating a prompt template, which produces inconsistent implementations across the codebase.
+6. Using AI to generate security sensitive code without a detailed review from someone who understands the threat model.
+7. Generating a large feature in one prompt instead of breaking it into units that can each be reviewed independently.
+8. Assuming the AI knows the edge cases in your data. It knows general programming patterns. It does not know your users.
+
+## A 30 day plan
+
+1. **Week one.** Pick one current feature in development. Write a full prompt spec before generating any code. Compare the output to a feature you built without a spec. Note the difference in review time.
+2. **Week two.** Create a prompt spec template for the two or three most common code patterns in your stack. Store them in the repo.
+3. **Week three.** Add prompt storage to your PR process. Any PR that includes substantial AI generated code should link to the prompt spec.
+4. **Week four.** Audit one month of AI generated PRs. Identify which ones required the most rework. Read the prompts that produced them. The pattern is usually a missing constraint or a missing edge case in the spec.
+
+For more on building responsibly with AI tools, see [why AI generated code breaks in production](/blog/why-ai-generated-code-breaks-in-production) and [the top five architectural failures in AI assisted codebases](/blog/the-top-five-architectural-failures-in-ai-assisted-codebases).

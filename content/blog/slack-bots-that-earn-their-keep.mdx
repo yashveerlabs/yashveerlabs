@@ -1,0 +1,65 @@
+---
+slug: "slack-bots-that-earn-their-keep"
+title: "Slack Bots That Earn Their Keep"
+excerpt: "Most Slack bots get built, used for a week, and forgotten. Here is what makes the ones that stick work."
+date: "2026-05-23"
+category: "Business Automation and Ops"
+tags: ["automation","operations","internal-tools","slack"]
+readingMinutes: 7
+ogImage: "/api/og/blog/slack-bots-that-earn-their-keep"
+status: "published"
+faq: [
+  {"q":"What is the Slack Bolt SDK?","a":"Slack Bolt is the official SDK for building Slack apps in JavaScript/TypeScript and Python. It handles OAuth installation flows, event subscriptions, action callbacks, and interactive components. It is the standard starting point for any new Slack bot build."},
+  {"q":"How do you handle Slack's 3-second response requirement?","a":"Slack requires a 200 response to incoming events within 3 seconds. For bots that trigger slow operations (database queries, external API calls), use deferred responses: acknowledge immediately, then use the response URL to post the actual result asynchronously."},
+  {"q":"Do you need to pay for Slack to build bots?","a":"The Slack API and app platform are available on free workspaces. Some features (message retention, certain bot scopes) are limited on the free plan. For internal bots in a paid workspace, you have access to the full API."},
+  {"q":"Can Slack bots access direct messages?","a":"Yes, with the appropriate OAuth scopes and user permission. Most internal automation bots operate in channels rather than DMs. DM bots are useful for personal notifications (expense approvals, leave requests) but require users to install the bot and grant DM access."},
+  {"q":"What is the best way to deploy a Slack bot?","a":"For simple bots: a serverless function on Vercel or AWS Lambda handles webhook events with no server management. For bots with persistent state or high event volume: a long-running Node or Python process on Fly.io or Railway. The choice depends on event volume and state requirements."}
+]
+---
+
+# Slack Bots That Earn Their Keep
+
+**A Slack bot that earns its keep is one that reduces friction on a workflow people already do, not one that adds a new workflow nobody asked for. The best internal Slack bots do one thing well: surface the right information at the right moment, trigger an action without context switching, or route a notification to the right person without requiring someone to manually pass it along. The bots that get abandoned try to do too much or automate something that was not actually a bottleneck.**
+
+## What you need to know
+
+- Slack bots earn their keep when they automate a repetitive workflow that currently involves someone manually switching between tabs or pinging the right person
+- The highest-value Slack bot categories: deployment notifications, incident alerts, customer signals (new signups, churned accounts, revenue milestones), and approval workflows
+- Building on the Slack Bolt SDK (Python or Node.js) is the current standard; it handles OAuth, event subscriptions, and interactive components
+- Bots with interactive components (buttons, modals, dropdowns) have significantly higher engagement than bots that only post messages
+- The graveyard of abandoned Slack bots is full of bots that required new habits from users; build bots that fit existing habits
+
+## The core argument
+
+The Slack bots that run in production for years without anyone maintaining them are all variations on the same thing: they surface information that people were already looking for elsewhere. A deployment notification bot that posts to #deployments when a release goes out eliminates the need for everyone to check a CI/CD dashboard. A revenue notification that posts when Stripe records a new subscriber eliminates the need for anyone to refresh the dashboard. A customer health score bot that alerts the #customer-success channel when a key account drops below a threshold surfaces information that would otherwise require a manual query.
+
+The bots that die are the ones that create new workflows instead of improving existing ones. I have seen founders build elaborate Slack bots for standup reporting, meeting note distribution, and feature request tracking, only to watch them go unused within a month. People did not hate those workflows; they just had existing tools that were good enough. The bot was not filling a gap; it was competing with the existing solution with the disadvantage of being less polished.
+
+The highest-leverage internal bots I have built or configured for clients are ones at the intersection of events and notifications. Velmora's internal tooling includes a bot that posts new customer inquiries to #sales with a one-click CRM add button. Expert Tutorials uses a bot that notifies #team when a new course enrollment happens, with the student's country and referral source. Prominence Football Academy has a bot that surfaces parent portal sign-ups to the admin team channel. None of these required new habits. They deliver information that was already wanted through the channel where the team already lives.
+
+## Common mistakes
+
+1. **Building a bot that requires users to learn a command syntax.** Slash commands work for power users who will memorize `/deploy production` but are useless for anyone who has to look up the syntax every time. Interactive components (buttons in a message) are almost always better.
+
+2. **Posting too much.** A bot that posts on every minor event trains the team to ignore it. Set notification thresholds thoughtfully. Revenue milestones, not every transaction. High-severity alerts, not every log line.
+
+3. **No error handling or fallback.** Bots that go silent when the upstream API is down or return empty messages when a query fails erode trust. Every bot should handle errors visibly and gracefully.
+
+4. **Making the bot stateless when state is required.** Approval workflows, multi-step forms, and interactive sequences require the bot to remember context between interactions. Use a database or cache to store conversation state.
+
+5. **Not testing with the actual Slack workspace before launch.** Slack's permission model, workspace settings, and channel configurations vary. A bot that works in development may not work in production if the workspace has restricted app installations or limited bot scopes.
+
+## Where to start
+
+1. **List the three most repetitive manual information tasks your team does.** Who checks what, how often, and what action do they take after? That list is your bot backlog. Start with the one where the information is already in a system (Stripe, GitHub, your CRM) that has a webhook or API.
+
+2. **Build a notification-only bot first.** No interactivity, no slash commands. One event, one message, one channel. Get that working reliably before adding complexity. This is also the fastest way to validate that the notification is actually useful.
+
+3. **Add one interactive component after the first version is proven.** The most common and highest-value interactive element is an approval button or a quick-action link. Once you have a message people read, adding a button that lets them act without switching apps dramatically increases the value.
+
+## Related reading
+
+- [The Business Automation Map: Where Founders Lose Hours](/blog/the-business-automation-map-where-founders-lose-hours)
+- [Building an Operations Stack Without an Operations Team](/blog/building-an-operations-stack-without-an-operations-team)
+- [Zapier vs Make vs n8n vs Custom in 2026](/blog/zapier-vs-make-vs-n8n-vs-custom-in-2026)
+- [The Internal Notification System for Founders](/blog/the-internal-notification-system-for-founders)

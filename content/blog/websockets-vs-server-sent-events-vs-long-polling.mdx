@@ -1,0 +1,116 @@
+---
+slug: "websockets-vs-server-sent-events-vs-long-polling"
+title: "WebSockets vs Server Sent Events vs Long Polling"
+excerpt: "Three ways to push data from a server to a client, each with different costs and different sweet spots. The right pick depends on the direction of the data, the platform constraints, and the failure modes you can tolerate."
+date: "2025-11-27"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 12
+ogImage: "/api/og/blog/websockets-vs-server-sent-events-vs-long-polling"
+status: "published"
+definition: "WebSockets are bidirectional and stateful, the right choice for chat and collaborative editing. Server-Sent Events are one-way server-to-client, cheaper and simpler for live updates and feeds. Long polling is a fallback that works everywhere but pays request overhead per message. Pick by traffic shape, infrastructure constraints, and whether you actually need two-way communication."
+faq: [
+  {"q":"When should I use WebSockets?","a":"When the client also needs to send messages to the server in real time. Chat, collaborative editing, multiplayer games, live drawing. WebSockets give you a persistent two-way channel. The cost is the connection state on the server and the infrastructure that supports long-lived connections."},
+  {"q":"When should I use Server-Sent Events?","a":"When the server pushes data to the client but the client does not push back over the same channel. Live feeds, notifications, server-driven progress bars, streaming AI responses. SSE is simpler to operate than WebSockets and works over plain HTTP, which makes it friendlier with CDNs and proxies."},
+  {"q":"What about long polling?","a":"It works everywhere, including environments hostile to other patterns. It is also the most expensive per message because every update requires a new HTTP request and response. Use it as a fallback or when you genuinely cannot run a persistent connection. Do not pick it as a default for new builds in 2026."},
+  {"q":"Do CDNs support WebSockets?","a":"Cloudflare and a few others do. Many CDNs do not, or charge extra for it. SSE works through any HTTP CDN because it is just an HTTP response that does not close. This is one of the strongest practical reasons to pick SSE over WebSockets when you can."},
+  {"q":"How many WebSocket connections can a server hold?","a":"Tens of thousands per modest server with proper tuning. Hundreds of thousands with a tuned event-driven runtime. The bottleneck is rarely connection count; it is memory per connection. The cost shows up in scaling out, where you need session affinity or a shared state layer."},
+  {"q":"What about reconnection logic?","a":"Critical for all three but easiest with SSE because the browser's EventSource handles reconnection automatically. WebSockets need explicit reconnection logic on the client. Long polling reconnects by definition. Whichever you pick, the connection will drop. Plan for it."},
+  {"q":"Can I use HTTP/2 push instead?","a":"HTTP/2 server push was an experiment that did not take off and is being removed. Do not pick it for new builds. SSE and WebSockets are the modern answers for server-to-client streaming. The lesson is that the simpler patterns won."}
+]
+---
+
+## What you actually need to know
+
+- WebSockets: bidirectional, stateful, best for two-way real time.
+- SSE: server-to-client only, simpler, works through HTTP CDNs.
+- Long polling: works everywhere, expensive per message, use as fallback.
+- The direction of the data is the first question. If it is one-way, SSE is usually right.
+- CDN compatibility is the second question. SSE wins this one decisively.
+
+| Concern | WebSockets | SSE | Long polling |
+|---|---|---|---|
+| Direction | Two-way | Server-to-client | Either, expensive |
+| Protocol | WS over TCP | HTTP | HTTP |
+| Connection model | Persistent | Persistent HTTP response | Repeated requests |
+| CDN support | Limited | Universal | Universal |
+| Reconnection | DIY on client | Automatic via EventSource | Built-in by design |
+| Cost per message | Lowest | Low | Highest |
+
+## The core argument
+
+Picking between these three is usually about the direction of data and the constraints of your infrastructure, not about performance. Real-time performance is similar for all three at human-perception timescales. The differences that matter are operational.
+
+WebSockets are powerful and expensive. Powerful because they give you a persistent two-way channel with low overhead per message. Expensive because they live outside the HTTP request-response model, which means most of your infrastructure that assumed HTTP does not work the same way. CDNs, proxies, load balancers, observability tools, all of these have to be configured specifically to support WebSockets.
+
+SSE is the underdog that quietly solves most real-time needs. It runs over plain HTTP, works through any CDN, and the browser API handles reconnection for you. The only thing it cannot do is push from the client to the server, but for most use cases the client can use a normal HTTP POST when it needs to send data. The bidirectional pattern is not actually required for most of what people call real-time.
+
+Long polling is the fallback. It works in every environment because it is just HTTP requests. It is the most expensive per message because every update is a full request and response cycle. For new builds in 2026, it is rarely the right primary pattern, but it is still a useful fallback when nothing else works.
+
+The decision tree is straightforward. Do you need two-way real time? WebSockets, or accept the complexity. Do you need one-way real time? SSE. Are you in an environment where neither works? Long polling.
+
+## Where each shines
+
+### WebSockets
+
+For collaborative editing, chat, multiplayer games, anything where both sides push messages frequently. The bidirectional channel and low overhead per message is what makes this pattern fit. The cost is infrastructure that has to support persistent connections, sticky sessions, and a more complex scaling story.
+
+### SSE
+
+For server-pushed updates of any kind. Notifications. Live feeds. Streaming responses from AI models. Progress bars. Stock tickers. Anywhere the data flows from server to client and the client sends back through normal API calls when it needs to.
+
+Streaming AI responses deserves special mention. Most LLM streaming uses SSE because it works with HTTP infrastructure, supports browser-side automatic reconnection, and is easy to implement on the server. WebSockets would work but the simplicity of SSE wins.
+
+### Long polling
+
+For environments where neither WebSockets nor SSE works reliably. Some corporate networks. Some older CDNs. Some platforms that do not support long-lived connections. As a fallback in a degraded mode. Almost never as the primary pattern in 2026.
+
+## How much does it cost
+
+| Concern | WebSockets | SSE | Long polling |
+|---|---|---|---|
+| Server memory per connection | Low | Low | Negligible (no persistent connection) |
+| Server CPU per message | Lowest | Low | Highest (full request handling) |
+| Bandwidth overhead per message | Lowest | Low | Highest (HTTP headers each time) |
+| Infrastructure complexity | Highest | Low | Lowest |
+| CDN/proxy compatibility | Worst | Best | Best |
+
+## What to weigh before picking
+
+- Direction of data: one-way or two-way.
+- Frequency: high enough to justify a persistent connection.
+- Infrastructure: what your CDN, load balancer, and platform support.
+- Platform fit: serverless platforms often do not support WebSockets.
+- Reconnection tolerance: how often clients can drop and resume.
+- Scale story: WebSockets need session affinity or shared state.
+
+## Expert opinion
+
+> The default I reach for in 2026 is SSE. It handles 80 percent of what people call real time, runs over plain HTTP, works through any CDN, and the browser handles the reconnection. WebSockets earn their place when the use case is genuinely bidirectional and the team has the infrastructure to support persistent connections. Long polling is a fallback worth implementing, not a primary choice. Most teams reach for WebSockets when SSE would have been simpler and cheaper.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client wanted "real-time notifications" and assumed they needed WebSockets. Their infrastructure was Vercel for the frontend and Cloud Run for the API. Vercel does not host WebSocket servers. Cloud Run could but would require careful setup. The team was about to do a substantial infrastructure detour for what was a one-way notification feed.
+
+We switched the design to SSE. The notification endpoint streamed events over a long-lived HTTP response. The browser handled reconnection automatically. The change took an afternoon. The result was identical from the user's perspective, and the infrastructure stayed simple. The same pattern shows up in [real-time collaboration in web apps](/blog/real-time-collaboration-a-web-app-engineering-primer) and the broader API direction question in [trpc vs rest vs graphql on the frontend](/blog/trpc-vs-rest-vs-graphql-on-the-frontend).
+
+## Common mistakes
+
+1. Picking WebSockets for one-way data when SSE would have been simpler.
+2. Building on a platform that does not support WebSockets, then trying to make WebSockets work.
+3. Not implementing reconnection logic and assuming connections will stay open.
+4. Treating SSE as deprecated. It is not. It is alive and increasingly the right answer.
+5. Using long polling as a default in 2026 instead of as a fallback.
+6. Putting WebSocket servers behind CDNs that do not support them.
+7. Forgetting that scaling persistent connections requires session affinity or a shared state layer.
+
+## A two week plan to pick and ship
+
+1. **Day one.** Identify the direction of your data and the frequency of updates.
+2. **Day two.** Check your infrastructure constraints. CDN, hosting platform, proxies.
+3. **Days three to five.** Build a prototype on the chosen pattern. Verify the reconnection behavior.
+4. **Week two.** Ship in production behind a feature flag. Monitor connection counts and message rates.
+5. **Week two ongoing.** Roll out broadly. Document the choice and the tradeoffs in [an ADR](/blog/the-architecture-decision-record-a-lightweight-discipline).
+6. **Long term.** Plan a fallback path. Even SSE drops sometimes. The graceful degradation pattern is what makes real-time feel reliable.

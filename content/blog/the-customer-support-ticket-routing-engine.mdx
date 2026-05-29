@@ -1,0 +1,74 @@
+---
+slug: "the-customer-support-ticket-routing-engine"
+title: "The Customer Support Ticket Routing Engine"
+excerpt: "How to build a support ticket routing system that gets tickets to the right person in under 60 seconds without a full-time support operations team."
+date: "2026-04-04"
+category: "Business Automation and Ops"
+tags: ["automation","support","operations","routing"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-customer-support-ticket-routing-engine"
+status: "published"
+definition: "A support ticket routing engine takes an incoming ticket and assigns it to the right person, team, or queue automatically. Without routing, every ticket lands in a shared inbox and someone manually decides who should handle it. That manual decision adds 5 to 30 minutes of latency per ticket and creates a bottleneck that does not scale past 50 tickets per day."
+faq: [
+  {"q":"When do I need a ticket routing engine?","a":"When you have more than one person handling support, or when tickets require different expertise for different topics. A single founder handling all support does not need routing. Two people with different specializations handling support need even basic routing to prevent tickets from being overlooked or double-handled."},
+  {"q":"What is the simplest routing logic to start with?","a":"Keyword tagging. Identify 5 to 10 topic categories from your most common ticket types. Write a keyword list for each category. Route tickets containing billing keywords to the billing queue, technical keywords to engineering, and onboarding keywords to customer success. Build this in a day with Zapier or your support platform's native rules."},
+  {"q":"Should I use AI to classify support tickets?","a":"For teams handling more than 100 tickets per day, yes. A simple classifier that tags tickets by topic and urgency adds significant value at that scale. For teams under 50 tickets per day, keyword rules are more predictable and easier to maintain."},
+  {"q":"What information should the routing engine capture with the ticket?","a":"Customer account tier (free vs paid), account age, previous ticket history, and the specific product area mentioned. This information lets the routed engineer understand the context before opening the ticket, cutting average resolution time."},
+  {"q":"How do I measure whether routing is working?","a":"Track first response time per queue, resolution time per category, and ticket bounce rate (tickets reassigned after initial assignment). If any queue has significantly higher first response time, the routing rules for that queue need review."}
+]
+---
+
+## What you actually need to know
+
+- A routing engine adds value the moment you have more than one person handling support, or more than 30 tickets per day.
+- Keyword-based routing covers 80 percent of tickets. The remaining 20 percent need human triage.
+- Route by topic first, then by urgency. Topic determines who can help. Urgency determines how fast.
+- Capture account context with every ticket: tier, age, previous tickets. Context cuts resolution time.
+- Measure first response time per queue. That is the metric that reveals routing problems.
+
+| Routing Approach | Tickets Handled Well | Build Time | Maintenance |
+|---|---|---|---|
+| No routing (shared inbox) | Under 30/day | None | None, until it breaks |
+| Keyword rules | 30 to 100/day | 1 to 2 days | Low |
+| AI classifier | 100 to 1000/day | 1 to 2 weeks | Medium |
+| Custom ML model | 1000+/day | 4 to 8 weeks | High |
+
+## The core argument
+
+Every SaaS product I have worked with reached a support bottleneck at roughly the same point. The company had grown past the point where one person could handle all tickets, but had not yet built the routing logic to distribute them. The shared inbox had 40 unread tickets. Nobody was sure which ones had been claimed. Billing questions sat next to technical bugs. Enterprise customers waited 48 hours for answers that a five-minute routing rule would have delivered in two.
+
+The routing engine is a force multiplier for the support team. It does not reduce the number of tickets. It reduces the cost of each one by ensuring the ticket reaches the right person with the right context without manual triage. A well-routed ticket has the customer's account tier, their previous ticket history, and the topic category pre-populated. The support engineer opens it and immediately knows the context.
+
+The implementation does not need to be complex. A routing engine that covers 80 percent of tickets is good enough. The other 20 percent can be routed manually. Building the perfect classifier before the basic rules are in place is backwards engineering. Start with keyword rules. Add context capture. Add urgency scoring. Improve from there.
+
+## How to build the routing engine
+
+**Step one: Categorize your ticket types.** Look at the last 100 tickets your team received. Group them by topic. The grouping will reveal 5 to 10 natural categories: billing, technical bug, integration help, onboarding, account management, feature request. Write down each category and the keywords that signal it.
+
+**Step two: Map categories to queues.** Each category maps to a queue or a specific person. Billing tickets go to the billing queue. Technical bugs go to engineering. Onboarding questions go to customer success. This is the routing table.
+
+**Step three: Add context enrichment.** When a ticket comes in, look up the submitter's account. Attach their tier, their account age, and the number of previous tickets. This information appears in the ticket header before the support engineer reads the body.
+
+**Step four: Add urgency scoring.** Tickets from enterprise accounts, tickets about data loss, and tickets about billing errors are high urgency. Tickets from free tier accounts asking about features are low urgency. A simple rule that promotes certain tickets to a priority queue takes 30 minutes to write.
+
+## Common mistakes in ticket routing
+
+1. Building the routing engine in a shared inbox without any system support. Routing logic needs to be codified in software, not in people's heads.
+2. Building too many categories. Five to ten categories is enough. More than ten creates routing confusion.
+3. Not capturing account context automatically. Support engineers who manually look up account information take three times longer per ticket.
+4. Not having a fallback queue for tickets that do not match any routing rule. Those tickets need to land somewhere, even if that somewhere is "unclassified for human triage."
+5. Not reviewing the routing rules quarterly. As the product evolves, the ticket taxonomy changes. Rules that were accurate six months ago may route tickets to the wrong queue today.
+
+## Where to start: a 3-step routing engine setup
+
+**Step 1: Audit 100 recent tickets.** What were the five most common topics? What keywords appeared in each topic? This audit is the routing table.
+
+**Step 2: Build the keyword rules in your support tool.** Intercom, Zendesk, Freshdesk, and most modern support platforms have native routing rules. Build the keyword-to-queue rules today. Test with 10 tickets from each category.
+
+**Step 3: Add account tier to the ticket template.** Configure your support form or incoming email handler to look up the submitter's account and attach their tier to the ticket. Most platforms support this with a CRM integration or a custom webhook.
+## Related reading
+
+- [The Business Automation Map: Where Founders Lose Hours](/blog/the-business-automation-map-where-founders-lose-hours)
+- [Workflow Automation for SaaS: A Founder's Guide](/blog/workflow-automation-for-saas-a-founders-guide)
+- [The Customer Onboarding Automation Map](/blog/the-customer-onboarding-automation-map)
+- [Building an Operations Stack Without an Operations Team](/blog/building-an-operations-stack-without-an-operations-team)

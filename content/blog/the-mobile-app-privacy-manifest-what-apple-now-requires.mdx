@@ -1,0 +1,157 @@
+---
+slug: "the-mobile-app-privacy-manifest-what-apple-now-requires"
+title: "The Mobile App Privacy Manifest: What Apple Now Requires"
+excerpt: "Apple's privacy manifest requirements are now enforced at App Store review. What to declare, how to declare it, and what happens if you miss something."
+date: "2025-02-26"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","privacy","apple","ios"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-app-privacy-manifest-what-apple-now-requires"
+status: "published"
+definition: "The Apple privacy manifest (PrivacyInfo.xcprivacy) is a structured declaration of the data a mobile app collects, the APIs it uses that access sensitive device data, and the purpose behind each data access. Apple began requiring privacy manifests for new apps and significant updates in Spring 2024. Third-party SDKs that access certain APIs must also provide their own privacy manifests. Missing or inaccurate privacy manifest declarations can cause App Store rejection and App Store Connect warnings."
+faq: [
+  {"q":"What does the privacy manifest file actually contain?","a":"Four types of declarations: NSPrivacyCollectedDataTypes (what types of user data the app collects), NSPrivacyAccessedAPITypes (which privacy-sensitive APIs the app uses, such as file timestamp APIs or system boot time APIs), NSPrivacyTrackingDomains (domains the app contacts for cross-app tracking, only required if the app uses ATT), and NSPrivacyTracking (whether the app tracks users across apps or websites). The format is a plist file (XML property list) added to the Xcode project. Each SDK that accesses sensitive APIs must also have its own PrivacyInfo.xcprivacy."},
+  {"q":"Which APIs trigger a privacy manifest requirement?","a":"Apple calls these 'required reason APIs.' The categories: file timestamp APIs (accessing modification date of files), system boot time APIs (used for measuring time intervals), disk space APIs (accessing available disk space), active keyboard APIs (detecting which keyboard is active), and user defaults APIs (NSUserDefaults). Apps that use these APIs must declare the reason in the privacy manifest. The required reason must be one of Apple's approved reasons for each API category -- not a custom reason."},
+  {"q":"How do I find out what privacy manifest declarations my third-party SDKs require?","a":"Check the SDK's official documentation and GitHub releases for their PrivacyInfo.xcprivacy file. Most major SDKs (Sentry, PostHog, Firebase, Stripe) have published their own privacy manifests and provide guidance on including them. Run the Xcode privacy report (Product > Generate Privacy Report) to get a summary of all privacy manifest content in your app, including third-party SDKs. Any SDK that uses required reason APIs but does not provide a privacy manifest will cause App Store Connect warnings."},
+  {"q":"What happens if I submit an app with an incomplete or missing privacy manifest?","a":"Since Spring 2024, Apple has been sending email notifications to developers when App Store Connect detects missing or inaccurate privacy manifest content. The notifications include specific guidance on what is missing. For new submissions with significant issues, App Store review may reject the build. For apps already on the store, the rejections are not retroactive but any significant update submission will need to pass the updated review requirements. The safest approach is to audit the privacy manifest before every major release."},
+  {"q":"Do React Native and Flutter apps have different privacy manifest requirements?","a":"Same requirements, different implementation. For React Native, the PrivacyInfo.xcprivacy file is added to the iOS module of the project (inside the ios/ directory in the Xcode project). Third-party React Native libraries with native iOS code should provide their own manifests -- check the library's documentation or iOS pod directory for a PrivacyInfo.xcprivacy file. For Flutter, the manifest is added to the Runner target in Xcode. Third-party Flutter plugins with native iOS code should similarly provide their own manifests -- check the plugin's ios/ directory."}
+]
+---
+
+## What you actually need to know
+
+- The PrivacyInfo.xcprivacy file is now required for all iOS apps that use any of Apple's "required reason APIs." Missing it causes App Store Connect warnings and potentially review rejection.
+- Third-party SDKs (analytics, crash reporting, payment) have their own privacy manifest requirements that are separate from the app's. Check each SDK you use.
+- The Xcode Privacy Report (Product > Generate Privacy Report) shows the aggregated privacy declarations from your app and all included SDKs -- run this before every App Store submission.
+- The required reason for each API access must be one of Apple's approved reasons listed in their documentation -- custom reasons are not accepted.
+- NSUserDefaults is a commonly missed required reason API. Most apps use it; most developers do not initially realize it requires a privacy manifest declaration.
+
+| API Category | Common Use | Required Reason Examples |
+|---|---|---|
+| File timestamp APIs | Cache management | DDA9.1 (app functionality) |
+| System boot time | Session timing | 35F9.1 (prevent fraud) |
+| Disk space | Storage management | E174.1 (app functionality) |
+| Active keyboard | Input handling | 54BD.1 (app functionality) |
+| NSUserDefaults | Settings, preferences | CA92.1 (app functionality) |
+
+## The core argument
+
+The privacy manifest requirement caught many developers off guard when Apple began enforcing it in 2024. The requirement is not new in spirit -- Apple has always required accurate privacy disclosures -- but the PrivacyInfo.xcprivacy format is a new, machine-readable mechanism that allows Apple to systematically audit compliance rather than relying on self-reported disclosures.
+
+The developers who had clean App Store review experiences after Spring 2024 are the ones who proactively audited their privacy manifests, including checking the manifests provided by their third-party SDKs. The developers who faced delays and rejection emails were the ones who discovered the requirement during the submission process.
+
+The practical implication for anyone building a mobile app in 2026: the privacy manifest audit is a pre-submission checklist item, the same as the App Store screenshot dimensions or the build configuration check. It takes 30-60 minutes to audit if you are doing it for the first time, and much less for subsequent updates once the initial declarations are in place.
+
+## What the privacy manifest file looks like
+
+The PrivacyInfo.xcprivacy file is an XML plist added to the Xcode project. A minimal example for an app that uses NSUserDefaults and accesses file timestamps:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSPrivacyTracking</key>
+  <false/>
+  
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
+  
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>CA92.1</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>
+```
+
+This manifest declares: the app does not track users across apps (NSPrivacyTracking: false), it collects email addresses linked to user identity for app functionality, and it accesses NSUserDefaults for app functionality (reason code CA92.1).
+
+## How to add it to a React Native project
+
+For React Native, the file is added to the iOS Xcode project:
+
+1. Open the project in Xcode (open `ios/YourApp.xcworkspace`).
+2. In the Project Navigator, right-click on the main project folder (not Pods) and select "New File."
+3. Search for "Privacy" in the template picker, select "App Privacy," and save it as `PrivacyInfo.xcprivacy`.
+4. Make sure the file is added to the main target (not test targets).
+
+Alternatively, create the file manually and add it to the Xcode project by dragging it into the Project Navigator.
+
+For checking what APIs the app uses, Xcode's static analyzer can help: run Product > Analyze and look for privacy API usage. The Xcode Privacy Report (Product > Generate Privacy Report, available when archiving for distribution) provides the most complete view.
+
+## Third-party SDK compliance
+
+The majority of privacy manifest issues come from third-party SDKs, not from the app code directly. Every iOS native SDK that accesses required reason APIs must provide its own PrivacyInfo.xcprivacy. When building the app, Xcode merges all the privacy manifests from all included SDKs into the final app submission.
+
+**Sentry:** Sentry's iOS SDK 8.7.0+ includes a privacy manifest. Update to this version or later and no additional action is required for the Sentry-related declarations.
+
+**PostHog:** PostHog's iOS SDK 3.0.0+ includes a privacy manifest. Check the GitHub repository's `PrivacyInfo.xcprivacy` in the iOS SDK directory.
+
+**Firebase:** Firebase iOS SDK 10.12.0+ includes privacy manifests for each module. If using Firebase Analytics, the NSPrivacyTracking declaration may need to be `true` if ATT consent is being used for advertising purposes.
+
+**Stripe:** Stripe's iOS SDK 23.18.2+ includes a privacy manifest.
+
+For any SDK that does not yet provide a privacy manifest but accesses required reason APIs, you must include the declaration in your app's manifest. The SDK's documentation or GitHub issues are the best source for this information.
+
+## Finding undeclared API usage
+
+The Xcode Privacy Report is the primary tool for finding undeclared API usage. To generate it: archive the app for distribution (Product > Archive), then in the Organizer, click "Generate Privacy Report" on the selected archive. The report shows all privacy manifest content aggregated from the app and all SDKs, and flags any required reason APIs that are used but not declared.
+
+For React Native, there is an additional step: the JavaScript layer can use APIs through native modules that are not visible at the Swift/Objective-C level. Review the native modules used by your JavaScript dependencies (by checking their iOS native code) to ensure their privacy requirements are covered.
+
+## The App Store Connect warning emails
+
+Since Spring 2024, Apple has been sending automated emails from App Store Connect when submissions include apps with privacy manifest issues. The emails are specific about what is missing:
+
+> ITMS-91053: Missing API declaration -- Your app's code references one or more APIs that require reasons, which are listed below. If you're using these APIs and targeting iOS 17 or later, you must provide an approved reason in your app's privacy manifest file, located at [...]. If you're not using these APIs, you can ignore this warning.
+
+The ITMS codes in the email identify the specific API and the category. Cross-reference these codes with Apple's "Required Reason API" documentation to find the approved reason codes for each.
+
+## Common mistakes teams make with privacy manifests
+
+1. Not checking third-party SDKs for their own privacy manifests. The app's PrivacyInfo.xcprivacy only covers the app code; each SDK is responsible for its own declarations. Using an outdated SDK version that predates privacy manifest support is the most common source of App Store Connect warnings.
+2. Using custom reasons instead of Apple's approved reason codes. The privacy manifest only accepts Apple's predefined reason codes (like "CA92.1" for NSUserDefaults used for app functionality). Custom text reasons are not accepted.
+3. Not running the Xcode Privacy Report before submission. The report aggregates all SDK manifests and flags missing declarations. Running it takes 5 minutes and catches issues before the App Store review process does.
+4. Declaring data types that are not collected. Inaccurate privacy manifest declarations (declaring data collection that does not happen) are a policy violation. Declare only what is actually collected.
+5. Not updating the privacy manifest when adding new SDKs. Adding a new analytics or crash reporting SDK after the initial privacy manifest audit is a common source of App Store Connect warnings on subsequent submissions. Review the manifest with every new SDK addition.
+
+## Where to start: a 3-step privacy manifest audit
+
+**Step 1: Run the Xcode Privacy Report on your current build.** This is the fastest way to identify what is and is not declared. The report flags missing required reason API declarations and shows the data types claimed by all included SDKs.
+
+**Step 2: Check the version of each major SDK (Sentry, analytics tools, payment SDKs) and verify it includes a privacy manifest.** If any SDK is below the version that added privacy manifest support, update it. Outdated SDK versions without privacy manifests are the most common cause of App Store Connect warning emails.
+
+**Step 3: Add the PrivacyInfo.xcprivacy file to the Xcode project with the accurate declarations for the app code.** Start with NSUserDefaults (reason: CA92.1) if the app uses it -- most apps do. Add the data types the app collects (email, name, device ID) with the purpose for each.
+
+## The Declaration That Keeps the App in the Store
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app needed a privacy manifest audit before a major feature update in 2024. The audit took an afternoon: running the Xcode Privacy Report, finding three warning-level issues (two from an outdated analytics SDK and one from a file caching library), updating both libraries to versions with correct manifests, and adding a NSUserDefaults declaration to the app's own manifest. The submission went through review without a single ITMS warning. The four hours of audit work prevented the rejection-and-resubmission cycle that would have delayed the feature release by a week. That is the value of the privacy manifest being a pre-submission checklist item rather than an afterthought.
+
+## Related reading
+
+- [The Mobile App Analytics Stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026)
+- The App Store Submission Checklist That Actually Works
+- [The Hybrid Mobile Architecture: WebView Heavy Apps in 2026](/blog/the-hybrid-mobile-architecture-webview-heavy-apps-in-2026)
+- [The Mobile App Onboarding Flow That Converts](/blog/the-mobile-app-onboarding-flow-that-converts)

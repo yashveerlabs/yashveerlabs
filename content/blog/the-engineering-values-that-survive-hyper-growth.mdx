@@ -1,0 +1,89 @@
+---
+slug: "the-engineering-values-that-survive-hyper-growth"
+title: "The Engineering Values That Survive Hyper Growth"
+excerpt: "Which engineering team values hold up when headcount doubles in a year -- and which ones collapse under the pressure of scale."
+date: "2026-02-05"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","culture","scaling","values"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-values-that-survive-hyper-growth"
+status: "published"
+definition: "Engineering values survive hyper growth when they are specific enough to guide behavior in situations that did not exist when the values were written. The value that says 'move fast' does not tell a team of 80 engineers when to slow down for a security review. The value that says 'we deploy to production when we are confident the change is safe' does tell them. The values that survive scale are the ones that are specific about what they mean in practice."
+faq: [
+  {"q":"What is hyper growth and why is it specifically challenging for engineering culture?","a":"Hyper growth is a period where the team doubles or triples in headcount within 12 to 18 months. It is challenging for engineering culture because the culture at 20 engineers is transmitted through direct interaction -- people see the values in practice daily. At 60 engineers, most of the new hires have never interacted with the people who established the culture. Values that existed only in the leaders' behavior do not transmit. Values that are written, taught, and demonstrated survive."},
+  {"q":"How do you preserve engineering values during rapid hiring?","a":"Embed the values in the interview process (ask candidates to demonstrate the value in the interview, not just affirm it), in the onboarding (first-week discussion of how each value applies to common engineering situations), and in the promotion criteria (the engineer who is promoted to senior has demonstrated the values, not just the technical criteria). Values that appear in decisions about who gets hired and promoted are values that survive."},
+  {"q":"Which engineering values tend to collapse under growth?","a":"Informality and implicit trust. At 10 engineers, everyone knows each other and trust is assumed. At 60 engineers, the new engineer who deploys without review is not breaking a cultural norm they know about -- they are operating on different assumptions. The informal values that worked when everyone was in the same room require formalization to survive the scale where informal transmission fails."},
+  {"q":"How do I write engineering values that are specific enough to be useful?","a":"For each value, write three scenarios where the value would guide a decision differently than the alternative value would. If the value does not change the decision in any concrete scenario, it is too abstract to be useful. A value that generates specific decisions is a value that can be taught and transmitted."},
+  {"q":"What is the role of the engineering leader in preserving values through growth?","a":"Modeling and narrating. The engineering leader who explains their decisions in terms of the team's values -- 'we are slowing this down to do a proper security review because we value shipping safely, not just shipping quickly' -- is transmitting the values more effectively than any written document. Values that are modeled by leaders and explained explicitly are more durable than values that exist only in policy documents."}
+]
+---
+
+## What you actually need to know
+
+- Values that exist only in the original team's behavior do not survive the transition from 20 to 60 engineers. They must be written, taught, and embedded in decisions.
+- The values that collapse first under growth are the informal ones: informal trust, informal review processes, informal communication norms. Formalization is not betrayal -- it is what enables the informal culture to scale.
+- Engineering values survive growth when they appear in hiring decisions, promotion criteria, and incident responses -- not just in written documents.
+- The engineering leader who explains their decisions in terms of the team's values is doing more to preserve culture than any culture deck.
+- Specific values survive. Abstract values do not.
+
+| Value Type | Survives Growth? | Why | How to Preserve It |
+|---|---|---|---|
+| Specific and behavioral ("we review every PR before merging") | Yes | Can be taught and checked | Embed in process |
+| Abstract and aspirational ("we value quality") | No | Uninterpretable at scale | Replace with specific version |
+| Informal trust-based ("just ship it if you think it's ready") | No | Fails when trust network breaks | Formalize the criteria |
+| Leadership-modeled ("leader explains decisions in terms of values") | Yes, if formalized | Survives as long as leader stays | Document and teach the why |
+
+## The core argument
+
+The engineering team that has strong values at 15 engineers and weak culture at 60 engineers has not experienced a culture collapse -- it has experienced a transmission failure. The values were real. The mechanism for transmitting them to new engineers was not sufficient to handle the rate of hiring.
+
+At 15 engineers, values are transmitted through direct interaction. Every engineer has worked directly with the founders or the early team members. The values are visible in the behavior of the people they spend every day with. The implicit standard for how code review should be done, when a deployment is safe to push, and how disagreements should be resolved is absorbed through osmosis because the team is small enough to observe these behaviors directly.
+
+At 60 engineers, most of the team has never worked directly with the people who established the culture. The new hires are observing each other, the team leads in their immediate orbit, and the processes the company has formalized. If the values are only in the original team's behavior, they reach the new hires as a faint signal filtered through multiple intermediaries. What arrives is often a distorted version or nothing at all.
+
+The engineering values that survive growth are the ones that have been formalized sufficiently to be transmitted without requiring direct contact with the founding team. This formalization is not necessarily written documents -- it includes interview processes that test for the value, promotion criteria that reward it, incident responses that invoke it, and leaders at every level who explain their decisions in terms of it.
+
+## The specific values that tend to survive
+
+**Code review as a learning mechanism, not a gatekeeping mechanism.** At scale, code review practices often degrade in one of two directions: rubber-stamping (reviews that happen quickly and say nothing) or gatekeeping (reviews that are slow and demanding without being developmental). The teams that maintain meaningful code review at scale are the ones where the value is specific: "code review is for learning and knowledge transfer, not just quality checking. Every reviewer should identify one thing they learned from the diff."
+
+**Ownership over assignment.** The value that engineers take ownership of problems -- that they do not wait to be assigned the work they see needs to be done -- is a value that creates high-functioning teams. At scale, this value is at risk because large organizations create ownership ambiguity. The engineering team that preserves this value at scale does so by making ownership explicit: every system has a designated owner, every incident has a designated responder. Ownership that is specific survives.
+
+**Transparency about technical debt.** The team that treats technical debt as visible and manageable, rather than hidden and shameful, maintains better technical health as it scales. This value survives growth when it is embedded in the planning process: every quarter, the team identifies the three highest-risk technical debts and allocates capacity to address them. The value is in the process, not just in the sentiment.
+
+**Shipping safely over shipping quickly.** This value is frequently stated and frequently violated under growth pressure. The teams that maintain it are the ones where the definition of "safely" is specific: a checklist of what a safe deployment includes (tests passing, monitoring in place, rollback tested), not a judgment call that is made differently by every engineer. The specific definition is what survives when the judgment-based version fails.
+
+## Common failure modes during hyper growth
+
+The most common pattern: a company doubles its engineering team in 18 months, the new hires optimize for shipping fast because that is the visible incentive, the incident rate increases, the original team members note that "the culture has changed," and the engineering leader is surprised because the values were "obvious."
+
+The values were obvious to the original team. They were not obvious to the new hires, who never observed the behaviors that embodied the values and were never explicitly taught them. The cultural values that were transmitted through osmosis at 15 engineers are not transmitted the same way at 60 engineers.
+
+The engineering leader who notices this pattern and says "we need to get back to our values" has misdiagnosed the problem. The values may be intact in the original team. The transmission mechanism failed. The fix is not a culture talk -- it is a systematic investment in the processes that make the values visible and teachable to engineers who did not experience the origin.
+
+## Common mistakes engineering leaders make with values during growth
+
+1. Assuming values will transmit through culture rather than through process. Culture transmits through process at scale. The informal culture of a small team requires formalization to reach a large team.
+2. Writing values in abstract language. "We value excellence" is not a value that can be taught or checked. "We do not merge code without passing tests and a reviewer's approval" is.
+3. Not updating values as the company grows. The values appropriate for a 10-person team are not identical to the values appropriate for a 100-person team. Some values (informal trust, quick decision-making) need formalization. Others (customer obsession, technical rigor) can scale if formalized correctly.
+4. Leaving values transmission to the people operations team. Engineering values must be modeled and transmitted by engineering leaders. A culture deck written by HR is not a substitute for an engineering leader who explains every significant technical decision in terms of the team's values.
+5. Not including values in promotion criteria. The engineer who is promoted for technical output alone, regardless of whether they model the team's values, sends a clear signal about which behaviors are actually rewarded.
+
+## Where to start: a 3-step values preservation plan
+
+**Step 1: Identify the three engineering behaviors that most define the team's culture.** Not the stated values. The actual behaviors that the best engineers on the team exhibit that distinguish them from less effective engineers. Write each behavior in a sentence that is specific enough to evaluate.
+
+**Step 2: Embed each behavior in the hiring, onboarding, and promotion process.** How will you test for this behavior in the interview? How will you teach it in the onboarding? How will you reward it in the promotion criteria? Each touchpoint is a reinforcement of the value.
+
+**Step 3: Have the engineering leader narrate every significant technical decision in terms of the values.** "We are doing this because we value X" is the most effective values transmission mechanism. Do this in every public engineering forum: the all-hands, the incident review, the architecture review.
+
+## Values That Outlast the Founding Team
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The engineering values I have tried to transmit through my own projects are the ones that are specific enough to guide decisions I have not anticipated. The informal values that worked when I was the only engineer will not work when there is a team. The formalization that makes values transmissible is the investment that makes culture durable.
+
+## Related reading
+
+- [The Engineering Culture Document That Engineers Actually Read](/blog/the-engineering-culture-document-that-engineers-actually-read)
+- [The Engineering Onboarding That New Hires Love](/blog/the-engineering-onboarding-that-new-hires-love)
+- [The Engineering Org Chart at 5, 25, and 100 Engineers](/blog/the-engineering-org-chart-at-5-25-and-100-engineers)
+- [The Engineering All Hands That Engineers Look Forward To](/blog/the-engineering-all-hands-that-engineers-look-forward-to)

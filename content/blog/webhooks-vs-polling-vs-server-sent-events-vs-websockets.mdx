@@ -1,0 +1,134 @@
+---
+slug: "webhooks-vs-polling-vs-server-sent-events-vs-websockets"
+title: "Webhooks vs Polling vs Server Sent Events vs WebSockets"
+excerpt: "Working notes on webhooks vs polling vs server sent events vs websockets. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-03-21"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 13
+ogImage: "/api/og/blog/webhooks-vs-polling-vs-server-sent-events-vs-websockets"
+status: "published"
+definition: "Webhooks, polling, server-sent events, and WebSockets are four ways to move data between a server and a client when something changes. Each has a different cost, reliability profile, and implementation complexity. I pick between them based on who initiates the connection, how often the data changes, and whether the channel needs to carry data in both directions."
+faq: [
+  {"q":"When should I use webhooks instead of polling for event notifications in a SaaS backend?","a":"Use webhooks when the consumer is a server that can receive HTTP requests, the events are infrequent or unpredictable, and you want the producer to push data rather than having the consumer burn CPU asking for it. Polling is acceptable when the consumer cannot expose a public endpoint, the event frequency is high enough that polling at a short interval misses nothing, or the consumer needs to control the read rate."},
+  {"q":"What is the difference between server sent events and WebSockets for real time data?","a":"Server-sent events are unidirectional: the server pushes data to the browser over a persistent HTTP connection. WebSockets are bidirectional: both sides can send messages at any time over a persistent TCP connection. SSE is simpler to implement and works through HTTP proxies. WebSockets are necessary when the browser also needs to send frequent messages, such as in a chat app or collaborative editor."},
+  {"q":"How do I make webhooks reliable so deliveries are not lost?","a":"The producer stores the event before attempting delivery. If delivery fails or times out, the producer retries with exponential backoff. The consumer endpoint is idempotent so duplicate deliveries do not cause problems. Both sides log delivery attempts and outcomes. Most production webhook systems include a dead letter queue for events that exhaust all retries."},
+  {"q":"What are the infrastructure costs of maintaining WebSocket connections at scale?","a":"Each open WebSocket connection holds a file descriptor and some memory on the server, typically 2 to 10 kilobytes depending on the implementation. At ten thousand concurrent connections, this is manageable on a single server. At a hundred thousand, you need a dedicated connection tier, usually a service like Ably, Pusher, or a custom gateway. The cost comes from connection state, not bandwidth."},
+  {"q":"Can polling be a good architectural choice in 2026 or is it always wrong?","a":"Polling is fine when the alternative adds complexity that the product does not need. A SaaS dashboard that refreshes every thirty seconds over HTTP is simple, reliable, and costs almost nothing. The case for replacing polling with SSE or WebSockets arrives when you need sub-second updates, when the polling frequency is causing noticeable load on the server, or when the product genuinely requires real-time feel."},
+  {"q":"How do I implement server sent events in a Next.js or Node.js backend?","a":"SSE uses a standard HTTP response with Content-Type of text/event-stream. The response stays open and the server writes formatted event data to it. In Node.js, you set the headers, hold the response object, and call res.write as events occur. In Next.js with the App Router, you use a ReadableStream returned from a Route Handler. No special library is required for basic SSE."},
+  {"q":"What is the best way to handle reconnection and missed events in a polling or SSE architecture?","a":"Store a cursor or sequence number with each event. The client includes its last seen cursor in every request or reconnection. The server returns all events after that cursor. This pattern, sometimes called a resumable event stream, ensures that a brief network interruption or client restart does not silently drop events. It works for polling, SSE, and even WebSocket reconnections."}
+]
+---
+
+## What you actually need to know
+
+- These four patterns are not competitors. They serve different use cases. Choosing the right one requires understanding who initiates the connection and which direction data flows.
+- Polling is the default. It is simple, reliable, and almost always sufficient below a certain freshness requirement.
+- Webhooks push data server to server. SSE pushes data server to browser. WebSockets are bidirectional and carry more operational cost.
+- Reliability in webhooks and SSE requires explicit design: idempotency, retries, cursor-based resumption.
+- In my experience, the fastest engineering mistake in this space is reaching for WebSockets when SSE would have been enough.
+
+| Pattern | Direction | Who initiates | Latency | Complexity | Best for |
+|---|---|---|---|---|---|
+| Polling | Pull | Client | High (interval-bound) | Very low | Simple dashboards, infrequent updates |
+| Webhooks | Push | Server to server | Low | Moderate (reliability design) | Payment events, third-party integrations |
+| Server-sent events | Push | Server to client | Low | Low | Live feeds, notifications, progress |
+| WebSockets | Bidirectional | Either | Very low | High | Chat, collaborative tools, live games |
+
+## The core argument
+
+Every few years someone declares that polling is dead. It never is. Polling is the most boring way to get fresh data from a server, and boring is often exactly right. A background job that fetches updated data every thirty seconds is predictable, easy to debug, trivially retried, and requires nothing from the server that it would not already do for a normal request. If your product can tolerate thirty second latency on updates, polling is the correct default.
+
+The argument for moving away from polling starts when either latency or load becomes a genuine problem. If users need to see changes within a second, a thirty-second polling interval is not sufficient. If ten thousand users are each polling every ten seconds, that is a hundred thousand requests per minute that exist purely to confirm that nothing has changed. At that scale, the load from polling is a line item in the infrastructure cost.
+
+The escalation path runs roughly from polling to SSE to WebSockets, with webhooks being a separate track for server-to-server rather than server-to-client communication. Each step up the escalation path increases capability and increases complexity. The question is whether the product genuinely needs the capability at the cost of the complexity.
+
+For most SaaS products, the right answer is: polling for most things, SSE for the handful of surfaces that need live updates, webhooks for server-to-server event delivery, and WebSockets only if the product is fundamentally collaborative or chat-based. That is a smaller footprint than most teams implement.
+
+## The four patterns in detail
+
+### Polling
+
+The client sends a request on an interval and receives the current state. Nothing stays open between requests. The server is stateless with respect to the connection. The client handles its own refresh logic.
+
+The failure mode is freshness. A thirty-second interval delivers news that can be thirty seconds old. For a payment status or a delivery tracking update, that is often fine. For a live cursor position in a collaborative document, it is not.
+
+The advantage is simplicity. Every HTTP caching layer, every proxy, every load balancer, and every monitoring tool understands a polling request. Nothing special is required from the infrastructure.
+
+### Webhooks
+
+The producer system sends an HTTP POST to a URL that the consumer provides when something happens. No polling. The consumer registers a URL, and the producer calls it.
+
+The reliability design is the non-trivial part. The producer should store the event before attempting delivery. If the consumer is unavailable or slow, the producer retries with exponential backoff. The consumer endpoint must be idempotent so that retry delivery does not cause a duplicate action. Both sides should log delivery attempts.
+
+The [webhooks reliability post](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong) covers this in detail, but the summary is: the difference between a webhook implementation that works in testing and one that works in production is almost entirely in the retry and idempotency design.
+
+### Server-sent events
+
+The client opens an HTTP connection to a SSE endpoint and keeps it open. The server writes formatted event data to the response stream whenever something changes. The client receives events in real time. If the connection drops, the browser reconnects automatically.
+
+SSE is unidirectional. Data flows server to client. If the client also needs to send data, that goes over a separate HTTP request, not the SSE stream. This is usually fine. Most real-time UIs need the server to push changes and the client to send user actions as separate events.
+
+SSE works through HTTP/2 multiplexing, through standard proxies, and through typical load balancers. It does not require a special protocol upgrade or dedicated infrastructure. The implementation is a long-lived HTTP response with the right content type header.
+
+### WebSockets
+
+The client initiates a WebSocket handshake over HTTP, then the connection is upgraded to a persistent TCP channel. Both sides can send messages at any time. The channel stays open as long as both sides keep it alive.
+
+The capability is genuine: sub-ten-millisecond round-trip latency, bidirectional, multiplexable over HTTP/2. The cost is real: connections are stateful, they need to be routed consistently to the same server or managed through a broker, and horizontal scaling requires either sticky sessions or a shared pub/sub layer like Redis.
+
+For a collaborative document editor or a multiplayer game, WebSockets are the right call. For a dashboard that needs to show live metric updates, SSE is almost always sufficient and much simpler to operate.
+
+## What it actually costs
+
+| Pattern | Server-side cost | Client complexity | Scaling approach |
+|---|---|---|---|
+| Polling | Per-request, stateless | Minimal | Standard horizontal scaling |
+| Webhooks | Per-delivery attempt | Consumer needs a public endpoint | Standard, with delivery queue |
+| SSE | One open connection per user | Browser handles reconnect | Sticky sessions or stateless stream proxy |
+| WebSockets | One persistent socket per user | Reconnection, buffering logic | Broker or pub/sub layer, more complex |
+
+At ten thousand concurrent users, SSE and WebSocket costs are similar: each connection holds a file descriptor and some memory. The difference is in the operational design. SSE connections are HTTP and can be balanced by standard load balancers. WebSocket connections need consistent routing, which requires either sticky sessions or a broker.
+
+## Features to look for in any real-time implementation
+
+- Cursor-based event delivery so clients that reconnect do not miss events.
+- Idempotency keys on webhook deliveries so consumers can safely deduplicate.
+- Retry logic with exponential backoff and a dead letter queue for webhooks.
+- Connection limits and per-user quotas to prevent one client from exhausting server resources.
+- Heartbeat or keepalive messages on SSE and WebSocket connections so both sides detect a dead connection without waiting for TCP timeout.
+- Monitoring on open connection count, delivery success rate, and queue depth for the webhook retry system.
+
+## Expert opinion
+
+> The single most common mistake I see in real-time architecture decisions is teams choosing WebSockets for a use case that needs nothing more than SSE, because WebSockets feel more serious. SSE is HTTP. It is boring. That is its best quality. It works behind every proxy and CDN, it reconnects automatically, and it requires zero special infrastructure. Save WebSockets for when the browser genuinely needs to send high-frequency messages to the server. For everything else, SSE is the quieter and more reliable choice.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client was running a SaaS workflow tool where multiple users could view the status of shared tasks. The first implementation used polling at a five-second interval. At fifteen thousand users, the polling load was significant: three million requests per ten minutes, almost all of which returned no changes. The team was considering WebSockets to reduce load.
+
+The actual fix was SSE. We replaced the polling loop in the frontend with a single SSE connection per user. The server pushed task status changes over the stream. Polling load dropped to near zero. Connection count was manageable because most users were not actively using the tool at any given moment. The backend change was about two days of work. The frontend change was one day.
+
+WebSockets would have required a Redis pub/sub layer for multi-server routing and sticky session configuration at the load balancer. SSE required neither. The [outbox pattern](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) fed events to the SSE streams reliably, ensuring that task changes were never silently dropped. For the webhook side of the same system, where the tool emitted events to external integrations, the [webhooks reliability post](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong) covers the retry design we implemented.
+
+## Common mistakes
+
+1. Reaching for WebSockets when SSE is sufficient. The operational complexity of WebSockets is only justified by bidirectional high-frequency messaging.
+2. Building webhooks without retry logic. A webhook that does not retry on failure is not a reliable delivery mechanism.
+3. Not implementing idempotency on webhook consumer endpoints. Retries will cause duplicate deliveries. The consumer must handle them.
+4. Polling at an interval so short it creates noticeable server load but not short enough to feel real-time. This is the worst of both worlds: the cost of frequent requests without the benefit of true low-latency updates.
+5. Not implementing cursor-based resumption in SSE or polling. A client that reconnects with no cursor misses every event that occurred during the disconnection.
+6. Forgetting heartbeat messages on SSE connections. Proxies and load balancers will close idle HTTP connections. A keepalive message every thirty seconds prevents silent disconnections.
+7. Building a WebSocket gateway without a pub/sub layer, then discovering that horizontal scaling breaks connection routing.
+8. Not monitoring delivery success rates on webhooks. A webhook endpoint that starts returning 500 will exhaust the retry queue silently unless you are watching it.
+
+## A 4 week plan
+
+1. **Week one.** Audit your current data freshness requirements by feature. For each real-time surface, answer: how stale can this data be before a user notices? Document the answer. Most surfaces will tolerate more latency than the team assumes.
+2. **Week two.** Replace your highest-frequency polling intervals with SSE where the surface needs sub-ten-second updates. Start with the one surface where polling load is highest or where users have complained about staleness.
+3. **Week three.** If you have external integrations that currently poll your API for events, design and ship a webhook system. Implement retry with exponential backoff and idempotency key validation on the consumer side.
+4. **Week four.** Measure the change. Compare polling request volume, SSE connection count, and webhook delivery success rate against your baseline. Adjust polling intervals upward for surfaces where the SSE migration is not yet planned.
+
+For related reading, [the webhooks reliability post](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong) goes deep on production webhook design. The [outbox pattern post](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) covers how to emit events reliably from your backend to any delivery mechanism.

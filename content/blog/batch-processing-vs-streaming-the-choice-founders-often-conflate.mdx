@@ -1,0 +1,113 @@
+---
+slug: "batch-processing-vs-streaming-the-choice-founders-often-conflate"
+title: "Batch Processing vs Streaming: The Choice Founders Often Conflate"
+excerpt: "Batch is for periodic work over a window of data. Streaming is for continuous work over an unbounded source. Founders pick streaming because it sounds modern. Most of them needed batch. Here is how to tell the difference."
+date: "2026-05-19"
+category: "Backend, APIs, and System Design"
+tags: ["batch","streaming","data","architecture"]
+readingMinutes: 12
+ogImage: "/api/og/blog/batch-processing-vs-streaming-the-choice-founders-often-conflate"
+status: "published"
+definition: "Batch processing runs over a bounded window of data on a schedule. Streaming processes events continuously as they arrive. Batch is simpler, cheaper, and right for almost every SaaS analytics workload. Streaming is right when the latency of the output matters in seconds rather than minutes, or when the data has no natural batch boundary. The wrong choice often doubles the operational cost and provides no business benefit."
+faq: [
+  {"q":"When should I use batch over streaming?","a":"When the output is consumed periodically rather than continuously. Daily reports, hourly aggregates, weekly invoices. Batch is also right when the data has a natural cutoff like end of day or end of month. The simplicity savings are real."},
+  {"q":"When is streaming actually necessary?","a":"When the consumer of the data needs sub minute latency. Fraud detection, live dashboards, real time pricing, alerting on anomalies. Streaming is also right when the data has no natural batch boundary, like event streams from IoT devices."},
+  {"q":"What about micro batching?","a":"Micro batching is the middle ground. Batches that run every few seconds to a few minutes. Most so called streaming systems are actually micro batching. The distinction is mostly academic for application engineers."},
+  {"q":"What is the cost difference?","a":"Streaming is typically two to five times the operational cost of batch for equivalent work. The infrastructure runs continuously, the failure modes are richer, the observability story is harder. The cost is justified when the latency matters and not otherwise."},
+  {"q":"Should I start with batch and move to streaming later?","a":"Yes for most workloads. Batch is faster to ship, cheaper to operate, and easier to reason about. Move to streaming when a specific use case demands lower latency. The migration is real work but contained to the affected pipeline."},
+  {"q":"What are the right tools for each?","a":"For batch, Airflow, Dagster, Prefect, dbt, or the scheduler in your warehouse. For streaming, Kafka, Kinesis, Pulsar, or managed services like Materialize, Tinybird, or RisingWave. The choice within each category depends on the team's stack."},
+  {"q":"Can I run both in the same pipeline?","a":"Yes, and many mature systems do. The pattern is to use streaming for the fast path and batch for reconciliation and reprocessing. The lambda architecture made the pattern famous. Modern stacks tend to simplify it."}
+]
+---
+
+## What you actually need to know
+
+- Batch is the right default for most SaaS analytics and back office work.
+- Streaming is right when output latency matters in seconds.
+- The cost difference between the two is real. Two to five times.
+- Most products that started streaming should have started batch.
+- The migration from batch to streaming is contained when the use case demands it.
+
+| Workload type | Pick | Why |
+|---|---|---|
+| Daily reports | Batch | Output consumed periodically |
+| Weekly invoices | Batch | Natural boundary |
+| Hourly aggregates | Batch | Periodic, not continuous |
+| Live dashboards | Streaming | Latency matters |
+| Fraud detection | Streaming | Action must be immediate |
+| Real time pricing | Streaming | Direct customer impact |
+| Cohort analysis | Batch | Output consumed periodically |
+| IoT event ingestion | Streaming | No natural boundary |
+
+## The core argument
+
+Founders pick streaming for the same reason they pick microservices and Kubernetes. The pattern sounds modern. The architecture diagrams look impressive. The conferences are full of speakers extolling its virtues. Then the team builds the pipeline and discovers that streaming costs five times more, fails in more interesting ways, and provides no latency benefit because the consumer of the data was a weekly email.
+
+The mature engineering decision is to pick batch unless there is a specific use case that demands streaming. The use cases that demand streaming are real. Fraud detection, alerting, live operational dashboards, real time pricing. The use cases that do not demand streaming are far more common. Reports, invoices, cohort analyses, monthly metrics.
+
+The cost of streaming is operational. The pipeline runs continuously, which means it fails continuously when it fails. Backfilling streaming data is harder than rerunning a batch job. Schema evolution is harder. Debugging is harder. The observability story is more complex. The team has to invest in tools and practices that batch teams do not need.
+
+The benefit of streaming, when it lands, is real. Sub minute latency on operational data. The ability to react to events as they happen. The capacity for use cases that batch cannot serve at all. The benefit only lands when the consumer of the data benefits from low latency. Most consumers do not.
+
+## The honest decision tree
+
+Ask three questions. Does the consumer of the data need sub minute latency. Does the data have a natural batch boundary. Does the volume make periodic processing acceptable.
+
+If sub minute latency matters and there is no natural batch boundary, pick streaming. If the consumer is fine with hourly or daily updates, pick batch. If the data has natural boundaries like end of day or end of session, pick batch. The volume question rarely changes the answer because both batch and streaming can scale.
+
+The trap is teams that pick streaming for the first use case because they expect to need it later. The expectation is usually wrong. By the time the future use case lands, the streaming pipeline they built has accumulated technical debt and the new use case has different requirements anyway. Build for the use case in front of you.
+
+## How much does this cost
+
+| Approach | Modest scale monthly cost | High scale monthly cost | Operational tax |
+|---|---|---|---|
+| Batch on a warehouse with dbt | 200 to 800 USD | 2000 to 10000 USD | Low |
+| Batch with Airflow or Dagster | 100 to 500 USD | 1500 to 8000 USD | Low |
+| Managed streaming (Tinybird, Materialize) | 300 to 1500 USD | 3000 to 20000 USD | Low |
+| Self hosted Kafka or Pulsar | 500 to 2000 USD | 5000 to 50000 USD | High |
+| Lambda architecture (both) | Higher of the two plus integration | High | Highest |
+
+## Features the pipeline must have
+
+- Backfill story. Reprocessing is a first class capability.
+- Idempotent transforms. Reruns do not duplicate output.
+- Schema evolution. Adding a column does not break the pipeline.
+- Observability. Throughput, latency, freshness, error rate.
+- Cost monitoring. Streaming bills can grow silently.
+- A clear consumer contract. The downstream system knows what to expect.
+
+## Expert opinion
+
+> The teams that picked streaming because it sounded modern almost always migrate back to batch for most of the workload within two years. The teams that picked batch and added streaming for the one use case that needed it almost never regret it. The pattern is consistent enough that I have stopped letting clients pick streaming first without a specific justification.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client building a marketplace platform asked me to design their analytics pipeline. They had been told by an advisor that streaming was the modern choice and were ready to spin up Kafka.
+
+The actual use case was a daily dashboard for sellers, a weekly email for buyers, and a monthly revenue report. None of it needed sub minute latency. We built the pipeline on Airflow with dbt against their warehouse. The cost was roughly 400 USD per month. The team shipped in three weeks.
+
+Eighteen months later, they added fraud detection. The fraud detection needed sub minute latency. We added a streaming pipeline using Tinybird for that one use case. The rest of the analytics stayed on batch. The total cost rose by roughly 600 USD per month, which was justified by the fraud prevented.
+
+For more on the related architecture work, see [the read heavy workload strategies that move the needle](/blog/the-read-heavy-workload-strategies-that-move-the-needle) and [event driven architectures when they help and when they hurt](/blog/event-driven-architectures-when-they-help-and-when-they-hurt).
+
+## Common mistakes teams make
+
+1. Picking streaming because it sounds modern.
+2. Picking streaming for a use case that consumes data weekly.
+3. Underestimating the operational tax of streaming.
+4. No backfill story. Reprocessing is impossible.
+5. Non idempotent transforms. Reruns produce different output.
+6. No cost monitoring. The streaming bill grows silently.
+7. Mixing batch and streaming with no clear contract. The downstream system is confused.
+8. Refusing to use the warehouse scheduler when it would suffice.
+
+## A 30 day plan to design the right pipeline
+
+1. **Week one.** Inventory the consumers of the data. Map their latency requirements.
+2. **Week two.** Pick batch or streaming per use case. Document the decisions.
+3. **Week three.** Build the first pipeline. Wire observability.
+4. **Week four.** Add backfill, idempotency, and cost monitoring.
+
+For more on the related work, read [Kafka in 2026 when you need it and when you do not](/blog/kafka-in-2026-when-you-need-it-and-when-you-do-not) and [Tinybird vs ClickHouse vs Cube for analytics at scale](/blog/tinybird-vs-clickhouse-vs-cube-for-analytics-at-scale). On the broader data architecture, [SaaS analytics infrastructure PostHog vs Mixpanel vs Snowflake vs build your own](/blog/saas-analytics-infrastructure-posthog-vs-mixpanel-vs-snowflake-vs-build-your-own) is the natural next read.

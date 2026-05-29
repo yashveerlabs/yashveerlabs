@@ -1,0 +1,118 @@
+---
+slug: "designing-an-mvp-that-can-scale-without-rewriting-it"
+title: "Designing an MVP That Can Scale Without Rewriting It"
+excerpt: "Most MVPs need a full rewrite at year two. The few that do not were designed with a small set of disciplines that cost nothing extra at the start. Here is the design that scales."
+date: "2026-05-22"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","architecture","scale","design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/designing-an-mvp-that-can-scale-without-rewriting-it"
+status: "published"
+definition: "An MVP designed to scale is one where the early decisions do not block the later scaling work. Multi tenancy as a first class concept. A clean data model. Idempotent jobs. Bounded contexts. A real database. These are not big upfront investments. They are choices that cost little at week one and save a quarter of rewrite at year two. Most MVPs do not need to be rewritten. Most MVPs were designed in ways that make rewrite inevitable."
+faq: [
+  {"q":"What is the single most important early decision?","a":"Multi tenancy. Almost every SaaS becomes multi tenant. Retrofitting multi tenancy after launch is a quarter to half year project. Building it in from day one is hours. The decision is invisible at MVP scale and load bearing at production scale."},
+  {"q":"What about choice of database?","a":"Pick a real database. Postgres for most cases. The MVPs that started on Firebase or DynamoDB for speed often hit limits at scale that force a rewrite. The MVPs that started on Postgres scale through their first few years without changing the database."},
+  {"q":"What about microservices?","a":"No. Start with a modular monolith. Microservices add operational complexity that an MVP team cannot absorb. The right time to split is when the team is large enough to own the services. That is rarely at MVP stage."},
+  {"q":"What does a modular monolith mean specifically?","a":"One deploy unit. One database. Internal module boundaries that respect the bounded contexts of the domain. When the time comes to split, the boundaries are already drawn. Splitting is a project, not a rewrite."},
+  {"q":"What about background jobs?","a":"Add a job queue from day one. Postgres backed is fine. The pattern lets you move work off the request thread. The teams that did not start with a queue retrofit one later, which is more painful than starting with it."},
+  {"q":"What about authentication?","a":"Use a managed auth provider. Clerk, Auth0, Supabase Auth. Building auth yourself at MVP stage is a common mistake. The retrofit to a managed provider later is a real project."},
+  {"q":"What is the worst MVP architecture decision?","a":"Mixing tenant data without a tenant ID column on every table. Retrofitting tenant scope across an existing schema is the most painful architectural debt a SaaS can carry. The hours to add the column at week one prevent the months to add it at year two."}
+]
+---
+
+## What you actually need to know
+
+- Multi tenancy from day one. tenant_id on every customer scoped table.
+- Real database. Postgres for most cases.
+- Modular monolith. One deploy. Clean internal boundaries.
+- Job queue from day one. Postgres backed is fine.
+- Managed authentication provider.
+
+| Decision | Right pattern at MVP | Wrong pattern |
+|---|---|---|
+| Tenancy | tenant_id everywhere | No tenant column |
+| Database | Postgres | Firebase or DynamoDB without justification |
+| Architecture | Modular monolith | Microservices |
+| Auth | Managed provider | Hand rolled |
+| Background work | Job queue | Cron loop over a table |
+| Configuration | Externalized | Hardcoded |
+| Logging | Structured | print statements |
+| Secrets | Vault or env vars | In code |
+
+## The core argument
+
+Most MVPs end up being rewritten at year two. The reason is consistent. The early architecture decisions were made for speed and ended up blocking the scaling work. The team has to either patch the broken architecture or rewrite. The rewrite often takes a quarter to a half year. The patching often takes longer.
+
+The MVPs that scale through year two without a rewrite share a small set of disciplines. Multi tenancy from day one. A real database. A modular monolith with clean boundaries. A job queue. Managed authentication. Externalized configuration. Each is a small decision at week one that compounds into the kind of system that can grow.
+
+The cost of these disciplines is small. An extra hour to add tenant_id columns. An extra day to set up the job queue. An extra day to integrate Clerk. The total cost at week one is roughly a week of engineering time. The savings at year two are months of rewrite work.
+
+The discipline that matters most is multi tenancy. Almost every B2B SaaS becomes multi tenant. The schema designed without tenant scope is the schema that takes a quarter to retrofit. The schema designed with tenant scope from day one is the schema that scales without architectural rework.
+
+## The disciplines that pay back
+
+| Discipline | Cost at week one | Savings at year two |
+|---|---|---|
+| Multi tenancy in schema | An hour | A quarter |
+| Real database | None | Avoiding migration to one |
+| Modular monolith | Modest | Avoiding microservices retrofit |
+| Job queue | Days | Avoiding retrofit |
+| Managed auth | Day | Avoiding migration |
+| Externalized config | Hours | Avoiding scattered hardcoding |
+| Structured logging | Hours | Avoiding debugging by print |
+| Secret management | Days | Avoiding credential leaks |
+| Bounded contexts | Days | Avoiding tangled module dependencies |
+
+## How much does this cost
+
+The total cost at MVP stage is roughly a week of engineering time spread across the build. The cost is invisible at MVP scale because the disciplines are simple and the data is small. The cost is enormous at year two if the disciplines were skipped because the retrofit work compounds.
+
+## Features the MVP design must have
+
+- tenant_id on every customer scoped table.
+- A real database that scales.
+- A modular monolith with named bounded contexts.
+- A job queue for background work.
+- Managed authentication.
+- Externalized configuration.
+- Structured logging.
+- A secret management approach that is not in code.
+- A clear path from MVP to production architecture.
+
+## Expert opinion
+
+> The MVPs that I have seen scale without rewrite share a small set of disciplines at the start. The ones that needed full rewrites at year two missed the same handful of disciplines. The pattern is consistent enough that I now insist on these for every client MVP. The cost at week one is a week of engineering. The savings at year two is a quarter. The math is favorable.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had built their MVP in three months. The team had moved fast. The schema had no tenant_id columns. The architecture was a tangle. The auth was hand rolled. The background work was a cron loop. By month nine the system was struggling.
+
+We had to rewrite significant parts. Multi tenancy was added across forty tables. The auth migrated to Clerk. The background work moved to a Postgres backed queue. The cleanup took five months.
+
+A different client started with the same scope but the disciplines were applied from day one. tenant_id columns. Clerk. Job queue. Modular monolith. The MVP shipped in three months and scaled through their next three years without architectural rewrite. The savings were a half year of engineering capacity that went into product instead of rework.
+
+For more on the related work, see [the modular monolith how to buy yourself two years](/blog/the-modular-monolith-how-to-buy-yourself-two-years) and [SaaS multi tenancy patterns database per tenant vs shared schema](/blog/saas-multi-tenancy-patterns-database-per-tenant-vs-shared-schema).
+
+## Common mistakes founders make
+
+1. No tenant_id columns. Multi tenancy retrofit is brutal.
+2. Firebase or DynamoDB without justification.
+3. Microservices at MVP stage.
+4. Hand rolled auth.
+5. Cron loops for background work.
+6. Hardcoded configuration.
+7. No structured logging.
+8. Treating MVP architecture as throwaway. Most of it survives.
+
+## A one week design exercise before coding
+
+1. **Day one.** Schema design with tenant_id everywhere.
+2. **Day two.** Pick the auth provider. Integrate.
+3. **Day three.** Set up the job queue. Use Postgres backed.
+4. **Day four.** Bounded contexts. Module boundaries.
+5. **Day five.** Configuration externalization. Secrets management.
+6. **Day six and seven.** Logging, observability, deployment pipeline.
+
+For more on the related work, read [the modular monolith how to buy yourself two years](/blog/the-modular-monolith-how-to-buy-yourself-two-years) and [the lean MVP stack for 2026 what I use for client projects](/blog/the-lean-mvp-stack-for-2026-what-i-use-for-client-projects). On the broader MVP side, [the over engineering trap how founders kill their own products](/blog/the-over-engineering-trap-how-founders-kill-their-own-products) is the natural next read.

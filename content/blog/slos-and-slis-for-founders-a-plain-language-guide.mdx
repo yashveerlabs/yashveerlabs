@@ -1,0 +1,67 @@
+---
+slug: "slos-and-slis-for-founders-a-plain-language-guide"
+title: "SLOs and SLIs for Founders: A Plain Language Guide"
+excerpt: "SLOs and SLIs turn reliability into a measurable commitment. Here is what they mean and why they matter."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","reliability","sre","slos","founders"]
+readingMinutes: 7
+ogImage: "/api/og/blog/slos-and-slis-for-founders-a-plain-language-guide"
+status: "published"
+faq: [
+  {"q":"What is an error budget?","a":"An error budget is the amount of unreliability you are allowed in a period based on your SLO. If your SLO is 99.9% availability in a 30-day month, you have 43 minutes of allowable downtime. When that budget is consumed, reliability work takes priority over feature work."},
+  {"q":"What is the difference between an SLO and an SLA?","a":"An SLO is an internal reliability target your engineering team commits to. An SLA (Service Level Agreement) is a contractual commitment to customers with financial penalties for missing it. SLOs should always be stricter than SLAs."},
+  {"q":"How do you handle multiple services with different reliability requirements?","a":"Define SLOs per service or per critical flow, not a single SLO for the entire product. A payment processing service and a reporting dashboard have different availability requirements and should have different SLO targets."},
+  {"q":"Do small startups need SLOs?","a":"Not formally. But the underlying practice, picking the metrics that matter, measuring them, and setting targets, is useful at any size. A startup with three engineers can run a simple version of this in a spreadsheet before investing in dedicated SRE tooling."},
+  {"q":"What tools help track SLIs and error budgets?","a":"Datadog has built-in SLO tracking. Grafana Cloud supports SLI metrics with error budget widgets. For lightweight needs, a simple Prometheus setup with a few dashboards works. The tool matters less than the habit of looking at the numbers."}
+]
+---
+
+# SLOs and SLIs for Founders: A Plain Language Guide
+
+**A Service Level Indicator (SLI) is a measurement of your system's behavior: request latency, error rate, availability percentage. A Service Level Objective (SLO) is the target you commit to hitting: "99.9% of requests complete in under 500ms." Together, SLIs and SLOs turn "the product should be reliable" from a feeling into a number. That number can be monitored, alerting can be built around it, and when the number is missed, the conversation about why becomes grounded in data rather than opinion.**
+
+## What you need to know
+
+- SLIs are the metrics; SLOs are the targets; SLAs are the customer-facing contractual commitments (which are separate from internal SLOs)
+- Internal SLOs should be stricter than your customer-facing SLAs; the gap between them is your error budget
+- The error budget is the most useful concept for engineering teams: it quantifies how much unreliability is acceptable in a given period
+- Startups do not need a full SRE practice to benefit from SLOs; three or four well-chosen SLIs and simple targets are enough to start
+- The most important SLI for most SaaS products is availability (can users reach the product) followed by error rate (what percentage of requests fail)
+
+## The core argument
+
+The reason SLOs matter for founders is not that they are an industry best practice. It is that they force a real conversation about reliability that would otherwise happen only during incidents. Without SLOs, every outage discussion is qualitative: "we need to be more reliable." With SLOs, the discussion becomes specific: "we have used 60% of our monthly error budget in the first two weeks; here is what is consuming it."
+
+That specificity is what makes engineering decisions tractable. If you have an error budget, you can make a deliberate choice to spend some of it on faster shipping (accepting a higher risk of minor incidents) or save it with slower, more careful releases. Without the budget framework, these tradeoffs are invisible and teams tend to either over-engineer reliability or ignore it entirely.
+
+For Nexli, the SLI I care most about is the attendance recording API availability during school hours. A failure in that window has a real operational impact on the schools using the system. That is not the same as a failure at 3am on a Sunday. SLOs let you encode that distinction. The attendance API has a different (stricter) availability target during operating hours than the reporting module, which handles mostly async batch operations. That differentiation is only possible because the reliability targets are explicit.
+
+The error budget framing also helps founders communicate reliability decisions to non-technical stakeholders. "We have used 80% of our reliability budget this month and we have 10 more days to go, so we should hold off on the database migration" is a more persuasive sentence than "we should be careful."
+
+## Common mistakes
+
+1. **Setting SLOs before you have SLI data.** If you do not know what your current error rate or latency distribution looks like, your SLO target will be either trivially achievable or impossible. Measure first, then set targets.
+
+2. **Setting too many SLIs.** Three or four well-chosen SLIs monitored consistently are better than twenty SLIs that nobody watches. Start with availability, error rate, and latency. Add more when those are under control.
+
+3. **Confusing internal SLOs with customer SLAs.** Your internal SLO should be stricter than what you promise customers. The gap is your buffer. If your SLO is 99.9% and your SLA is also 99.9%, any SLO miss is automatically an SLA breach.
+
+4. **Not defining what "availability" means.** A system can be "up" (returning responses) and still failing (returning 500 errors for 20% of requests). Define availability in terms of successful requests, not just server uptime.
+
+5. **Building SLOs without alerting.** A target that nobody watches is a target that does not change behavior. Connect SLI monitoring to alerting that fires before you run out of error budget, not after.
+
+## Where to start
+
+1. **Pick three SLIs for your most critical user flows.** For most SaaS products: availability of the login flow, error rate on the primary API, and latency on the most-used endpoint. Start with what matters most to users.
+
+2. **Measure your current baseline for two weeks before setting targets.** Whatever the numbers show, add a small stretch: if your current error rate is 0.3%, target 0.2%. If your P95 latency is 800ms, target 600ms. Aggressive targets early burn goodwill; achievable targets build the habit.
+
+3. **Set up a simple dashboard.** Grafana Cloud or Datadog can display your SLIs with error budget tracking in an afternoon. The dashboard does not need to be sophisticated; it needs to be visible and checked regularly.
+
+## Related reading
+
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [The Error Budget: SRE for Small Teams](/blog/the-error-budget-sre-for-small-teams)
+- [The On Call Rotation That Engineers Can Actually Sustain](/blog/the-on-call-rotation-that-engineers-can-actually-sustain)
+- [Incident Response for Startups: A Playbook](/blog/incident-response-for-startups-a-playbook)

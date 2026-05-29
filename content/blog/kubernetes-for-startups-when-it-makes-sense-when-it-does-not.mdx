@@ -1,0 +1,65 @@
+---
+slug: "kubernetes-for-startups-when-it-makes-sense-when-it-does-not"
+title: "Kubernetes for Startups: When It Makes Sense, When It Does Not"
+excerpt: "Kubernetes is real infrastructure for real scale. Here is how to know if you are there yet."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","kubernetes","containers"]
+readingMinutes: 7
+ogImage: "/api/og/blog/kubernetes-for-startups-when-it-makes-sense-when-it-does-not"
+status: "published"
+faq: [
+  {"q":"At what company size does Kubernetes make sense?","a":"In my experience, it starts making sense when you have 3 or more independent services with different scaling needs and at least one full-time engineer who can own the infrastructure. Company headcount is less relevant than service count and traffic complexity."},
+  {"q":"Is EKS, GKE, or AKS better for a startup?","a":"GKE generally has the most mature tooling and the smoothest managed experience. EKS is the right call if your stack is already AWS-native. AKS makes sense on Azure. The managed Kubernetes platform that matches your cloud provider is almost always the right choice."},
+  {"q":"Can I run Kubernetes on a single server?","a":"Yes, tools like K3s and MicroK8s run Kubernetes on minimal hardware. This is useful for development and testing but does not give you the scaling and fault tolerance benefits that justify Kubernetes in the first place."},
+  {"q":"What is the alternative to Kubernetes for container-based deployment?","a":"AWS ECS and Fargate, Fly.io, Render, and Railway all run containers without Kubernetes overhead. For most startups, these platforms hit the right balance of control and operational simplicity."},
+  {"q":"How long does it take to learn Kubernetes properly?","a":"Budget two to four weeks of focused learning to understand the core concepts well enough to operate a cluster. Budget three to six months of real production experience to develop the judgment to handle incidents confidently."}
+]
+---
+
+# Kubernetes for Startups: When It Makes Sense, When It Does Not
+
+**Kubernetes is a container orchestration platform that handles deployment, scaling, self-healing, and traffic routing across clusters of machines. It was built by Google to manage workloads at planetary scale. Most startups are not operating at planetary scale. The companies that benefit from Kubernetes early are running multiple services, need fine-grained scaling per service, and have at least one engineer who can run the cluster without it becoming a full-time job.**
+
+## What you need to know
+
+- Kubernetes adds significant operational complexity that pays off at scale but costs heavily in early-stage engineering time
+- For a single-service app under 10,000 daily active users, platforms like Fly.io, Railway, or Render will serve you better for a fraction of the setup cost
+- The managed Kubernetes options (EKS, GKE, AKS) remove cluster setup but not cluster operations; you still need to understand what you are running
+- The minimum viable Kubernetes team is one engineer who knows it well; operating it "by committee" with documentation is a path to expensive incidents
+- Kubernetes shines when you have 5 or more independent services that need to scale at different rates
+
+## The core argument
+
+The honest case against Kubernetes for early startups is this: the problem Kubernetes solves is not the problem you have. Your problem is shipping fast enough to find product-market fit before money runs out. Kubernetes solves the problem of orchestrating dozens of services across hundreds of nodes. Those are different problems.
+
+I have deployed on Fly.io, Vercel, and Railway for client projects at various stages. For a startup with one monolith or a handful of services, these platforms handle deployment, autoscaling, and rollbacks with almost no configuration. The Dwarka Bricks project runs on a platform deployment with zero Kubernetes. It is stable, it scales when it needs to, and no engineer is spending time on cluster management. That engineering time goes to features instead.
+
+The case for Kubernetes sharpens the moment you have multiple services with genuinely different scaling profiles. If your API needs to scale horizontally during peak hours while your background workers scale based on queue depth and your ML inference service needs GPU instances, Kubernetes starts earning its complexity cost. The same goes for teams that need strong deployment isolation between services, fine-grained rollout controls like canary deployments and blue-green switches, or strict resource quotas across multiple product lines. At that point, the orchestration work Kubernetes does for free would otherwise be custom scripting on top of a simpler platform.
+
+## Common mistakes
+
+1. **Adding Kubernetes because it looks good on the architecture diagram.** This is the startup version of cargo-culting. Kubernetes on the diagram does not mean the business is more defensible. It means the ops burden just went up significantly.
+
+2. **Underestimating the learning curve.** Kubernetes has a steep ramp. Getting a cluster running is one thing. Understanding namespaces, resource limits, ingress controllers, RBAC, PersistentVolumeClaims, and cluster autoscaling is another. Budget weeks, not days.
+
+3. **Running Kubernetes without dedicated monitoring.** A Kubernetes cluster without proper observability is a mystery box. Datadog, Grafana, or at minimum Prometheus with alerting is not optional. Without it, incidents become guesswork.
+
+4. **Using Kubernetes for a monolith.** If you have one service, you do not need container orchestration. You need a server. Kubernetes adds no value when there is nothing to orchestrate.
+
+5. **Letting the cluster drift.** Kubernetes clusters need regular maintenance: node version upgrades, certificate renewals, security patches. Teams that treat Kubernetes as a "set and forget" infrastructure end up with clusters several major versions behind and large upgrade debt.
+
+## Where to start
+
+1. **Honestly assess your service count and scaling requirements.** If you have fewer than three independently deployable services and your scaling story is "add more instances of the same thing," start with Fly.io or Railway. Revisit Kubernetes when the infrastructure genuinely needs it.
+
+2. **If you are committing to Kubernetes, start managed.** GKE Autopilot or EKS with managed node groups removes the most painful parts of cluster operations. You still need Kubernetes knowledge, but you are not managing etcd or the control plane.
+
+3. **Hire or develop the expertise before you need it.** Do not start a Kubernetes migration during an incident or a product crunch. The engineer who will run the cluster needs to be comfortable with it before the stakes are high.
+
+## Related reading
+
+- [CI CD Pipelines That Engineers Trust: A Pattern Library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library)
+- [Fly.io, Railway, Render, Vercel: The 2026 Platform Comparison](/blog/fly-io-railway-render-vercel-the-2026-platform-comparison)
+- [Containerization: Why Docker Is Still Worth Learning](/blog/containerization-why-docker-is-still-worth-learning)
+- [Infrastructure as Code: Terraform vs Pulumi vs CDK](/blog/infrastructure-as-code-terraform-vs-pulumi-vs-cdk)

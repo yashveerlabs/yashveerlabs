@@ -1,0 +1,114 @@
+---
+slug: "acid-vs-base-when-each-belongs-in-your-architecture"
+title: "ACID vs BASE: When Each Belongs in Your Architecture"
+excerpt: "ACID and BASE are not religions, they are tools. Picking the wrong one costs you data integrity or performance. Here is the call I make for client projects, and the reasoning behind each side."
+date: "2026-05-18"
+category: "Backend, APIs, and System Design"
+tags: ["backend","databases","architecture","system-design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/acid-vs-base-when-each-belongs-in-your-architecture"
+status: "published"
+definition: "ACID is the guarantee that a database transaction either fully succeeds or fully fails. BASE is the guarantee that a system remains available even when individual nodes disagree for a short time. Most production systems run both, in different layers. Picking the wrong one for the wrong workload costs you either data integrity or uptime."
+faq: [
+  {"q":"Is ACID always better than BASE?","a":"No. ACID is stronger but more expensive. For workloads where every write must be consistent before the next read, ACID is the right call. For workloads where availability matters more than instant consistency, like a global notification feed, BASE wins. The pattern in modern SaaS is to use both, ACID for the core data, BASE for the high volume edges."},
+  {"q":"What is a real example where BASE is the right choice?","a":"A global analytics dashboard. Page view counts do not need to be exactly consistent across regions in real time. They need to be available and eventually correct within a few seconds. Forcing ACID on that workload would either slow it down or take it offline during partial outages."},
+  {"q":"Can I use PostgreSQL for BASE workloads?","a":"You can, with care. PostgreSQL can run replicas, queue based writes, and async patterns that behave like a BASE system at the application layer. The tradeoff is that you are now responsible for the consistency logic that a true BASE database like Cassandra or DynamoDB handles internally."},
+  {"q":"Why does eventual consistency feel scary?","a":"Because the first time a user sees stale data, it looks like a bug. The fix is to design the UI to acknowledge it, with subtle indicators when data is syncing, optimistic updates that reconcile gracefully, and idempotent operations that recover from conflicts. Once the UX absorbs eventual consistency, it stops being scary."},
+  {"q":"Do startups need to choose this on day one?","a":"No. Almost every startup should start with a single PostgreSQL database running in ACID mode. The conversation about BASE belongs to the year your traffic crosses a real threshold or your geographic distribution becomes a constraint. Until then, pick the boring database and move on."},
+  {"q":"Are NoSQL databases always BASE?","a":"Most are by default, but the line has blurred. MongoDB supports multi document ACID transactions. DynamoDB supports conditional writes and transactional APIs. The label NoSQL is less useful than the question of which guarantees your specific workload needs."},
+  {"q":"What is the most expensive mistake teams make here?","a":"Choosing BASE because it sounds modern, then spending six months reconstructing the consistency guarantees the application actually needed. Choosing ACID for a workload where availability matters more than freshness is also expensive, but it is recoverable. The other direction is harder to undo."}
+]
+---
+
+## What you actually need to know
+
+- ACID and BASE are guarantees, not architectures. The same application can hold both at the same time, in different layers.
+- For your core business data, default to ACID. For high volume read traffic, queues, and global edges, BASE is often a better fit.
+- The decision is rarely permanent. You can migrate workloads between consistency models if you design the boundaries cleanly.
+- The hardest part is not picking. It is teaching the team and the UX to live with eventual consistency where you chose BASE.
+- In my experience, most early stage SaaS does not need BASE at all for the first two years. Postgres in ACID mode covers the load.
+
+| Guarantee | What it gives you | What it costs | Where it fits |
+|---|---|---|---|
+| ACID | Strong consistency, no partial writes | Performance, complexity at scale | Core data, payments, identity |
+| BASE | High availability, partition tolerance | Stale reads, conflict handling | Caches, queues, global feeds |
+| Hybrid | Both, in different layers | Operational complexity | Most real production SaaS |
+
+## The core argument
+
+The first time a junior engineer reads the CAP theorem, they treat it like a binary choice. You pick consistency or availability, and that is the end of the conversation. In production, that is not how the call is made. You pick which workload gets which guarantee. The payment table gets ACID. The product analytics pipeline gets BASE. The auth service gets ACID. The push notification queue gets BASE. The architecture is a mosaic, not a flag.
+
+The argument that follows is therefore not ACID vs BASE in the abstract. It is, for each workload in your system, which set of guarantees is cheap and which is expensive. If you cannot afford to lose a single write, ACID is cheap and BASE is expensive. If you cannot afford to be offline during a regional outage, BASE is cheap and ACID is expensive.
+
+For most of my client work, the right starting point is boring. One PostgreSQL primary, one read replica, ACID transactions on every business operation. That covers the first two years for almost every SaaS I have shipped. The conversation about BASE arrives when one of three things happens. Traffic crosses a real threshold. A regulator demands data residency in multiple regions. A specific workload, usually analytics or notifications, starts to bottleneck the main database.
+
+The mistake I see most often is teams that import a BASE database in week one because a conference talk made it sound like the modern choice. They then spend six months rebuilding the consistency guarantees their product actually needed, in the application layer, more slowly and with more bugs than the database would have provided for free.
+
+## Where ACID is the right call
+
+The default for anything tied to money, identity, or business state. If you can describe the data as "this customer owns this resource and the system must know that fact reliably," it belongs in an ACID transaction. The cost of inconsistency in those workloads is higher than the cost of the slightly slower writes.
+
+Specific examples from my own work. The billing table in a SaaS. The user profile in any product. The booking state in [Velmora](/projects), where two customers cannot accidentally hold the same slot. The membership state in [Prominence Football Academy](/projects), where roster integrity matters more than uptime during peak load. Each of these is small enough in volume that ACID is cheap and the guarantee pays for itself.
+
+## Where BASE is the right call
+
+The workloads where you can lose a few writes, or accept stale reads, in exchange for being online. Global notification fans, click stream analytics, social feed timelines, cache layers, search indexes. The guarantee BASE gives you is that the system stays up. The price is that the user might see slightly older data for a few seconds.
+
+The trick in BASE design is to make the staleness explicit in the UI. A small spinner that says "syncing." A green dot that turns yellow when data is in flight. Optimistic updates that show the user the action immediately and reconcile in the background. The UX work matters more than the database work, because the user is the one who decides whether eventual consistency feels broken or feels normal.
+
+## What the architecture usually looks like
+
+A typical mid sized SaaS I help build runs Postgres in the center for the ACID workloads. Around it sit Redis for caches, an async job queue for background work, a search service like Typesense or Algolia for read heavy queries, and a separate analytics warehouse for reporting. Each of those satellites is a BASE system, by design, because the workload tolerates eventual consistency and benefits from horizontal scale.
+
+The boundary between ACID and BASE is the most important architectural line in the system. It is the place where you decide what data has to be exactly correct and what data can be approximately correct. Drawing that line carelessly is how you get a billing system that occasionally double charges or a notification system that takes thirty minutes to deliver.
+
+## What it actually costs to run each
+
+| Choice | Monthly infra cost at 50k users | Operational load |
+|---|---|---|
+| Single Postgres, ACID only | 100 to 400 dollars | Low, well documented |
+| Postgres plus Redis, hybrid | 250 to 800 dollars | Moderate, requires cache invalidation discipline |
+| Multi region with replication | 1500 to 6000 dollars | High, requires on call for conflict resolution |
+| Full BASE store like Cassandra | 2000 to 10000 dollars | High, requires team that knows the operational model |
+
+The numbers above are honest estimates from my own client projects and published cloud pricing as of 2026. Your real numbers will move based on the cloud provider, the region, and the storage profile of your data. The shape is consistent. Going from ACID to BASE buys you scale, but the bill and the operational complexity rise faster than most teams expect.
+
+## Features to demand from whichever side you pick
+
+- Transparent failure modes. The system should tell you when consistency is breaking, not hide it.
+- Idempotent operations on the BASE side. Every write must be safe to retry without producing a duplicate.
+- A migration path. The system you choose today should not lock you in. A clean repository pattern at the application layer lets you swap the implementation later.
+- Observability. Metrics on replication lag, write conflicts, and queue depth. Without these you are flying blind.
+- A documented consistency model that a new engineer can read in twenty minutes. If your team cannot articulate the guarantees, they will violate them.
+
+## Expert opinion
+
+> The teams that get this right do not argue about ACID or BASE. They argue about specific workloads. They write down which workload gets which guarantee, and they hold the line on that decision until evidence forces a change. Architecture by ideology is how you end up with the wrong database for half your traffic.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+The most useful split I made on a recent client project was simple. Customer payments, profiles, and bookings live in Postgres with strict serializable transactions. Activity feeds, notifications, and analytics live in a Redis backed queue with eventual consistency. The two systems never share a transaction. The only contract between them is a documented event format. When traffic spiked during a launch, the BASE side absorbed the load and the ACID side stayed quiet because we had never asked it to do the high volume work.
+
+The reverse story is one I cleaned up early last year. A team had picked DynamoDB on day one for everything, including the billing ledger. The application code was rebuilding ACID semantics on top of a BASE store, badly. We migrated the billing tables to Postgres in two sprints. The error rate on charges dropped to zero in the same week. The lesson is not that DynamoDB is bad. It is that the workload should fit the store.
+
+You can see more of the architectural framing on [the systems page](/systems/stack), and a deeper read on the boundary between transactional and eventual systems lives in [the eventual consistency post](/blog/eventual-consistency-in-plain-language-for-founders).
+
+## Common mistakes teams make
+
+1. Picking BASE because it sounds modern, then rebuilding ACID semantics in the application layer.
+2. Picking ACID for a workload that does not need it and bottlenecking the database with traffic the system could have absorbed with caches.
+3. Failing to write down the consistency contract between the two sides, so engineers make different assumptions and the bugs only show up in production.
+4. Treating eventual consistency as a bug to hide, instead of a state to communicate. The user is more forgiving than the team thinks if the UI is honest.
+5. Skipping the migration plan, so the architecture you pick on day one becomes the one you cannot change on day one thousand.
+6. Treating database choice as a religious debate instead of a workload by workload call.
+
+## Where to start, a 60 day plan
+
+1. **Week one.** Inventory every meaningful workload in your system. Payments, identity, search, analytics, notifications, feeds. For each, write one sentence on what happens if a write is lost or a read is stale.
+2. **Week two.** Tag each workload as either "must be ACID" or "can be BASE." Anything in doubt goes to ACID. The default is safety.
+3. **Week three.** Look at your current architecture. Note where the workload tag and the store choice do not match. Those are your migration targets.
+4. **Week four to week eight.** Migrate the most painful mismatch first. Usually it is either a billing workload sitting on a BASE store, or a high volume feed sitting on the ACID primary. Either is a quick win.
+
+For deeper reading, [the read replica post](/blog/read-replicas-when-they-save-you-and-when-they-lie-to-you) covers what changes when you add eventual consistency at the read layer. [The sharding post](/blog/sharding-strategies-for-saas-when-to-start-and-when-to-stop-avoiding-it) covers the next decision after BASE. [The Postgres performance post](/blog/postgresql-performance-at-scale-the-tweaks-that-move-the-needle) covers how far you can take ACID before BASE becomes necessary.

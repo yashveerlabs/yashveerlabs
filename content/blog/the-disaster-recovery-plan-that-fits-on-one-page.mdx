@@ -1,0 +1,103 @@
+---
+slug: "the-disaster-recovery-plan-that-fits-on-one-page"
+title: "The Disaster Recovery Plan That Fits on One Page"
+excerpt: "A disaster recovery plan that is actually used in a crisis needs to be short, specific, and executable by anyone on the team under pressure."
+date: "2025-08-02"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","disaster-recovery","infrastructure","security","incidents"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-disaster-recovery-plan-that-fits-on-one-page"
+status: "published"
+definition: "A disaster recovery plan is the documented procedure for restoring a system to operational state after a catastrophic failure. Most DR plans are too long to read during an incident, too abstract to execute under pressure, and stored in systems that may not be accessible during the disaster they are meant to address. A useful DR plan fits on one page, lives in multiple locations, and contains specific commands rather than general principles."
+faq: [
+  {"q":"What is the difference between a disaster recovery plan and a business continuity plan?","a":"A disaster recovery plan focuses on restoring technical systems: databases, applications, infrastructure. A business continuity plan covers how the business operates while systems are down: how customers are notified, how support is handled, how communications flow. Both are needed. The DR plan restores the systems. The BCP manages the period while restoration is happening."},
+  {"q":"What is RTO and RPO and why do they matter?","a":"RTO (Recovery Time Objective) is the maximum acceptable downtime: how long the business can operate without the system. RPO (Recovery Point Objective) is the maximum acceptable data loss: how far back the last clean data backup can be. These two numbers define the requirements for your backup and recovery systems."},
+  {"q":"How often should I test the disaster recovery plan?","a":"At minimum once per year for a full DR test and quarterly for component tests (backup restoration, failover procedure). An untested DR plan is not a DR plan. The test reveals gaps that the plan cannot reveal theoretically."},
+  {"q":"Where should the DR plan be stored?","a":"In at least three locations, one of which is accessible when primary systems are down. Options: a printed copy in the office, a document in a cloud storage service independent of the main cloud provider, and a document shared with key team members' personal email. If the plan is only in the system that is down, it is not accessible when needed."},
+  {"q":"What is the most common reason DR plans fail when executed?","a":"The plan describes the desired end state rather than the specific commands to get there. 'Restore the database from backup' is not a DR procedure. 'Run this command, verify with these checks, then run this command' is a DR procedure. Specificity is the difference between a plan that works and one that fails under pressure."}
+]
+---
+
+## What you actually need to know
+
+- RTO and RPO are the engineering requirements. Define them before designing the backup system.
+- The plan must contain specific commands, not general principles. "Restore from backup" is not actionable.
+- Store the plan somewhere accessible when the primary systems are down. A plan only in Notion is not available during a Notion outage.
+- Test annually at minimum. An untested plan has unknown holes.
+- The plan for a startup fits on one page because the systems fit on one page. Complexity comes later.
+
+| Scenario | RTO Target | RPO Target | Required Infrastructure |
+|---|---|---|---|
+| Database corruption | Under 4 hours | Under 1 hour | Point-in-time backup, tested restore |
+| Application deployment failure | Under 30 minutes | Zero (code only) | Versioned releases, tested rollback |
+| Cloud provider outage | Under 8 hours | Under 4 hours | Multi-region backup, documented failover |
+| Data center loss | Under 24 hours | Under 4 hours | Cross-region replication, tested failover |
+
+## The core argument
+
+Most startups write disaster recovery plans as a compliance exercise or after a near-miss incident convinces the team that they need one. These plans are often long documents stored in Notion that describe the recovery process in general terms. When an actual disaster happens, the team discovers that the plan does not contain the specific commands needed to restore the database, the plan assumes the infrastructure documentation is current when it is not, and the plan is stored in the system that is currently down.
+
+A useful DR plan starts with a different premise: it is a procedure document designed to be executed by someone who is under stress and may not be the person who wrote it. Every step must be specific enough that a team member who does not work with that system every day can follow it successfully. Every command must be written out. Every access credential must have a path to retrieval. Every step must have a verification that it worked.
+
+The one-page constraint is not arbitrary. A one-page plan forces the team to identify the truly critical recovery steps and omit everything that is not essential. If the plan requires two hours to read, it will not be read during an incident. If it requires 15 minutes, it will be.
+
+## Defining RTO and RPO before designing the backup system
+
+Most teams design their backup systems before defining their recovery objectives. This is backwards. The RTO and RPO define the requirements that the backup system must meet.
+
+RTO (Recovery Time Objective) is the answer to: how long can the business operate without this system? For a SaaS product with paying customers, the answer is usually a few hours to a day. For internal tools, the answer might be several days. Set the RTO for each critical system explicitly.
+
+RPO (Recovery Point Objective) is the answer to: how much data loss is acceptable? If the backup runs every 24 hours, the RPO is 24 hours of data. If the business cannot accept losing more than 1 hour of customer data, the backup system must produce a point-in-time restore that is updated at least hourly.
+
+For most early-stage SaaS products, a practical starting point: RTO of 4 hours for the primary database, RPO of 1 hour. This means database backups that run every 30 minutes (to provide margin), a restore procedure that has been tested and takes under 2 hours, and a deployment procedure that can restore the application layer in under 1 hour.
+
+## The one-page plan structure
+
+The plan should cover five sections, each as brief as possible.
+
+**System inventory.** What are the critical systems? For most SaaS products: the primary database, the application servers, the object storage, and the DNS/CDN configuration. Each with the cloud provider, region, and resource identifier.
+
+**Backup locations.** Where are the backups for each system? Not "S3 bucket" but the specific bucket name and path, and the access credential required. If the person restoring the backup cannot find the backup, the plan fails.
+
+**Restore procedures.** For each critical system, the specific commands to restore from backup. Not "restore the database" but the exact command sequence, the expected output at each step, and the verification command that confirms the restore succeeded.
+
+**Access credentials.** Where to find the credentials needed to execute the restore. The credentials should not be in the plan itself (security risk) but should point to the secrets manager location where they are stored. If the secrets manager is the system that is down, there must be an offline backup of critical credentials.
+
+**Escalation contacts.** Who to contact if the restore fails or the plan does not cover the scenario. Cloud provider support contacts, senior engineer contacts, vendor support for critical third-party services.
+
+## Testing the plan
+
+The test procedure should simulate the actual scenario as closely as possible without affecting production.
+
+For a database restore test: take the production database offline in a test environment. Execute the restore procedure from the backup. Verify the data is complete and correct. Measure the total time from start to confirmed restore. Record any steps that were unclear or failed.
+
+For a full DR test (annually): take the entire production system offline in a test environment. Execute all restore procedures in sequence. Verify the application is functional. Measure the total recovery time. Compare against the RTO target.
+
+Document every test. The test results are the proof that the plan works and the data that reveals where it needs improvement.
+
+## Common mistakes teams make with disaster recovery
+
+1. Writing a DR plan that describes the desired outcome rather than the specific steps to achieve it. "Restore the database" is not a step. "Run this command with these parameters, verify with this query" is a step.
+2. Storing the DR plan only in systems that might be unavailable during the disaster. The plan must be accessible when the primary systems are down.
+3. Not testing the restore. A backup that has never been restored is not a validated backup. Test restores monthly.
+4. Setting RTO and RPO optimistically without designing the backup infrastructure to meet them. If the RTO is 4 hours but the restore procedure takes 6 hours, the RTO is aspirational, not real.
+5. Not updating the plan when the infrastructure changes. The DR plan that accurately describes the infrastructure from six months ago is a liability. Review and update quarterly.
+
+## Where to start: a 3-step DR plan creation
+
+**Step 1: Define the RTO and RPO for each critical system.** Write the numbers down. These are the engineering requirements.
+
+**Step 2: Audit the current backup configuration against those requirements.** Does the backup frequency meet the RPO? Has the restore procedure been tested? Has the restore time been measured against the RTO? These questions reveal the gaps.
+
+**Step 3: Write the one-page plan with specific commands.** Use the structure above. Every step is specific enough that someone unfamiliar with the system can execute it. Store it in three locations, one of which is accessible when primary systems are down.
+
+## The Infrastructure Discipline Behind the Shipping
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. Every production system I build has backup configuration, tested restore procedures, and a recovery plan before it goes live. Not because it is required but because shipping a system without a restore procedure is shipping a system that cannot be recovered from. If you need someone who treats DR as a first-class concern rather than a compliance afterthought, the way I work reflects that.
+
+## Related reading
+
+- [The Deployment Pipeline That Survives Real World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- [Incident Response for Startups: A Playbook](/blog/incident-response-for-startups-a-playbook)
+- Zero Downtime Deployments: How to Ship Without Outages
+- [The Bug That Cost a Year of Trust](/blog/the-bug-that-cost-a-year-of-trust)

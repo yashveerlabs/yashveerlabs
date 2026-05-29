@@ -1,0 +1,62 @@
+---
+slug: "reserved-instances-and-cost-math-when-they-pay-off"
+title: "Reserved Instances and Cost Math: When They Pay Off"
+excerpt: "Reserved instances offer significant discounts over on-demand pricing, but only if the commitment matches actual usage. Here is how to run the math before committing and how to avoid reserving resources you will not fully use."
+date: "2026-05-23"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing"]
+readingMinutes: 6
+ogImage: "/api/og/blog/reserved-instances-and-cost-math-when-they-pay-staff-off"
+status: "published"
+definition: "Reserved instances are cloud compute commitments where you agree to use a specific instance type in a specific region for one or three years, in exchange for a discount of 30 to 70 percent compared to on-demand pricing. Reserved instances transfer the utilization risk from the cloud provider to the buyer: the cloud provider offers a lower price because they have committed capacity, and the buyer pays for the capacity whether they use it or not. The break-even point for reserved instances requires sustained utilization above approximately 60 percent."
+faq: [
+  {"q":"What is the discount for reserved instances versus on-demand?","a":"AWS EC2 reserved instances offer 30 to 45 percent discount for 1-year terms and 50 to 70 percent discount for 3-year terms compared to on-demand pricing. The discount varies by instance family, region, and payment option (all upfront, partial upfront, no upfront). Azure Reserved VM Instances offer similar discounts. GCP Committed Use Discounts offer 37 percent for 1-year and 55 percent for 3-year commitments. The exact numbers change periodically; check the current pricing before running break-even calculations."},
+  {"q":"How do you calculate the break-even utilization for a reserved instance?","a":"The break-even utilization is the utilization rate at which the reserved instance cost equals the on-demand cost for the same usage. If the reserved instance costs $0.10 per hour (for a 1-year upfront payment) and the on-demand price is $0.17 per hour, the break-even utilization is 0.10 / 0.17 = 59%. At utilization above 59%, the reserved instance is cheaper. At utilization below 59%, on-demand would have been cheaper. Most production workloads with consistent traffic run at utilization above 80%, making reserved instances clearly beneficial for committed workloads."},
+  {"q":"What is a Savings Plan and how is it different from a reserved instance?","a":"AWS Savings Plans are a more flexible commitment than reserved instances. You commit to a specific dollar amount of compute spend per hour (for example, $1.00 per hour) for 1 or 3 years, and receive the discounted rates applied to any eligible compute usage up to that commitment. Reserved instances are tied to a specific instance type and region; Savings Plans apply across instance types, regions, and even AWS services (EC2, Fargate, Lambda) depending on the plan type. Savings Plans are better for workloads that might change instance type or scale to different services; reserved instances are better for workloads with stable, predictable configurations."},
+  {"q":"What is reserved instance convertibility and when should you use it?","a":"Convertible reserved instances allow changing the instance type, operating system, tenancy, or payment option during the reservation term. They cost slightly more than standard reserved instances (smaller discount) but provide flexibility if the workload requirements change. Convertible reserved instances are the right choice when the instance type requirements might change during the term: if you are reserving for a workload that may scale to a larger instance type as data volume grows, or if you expect to migrate to a newer generation instance family during the term. For workloads with stable instance type requirements, standard reserved instances provide better discounts."},
+  {"q":"What is the risk of over-reserving and how do you mitigate it?","a":"Over-reservation occurs when you commit to more reserved instances than you actually use, paying for reserved capacity that sits idle. The cost of idle reserved capacity is the difference between the reserved instance price and zero (unlike on-demand, you pay for reserved capacity whether it is used or not). Mitigation strategies: start with a 1-year term rather than 3-year to limit exposure, reserve only the baseline load and use on-demand or spot for variable peaks, use AWS Cost Explorer's reservation recommendations (which analyzes your historical usage to recommend optimal reservation levels), and monitor reservation utilization monthly to identify and address underutilization."}
+]
+---
+
+## What you need to know
+
+- Reserved instances make economic sense for workloads that run continuously at utilization above 60 percent. Below this threshold, on-demand pricing is cheaper.
+- Commit to a 1-year term before a 3-year term unless you have strong confidence in the instance type requirements. The 3-year discount is larger, but the commitment risk is also larger.
+- Savings Plans are more flexible than reserved instances and are often the better starting point. Switching to reserved instances provides marginally better discounts for very stable workloads.
+- Reserve baseline load only. Spiky or seasonal peaks should use on-demand or Spot. Reserve what you always need, not what you occasionally need.
+- AWS Cost Explorer's reservation recommendations provide a data-driven starting point based on historical usage. Trust the data over intuition.
+
+## The core argument
+
+Reserved instance decisions are a classic risk-return tradeoff. The return is a 30 to 70 percent discount on compute costs for a committed workload. The risk is paying for reserved capacity that goes unused if the workload changes. Most teams that have not run the numbers either over-commit (reserving instances for workloads that are too variable) or under-commit (leaving significant discounts on the table for stable workloads).
+
+The math is not complex. Take a workload that runs continuously at 90% utilization on a specific instance type. The on-demand price is $100 per month. The 1-year reserved price (all upfront) is $60 per month effective cost. At 90% utilization, the reservation saves $36 per month ($40 savings minus $4 for the 10% idle time). Over 12 months, the savings are $432. The reservation makes obvious sense.
+
+The math changes significantly for variable workloads. A workload that runs at 90% utilization for 6 months and 20% utilization for the other 6 months has an average utilization of 55%, below the break-even point. The reservation loses money compared to on-demand pricing for this profile. The correct approach for this workload is: reserve at the 20% baseline level (what you always need), use on-demand for the 6-month peak, and re-evaluate whether the peak is predictable enough to benefit from a shorter-term reservation approach.
+
+## Common mistakes
+
+1. **Making reservation decisions based on current month usage rather than 12-month history.** A single month of high usage creates a misleading picture. Pull 12 months of usage data before making a reservation commitment. Seasonal variation, growth trends, and incident recovery periods all affect what commitment level is appropriate.
+
+2. **Reserving database instances before application instances.** Databases often have more stable utilization patterns than application servers (which scale with traffic), making database reservations lower risk. Many teams forget that RDS Reserved Instances provide the same discount structure as EC2 and have database workloads that are stable enough to benefit significantly.
+
+3. **Not using partial upfront or no upfront payment for the first reservation.** The maximum discount comes from all-upfront payment, but the cash-flow implication of paying for 12 months of compute upfront is significant for smaller companies. Partial upfront and no upfront options have smaller discounts but better cash-flow characteristics. For the first reservation in a category, use partial upfront to limit the exposure while validating the commitment level.
+
+4. **Ignoring reserved instance marketplace for unwanted reservations.** AWS has a marketplace where reserved instances can be sold before the term expires. Teams that over-reserved can recover some cost by selling the unused reservation. This option is not zero friction, but it reduces the cost of over-reservation for AWS EC2 standard reserved instances.
+
+5. **Making all reservations at once.** Instead of reserving 100% of baseline in January, stagger reservations so 20-25% expire each quarter. This provides flexibility to adjust commitment levels as usage patterns evolve and prevents the "all reservations expire simultaneously" renewal complexity.
+
+## Where to start
+
+1. **Run the Cost Explorer reservation recommendations.** AWS Cost Explorer has a built-in recommendations tool that analyzes your last 7, 30, or 60 days of usage and recommends specific reserved instance purchases with estimated savings. This is a data-driven starting point. Review the recommendations critically, particularly for any service that had unusual usage during the analysis period.
+
+2. **Start with RDS if you have a stable database workload.** Database workloads are typically more stable than application workloads and often represent significant monthly spend. A reserved RDS instance for a database that has been running continuously for months is a low-risk first reservation. Calculate the monthly savings, the break-even utilization, and the risk if the instance is no longer needed before committing.
+
+3. **Set a monthly reservation utilization review.** Add a monthly calendar reminder to review reservation utilization in Cost Explorer. Reservations with utilization below 70% need attention: either the workload changed, the reservation was too large, or the instance type no longer matches the deployment. Catching underutilization early limits the cost of suboptimal reservations.
+
+## Related reading
+
+- [Reserved Instances, Savings Plans, Spot: The Saving Map](/blog/reserved-instances-savings-plans-spot-the-saving-map)
+- [PlanetScale vs Supabase vs Neon vs Aurora Serverless](/blog/planetscale-vs-supabase-vs-neon-vs-aurora-serverless)
+- [Per Seat vs Per Usage Pricing: Cost Implications for Buyers](/blog/per-seat-vs-per-usage-pricing-cost-implications-for-buyers)
+- Software Costs That Founders Underestimate

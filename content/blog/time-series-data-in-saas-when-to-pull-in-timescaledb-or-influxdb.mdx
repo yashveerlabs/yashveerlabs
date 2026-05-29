@@ -1,0 +1,120 @@
+---
+slug: "time-series-data-in-saas-when-to-pull-in-timescaledb-or-influxdb"
+title: "Time Series Data in SaaS: When to Pull in TimescaleDB or InfluxDB"
+excerpt: "Working notes on time series data in saas: when to pull in timescaledb or influxdb. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-04-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design","saas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/time-series-data-in-saas-when-to-pull-in-timescaledb-or-influxdb"
+status: "published"
+definition: "Time series data is data where the timestamp is the primary key and queries are almost always range-based: give me the values between now and thirty days ago. Postgres handles it adequately at low volumes. TimescaleDB extends Postgres with automatic partitioning and compression for time-ordered data. InfluxDB is purpose-built for metrics at high ingestion rates. Knowing which to reach for saves weeks of wasted infrastructure work."
+faq: [
+  {"q":"When should a SaaS application switch from PostgreSQL to TimescaleDB for time series data?","a":"When your time series tables are growing faster than your queries can keep up, or when you are doing manual partitioning to manage table size. TimescaleDB handles partitioning automatically through hypertables and adds compression that can reduce storage by 90 percent. If you are already on Postgres, it installs as an extension and the migration is straightforward."},
+  {"q":"What is the difference between TimescaleDB and InfluxDB for SaaS metrics?","a":"TimescaleDB is Postgres with time series optimizations. You write SQL, use your existing Postgres tooling, and get joins across relational and time series data in one database. InfluxDB is a purpose-built time series store with its own query language, higher raw ingestion throughput, and better compression for pure metrics workloads. InfluxDB wins on write throughput; TimescaleDB wins on SQL compatibility and operational simplicity."},
+  {"q":"Can I use plain PostgreSQL for time series data in a small SaaS?","a":"Yes, up to a few million rows per table, especially with proper indexing on the timestamp column and monthly partitioning. Most SaaS products below fifty thousand active users never need a dedicated time series store. The point to reconsider is when queries against time series tables start appearing in the slow query log or when the tables start exceeding a few hundred gigabytes."},
+  {"q":"What is InfluxDB best suited for in a backend application?","a":"High-frequency metric ingestion: server telemetry, IoT sensor data, infrastructure monitoring, click streams at millions of events per day. InfluxDB's line protocol is optimized for this pattern and its compression for float metrics is very efficient. It is less suited for workloads that need joins with relational data or complex SQL queries."},
+  {"q":"How does TimescaleDB handle data retention and compression automatically?","a":"Through retention policies and compression policies set per hypertable. You define a rule like compress chunks older than 7 days and drop chunks older than 90 days. TimescaleDB applies these on a schedule in the background. Compressed chunks become read-only but are still queryable with SQL. This keeps storage manageable without application-layer data management code."},
+  {"q":"Is there a managed cloud option for TimescaleDB or InfluxDB for a production SaaS?","a":"Yes. Timescale Cloud is the managed offering for TimescaleDB, available on AWS, GCP, and Azure with pricing based on compute and storage. InfluxDB Cloud is the managed offering for InfluxDB 3.0 with a usage-based pricing model. Both are production-ready options for teams that do not want to operate the database themselves."},
+  {"q":"What are the most common mistakes engineers make when storing time series data in a relational database?","a":"Missing or poorly structured indexes on the timestamp column. Storing every metric in a single monolithic table rather than separating by retention and access pattern. Not partitioning large tables, which causes query planner overhead even on well-indexed columns. And storing raw high-frequency events when pre-aggregated rollups would serve all actual query patterns."}
+]
+---
+
+## What you actually need to know
+
+- PostgreSQL handles time series data fine for most SaaS products below a certain volume. The threshold is lower than most engineers think.
+- TimescaleDB is a Postgres extension, not a new database. The migration from vanilla Postgres is incremental and the SQL is identical.
+- InfluxDB is faster at raw ingestion but requires a separate operational stack and does not do SQL joins against your relational data.
+- The decision point is usually not ingestion volume. It is query latency as table size grows, and storage cost as retention windows extend.
+- In my experience, most teams pull in a specialized time series store six months too late and pay an unnecessary storage bill in the meantime.
+
+| Store | Ingestion throughput | SQL support | Storage compression | Best for |
+|---|---|---|---|---|
+| Plain PostgreSQL | Low to moderate | Full | None by default | Low-volume metrics, small teams |
+| TimescaleDB | Moderate to high | Full (Postgres SQL) | Up to 90% on chunks | SaaS dashboards, mixed relational + time series |
+| InfluxDB | Very high | Flux / SQL-like | Excellent for float metrics | IoT, infrastructure monitoring, pure metric streams |
+| ClickHouse | Extremely high | Analytical SQL | Excellent | Large scale analytics, not a primary DB |
+| Amazon Timestream | High | AWS-native SQL | Good | AWS-native infrastructure monitoring |
+
+## The core argument
+
+Time series workloads are deceptively well handled by PostgreSQL in the early days. You create a table with a timestamp column, index it, and queries run fast. Then the table grows to fifty million rows and queries that used to take milliseconds start taking seconds. You add partitioning manually. The manual partitioning works until the next scale jump. At some point you are spending more engineering time managing the data than using it.
+
+TimescaleDB is the obvious next step if you are already on Postgres and your workload is mixed, part relational, part time series. It installs as an extension. You convert existing tables to hypertables with one function call. Automatic partitioning happens behind the scenes. Compression policies reduce old data to a fraction of its original size. You keep writing SQL. You keep using your existing tooling.
+
+InfluxDB is the right choice when the workload is primarily or exclusively metric ingestion at high rates, and when the operational investment in a second database is acceptable. If you are ingesting infrastructure metrics, IoT sensor data, or anything where you are writing millions of rows per hour and the data is pure timestamps and numeric values, InfluxDB's write path is meaningfully faster and its storage format is better optimized for the pattern.
+
+The mistake I see most often is teams pulling in InfluxDB for a SaaS product dashboard that shows three months of user activity metrics. That workload is comfortably handled by TimescaleDB or even plain Postgres with partitioning. InfluxDB adds operational complexity, removes SQL joins, and introduces a separate authentication system without providing enough benefit to justify the cost for that pattern.
+
+## When to stay with PostgreSQL
+
+The answer is almost always "stay on Postgres until you cannot." The signals that you can stay are: fewer than a hundred million rows in your time series tables, query latency under five hundred milliseconds on your typical time range queries, and storage costs that are not a meaningful line item in your infrastructure budget.
+
+If you are already partitioning manually by month, you are doing what TimescaleDB automates. The question is whether the automation is worth the extension dependency. For most teams, yes. Install the extension, convert the table to a hypertable, and get the compression and automatic partition management without writing any maintenance code.
+
+## When to reach for TimescaleDB
+
+Three signals push me toward TimescaleDB on a client project. First, when the SaaS product has a user-facing dashboard that displays aggregated metrics over time ranges. TimescaleDB's continuous aggregates pre-compute rollups and query them like views, which is dramatically faster than computing aggregates at query time on a large hypertable.
+
+Second, when the team needs to join time series data with relational data in the same query. Customer activity over the last thirty days joined to the subscription tier. Event counts joined to user metadata. InfluxDB cannot do this. Plain Postgres can, but TimescaleDB does it while also handling the partitioning and compression that make the queries fast at scale.
+
+Third, when the team wants to stay on the Postgres operational stack, managed Postgres hosting, existing backup tooling, familiar monitoring. TimescaleDB fits inside all of that. InfluxDB does not.
+
+## When to reach for InfluxDB
+
+High-frequency pure metrics. Infrastructure monitoring where you are ingesting CPU, memory, disk, and network metrics from hundreds of servers every ten seconds. IoT workloads where sensors emit temperature, pressure, and humidity readings constantly. Click streams from a high-traffic consumer product where you are writing millions of events per hour and the reads are always pure time range aggregations without relational joins.
+
+At those ingestion rates, InfluxDB's line protocol and column-oriented storage format are genuinely better suited to the workload than any row-oriented database. The operational cost is real: it is a separate database to deploy, monitor, and back up. But for the workloads it is designed for, it is worth it.
+
+## What it actually costs
+
+| Option | Monthly infra cost at 50k users | Migration cost | Operational load |
+|---|---|---|---|
+| Plain Postgres time series | Included in existing Postgres bill | None | Low |
+| TimescaleDB (self-hosted) | 50 to 200 dollars extra for storage | 1 to 3 days engineering | Low, Postgres-compatible tooling |
+| Timescale Cloud (managed) | 100 to 500 dollars depending on compute | 1 to 3 days engineering | Very low |
+| InfluxDB self-hosted | 100 to 400 dollars | 1 to 2 weeks engineering | Moderate, separate operational stack |
+| InfluxDB Cloud | 50 to 800 dollars depending on ingestion | 1 to 2 weeks engineering | Low |
+
+## Features to look for
+
+- Automatic partitioning so you do not manage partition boundaries by hand.
+- Compression policies for old data, configurable by age.
+- Continuous aggregates or materialized rollups for common query patterns.
+- A retention policy system that drops old chunks automatically.
+- SQL compatibility if your team is already writing SQL.
+- A managed cloud option for teams that cannot afford a dedicated DBA.
+- Observability into chunk sizes, compression ratios, and query performance at the chunk level.
+
+## Expert opinion
+
+> The conversation about TimescaleDB versus InfluxDB is less interesting than the conversation about whether you need either one at all. Most SaaS products do not have a time series problem. They have a query problem that looks like a time series problem. Fixing the index, adding a monthly partition, and moving the reporting query to a read replica solves it without introducing a new database. When those options are genuinely exhausted, then we talk about TimescaleDB.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client built a SaaS platform for commercial real estate that included an energy consumption dashboard. The events table stored meter readings every fifteen minutes for every sensor in every building under management. After eighteen months in production, the table had grown to three hundred million rows. Dashboard queries were timing out. The team had tried adding indexes and increasing the database instance size. Neither helped.
+
+We installed TimescaleDB as an extension on their existing Postgres database, converted the events table to a hypertable partitioned by week, and created a continuous aggregate for the daily rollup that the dashboard primarily read from. Dashboard query times dropped from thirty seconds to under two hundred milliseconds. We then enabled chunk compression for chunks older than thirty days, which reduced the storage footprint by seventy percent over the following three months.
+
+The entire migration took four days of engineering work. The client never needed to move to a separate database, hire a new operator, or retrain the team on a new query language. It is a pattern consistent with what I describe in the [write-heavy workload post](/blog/the-write-heavy-workload-a-different-set-of-tradeoffs): the first move is always to optimize within the existing stack before adding operational complexity. For further context on what happens to database performance as data volume grows, the [slow query log post](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice) covers how to identify the queries worth optimizing before they become outages.
+
+## Common mistakes
+
+1. Adding a dedicated time series database before exhausting what Postgres can do with proper indexing and partitioning.
+2. Storing raw high-frequency events when all queries read aggregated rollups. The raw data is taking up space and slowing down queries for no benefit.
+3. Using InfluxDB for a workload that needs SQL joins with relational data. You will spend weeks rebuilding join logic in the application layer.
+4. Not setting a retention policy. Time series tables grow without bound. Setting a retention window on day one is far easier than migrating old data years later.
+5. Not using continuous aggregates or materialized views for the dashboard queries. Recomputing thirty-day aggregates on demand at query time does not scale.
+6. Assuming TimescaleDB is a drop-in replacement for InfluxDB or vice versa. They have different query languages, different client libraries, and different operational models.
+7. Not monitoring chunk sizes and compression ratios. These are the primary indicators of whether the time series store is healthy.
+
+## A 30 day plan
+
+1. **Days 1 to 5.** Profile your time series tables. Find the largest ones and measure their row count, storage size, and slowest queries. Check whether they have timestamp indexes and monthly partitioning. If not, add them and measure again. Document how much of the problem this solves.
+2. **Days 6 to 12.** If partitioning and indexing are not enough, install TimescaleDB on a staging environment. Convert the most problematic table to a hypertable. Set up a continuous aggregate for your most common dashboard query. Benchmark the difference.
+3. **Days 13 to 20.** If the TimescaleDB results are compelling, plan the production migration. It is incremental: install extension, convert table, observe. No downtime required for the extension install or hypertable conversion.
+4. **Days 21 to 30.** Enable compression policies on chunks older than your hot window. Set a retention policy. Monitor storage size and query latency weekly for the first month. Adjust the compression and retention thresholds based on what you observe.
+
+For related reading, [the write-heavy workload post](/blog/the-write-heavy-workload-a-different-set-of-tradeoffs) covers the broader context of high-volume write patterns in SaaS backends. For the ACID vs BASE decision that underpins any database architecture choice, [the ACID vs BASE post](/blog/acid-vs-base-when-each-belongs-in-your-architecture) is worth reading alongside this one.

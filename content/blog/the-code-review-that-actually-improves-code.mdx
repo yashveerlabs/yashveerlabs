@@ -1,0 +1,61 @@
+---
+slug: "the-code-review-that-actually-improves-code"
+title: "The Code Review That Actually Improves Code"
+excerpt: "Most code reviews catch bugs. The best ones improve the engineer. Here is how to make code review a tool for quality and growth, not just gatekeeping."
+date: "2026-05-24"
+category: "Tech Debt and Refactoring"
+tags: ["code-review", "engineering", "quality", "tech-debt", "teams"]
+readingMinutes: 6
+ogImage: "/api/og/blog/the-code-review-that-actually-improves-code"
+status: "published"
+faq: [
+  {"q":"How large should a PR be for effective code review?","a":"Small. Under 400 lines is a commonly cited guideline. Above 1,000 lines, review quality drops significantly because reviewers cannot hold the full context in mind. If a feature requires a large change, break it into review-sized pieces. The investment in smaller PRs pays off in faster, higher-quality reviews."},
+  {"q":"How long should a code review take?","a":"A reviewer should spend between 20 and 60 minutes on a typical PR. Less than 20 minutes suggests the review was superficial. More than 60 minutes suggests the PR is too large or the reviewer is writing essays rather than comments. These numbers are guidelines, not rules."},
+  {"q":"Should code reviews include automated tool feedback?","a":"Yes. Lint, type checking, test coverage, and static analysis should run automatically on every PR. This offloads the mechanical correctness checking from human reviewers and lets them focus on logic, design, and knowledge transfer. Reviewer comments that repeat what a lint rule could catch are low-value."},
+  {"q":"Is it appropriate to reject a PR because of disagreement about code style?","a":"No. Code style disagreements should be resolved by the team's shared style guide, enforced by a linter where possible. If the style guide does not address the issue, the author's preference takes precedence until the team agrees to update the guide. Style preferences are never a reason to block a merge."},
+  {"q":"How do you review code you do not fully understand?","a":"Ask questions. \"Can you help me understand the reasoning behind this approach?\" is a legitimate review comment. It prompts explanation, which often reveals either a good reason (and the reviewer learns something) or a gap in the author's reasoning (and the review has caught a real problem)."}
+]
+---
+
+# The Code Review That Actually Improves Code
+
+**Code review is the practice of having engineers read each other's code before it merges. Done well, it catches bugs, improves code quality, spreads knowledge across the team, and develops junior engineers faster than any other single practice. Done badly, it is a rubber stamp at best and a political battleground at worst. The difference between these outcomes is not the tool. It is the culture and the specific behaviors of the reviewers.**
+
+## What you need to know
+
+- The goal of code review is to improve the code, not to demonstrate the reviewer's superiority or to perform thoroughness
+- Nit comments (minor style preferences) should be labeled as nits and never block merging
+- The reviewer's job is to ensure correctness and quality, not to rewrite the code in their preferred style
+- Async code review is more scalable than synchronous review but requires clearer written communication
+- The best code reviews for junior engineers include explanations of the why, not just what to change
+
+## The core argument
+
+Code review culture is one of the highest-leverage engineering practices for two reasons: it directly affects code quality, and it is one of the primary mechanisms for knowledge transfer and engineering development. A team with good code review produces fewer bugs, shares context more effectively, and develops junior engineers faster than a team with weak review culture. The investment in making code review work correctly pays off across every dimension of engineering output.
+
+The most common failure mode is the review as performance. Reviewers who write long comments to demonstrate their expertise, who identify every possible issue regardless of severity, who block PRs over style preferences, and who treat code review as an evaluation of the author rather than a collaborative improvement of the code. This behavior makes authors defensive, slows the development cycle, and teaches junior engineers that code review is about being criticized rather than about improving their work. The most talented engineers on the team will push back on this review culture or leave. The less experienced engineers will internalize the criticism as an assessment of their worth.
+
+The review that actually improves code has a different character. It asks questions before making assertions: "What was the reasoning behind this approach?" rather than "This is wrong." It distinguishes clearly between correctness issues (must fix before merge), design questions (should discuss, may or may not change), and nits (take it or leave it, never blocking). It explains the why behind significant feedback: "I would use an index here because this query runs on every page load and will be slow at table sizes above 10,000 rows" is more useful than "add an index." Explanations build mental models that carry forward to the author's future work. The comment without explanation changes the code. The comment with explanation changes the engineer.
+
+## Common mistakes
+
+1. **Treating all feedback with equal weight.** Not all code review comments deserve equal consideration. A correctness bug is not the same as a style preference. Label your comments: "Bug," "Design question," "Nit." This makes the review easier to parse and prevents nits from blocking merges.
+2. **Reviewing code without running it.** Code review in a text editor catches logic errors and style issues. It does not catch integration errors, performance problems, or behavior in edge cases. The strongest reviews combine static analysis with actually running the code and the tests.
+3. **Writing long essays in comments.** If a review comment requires a paragraph of explanation, consider whether the conversation should happen synchronously instead. Long comment threads in code review slow down the development cycle and often produce less clarity than a 10-minute conversation.
+4. **Reviewing everything with the same depth.** A one-line change in a low-risk utility function does not require the same review depth as a change to the payment processing logic. Calibrate review depth to the risk of the change. Deep reviews for high-risk code; lighter reviews for low-risk changes.
+5. **Not acknowledging good code.** Code review is often purely critical. Reviewers who also note what is done well, a clever solution, a clean abstraction, a well-named function, create a review culture that is safer for junior engineers to participate in and that reinforces good habits as explicitly as it corrects bad ones.
+
+## Where to start
+
+**Step 1: Establish a shared understanding of what code review is for.** Write a one-page document with your team that defines: what kinds of issues block merging, what kinds are suggestions, and what the expected response time for reviews is. Agreement on the purpose and the process reduces friction significantly.
+
+**Step 2: Adopt a labeling convention for comments.** At minimum: "Bug" (must fix), "Question" (author should answer), "Suggestion" (consider this), "Nit" (take it or leave it). This convention makes the review output actionable and removes the guessing game about what the reviewer actually expects.
+
+**Step 3: Conduct a review retrospective quarterly.** Ask the team: what makes reviews take too long? What feedback formats are most useful? Are there recurring patterns that should become automated lint rules instead of manual review comments? Improving the review process itself is the highest-leverage investment in code review quality.
+
+## Related reading
+
+- [Test Coverage: A Metric With a Story](/blog/test-coverage-a-metric-with-a-story)
+- [Tech Debt in Startups: How It Kills Products and How to Manage It](/blog/tech-debt-in-startups-how-it-kills-products-and-how-to-manage-it)
+- [The Tech Debt Audit: A Two-Day Process](/blog/the-tech-debt-audit-a-two-day-process)
+- [Refactoring Without a Test Suite: A Survival Guide](/blog/refactoring-without-a-test-suite-a-survival-guide)

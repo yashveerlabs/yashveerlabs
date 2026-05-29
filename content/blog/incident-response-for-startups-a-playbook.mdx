@@ -1,0 +1,62 @@
+---
+slug: "incident-response-for-startups-a-playbook"
+title: "Incident Response for Startups: A Playbook"
+excerpt: "A startup does not need an enterprise incident response program. It needs a simple, documented process that prevents the chaos that happens when something breaks at 2am and nobody knows who does what."
+date: "2026-05-23"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance"]
+readingMinutes: 6
+ogImage: "/api/og/blog/incident-response-for-startups-a-playbook"
+status: "published"
+definition: "Incident response for a startup is a documented, practiced process for detecting, communicating about, and resolving service disruptions in a way that minimizes customer impact and preserves trust. The goal is not to prevent all incidents. It is to handle them in a way that customers and prospects find credible and that the team finds manageable."
+faq: [
+  {"q":"What does a startup incident response plan actually need to include?","a":"A severity classification, a contact and escalation chain, a communication template for each severity level, a defined incident commander role, a runbook for the most common incident types, and a post-mortem process. These six elements cover ninety percent of incident scenarios without requiring enterprise-level process overhead."},
+  {"q":"Who should be the incident commander?","a":"The most technically informed person available when the incident begins, with the authority to make decisions without approval. At a startup, this is usually the CTO or the lead engineer. The commander's job is to coordinate the response, not to do all the technical work personally."},
+  {"q":"How do I communicate with customers during an incident?","a":"Early, honestly, and with regular updates. 'We are aware of an issue affecting X and are investigating' within fifteen minutes is better than a detailed explanation two hours later. Update every thirty minutes while the incident is active, even if the update is 'we are still investigating.' Silence is worse than uncertainty."},
+  {"q":"Do I need a status page?","a":"Yes, from the first enterprise customer. A status page costs 20 to 50 dollars per month and provides a public, credible record of your uptime and incident history. It also gives you a communication channel for incidents that does not require individual customer notifications."},
+  {"q":"What is a post-mortem and how do I run one?","a":"A post-mortem is a structured review of an incident that answers: what happened, why it happened, what limited its impact, and what process or technical changes will prevent recurrence. Run it within seventy-two hours while the memory is fresh. Make it blameless. The goal is system improvement, not accountability."}
+]
+---
+
+## What you need to know
+
+- The most expensive part of an incident is not the technical problem. It is the uncoordinated response that makes the problem worse, takes longer to resolve, and communicates poorly to affected customers.
+- A documented incident response plan does not need to be elaborate. A one-page process with clear roles and a communication template covers the scenarios most early-stage startups will encounter.
+- Customer communication during an incident is more important than the speed of the technical resolution. A customer who hears from you early and regularly will be more forgiving than one who discovers the incident through their own monitoring.
+- The status page is the lowest-cost enterprise credibility signal available. It takes an hour to set up and signals operational maturity to enterprise prospects before they even sign.
+- Post-mortems are not blame sessions. They are system audits. The outcome is a list of specific changes that reduce the probability or impact of the next incident.
+
+## The core argument
+
+The startup incident response problem is not that founders lack good intentions. It is that when something breaks at 2am, without a documented process, every person on the team independently tries to solve the problem, nobody owns the customer communication, and the resolution takes twice as long as it would have taken with a clear chain of command. I have seen this pattern play out in multiple contexts. The technical resolution is often found quickly. The customer communication happens after too long a delay. The post-mortem either does not happen or produces a list of improvements that nobody implements.
+
+The playbook that prevents this is short. It defines who is notified first when an incident is detected, who makes the decision to declare an incident at each severity level, who owns the customer communication and when the first update goes out, and what the post-mortem process looks like. Writing this down takes two to three hours. Practicing it once, even in a tabletop exercise, takes one hour. The return on that investment is the first real incident where the team knows exactly what to do without asking.
+
+The customer communication piece deserves specific attention. Most technical founders underestimate how much customer trust is affected by how an incident is communicated rather than by the incident itself. A well-communicated incident that lasts two hours is almost always forgiven. A poorly communicated incident that lasts forty-five minutes often leaves customers uncertain about the platform's reliability. The template approach eliminates the improvisation: at minute fifteen, this goes out. At minute forty-five, this goes out. At resolution, this goes out. Consistent, early, honest communication is the standard that enterprise customers remember.
+
+## Common mistakes
+
+1. **Not having an on-call rotation.** Without a defined on-call rotation, incidents surface to whoever happens to be awake. A documented rotation means the right person is reachable every night, which reduces mean time to response.
+
+2. **Not setting up monitoring before the first customer.** An incident you discover through a customer complaint is an incident that went undetected in your system. Basic uptime monitoring and error rate alerting should be in place before any customer goes live.
+
+3. **Skipping the post-mortem after minor incidents.** Minor incidents teach the same lessons as major ones. The post-mortem habit built on minor incidents is the process that handles major incidents well.
+
+4. **Writing a post-mortem that does not include action items.** A post-mortem without specific, assigned, time-bound action items is a document, not a process. The action items are the product of the post-mortem.
+
+5. **Not telling customers what changed after an incident.** A post-incident update that tells customers what was changed and why reduces the probability they cancel because of the incident. Most customers respect transparency about what happened and what was done about it.
+
+## Where to start
+
+1. **Write the one-page incident response document.** Severity levels, contact chain, communication template, and incident commander definition. Share it with everyone on the team this week.
+
+2. **Set up a status page.** Betterstack, Statuspage, or any simple alternative. Configure at least one automated uptime check that reports to the status page.
+
+3. **Set up basic monitoring and alerting.** Error rate above threshold, API response time above threshold, and database connection failure are the three alerts that catch most production incidents. Set them up before the next customer goes live.
+
+## Related reading
+
+- [Incident Severity Levels: A Practical Definition](/blog/incident-severity-levels-a-practical-definition)
+- [Runbooks That Actually Get Used During Incidents](/blog/runbooks-that-actually-get-used-during-incidents)
+- [Status Pages That Build Trust During Outages](/blog/status-pages-that-build-trust-during-outages)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)

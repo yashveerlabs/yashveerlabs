@@ -1,0 +1,117 @@
+---
+slug: "designing-for-failure-a-backend-engineers-mental-model"
+title: "Designing for Failure: A Backend Engineer's Mental Model"
+excerpt: "Production systems fail. The question is whether they fail cleanly. The engineers who design for failure produce systems that degrade gracefully. The ones who do not produce systems that cascade."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["backend","failure","reliability","architecture"]
+readingMinutes: 12
+ogImage: "/api/og/blog/designing-for-failure-a-backend-engineers-mental-model"
+status: "published"
+definition: "Designing for failure means assuming that every dependency can fail and building the application to degrade gracefully rather than cascade. Timeouts. Retries with backoff. Circuit breakers. Bulkheads. Graceful degradation. Each is a small pattern that prevents a small failure from becoming a customer facing incident. The mental model is that failures are normal and the system should handle them as such."
+faq: [
+  {"q":"What is the failure mental model?","a":"Every external dependency can fail. The database. The cache. The third party API. The disk. The network. The other service. The engineer designs the application assuming any of these will fail at some point. The application has to handle the failure without taking the whole system down."},
+  {"q":"What is the most basic failure pattern?","a":"Timeout. Every call to an external dependency has a timeout. Without a timeout, a slow dependency hangs the caller. The hang cascades. The system stops responding. Default timeouts in most libraries are too long. Set them explicitly."},
+  {"q":"What about retries?","a":"Retries with exponential backoff and a maximum attempt count. Without backoff, retries hammer a failing dependency. Without a maximum, retries loop forever. The combination is the right pattern. Idempotency on the called endpoint is the prerequisite."},
+  {"q":"What is a circuit breaker?","a":"A pattern that stops calling a failing dependency for a period after too many failures. The breaker opens after N failures in a window. While open, calls return immediately with a failure. The breaker closes after a half open test passes. The pattern prevents a failing dependency from consuming all the caller's capacity."},
+  {"q":"What is a bulkhead?","a":"A pattern that isolates failure to one part of the system so the rest stays healthy. Separate thread pools per dependency. Separate connection pools per service. The failure of one bulkhead does not sink the whole ship. The pattern requires deliberate resource separation."},
+  {"q":"What does graceful degradation look like?","a":"The feature that depends on a failing service degrades to a smaller experience instead of breaking entirely. Search that falls back to recently used. Recommendations that fall back to popular. The customer sees a slightly worse experience instead of an error."},
+  {"q":"What is the worst failure design mistake?","a":"Assuming dependencies do not fail. Default infinite timeouts. No retries. No circuit breakers. The first time a dependency goes slow, the entire system stalls. The customers experience an outage instead of a small degradation."}
+]
+---
+
+## What you actually need to know
+
+- Every external dependency can fail. Design for it.
+- Timeouts on every call. Default ones are too long.
+- Retries with exponential backoff and maximum attempts. Idempotency required.
+- Circuit breakers stop calling failing dependencies.
+- Bulkheads isolate failure. Graceful degradation preserves the user experience.
+
+| Pattern | What it prevents |
+|---|---|
+| Timeout | Hung callers |
+| Retry with backoff | Cascading failures |
+| Circuit breaker | Capacity exhaustion |
+| Bulkhead | Failure spreading |
+| Graceful degradation | Customer facing breakage |
+| Idempotency | Duplicate side effects on retry |
+| Dead letter | Lost work on terminal failure |
+| Backpressure | Producer overrunning consumer |
+
+## The core argument
+
+Production systems fail. Not occasionally. Often. Dependencies go slow. Networks partition. Disks fill. Services restart. The teams that pretend failure is exceptional ship systems that fail badly when reality intrudes. The teams that design for failure ship systems that degrade gracefully and recover automatically.
+
+The mental model is small. Every external call can fail. The application has to handle it. The handling is a small set of patterns applied consistently. Timeouts on every call. Retries with backoff. Circuit breakers for repeat failures. Bulkheads to isolate. Graceful degradation to preserve customer experience.
+
+The cost of the patterns is small. The libraries exist. The application code adds a few lines per call site. The reasoning is the discipline. The team has to think about what happens when the call fails. The answer should be specific to the call. A retry might be right. A circuit breaker might be right. A graceful fallback might be right.
+
+The teams that do this well have production systems that survive dependency failures the customer never sees. The teams that do not have systems that cascade. A slow third party API takes down the application. A database hiccup propagates to every endpoint. The team learns by causing incidents.
+
+## The patterns reference
+
+| Pattern | Implementation |
+|---|---|
+| Timeout | Per call, set deliberately. Usually a few seconds for hot path. |
+| Retry with backoff | Exponential. Max attempts. Idempotent required. |
+| Circuit breaker | After N failures in a window, stop calling. Half open test to recover. |
+| Bulkhead | Separate resource pools per dependency. |
+| Graceful degradation | Fallback that is worse but not broken. |
+| Idempotency | Server side support so retries are safe. |
+| Dead letter | Failed work captured for later inspection. |
+| Backpressure | Producer slows when consumer is overwhelmed. |
+| Compensating transaction | Roll back a side effect when later step fails. |
+| Hedged requests | Send to multiple replicas, take the first. |
+
+## How much does this cost
+
+The cost is small once the patterns are in the team's repertoire. A few hours per critical surface to apply them. The libraries do the heavy lifting. The reasoning is the discipline. The cost is mostly the time to think about failure, not the code to handle it.
+
+## Features the failure design must have
+
+- Timeouts on every external call.
+- Retry policy documented per call site.
+- Circuit breakers on the highest stakes dependencies.
+- Bulkheads where dependencies could starve each other.
+- Graceful fallbacks for user facing features.
+- Idempotency on write endpoints.
+- Dead letter handling for background work.
+- Monitoring on timeout rate, retry rate, breaker state.
+- Chaos testing of failure modes.
+
+## Expert opinion
+
+> The teams that design for failure ship systems that survive the kinds of incidents that take down their peers. The patterns are small. The discipline is to apply them consistently. The teams that do not design for failure spend years learning the patterns by causing incidents. The cost of incidents is large. The cost of applying the patterns by default is small.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS experienced a major incident when their payment processor went slow. The application called the processor synchronously without a timeout. The slow processor calls held threads. The threads filled the application's pool. The whole application stopped responding. The incident lasted four hours.
+
+We applied the failure patterns. Timeout on every external call. Circuit breaker on the payment processor. Graceful degradation that put orders into a pending state when the processor was unavailable. Dead letter queue for the orders that needed manual reprocessing.
+
+A similar event six months later was contained. The circuit breaker opened. The application kept serving other traffic. Orders went into the pending state. The processor came back online. The pending orders were retried. The customers saw a brief delay on payment confirmations instead of an outage.
+
+For more on the related work, see [resilience patterns circuit breakers retries bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads) and [timeouts the setting most engineers get wrong](/blog/timeouts-the-setting-most-engineers-get-wrong).
+
+## Common mistakes teams make
+
+1. Default timeouts. Usually too long.
+2. No retry policy. Or retries without backoff.
+3. No circuit breakers on dependencies that fail.
+4. No bulkheads. One dependency starves others.
+5. No graceful degradation. Features break entirely on dependency failure.
+6. No idempotency. Retries duplicate side effects.
+7. No dead letter handling. Failed work disappears.
+8. No chaos testing. Failure modes are theoretical.
+
+## A 30 day plan to put patterns in place
+
+1. **Week one.** Audit external calls. Identify the ones without timeouts.
+2. **Week two.** Add timeouts. Add retries where appropriate.
+3. **Week three.** Add circuit breakers on high stakes dependencies.
+4. **Week four.** Add graceful fallbacks for user facing features. Run chaos tests.
+
+For more on the related work, read [resilience patterns circuit breakers retries bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads) and [chaos engineering at startup scale](/blog/chaos-engineering-at-startup-scale). On the broader reliability side, [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) is the natural next read.

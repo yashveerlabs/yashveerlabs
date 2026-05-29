@@ -1,0 +1,114 @@
+---
+slug: "ai-failover-and-fallback-patterns-when-your-model-stops-working"
+title: "AI Failover and Fallback Patterns: When Your Model Stops Working"
+excerpt: "Every AI feature in production will fail. Rate limits, timeouts, model outages, prompt drift. The patterns that keep the product alive when the model is not are smaller and more proven than most teams realize."
+date: "2026-05-18"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","reliability","architecture","llm"]
+readingMinutes: 11
+ogImage: "/api/og/blog/ai-failover-and-fallback-patterns-when-your-model-stops-working"
+status: "published"
+definition: "AI failover is the discipline of building features that degrade gracefully when the model is slow, expensive, rate limited, or completely down. The patterns are timeouts, retries with backoff, secondary providers, cached fallbacks, and a graceful UI state. The teams that ship these patterns from the start sleep well. The teams that skip them learn what an OpenAI outage feels like at the worst possible moment."
+faq: [
+  {"q":"What is the most important fallback pattern?","a":"A short timeout with a deterministic fallback response. If the model has not responded in seven to ten seconds, show the user a non AI version of the feature. The user gets value, the product stays alive, and the team is not held hostage by a slow API."},
+  {"q":"Should I use multiple AI providers?","a":"Yes, for any feature that the product cannot live without. Anthropic and OpenAI both have outages. Running with a single provider is a single point of failure. The cost of integrating a second provider is one to three days. The cost of an outage with no fallback is the day your customers learn the feature is unreliable."},
+  {"q":"How do I handle rate limits gracefully?","a":"Three layers. Exponential backoff with jitter at the client. A queue for non urgent requests so they retry later. A circuit breaker that stops sending new requests when the error rate crosses a threshold. The combination keeps the product responsive instead of letting one bad minute cascade."},
+  {"q":"What is a circuit breaker in this context?","a":"A pattern where, after a set number of failures in a window, the client stops calling the AI for a cool down period and serves the fallback instead. It prevents a flood of failed requests from making the situation worse and gives the provider time to recover."},
+  {"q":"Should I cache AI responses?","a":"Yes for any request where the same input is likely to produce the same useful output. Embeddings, summaries of static documents, structured extractions. Cache by a hash of the input plus the model version. Bust the cache when the prompt changes."},
+  {"q":"What about streaming responses and partial failures?","a":"Streaming makes timeouts harder, because the response is partial. The fix is to set both a connection timeout and an inter token timeout. If the model goes silent mid stream, the client closes the connection and falls back."},
+  {"q":"How do I know my fallback is working?","a":"Force a failure in production occasionally. Inject a fake timeout once a week and verify the fallback path runs. The fallback that has never been exercised is the fallback that does not work."}
+]
+---
+
+## What you actually need to know
+
+- Every production AI feature needs a timeout, a retry policy, a fallback path, and a way to monitor failure.
+- Multiple providers are cheap insurance for any feature the product cannot live without.
+- A circuit breaker prevents one bad minute from cascading into a bad hour.
+- The fallback must be exercised regularly or it will not work when needed.
+- In my experience, the teams that lose customer trust on AI features lose it during outages, not during good days.
+
+| Layer | Fallback option | Speed of recovery |
+|---|---|---|
+| Network timeout | Retry with backoff | Seconds |
+| Rate limit | Queue with deferred retry | Minutes |
+| Provider outage | Switch to secondary provider | Seconds if integrated |
+| Total failure | Show non AI version | Always available |
+
+## The core argument
+
+AI features feel different from traditional API integrations in a way that masks how often they fail. The output is variable, the latency is high, and the errors look more like API errors than database errors. The team tends to treat each failure as a one off until enough of them stack up that the customer notices. By then the trust damage is already done.
+
+The right way to think about an AI feature is the same way you think about a third party payment processor. It will fail. It will fail in surprising ways. The system has to keep working when it does. The patterns are not new. Timeouts, retries, circuit breakers, fallbacks, and graceful degradation are the same patterns that have run reliable systems for twenty years. The only difference is that AI feels novel enough that teams forget to apply them.
+
+I have seen this happen on enough client projects to write the pattern down. A team integrates an AI feature in week one. It works in development. It ships to production. The first OpenAI outage hits at week six. The feature returns errors for forty minutes. The customer support inbox fills up. The team retrofits the fallback under pressure, which is the worst time to design it. Two months later they have the right architecture, but they paid for it in customer trust.
+
+The pattern that prevents this is simple. Decide upfront which AI features are essential and which are nice to have. For the essential ones, integrate a secondary provider on day one. For all of them, set timeouts, add retries with backoff, and build a deterministic fallback path. The work takes one to three days and saves the team from the post outage retrofit.
+
+## The five patterns that matter
+
+**Pattern one. Timeouts.** Set a hard ceiling on how long the client will wait for a response. For most user facing features, seven to ten seconds is the right range. For background batch work, sixty to two hundred and forty seconds. A timeout that fires is not an error. It is the system protecting the user experience.
+
+**Pattern two. Retries with exponential backoff and jitter.** When the call fails, retry once, twice, maybe three times, with increasing delay and randomization. The jitter is important. Without it, every client retries at the same time after an outage and produces a thundering herd.
+
+**Pattern three. Circuit breaker.** Track the error rate over a rolling window. When it crosses a threshold, stop calling the AI for a cool down period and serve the fallback. Reset after a successful probe. The breaker prevents one degraded minute from cascading into ten minutes of compounding failure.
+
+**Pattern four. Secondary provider.** Wire an alternate model behind the primary one. Anthropic if your primary is OpenAI. Or the reverse. Or a self hosted open source model for the fallback. The switch should be automatic on circuit breaker open, with the user never knowing which model produced the response.
+
+**Pattern five. Deterministic fallback.** When all AI options are exhausted, fall back to a non AI path. A cached previous response. A static recommendation. A simple form the user can fill out manually. The fallback should not look broken. It should look like a slightly less smart version of the same feature.
+
+## What it actually costs
+
+| Setup | Engineering investment | Insurance value |
+|---|---|---|
+| Single provider, no fallback | Zero | None |
+| Timeouts and retries | One day | Catches most transient failures |
+| Add circuit breaker | One day | Prevents cascading failures |
+| Add secondary provider | One to two days | Survives provider outages |
+| Add deterministic fallback path | Two to five days depending on feature | Product stays usable in worst case |
+| Full pattern set with monitoring | One to two weeks | Sleep well |
+
+The full pattern set on a single AI feature usually takes a senior engineer about a week to ship cleanly. For a product with three or four AI surfaces, three weeks of focused work covers everything. That is a tiny fraction of the cost of one customer reporting an outage on social media.
+
+## Features to demand from the failover layer
+
+- A configurable timeout per feature, not a global one.
+- A retry policy with exponential backoff and jitter that the team can tune without code changes.
+- A circuit breaker with metrics and alerts on open and close events.
+- A secondary provider abstraction that lets the team swap providers from a config file.
+- A clear deterministic fallback for every AI feature, written down and tested.
+- Observability. Latency, error rate, fallback rate, model usage per provider. Without numbers, you cannot tune.
+
+## Expert opinion
+
+> The AI features that survive a year in production are the ones engineered for failure from the start. The features that look impressive on launch day are usually the ones that fail hardest when the model has a bad afternoon. Engineer for the bad afternoon. The good afternoons take care of themselves.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+The cleanest fallback I shipped on a client project was for a summarization feature. The primary call ran against Anthropic with a seven second timeout. The retry ran against OpenAI with a five second timeout. The deterministic fallback was a simple extraction of the first three sentences of the document, with a small banner that said "Showing extract while smart summary is unavailable." During the OpenAI outage in February of that year, the feature kept working. Customers did not file tickets. The team did not get paged. The feature was perceived as reliable.
+
+The opposite story is a project I rescued where the AI feature had no fallback at all. During a four hour Anthropic incident, the feature returned a generic error for every user. Three customers churned that week. The team had to retrofit the fallback under pressure. The retrofit took ten days because the team was also fielding customer complaints. The same work, planned upfront, would have taken three days.
+
+For more on the architectural framing, see [the cost of running LLMs in production](/blog/the-cost-of-running-llms-in-production-a-realistic-budget) for the inference economics that drive provider choice, and [AI evals](/blog/ai-evals-how-to-test-your-ai-features-like-software) for the testing layer that catches regressions the fallback cannot. [Streaming AI responses to users](/blog/streaming-ai-responses-to-users-an-architecture-primer) covers the streaming side of timeout discipline.
+
+## Common mistakes teams make
+
+1. No timeout at all. The request hangs forever, the user thinks the product is broken.
+2. Retries without backoff. The thundering herd makes a small outage into a long one.
+3. Circuit breakers configured with the wrong window or threshold. Too aggressive, the breaker opens on noise. Too lax, it never opens when needed.
+4. Secondary provider that is configured but never exercised. The first time it runs is the worst time to find out it is broken.
+5. Fallback that looks broken. The user sees a 500 error and assumes the feature is down. The fallback should look like a feature, not a failure.
+6. No monitoring on the failover layer. The team has no idea how often the fallback is running until a customer complains.
+
+## Where to start, a 14 day plan
+
+1. **Day one.** Inventory every AI feature in the product. For each, decide whether it is essential or nice to have.
+2. **Day two and three.** Add timeouts to every AI call. Add retries with exponential backoff and jitter.
+3. **Day four and five.** Add a circuit breaker. Tune the thresholds against real production error rates.
+4. **Day six to day ten.** Integrate a secondary provider for the essential features. Test the switch in staging.
+5. **Day eleven to day thirteen.** Build the deterministic fallback for each essential feature. Test by forcing both providers offline.
+6. **Day fourteen.** Set up monitoring on latency, error rate, and fallback rate. Add an alert for sustained fallback usage.
+
+For deeper reading, [the AI output validation problem](/blog/the-ai-output-validation-problem-why-it-is-bigger-than-you-think) covers what to do with output once the AI does return something, and [token economics](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it) covers the cost side of running with multiple providers.

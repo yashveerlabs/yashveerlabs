@@ -1,0 +1,133 @@
+---
+slug: "the-mvp-feature-checklist-what-to-build-what-to-cut-and-why"
+title: "The MVP Feature Checklist: What to Build, What to Cut, and Why"
+excerpt: "The framework for deciding what goes in the MVP and what waits -- based on whether the feature tests the hypothesis, not whether users would like it."
+date: "2024-06-01"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders","product-management"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mvp-feature-checklist-what-to-build-what-to-cut-and-why"
+status: "published"
+definition: "The MVP feature checklist is the set of criteria for deciding which features belong in an MVP and which should be deferred. The core criterion is hypothesis testing: the MVP should include the minimum set of features required to test whether the product hypothesis is true. Features that users would enjoy but that do not test the hypothesis are deferred. Features that are required for the hypothesis test to be valid are included, even if they are expensive to build. The failure mode is building features that are nice-to-have rather than hypothesis-testing -- producing an expensive MVP that does not answer the core question faster than a cheap one would have."
+faq: [
+  {"q":"What is the test for whether a feature belongs in the MVP?","a":"One question: does this feature change whether the product hypothesis is true or false? The hypothesis is typically 'users will pay for X because it solves Y problem.' A feature that is required to deliver X belongs in the MVP. A feature that makes X more pleasant but does not change whether users will pay for it is a post-MVP feature. The founder who applies this test rigorously to every proposed feature will ship a significantly smaller and faster MVP than the founder who asks 'would users like this feature?'"},
+  {"q":"What categories of features are almost always safe to cut from an MVP?","a":"Six categories that rarely need to be in the MVP: team and collaboration features (unless the hypothesis is specifically about team collaboration), reporting and analytics dashboards (the first users rarely need dashboards), integrations with third-party tools (unless the integration is required for the core use case), mobile apps when a web app tests the hypothesis (the hypothesis test is about the value, not the delivery channel), notification and reminder systems (manual outreach works at MVP scale), and customization and settings (one version of the product is sufficient to test whether users value it)."},
+  {"q":"How do I handle features that feel essential but are not hypothesis-testing?","a":"Build the manual version. A feature that takes two weeks to build properly -- an automated report, a bulk operation tool, an integration -- can often be replaced by a manual process for the first 20 users. If 20 users are in the product and the team is manually running reports for them, that manual process confirms whether the report is valuable before it is built. The 'fake it before you make it' approach is not deceptive; it is hypothesis testing for features."},
+  {"q":"What happens when the MVP scope keeps growing despite the feature checklist?","a":"Each proposed feature is being evaluated on the wrong dimension. 'Would this be useful?' or 'competitors have this' are not the right evaluation criteria. 'Does this change whether our hypothesis is validated?' is the question. When a founder or stakeholder says 'we need this feature,' the response is 'what happens if we test the hypothesis without it?' If the hypothesis can still be tested, the feature is deferred. If it cannot, it is included. The scope creep usually comes from evaluating features on desirability rather than on hypothesis necessity."},
+  {"q":"What is the minimum viable product in a regulated industry where compliance features are required?","a":"In regulated industries (healthcare, finance, legal), compliance features are not optional and belong in the MVP regardless of whether they test the hypothesis. HIPAA compliance for a healthcare product, SOC 2 considerations for a B2B SaaS, and financial regulation compliance for a fintech are table stakes for market entry. The MVP in these categories is larger than in unregulated categories -- but the compliance requirements are not hypothesis-dependent. Budget for compliance as infrastructure, not as features."}
+]
+---
+
+## What you actually need to know
+
+- The MVP includes only what is needed to test the hypothesis. "Would users like this?" is the wrong question. "Does this test whether users will pay for the core value?" is the right question.
+- Team features, analytics dashboards, third-party integrations, and customization settings are almost always post-MVP.
+- Manual processes are legitimate MVP substitutes for features that can be built after the hypothesis is validated.
+- The scope creep that delays MVP launch is almost always features that test user desirability, not features that test the hypothesis.
+- In regulated industries, compliance features are infrastructure -- they belong in the MVP regardless of hypothesis testing.
+
+| Feature Category | Usually in MVP? | Cut Unless... | Manual Alternative |
+|---|---|---|---|
+| Core use case (the hypothesis) | Yes | -- | No |
+| Authentication + basic auth | Yes | Simple enough to skip | No |
+| Basic payment processing | Yes (if charging) | Free trial phase | No |
+| Team/collaboration | No | Hypothesis is about teams | Manual coordination |
+| Reporting/analytics | No | Reporting is the product | Manual exports |
+| Third-party integrations | No | Integration is the core use case | Manual data entry |
+| Mobile app | No | Mobile is the primary channel | Web app |
+| Notification system | No | -- | Manual emails |
+| Settings/customization | No | -- | One default config |
+| Admin tools | No | -- | Direct database access |
+
+## The core argument
+
+The MVP that is too large is the most common failure mode in startup engineering. Not the MVP that launches too soon -- the MVP that takes six months to build because the founder kept adding features, each individually reasonable, until the scope became a full product rather than a hypothesis test.
+
+The cause is evaluating features on desirability ("users would love this") rather than on hypothesis necessity ("this is required to test whether users will pay for the core value"). These are different evaluations that produce different scopes. The desirability evaluation produces an MVP that is feature-complete but expensive and slow. The hypothesis-necessity evaluation produces an MVP that is minimal but fast and informative.
+
+The insight is that a user who tries the MVP and finds the core value will tell you what else they need. A user who never tries the MVP because it was delayed by six months of feature development cannot tell you anything. The minimum viable product is not "the minimum features that make users happy" -- it is "the minimum features that test the hypothesis quickly enough to inform the decision."
+
+## The hypothesis formulation
+
+Before evaluating any feature, the hypothesis must be explicit. An implicit hypothesis produces fuzzy feature decisions; an explicit hypothesis produces clear ones.
+
+A usable hypothesis format: "We believe [type of user] will pay [price point] for [product capability] because [problem it solves]."
+
+Examples:
+- "We believe small business owners will pay $49/month for automated invoice reminders because they lose significant revenue to late payments and cannot afford a full-time AR person."
+- "We believe independent financial advisors will pay $99/month for a client reporting tool because they spend 8+ hours per month manually compiling reports that their clients expect."
+- "We believe restaurant operators will pay $199/month for shift scheduling software because they currently use spreadsheets that take 3+ hours to update and produce errors."
+
+With the hypothesis stated, feature decisions become tractable. For the invoice reminder product: does a mobile app change whether small business owners will pay $49/month for automated invoice reminders? No -- a web app tests the same hypothesis. Is it needed? No.
+
+## Applying the checklist to a specific MVP
+
+For the invoice reminder product with the above hypothesis:
+
+**Include (hypothesis-required):**
+- Customer/invoice management interface (minimum fields: customer name, email, invoice amount, due date)
+- Automated reminder schedule (3 emails: 7 days before, on due date, 7 days after)
+- Email delivery (Resend with a basic template)
+- User authentication (Clerk)
+- Billing (Stripe, monthly subscription)
+- Basic dashboard showing pending invoices and reminder status
+
+**Exclude (post-MVP):**
+- QuickBooks/Xero integration (manual import via CSV works for the first 30 users)
+- Custom reminder schedules (the default schedule tests whether the product works)
+- Team member accounts (the hypothesis is about individual business owners)
+- Mobile app (web app tests the hypothesis)
+- Analytics dashboard (the founder can check the database directly for MVP metrics)
+- Invoice PDF generation (link to an existing invoice in the email body)
+- Payment processing (the product reminds, not processes payments -- stay in scope)
+
+This produces an MVP that is buildable in 3-4 weeks by one developer. The 6-month version includes all of the excluded features and does not test the hypothesis any better than the 4-week version.
+
+## The manual process approach
+
+For features that are post-MVP but that specific early users request, the manual process is a legitimate short-term substitute:
+
+**QuickBooks integration:** For the first 20 customers, provide a CSV import template that the user fills in from their QuickBooks export. Process the import manually if needed. This takes 30 minutes per customer; at 20 customers, it takes 10 hours total -- significantly less than building a QuickBooks integration. After 20 customers, you know whether the integration is worth building.
+
+**Custom reminder schedules:** When a customer asks for a different schedule, configure it manually in the database. This is not scalable past 50 customers, but at MVP scale it allows testing whether schedule customization is a retention factor before building the UI for it.
+
+**Analytics dashboard:** Export data from the database periodically and present it to the customer in a shared spreadsheet. This is manual but allows testing whether customers want analytics before building a dashboard.
+
+The principle: the manual process confirms that the feature is valuable before it is built. Building the feature first, then discovering that customers do not actually use it, is the waste that the manual process prevents.
+
+## The regulation exception
+
+In regulated industries, compliance is not a hypothesis test -- it is a market entry requirement. The MVP in these categories is larger than in unregulated categories, and that is correct.
+
+**Healthcare (HIPAA):** HIPAA-compliant data handling, audit logging, business associate agreements, and access controls are required for any product that handles protected health information. These are in the MVP regardless of whether they test the core hypothesis. Building without them is not an MVP -- it is a product that cannot legally be used by the intended customers.
+
+**B2B SaaS (SOC 2):** Enterprise customers increasingly require SOC 2 Type II compliance. The compliance program is expensive but may be required to close the first enterprise contracts. For a product targeting enterprises, SOC 2 infrastructure is closer to MVP-required than post-MVP optional.
+
+**Fintech:** Financial regulations (money transmission, KYC/AML, lending regulations) vary by jurisdiction and product type. Legal counsel is required to scope compliance requirements before development begins -- building a fintech MVP without this clarity risks building a product that cannot legally operate.
+
+## Common mistakes founders make with MVP scope
+
+1. Adding features because competitors have them. The competitor's feature set is their answer to their hypothesis, not yours. Features that tests whether your hypothesis is true may be completely different from the competitor's features.
+2. Not cutting features when the team pushes back on cuts. The developer who says "that would only take two days" is evaluating by effort, not by hypothesis necessity. Two days is not the criteria; hypothesis testing is.
+3. Over-engineering the features that are included. An MVP that includes the right features but builds each one to production quality (with full test coverage, edge case handling, and documentation) is as slow as an MVP that includes too many features. Build the included features at MVP quality: functional, not polished.
+4. Not tracking which excluded features users actually request. The cut features list is a backlog. Keep it and track how frequently each cut feature is requested by users. High request frequency after launch informs the post-MVP roadmap.
+5. Treating the MVP as the product rather than as the hypothesis test. The MVP is not the thing; it is the test. After the test produces results, the product is built based on what the test showed. Teams that treat the MVP as the product optimize for the wrong outcome.
+
+## Where to start: a 3-step MVP scope decision
+
+**Step 1: Write the explicit hypothesis in one sentence.** Who pays, how much, for what capability, because of what problem. If the hypothesis cannot be written in one sentence, it is not clear enough to build against.
+
+**Step 2: List every proposed feature and ask: "Does removing this feature change whether the hypothesis is true or false?"** Features that survive this test are MVP-required. Features that do not survive are post-MVP unless they have a regulation requirement.
+
+**Step 3: For each post-MVP feature that specific beta users request before launch, design the manual process that provides the feature without building it.** The manual process takes 30-60 minutes to design and runs at MVP scale without engineering investment.
+
+## The Scope That Teaches You Something
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The first version of Expert Tutorials had nine features on the proposed feature list. Five were cut with the hypothesis-necessity test: a mobile app, a social learning feed, gamification badges, a content recommendation engine, and an instructor analytics dashboard. The three features that remained were: course content delivery, student progress tracking, and billing. The MVP launched in four weeks instead of twelve. Of the five cut features, two were eventually built (the instructor analytics dashboard and the recommendation engine -- both validated by user requests after launch). Three were never built because the hypothesis test revealed they were not the right features for the product direction. The twelve weeks not spent on the three never-built features paid for six months of product iteration based on what users actually valued.
+
+## Related reading
+
+- [The Five Hour Founder Audit: Are You Ready to Build?](/blog/the-five-hour-founder-audit-are-you-ready-to-build)
+- [The Modular MVP: Building So You Can Pivot Without Burning Everything](/blog/the-modular-mvp-building-so-you-can-pivot-without-burning-everything)
+- [The Honest MVP Checklist: 25 Items Before You Launch](/blog/the-honest-mvp-checklist-25-items-before-you-launch)
+- [The Lean MVP Stack for 2026: What I Use for Client Projects](/blog/the-lean-mvp-stack-for-2026-what-i-use-for-client-projects)

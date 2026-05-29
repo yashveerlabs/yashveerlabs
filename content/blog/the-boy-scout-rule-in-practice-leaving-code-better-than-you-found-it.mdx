@@ -1,0 +1,89 @@
+---
+slug: "the-boy-scout-rule-in-practice-leaving-code-better-than-you-found-it"
+title: "The Boy Scout Rule in Practice: Leaving Code Better Than You Found It"
+excerpt: "The boy scout rule applied to engineering: what it means to leave code better, the limits of the rule, and how to practice it without derailing your sprint."
+date: "2025-09-27"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","code-quality","engineering"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-boy-scout-rule-in-practice-leaving-code-better-than-you-found-it"
+status: "published"
+definition: "The boy scout rule for code says: always leave the code better than you found it. Not dramatically better. Not rewritten. Better. Rename the confusing variable. Extract the repeated block. Add the missing type. The practice compounds over a year into a codebase that is measurably cleaner without any dedicated refactor sprint, because improvement happened in every pull request."
+faq: [
+  {"q":"How much improvement is the right amount for each pull request?","a":"Proportional to the size of the pull request. A one-line bug fix warrants a variable rename in the same file. A week-long feature warrants cleaning the module it touches. The rule is not a license for unbounded refactoring on every PR. It is permission to make targeted improvements without filing a separate ticket."},
+  {"q":"What is the difference between boy scout improvements and scope creep?","a":"Boy scout improvements are in the immediate vicinity of the code you are touching, are small enough to review in under 15 minutes, and do not change behavior. Scope creep is work that expands the ticket's scope without expanding the ticket's time estimate. The line is: would this change require a separate review conversation? If yes, it is scope creep."},
+  {"q":"Should I document boy scout improvements in the PR description?","a":"Yes, briefly. 'Also renamed X to Y for clarity' is enough. Documentation prevents the reviewer from thinking the change is accidental and from asking about it in review. It also creates a record if the rename causes an unexpected issue."},
+  {"q":"What kinds of improvements should I not make in a passing pull request?","a":"Anything that changes behavior, anything that requires more than 30 minutes, anything that touches code outside the immediate area of the change, and anything that would require its own test coverage that does not already exist. Those improvements belong in a separate ticket."},
+  {"q":"Does the boy scout rule apply to test code?","a":"Yes. Unclear test names, copy-pasted test setup that could be extracted to a fixture, missing assertions for edge cases the original author missed. Test code is the first thing to atrophy in a codebase. The boy scout rule applied to tests pays back in fewer mysterious test failures."}
+]
+---
+
+## What you actually need to know
+
+- "Better" means specifically better, not generally reorganized. Rename a variable, extract a function, add a type. Not rewrite the module.
+- The rule applies to the code you are touching, not to every file you open.
+- Boy scout improvements should be included in the PR that touches the relevant code. They are not a separate ticket.
+- The improvement must be small enough to review in under 15 minutes and must not change behavior.
+- The compound effect over a year is a cleaner codebase without any dedicated refactor time.
+
+| Improvement Type | Appropriate for Boy Scout | Should Be a Separate Ticket |
+|---|---|---|
+| Variable rename in current file | Yes | No |
+| Extract repeated 3-line block | Yes | No |
+| Add missing type annotation | Yes | No |
+| Rewrite a 200-line function | No | Yes |
+| Migrate a module to new pattern | No | Yes |
+
+## The core argument
+
+Most codebases accumulate debt not because engineers are careless but because the permission to clean small things is never made explicit. Engineers notice the poorly named variable on the way to the bug they are fixing. They notice the copy-pasted block that could be extracted to a function. They notice the missing type annotation. But they do not fix these things because they are not in scope, because the ticket does not cover it, because it might be questioned in review.
+
+The boy scout rule makes the permission explicit. Every engineer who touches a piece of code is authorized to leave it cleaner than they found it, within the bounds of what can be reviewed in the same pull request. No separate ticket. No manager approval. Small improvement, documented in the PR description, merged with the original work.
+
+The compounding is the point. A codebase touched by 10 engineers making 2 small improvements per pull request, across 200 pull requests per year, gets 400 targeted improvements per year. Each one is small. Together they add up to a codebase that is meaningfully cleaner than one where improvements require a separate sprint.
+
+The discipline required is restraint, not effort. The temptation is to let one variable rename turn into a module reorganization. That is the failure mode. The rule only works if the improvements stay small. When the improvement grows beyond the scope of the PR, it needs to be a separate ticket with its own review and its own time estimate.
+
+## What counts as a boy scout improvement
+
+**Naming.** Renaming variables, functions, or parameters to names that are more accurate or more consistent with the surrounding code. Renaming is almost always safe, cheap, and high value.
+
+**Extraction.** Pulling a repeated block into a named function. Adding a comment does not count. Extraction does.
+
+**Type annotations.** Adding missing type annotations in a typed codebase. These improve static analysis coverage and documentation quality at the same time.
+
+**Dead code.** Removing commented-out code that has been there for more than a few weeks. If it has not been used in a month, it is not coming back.
+
+**Simplification.** Replacing a complex conditional with a named helper that makes the intent explicit. Replacing a magic number with a named constant.
+
+## What does not count
+
+**Behavior changes.** If the change could affect what the code does, it is not a boy scout improvement. It is a feature or a bug fix.
+
+**Large refactors.** If the improvement takes more than 30 minutes and touches more than 50 lines, it is a separate ticket.
+
+**Changes to code outside the immediate area.** The rule applies to code you are already touching. Not to code you noticed across the module.
+
+**Test additions for uncovered behavior.** Adding tests for new behavior is good engineering, but it belongs in its own conversation, not in a passing PR.
+
+## Common mistakes with the boy scout rule
+
+1. Using the rule to justify unlimited scope expansion. "Leave it better" is not "fix everything while you are here."
+2. Not documenting the improvement in the PR description. Reviewers who do not understand why a change was made will ask about it in review.
+3. Making improvements that change behavior and calling them cleanup. Behavior changes require tests. If there are no tests for the change, it is not cleanup.
+4. Skipping the improvement because it is "not worth it." A variable rename takes 30 seconds. Over a year, those 30-second decisions add up.
+5. Treating the rule as optional rather than as a professional standard. The engineers who practice it produce noticeably cleaner codebases over time.
+
+## Where to start: a 3-step practice plan
+
+**Step 1: In your next PR, identify one small improvement.** One naming change, one extraction, one type annotation. Include it in the PR. Document it in the description. That is the entire first step.
+
+**Step 2: Make it a team norm.** In the next code review, when you see a small improvement in the PR that is not strictly related to the ticket, approve it and thank the author. This signals to the team that boy scout improvements are welcome, not questioned.
+
+**Step 3: Track the improvements over a sprint.** At the end of a two-week sprint, count the number of small improvements that were included in PRs. If the number is greater than zero and none of them caused a problem, the norm is working.
+## Related reading
+
+- [Tech Debt in Startups: How It Kills Products and How to Manage It](/blog/tech-debt-in-startups-how-it-kills-products-and-how-to-manage-it)
+- [The Code Review That Actually Improves Code](/blog/the-code-review-that-actually-improves-code)
+- [The Pareto Refactor: Twenty Percent Effort for Eighty Percent Improvement](/blog/the-pareto-refactor-twenty-percent-effort-for-eighty-percent-improvement)
+- [The Tech Debt Audit: A Two Day Process](/blog/the-tech-debt-audit-a-two-day-process)

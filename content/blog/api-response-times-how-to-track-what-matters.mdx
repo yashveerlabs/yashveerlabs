@@ -1,0 +1,108 @@
+---
+slug: "api-response-times-how-to-track-what-matters"
+title: "API Response Times: How to Track What Matters"
+excerpt: "Average response time is the worst metric in distributed systems. The numbers that matter are percentiles, and the cuts that matter are by endpoint and by customer. Here is the discipline that works."
+date: "2026-05-18"
+category: "Performance Optimization"
+tags: ["performance","api","observability","backend"]
+readingMinutes: 11
+ogImage: "/api/og/blog/api-response-times-how-to-track-what-matters"
+status: "published"
+definition: "API response time discipline is built on three numbers per endpoint. The p50, the p95, and the p99. The p50 tells you what most users experience. The p95 tells you what the unlucky users experience. The p99 tells you what the worst customer event looks like. Averages lie. Percentiles do not. The teams that track all three by endpoint and by customer catch problems before users complain."
+faq: [
+  {"q":"Why is average response time misleading?","a":"Because outliers move the average without changing the median. A handful of slow requests at the tail can make the average look bad while most users are fine, or hide a real problem while the average looks good. Percentiles separate the typical experience from the tail."},
+  {"q":"What is a healthy p95 for an API?","a":"For most user facing CRUD endpoints, p95 under three hundred milliseconds. For complex aggregations, p95 under one second. For background jobs, the metric is throughput, not latency. The right number depends on what the endpoint does."},
+  {"q":"What is a healthy p99?","a":"For most APIs, p99 under one second. The p99 is where database lock contention, cold caches, and slow third party calls show up. If p99 is bad and p95 is fine, the problem is a tail issue, not a systemic one."},
+  {"q":"Should I track response times per customer?","a":"For B2B SaaS, yes. One customer with a heavy workload can degrade the experience for everyone else. Per customer telemetry tells you who is suffering and who is causing the suffering."},
+  {"q":"How do I track response time without slowing the API?","a":"Sampling. Capture full traces on a small percentage of requests, latency only on the rest. Modern observability tools handle this cheaply. The overhead should be under one percent of latency."},
+  {"q":"What is the most common tracking mistake?","a":"Looking only at the average and at total volume. The team thinks the API is fine until customers complain about specific slow operations. The fix is to break the data down by endpoint and by customer."},
+  {"q":"What tools do you recommend?","a":"Datadog and Honeycomb for serious observability budgets. Grafana with Tempo and Loki for self hosted. Sentry has performance tracking that covers most teams up to mid scale. The tool matters less than the discipline of looking at the data weekly."}
+]
+---
+
+## What you actually need to know
+
+- Track p50, p95, p99 per endpoint. Averages are misleading.
+- For B2B SaaS, break the data down by customer.
+- Capture traces on a sampled subset of requests for deep debugging.
+- The tail of the distribution is where the real problems hide.
+- In my experience, weekly reviews of percentile dashboards catch ninety percent of performance regressions before customers notice.
+
+| Metric | Tells you | When it moves |
+|---|---|---|
+| p50 (median) | Typical user experience | The whole system is slow |
+| p95 | Unlucky user experience | Specific endpoints, specific customers, or contention |
+| p99 | Worst case | Cold caches, lock contention, third party hiccups |
+| Average | Mostly noise | Pulled by outliers, hides systemic issues |
+
+## The core argument
+
+The right way to think about API response times is as a distribution. Every request is a sample. The distribution has a shape. The shape tells you whether the API is healthy or whether something is hiding. A healthy API has a tight distribution with a small tail. A sick API has a wide distribution or a long tail.
+
+Average response time collapses the distribution to a single number, which loses the shape. Percentiles preserve enough of the shape to be useful without overwhelming the team with numbers. P50, p95, and p99 cover the typical case, the unlucky case, and the worst case. Tracking all three by endpoint gives the team a usable picture.
+
+The next layer is breaking down by customer. In B2B SaaS, one customer can have an outsized impact on shared infrastructure. A noisy tenant runs a query that locks a table. The p99 for every other tenant goes up. Without per customer telemetry, the team chases ghosts. With it, the team identifies the noisy tenant in minutes.
+
+The third layer is tracing. Sampled at a small percentage of requests, traces show what happened inside the slow requests. Which database queries ran, which downstream services were called, how long each step took. Without traces, the team can see that something is slow without knowing why. With traces, the root cause is usually visible in the slow request itself.
+
+## What good response time discipline looks like
+
+A dashboard per endpoint, showing p50, p95, and p99 over time. Updated in near real time. Reviewed at least weekly. Alerts when any percentile exceeds a defined threshold.
+
+A dashboard per customer, showing the same numbers. Reviewed when customers complain. Used proactively to spot patterns before complaints arrive.
+
+A trace sampling pipeline. One percent of production traffic gets fully traced. The traces feed an observability tool that engineers can query when investigating a slow endpoint.
+
+A documented SLO for each endpoint. P95 under three hundred milliseconds, p99 under one second, ninety nine point five percent of the time over thirty days. The numbers are not aspirational. They are the contract the team holds itself to.
+
+## What it actually costs
+
+| Setup | Engineering effort | Monthly cost |
+|---|---|---|
+| Sentry performance only | 1 day | 30 to 200 dollars |
+| Grafana, Tempo, Loki self hosted | 2 to 4 weeks | 100 to 500 dollars infrastructure |
+| Datadog | 1 to 3 days | 500 to 5000 dollars depending on scale |
+| Honeycomb | 1 to 3 days | 200 to 4000 dollars |
+
+The investment is small compared to the cost of customer support tickets that come from missed performance regressions. Most teams I work with land on Sentry plus a custom Grafana dashboard for a year or two, then move to Datadog or Honeycomb as scale demands more.
+
+## Features to demand from the observability stack
+
+- Per endpoint percentile dashboards, not just averages.
+- Per customer telemetry for B2B SaaS.
+- Trace sampling that captures enough requests for debugging without overwhelming the budget.
+- Alerts on percentile thresholds, not just error rates.
+- A way to compare current performance against a baseline. Last week, last month, last release.
+- Integration with the rest of your stack. Logs, metrics, and traces should join up.
+
+## Expert opinion
+
+> The teams that catch performance regressions before customers notice are the teams that look at percentile dashboards every week. The teams that surprised by performance regressions are the teams that look at averages, if they look at all. The discipline is in the cadence, not in the tool.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client project that had been firefighting performance issues for months, the first thing we did was set up per endpoint percentile dashboards. The first week showed three endpoints with p99 over four seconds. The team had no idea, because the average response times all looked fine. We tracked each one back to a specific query plan. Two of the three were fixed in a sprint by adding indexes. The third required a deeper refactor but is now on the roadmap with a real measurement to justify it.
+
+The opposite story is a team that had detailed averages and customer complaints. They could not understand why customers said the API was slow when the average was under two hundred milliseconds. Once we broke the data down by percentile, the p99 was over six seconds. The customers were not crazy. They were just unlucky often enough to notice. The team that looks at averages cannot see this. The team that looks at percentiles can.
+
+For more on the broader topic, see [why your app got slower after you added users](/blog/why-your-app-got-slower-after-you-added-users), [the real numbers behind a fast web app in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026), and [database query performance the five patterns that hurt the most](/blog/database-query-performance-the-five-patterns-that-hurt-the-most).
+
+## Common mistakes teams make
+
+1. Tracking averages instead of percentiles.
+2. Aggregating across endpoints instead of breaking them down.
+3. Not tracking per customer in B2B SaaS.
+4. No trace sampling, so debugging slow requests is guesswork.
+5. Alerts on error rate only. Performance can degrade without errors firing.
+6. No documented SLO. The team has no contract to hold itself to.
+
+## Where to start, a 14 day plan
+
+1. **Day one and two.** Set up an observability tool. Sentry for the lightest touch, Datadog or Honeycomb for more depth.
+2. **Day three to seven.** Configure per endpoint dashboards showing p50, p95, p99. Confirm the data is flowing.
+3. **Day eight to ten.** Configure per customer telemetry. Tag every request with the customer ID.
+4. **Day eleven to fourteen.** Set alerts on percentile thresholds. Schedule a weekly review. Document the SLO for each endpoint.
+
+For deeper reading, [the hot path finding and optimizing it](/blog/the-hot-path-finding-and-optimizing-it) covers what to do once you have identified a slow endpoint, and [profiling production how to do it without causing incidents](/blog/profiling-production-how-to-do-it-without-causing-incidents) covers the deeper diagnostic work.

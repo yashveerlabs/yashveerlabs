@@ -1,0 +1,105 @@
+---
+slug: "background-jobs-at-scale-inngest-trigger-cron-and-beyond"
+title: "Background Jobs at Scale: Inngest, Trigger, Cron, and Beyond"
+excerpt: "Inngest and Trigger.dev have made durable background jobs a managed product. Cron is still the right tool for scheduled work. Knowing which to reach for is the difference between a quiet platform and a constant incident."
+date: "2026-05-19"
+category: "Backend, APIs, and System Design"
+tags: ["background-jobs","inngest","trigger","cron","durable-execution"]
+readingMinutes: 13
+ogImage: "/api/og/blog/background-jobs-at-scale-inngest-trigger-cron-and-beyond"
+status: "published"
+definition: "Inngest and Trigger.dev are managed durable execution platforms designed for serverless and Next.js stacks. They handle retries, scheduling, fan out, and step level state for multi step jobs. Cron is still the right tool for simple scheduled work. The combination of a managed durable executor for complex flows and a queue for simple background work covers most modern SaaS workloads cleanly."
+faq: [
+  {"q":"What is durable execution?","a":"Durable execution is the pattern where the runtime persists the state of a multi step process so that each step can be retried independently and the whole process resumes after a worker restart. Temporal pioneered the pattern at scale. Inngest, Trigger.dev, and Restate brought it to the serverless world."},
+  {"q":"When should I use Inngest or Trigger over a simple queue?","a":"When the work has multiple steps that should each be retried independently, when the work spans minutes to hours, or when you want a managed solution that handles scheduling, fan out, and observability. For single step background work a simple queue is enough."},
+  {"q":"Is cron obsolete?","a":"No. Cron is the right tool for simple scheduled jobs that run at known times. The managed alternatives like Cloud Scheduler or the scheduler in your queue are also fine. The wrong tool is a hand rolled loop that polls a database."},
+  {"q":"Can I run Inngest or Trigger on premise?","a":"Both have self hosted options. Inngest has an open source dev server and a self hosted enterprise tier. Trigger.dev has a v3 self host option. The managed cloud is the right default for most teams. Self host when compliance or cost demands it."},
+  {"q":"What is the cost of these platforms?","a":"Inngest and Trigger both have generous free tiers. Past the free tier expect 50 to 500 USD per month at modest scale, growing to a few thousand at high scale. The cost is meaningful but typically less than running the equivalent self hosted infrastructure."},
+  {"q":"How do these compare to AWS Step Functions?","a":"Step Functions is the AWS native durable execution. It is powerful but the developer experience is heavy. Inngest and Trigger are friendlier for application engineers and better integrated with Next.js. Step Functions wins for AWS deep teams. Inngest and Trigger win for modern web stacks."},
+  {"q":"What about Temporal?","a":"Temporal is the most powerful and most operationally complex of the durable execution options. The fit is large engineering organizations with serious workflow needs. For a startup of fewer than ten engineers, Inngest or Trigger is the more sane choice."}
+]
+---
+
+## What you actually need to know
+
+- Inngest and Trigger.dev have made durable execution a managed product.
+- Use them for multi step work, scheduling, fan out, and long running flows.
+- Use a simple queue for single step background work.
+- Cron is still the right tool for known time scheduled jobs.
+- The cost of these platforms is less than the operational tax of self hosting equivalents.
+
+| Tool | Best fit | Operational tax | Cost at modest scale |
+|---|---|---|---|
+| Postgres or Redis queue | Single step background work | Low | Negligible to 200 USD |
+| Cron or Cloud Scheduler | Known time scheduled jobs | Negligible | Negligible |
+| Inngest | Multi step durable flows, Next.js stacks | Low | 50 to 500 USD |
+| Trigger.dev | Multi step durable flows, JS first | Low | 50 to 500 USD |
+| AWS Step Functions | AWS native, deep AWS integration | Medium | 25 to 500 USD |
+| Temporal | Large workflow needs, enterprise scale | High | High |
+
+## The core argument
+
+Background jobs have evolved past the era when every team rolled their own Sidekiq or Celery setup. The modern serverless stack made the queue pattern awkward, because there is no long running worker to pull jobs. Inngest and Trigger.dev solved the problem by inverting the model. The runtime invokes your serverless functions when a job is ready. Your code runs in your own infrastructure. The orchestration lives in their platform.
+
+The shift matters because most modern web stacks are serverless leaning. Next.js, Cloudflare Workers, Vercel Functions, AWS Lambda. The traditional queue with a long running worker does not fit cleanly. The managed durable executor does.
+
+The pattern also enables work that was previously hard. A multi step process that runs over hours, with retries per step, with the ability to resume after a worker restart. Build it in raw Postgres and the code is brittle. Build it in Inngest or Trigger and the platform handles the state.
+
+The cost of these platforms is real but it is less than the cost of building the equivalent in house. The break even is usually around the third multi step flow. The first flow you can build yourself. By the third one the platform is paying back in engineering time saved.
+
+## When to pick which
+
+Inngest and Trigger are similar in shape. Both are JS first. Both invoke your serverless functions. Both handle scheduling, fan out, retries, and step state. The differences are at the margin. Inngest has the cleaner Next.js integration. Trigger has the longer history. Pick the one your team finds more pleasant.
+
+Cron is the right tool when the schedule is the entire job. A nightly report. A weekly digest. A monthly billing run. The job is one step. The schedule is the thing. Cron or the scheduler in your queue handles this without ceremony.
+
+AWS Step Functions is the right tool when you live deep in AWS and the workflow is mostly AWS service orchestration. It is powerful and operationally serious. Pick it if your team is already AWS first and your workflows are mostly invoking AWS services.
+
+Temporal is the right tool for large engineering organizations with serious workflow requirements. The learning curve is real. The operational complexity is real. The payoff is durability and expressiveness past what the lighter options offer.
+
+## Features the durable execution platform must have
+
+- Step level retries with exponential backoff.
+- Idempotent step design as a first class concern.
+- Scheduling support with timezone aware cron expressions.
+- Fan out and fan in for parallel work.
+- Observable execution history with replay.
+- Concurrency limits per function and per resource.
+- A clear local development story.
+- A migration path to and from the platform.
+
+## Expert opinion
+
+> The durable execution platforms have collapsed a class of engineering work that used to take quarters into something you can adopt in a sprint. The teams that recognized this early shipped multi step features that their competitors are still building from scratch. The platform itself is now a competitive lever, not just an infrastructure choice.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client wanted to add an onboarding sequence that ran across two weeks. Welcome email day zero. Setup reminder day three. Feature highlight day seven. Check in day fourteen. Each step depended on the customer's state at that point. The team had written the first version as a cron loop that queried the database every hour.
+
+The cron loop worked for the first six months. At scale it started missing customers and duplicating sends. The team had spent three weeks trying to harden it.
+
+We migrated to Inngest. The whole onboarding sequence became a single durable function with sleep statements between steps and conditional branches based on state. The code was shorter than the cron loop it replaced. The reliability problems vanished. The onboarding completion rate improved by roughly fifteen percent because the messages started landing reliably.
+
+For more on the broader background work, see [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip) and [why your SaaS should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one).
+
+## Common mistakes teams make
+
+1. Building durable execution from scratch on Postgres. The cost outruns the platform fee.
+2. Using a queue for multi step state. The retries duplicate previous steps.
+3. Picking Temporal too early. The operational tax kills velocity for small teams.
+4. Treating cron as the workflow engine. Cron is for known time scheduling.
+5. No observability for the flow. The platform makes this free if you use it.
+6. Non idempotent steps. Retries duplicate side effects.
+7. Mixing dev and prod in the same platform tenant.
+8. No migration plan. Lock in is real if you do not abstract.
+
+## A 30 day plan to adopt a durable execution platform
+
+1. **Week one.** Inventory the multi step flows. Onboarding, billing, integrations, reports.
+2. **Week two.** Pick the platform. Inngest or Trigger for most modern stacks.
+3. **Week three.** Migrate the first flow. Make every step idempotent.
+4. **Week four.** Migrate the rest. Add observability. Document the runbook.
+
+For more on the related work, read [Inngest vs Trigger vs Temporal for background jobs](/blog/inngest-vs-trigger-vs-temporal-for-background-jobs) and [workflow engines when you need Temporal when you need Cron](/blog/workflow-engines-when-you-need-temporal-when-you-need-cron). On the reliability side, [async job failure recovery patterns that actually work](/blog/async-job-failure-recovery-patterns-that-actually-work) is the natural next read.

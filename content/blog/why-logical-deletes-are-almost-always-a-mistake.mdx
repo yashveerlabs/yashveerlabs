@@ -1,0 +1,114 @@
+---
+slug: "why-logical-deletes-are-almost-always-a-mistake"
+title: "Why Logical Deletes Are Almost Always a Mistake"
+excerpt: "Soft deletes feel safe until the schema rot and query complexity make everything harder. Here is the case against them, when they are genuinely warranted, and what to use instead."
+date: "2025-04-27"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-logical-deletes-are-almost-always-a-mistake"
+status: "published"
+definition: "A logical delete, also called a soft delete, is a pattern where rows are never removed from the database. Instead, a deleted_at timestamp or is_deleted flag marks them as gone. The data stays. The complexity grows. Most teams adopt this pattern early and regret it late, when every query needs a WHERE deleted_at IS NULL and migrations become a negotiation with historical junk."
+faq: [
+  {"q":"What is the difference between a soft delete and a hard delete in a database?","a":"A hard delete removes the row permanently with a DELETE statement. A soft delete sets a flag or timestamp on the row and leaves it in place. Soft deletes preserve history but force every query to filter out deleted rows. Hard deletes are simpler to query but require a separate strategy for history if you need it."},
+  {"q":"When are soft deletes actually the right choice?","a":"When a regulator or contract requires point-in-time recovery of the exact row state, and an audit table is too expensive to build. Also when users expect an undo feature, like email clients that restore deleted messages. Outside those two cases, the pattern costs more than it buys."},
+  {"q":"Why do soft deletes slow down queries over time?","a":"Every query on that table must include a WHERE deleted_at IS NULL clause. As the deleted row count grows, the table bloats, index scans cover more dead rows, and any ORM that forgets the clause returns incorrect results. The query plans also change in ways that are hard to predict. The longer the table lives, the worse this gets."},
+  {"q":"What should I use instead of soft deletes for audit history?","a":"A separate audit or event table, written to on every meaningful state change. The live table stays clean and small. The audit table holds the full history without polluting the operational data. Tools like Temporal Tables in SQL Server or custom event sourcing do this well. PostgreSQL triggers can also write to an audit table automatically."},
+  {"q":"How do I migrate away from soft deletes in a live production database?","a":"First, add an audit table. Then write a migration that copies all is_deleted rows to the audit table and hard deletes them from the live table. Run this in batches to avoid locking. Update the ORM and all queries to remove the deleted_at filter. Test thoroughly before deploying. The migration itself takes a sprint, not a quarter."},
+  {"q":"Do soft deletes cause problems with foreign key constraints?","a":"Yes. A soft deleted parent row can still be referenced by live child rows if you only filter in the application layer. The database does not know the row is conceptually gone. This creates inconsistent states that are hard to detect until a query unexpectedly returns children with no visible parent."},
+  {"q":"What happens to GDPR right-to-erasure requests when you use soft deletes?","a":"You need a second step anyway. A soft delete does not satisfy an erasure request because the PII is still in the database. You still have to hard delete or overwrite the personal data when a user invokes their right to erasure. Soft delete gives you no advantage on compliance. It just adds a step."}
+]
+---
+
+## What you actually need to know
+
+- Soft deletes look safe on day one and become a liability by year two, when the deleted row count is larger than the live row count.
+- Every query on a soft-deleted table needs a WHERE deleted_at IS NULL guard. One missing guard returns deleted data silently. ORMs make this easy to forget.
+- Soft deletes do not satisfy GDPR erasure requests. You still need to hard delete or scrub PII, which means you added complexity for no compliance benefit.
+- The honest use cases for soft deletes are narrow: user-facing undo features and tables covered by a contractual point-in-time recovery requirement.
+- A separate audit or event table gives you history without poisoning the operational query path.
+
+| Pattern | Query simplicity | History kept | GDPR safe by default | Scales cleanly |
+|---|---|---|---|---|
+| Hard delete only | High | No | Yes | Yes |
+| Soft delete (deleted_at flag) | Low | Yes, in place | No | Degrades over time |
+| Hard delete plus audit table | High | Yes, isolated | Yes | Yes |
+| Event sourcing | Medium | Full | Depends on design | Yes, with discipline |
+
+## The core argument
+
+The first version of this pattern sounds reasonable. You do not want to lose data. Deletes feel irreversible. A flag feels safe. So you add an is_deleted column or a deleted_at timestamp and convince yourself you have a rollback mechanism.
+
+What you actually have is a table that grows forever. Six months in, thirty percent of the rows are deleted. A year in, it is sixty percent. Every index on the table covers all those dead rows. Every query that touches the table needs the filter clause. Every new engineer you hire has to learn the convention or they will write a query that returns deleted records, silently, in production.
+
+The ORM problem is the one that bites hardest. Libraries like ActiveRecord and Hibernate can add the soft delete filter globally, but the global filter has edge cases. Admin panels. Analytics queries. Migration scripts. Background jobs that check historical data. In each of those contexts, someone eventually writes a raw query or bypasses the ORM layer, and the deleted records come back.
+
+The argument for soft deletes always collapses to one of two claims. Either "we need history" or "we need undo." Both are legitimate needs. Neither requires keeping deleted rows in the live table.
+
+## When soft deletes actually make sense
+
+There are two situations where I will defend soft deletes without apology.
+
+The first is a genuine undo feature. Email clients do this. Trello does this. The user clicks delete, the item disappears from the UI, and the user has some window, often thirty days, to recover it. In this case the soft delete is doing real product work. The deleted row is not conceptually gone. It is in a trash state. Model it that way explicitly, with a trash_expires_at column, not a generic deleted_at, and clean up expired rows on a schedule.
+
+The second is a table with a contractual or regulatory point-in-time recovery requirement and no budget for a full audit table implementation. This is a pragmatic exception, not a best practice. If the requirement is real and the audit table is genuinely too expensive to ship right now, a soft delete buys time. You still need to migrate off it before the table gets large.
+
+Everything else is convenience that compounds into pain. The team that added soft deletes to the users table "just in case" is the team writing apologetic comments next to every query three years later.
+
+### The GDPR trap
+
+Soft deletes create a specific compliance problem that most teams discover only when a lawyer asks about it. A user invokes their right to erasure. Your soft delete did not delete anything. The PII is still in the database, now marked with a timestamp. You must hard delete or overwrite the personal fields anyway. The soft delete added a step to the erasure workflow without providing any benefit. This pattern fails the GDPR test invisibly, which is the worst kind of failure.
+
+## How much does it cost
+
+| Scenario | Time to implement | Long-term cost |
+|---|---|---|
+| Soft delete from the start | Half a day | Weeks of query maintenance over two years |
+| Hard delete plus audit table | One to two days | Near zero after setup |
+| Migrating off soft deletes later | One sprint | High, requires touching every query and ORM config |
+| Event sourcing for history | One to two weeks | Low if designed well, high if retrofitted |
+
+The numbers above reflect what I observe on real rescue projects. The half-day investment in soft deletes is the cheapest entry cost in the table. It is also the only option where the long-term cost exceeds the setup cost by an order of magnitude.
+
+## Features to demand from whichever deletion strategy you pick
+
+- Every delete operation should be auditable. If you cannot answer "who deleted this and when," the system is not designed for production.
+- The live query path should be free of deleted-row noise. The filter should not live in the application layer where it can be forgotten.
+- PII should be erasable in a single operation that satisfies a GDPR request without touching archived history.
+- The history store should be append-only. If the audit record can be modified, it is not an audit record.
+- New engineers should be able to understand the deletion model in ten minutes by reading the schema, not by asking a senior.
+
+## Expert opinion
+
+> Soft deletes are the duct tape of data modeling. They feel like a fix and look like a feature until the table hits a few million rows and every query starts apologising for the deleted half. The teams that get this right design for deletion on day one: hard delete the live row, write an event to the audit table, expose undo as an application feature where the product actually needs it. That is three well-defined things instead of one ambiguous flag.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client came to me with a PostgreSQL database where the largest table was a content items table with about four million rows. Around 2.3 million of them had deleted_at set. Every query included WHERE deleted_at IS NULL. Several background jobs had been written without the filter and were returning deleted content into aggregations. The index on the status column had ballooned because it covered all four million rows instead of the 1.7 million live ones.
+
+We spent the first sprint building an audit table and a migration script that moved the deleted rows there in batches of ten thousand during off-peak hours. The second sprint updated every query, the ORM config, and the background jobs. The live table dropped to 1.7 million rows. Query times on the most common paths fell by about forty percent. The team stopped finding deleted content in aggregations. The fix was mechanical. The only reason it had not been done earlier was the assumption that soft deletes were a safe pattern.
+
+For more on the architectural decisions around data lifecycle, [the audit logs post](/blog/audit-logs-for-saas-a-compliance-and-trust-tool) covers how to build the history layer that makes hard deletes safe. The schema design decisions that create these problems in the first place are covered in [zero-downtime database migrations](/blog/zero-downtime-database-migrations-a-step-by-step-guide).
+
+## Common mistakes teams make
+
+1. Adding soft deletes to every table by default because the ORM makes it easy. The ORM convenience is the trap.
+2. Writing the deleted_at filter in the application layer instead of a database view, so it can be bypassed.
+3. Assuming soft deletes satisfy a GDPR erasure request. They do not. The PII is still there.
+4. Never cleaning up old deleted rows, so the table grows without bound and query plans degrade silently.
+5. Using a boolean is_deleted flag instead of a timestamp, which loses the information of when the deletion happened.
+6. Forgetting to update foreign key behavior, leaving orphaned child rows attached to soft-deleted parents.
+7. Treating soft-deleted rows as recoverable by users without building the UI to actually surface that undo feature.
+8. Migrating off soft deletes by just hard-deleting all the flagged rows without first checking whether any live relationships depend on them.
+
+## A 30 day plan
+
+1. **Day one to day three.** Audit every table in your schema for a deleted_at or is_deleted column. List the row counts of live vs deleted for each. This gives you a severity map.
+2. **Day four to day seven.** For the highest-traffic table, design a separate audit table. Write the schema. Add the trigger or application-layer hook that writes to it on delete.
+3. **Day eight to day fifteen.** Run a migration script that copies existing soft-deleted rows to the audit table and hard-deletes them from the live table. Run in batches. Verify counts match.
+4. **Day sixteen to day twenty.** Update all queries, ORM configs, and background jobs on that table. Remove the deleted_at filter. Run the full test suite.
+5. **Day twenty-one to day thirty.** Repeat for the next highest-traffic table. By the end of the month you will have removed the worst of the debt. Continue table by table.
+
+For the broader context on keeping schemas maintainable, [the soft delete trap post](/blog/the-soft-delete-trap-a-pattern-that-catches-up-with-teams) covers the longer-term consequences, and [the tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) is the starting point if you need to map the full scope before deciding where to begin.

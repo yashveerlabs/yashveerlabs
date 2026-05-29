@@ -1,0 +1,112 @@
+---
+slug: "async-job-failure-recovery-patterns-that-actually-work"
+title: "Async Job Failure Recovery: Patterns That Actually Work"
+excerpt: "Every async job will fail eventually. The patterns that recover gracefully are the ones I drop into every client project. Here are the five that matter and the order to add them."
+date: "2026-05-18"
+category: "Backend, APIs, and System Design"
+tags: ["backend","reliability","queues","architecture"]
+readingMinutes: 11
+ogImage: "/api/og/blog/async-job-failure-recovery-patterns-that-actually-work"
+status: "published"
+definition: "Async jobs fail. Patterns that recover them well share five qualities. Idempotency, exponential backoff with jitter, dead letter queues with alerting, structured retries, and reconciliation jobs. Together they handle the vast majority of failure modes a SaaS will see. The teams that ship them ride out incidents the team that skipped them does not survive."
+faq: [
+  {"q":"What is the single most important async job pattern?","a":"Idempotency. Every job must be safe to run twice. Without idempotency, every retry is a roll of the dice on duplicate side effects. With idempotency, retries are cheap insurance."},
+  {"q":"How do I implement idempotency?","a":"Two patterns. The job carries a unique key derived from the input. The job checks whether the key has been processed before running. Or the side effect itself is naturally idempotent, like an upsert with a unique constraint. Pick the pattern that fits the job."},
+  {"q":"What is a dead letter queue?","a":"A separate queue that receives jobs that have failed all their retries. Jobs here require human attention. The dead letter queue exists so that a small number of permanent failures do not stop the main queue from making progress."},
+  {"q":"How many retries should a job get?","a":"For transient failures like network blips, three to five retries with exponential backoff. For more structural failures, the job moves to the dead letter queue faster. The number is less important than the backoff curve."},
+  {"q":"What is exponential backoff with jitter?","a":"Retry intervals double each time, with random variation added. The first retry might be at 1 second, the second at 2 seconds plus or minus 25 percent, the third at 4 seconds plus or minus 25 percent, and so on. The jitter prevents the thundering herd of every client retrying at the same moment."},
+  {"q":"What is a reconciliation job?","a":"A periodic job that scans the state of the system and corrects any inconsistencies that the live system did not handle. Useful when async jobs can fail silently. The reconciliation job is the safety net under the safety net."},
+  {"q":"What queue system should I use in 2026?","a":"For most teams, the choice is between SQS, Redis backed queues like BullMQ or Sidekiq, and managed background job platforms like Inngest or Trigger. Each has tradeoffs. The pattern is the same across all of them."}
+]
+---
+
+## What you actually need to know
+
+- Idempotency is the foundation. Every job must be safe to retry.
+- Exponential backoff with jitter prevents thundering herds.
+- Dead letter queues isolate the problem jobs without blocking the main queue.
+- Reconciliation jobs catch what the live system missed.
+- In my experience, the teams that build these patterns from the start have one tenth the incident volume of teams that retrofit them after the fact.
+
+| Pattern | What it solves | Effort |
+|---|---|---|
+| Idempotency | Duplicate side effects on retry | Moderate, design level |
+| Exponential backoff with jitter | Thundering herds, transient failures | Low, library level |
+| Dead letter queue | Permanent failures blocking progress | Low, queue config |
+| Structured retries | Distinguishing transient and permanent | Low to moderate |
+| Reconciliation job | Silent failures, drift | Moderate, per workflow |
+
+## The core argument
+
+Every SaaS that runs async work eventually hits the failure cases. The network blips. The database deadlocks. The third party API rate limits. The bad input that the validator missed. Each of these is rare. Cumulatively, they happen often enough that a system without recovery patterns generates a steady stream of customer support tickets.
+
+The patterns to handle these failure cases are well known and inexpensive. Idempotency makes retries safe. Exponential backoff with jitter spreads retries over time without overloading the downstream. Dead letter queues isolate the jobs that cannot be recovered automatically. Reconciliation jobs catch what the live system did not catch.
+
+The mistake teams make is treating these as advanced patterns to add later. They are not advanced. They are foundational. A queue without idempotency is a queue that ships duplicate emails, double charges, and inconsistent state at the worst possible moment. A queue without dead letter handling is a queue that grinds to a halt the first time one job repeatedly fails. A system without reconciliation drifts silently until a customer notices.
+
+The right move is to design every async workflow with these patterns from the start. The team that ships them as defaults rarely thinks about queue reliability. The team that skips them spends a lot of time apologizing to customers and explaining incidents.
+
+## The five patterns in detail
+
+**Pattern one. Idempotency.** Every job carries a unique key. The job checks whether the key has been processed before doing the work. Database upserts with unique constraints can serve as the idempotency check. For external API calls, store the idempotency key alongside the request and check it on retry. The pattern is more important than the implementation.
+
+**Pattern two. Exponential backoff with jitter.** When a job fails on a transient error, wait before retrying. The wait time doubles on each retry. Add random jitter so multiple jobs do not retry at the same moment. The combination prevents thundering herds when the downstream recovers.
+
+**Pattern three. Dead letter queue.** Jobs that fail all their retries move to a separate queue. The main queue continues processing other jobs. The dead letter queue is monitored. Alerts fire when it accumulates more than a threshold. Engineers triage. Some jobs are resubmitted after a fix. Some are abandoned with a written postmortem.
+
+**Pattern four. Structured retries.** Not all failures are transient. A bad input fails the same way every time. The retry policy should distinguish. Transient errors retry with backoff. Permanent errors move to the dead letter queue immediately. The error categorization matters more than the retry count.
+
+**Pattern five. Reconciliation.** A periodic job that scans the system state and corrects inconsistencies. Customer subscriptions that should have been provisioned but were not. Charges that succeeded but did not get recorded. The reconciliation job catches the silent failures that did not bubble up.
+
+## What it actually costs
+
+| Pattern | Engineering effort | Outcome |
+|---|---|---|
+| Idempotency | One to two weeks across the job library | Foundation, enables everything else |
+| Exponential backoff with jitter | Hours, library level | Standard discipline |
+| Dead letter queue plus alerting | One sprint | Surface permanent failures |
+| Structured retries by error class | One sprint | Faster recovery, cleaner alerting |
+| Reconciliation jobs per critical workflow | One to two weeks per workflow | Catches the silent drift |
+
+The full stack costs a few weeks of engineering up front. The payoff is fewer incidents, faster recovery when they happen, and a system that survives the failure cases that test the team's discipline.
+
+## Features to demand from your queue system
+
+- Native support for retries with backoff.
+- A dead letter queue concept built in.
+- Per job idempotency key support.
+- Observability into queue depth, processing time, and failure rate.
+- Alerts on dead letter queue accumulation.
+- A way to replay jobs from the dead letter queue after a fix.
+
+## Expert opinion
+
+> The teams that ship these patterns from day one have async systems that run quietly. The teams that skip them have async systems that demand constant attention. The work to build the patterns is small. The work to operate without them never ends.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client project, we shipped the full pattern stack on day one of the queue work. Eighteen months in, the queue has handled tens of millions of jobs. The team has triaged the dead letter queue maybe ten times total. Every triage led to a small fix or a one off resubmission. The team has never had a queue related customer incident.
+
+The opposite story is a project I rescued where the queue had no idempotency. Every transient retry produced duplicate side effects. Customers received duplicate emails. Charges occasionally double posted. The team had spent months patching the symptoms. We added idempotency keys to every job in two sprints and the symptom volume dropped by ninety percent. The lesson was that the patterns are cheap when added early and expensive to retrofit.
+
+For more on the broader topic, see [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code), [the reconciliation job a SaaS pattern founders should know](/blog/the-reconciliation-job-a-saas-pattern-founders-should-know), and [background jobs at scale Inngest Trigger Cron and beyond](/blog/background-jobs-at-scale-inngest-trigger-cron-and-beyond).
+
+## Common mistakes teams make
+
+1. No idempotency. Every retry rolls the dice on duplicate side effects.
+2. Fixed interval retries. The thundering herd makes a small outage worse.
+3. No dead letter queue. The bad job blocks the rest of the queue.
+4. Same retry policy for every error class. Transient and permanent failures handled the same way.
+5. No reconciliation. The silent failures accumulate until a customer notices.
+6. Treating queue reliability as advanced. It is foundational.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Audit the existing jobs. List the ones that touch money, identity, or external state. Add idempotency to those first.
+2. **Week two.** Implement exponential backoff with jitter as a library default. Apply to every job.
+3. **Week three.** Configure a dead letter queue. Set up alerts on accumulation.
+4. **Week four.** Build a reconciliation job for the most critical workflow. Schedule it to run daily.
+
+For deeper reading, [job failure recovery how good SaaS companies sleep at night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night) covers the operational side, and [why your SaaS should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one) covers the broader case for async work.

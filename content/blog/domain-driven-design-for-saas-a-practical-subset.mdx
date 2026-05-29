@@ -1,0 +1,118 @@
+---
+slug: "domain-driven-design-for-saas-a-practical-subset"
+title: "Domain Driven Design for SaaS: A Practical Subset"
+excerpt: "Domain driven design has a heavy reputation. The practical subset that helps SaaS teams is small. Bounded contexts. Ubiquitous language. Aggregates. Three concepts that pay back without the ceremony of the full method."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["ddd","architecture","saas","design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/domain-driven-design-for-saas-a-practical-subset"
+status: "published"
+definition: "Domain Driven Design is a set of patterns for modeling complex business domains in code. The full method has heavy ceremony. The practical subset that helps SaaS teams is small. Bounded contexts give you clear module boundaries. Ubiquitous language keeps engineering and product talking about the same things. Aggregates protect consistency across related entities. Three patterns. Used well, they prevent the architectural mess that grows from absent design."
+faq: [
+  {"q":"What is a bounded context?","a":"A clear scope within the system where the model and the language mean specific things. The billing context has Invoice and Subscription. The product context has Project and Workspace. The two contexts can use the same word with different meanings because the boundary is explicit. The pattern keeps modules from leaking into each other."},
+  {"q":"What is ubiquitous language?","a":"The shared vocabulary between engineering and product. The code uses the same names that the product uses. Customer means the same thing in the product spec and in the database. The pattern reduces translation errors and makes the codebase easier to navigate."},
+  {"q":"What is an aggregate?","a":"A cluster of related entities treated as a unit for consistency. The Order aggregate includes the Order and the OrderLines. Changes to the aggregate go through a single entry point. The pattern protects invariants and simplifies reasoning about consistency."},
+  {"q":"Do I need the rest of DDD?","a":"Probably not. The full method has events, value objects, factories, repositories, and more. Each has value in specific contexts. The three concepts above cover most of the practical benefit for SaaS teams without the ceremony."},
+  {"q":"When does DDD pay off?","a":"In SaaS with meaningful business logic. The accounting product. The compliance product. The healthcare workflow. The complex billing engine. Each has domain logic that benefits from explicit modeling. Simple CRUD products do not benefit as much."},
+  {"q":"What is the cost?","a":"The discipline of thinking about model design before coding. The cost is hours per significant feature. The savings is the architectural mess that does not happen. The cost is small relative to the savings."},
+  {"q":"What is the worst DDD mistake?","a":"Adopting the full method including all the ceremony when the team only needs the three core concepts. The ceremony slows the team. The benefit is small. The right pattern is the practical subset."}
+]
+---
+
+## What you actually need to know
+
+- The practical subset of DDD is small. Bounded contexts, ubiquitous language, aggregates.
+- The full method has heavy ceremony rarely justified for SaaS.
+- Bounded contexts give clean module boundaries.
+- Ubiquitous language reduces translation errors.
+- Aggregates protect consistency.
+
+| Concept | What it gives you |
+|---|---|
+| Bounded context | Clear module boundaries |
+| Ubiquitous language | Shared vocabulary across team |
+| Aggregate | Consistency protection |
+| Domain events | Decoupling and reactive flows |
+| Value objects | Type safety on domain concepts |
+| Repositories | Abstraction over storage |
+| Factories | Complex creation logic |
+| Anti corruption layer | Boundary protection across contexts |
+
+## The core argument
+
+Domain Driven Design has a heavy reputation. The book is dense. The conferences talk about layers of patterns. The teams that adopt the full method often slow down because the ceremony outpaces the benefit. The teams that reject DDD entirely miss the few patterns that genuinely help.
+
+The right approach is the practical subset. Three concepts. Bounded contexts. Ubiquitous language. Aggregates. These three give most of the value of DDD without the ceremony. The team can think in domain terms. The codebase can have clean module boundaries. The aggregates can protect invariants.
+
+Bounded contexts are the most useful concept. The SaaS that has clear contexts for billing, product, customer, and integration has cleaner module boundaries than the SaaS that mixes them. The cleaner boundaries make refactoring easier. The cleaner boundaries make new engineer onboarding faster. The benefit compounds.
+
+Ubiquitous language is the second most useful. The codebase that uses the same words the product uses is easier to navigate. The translation errors between product and engineering go down. The cost of teaching new engineers the domain drops because the code teaches them.
+
+Aggregates are the third. The cluster of entities that change together is the aggregate. Changes go through one entry point. The invariants are protected. The reasoning about consistency is simpler. The pattern is most valuable in domains with complex invariants.
+
+## The patterns and their uses
+
+| Concept | When to use |
+|---|---|
+| Bounded context | Always. Draw the lines deliberately. |
+| Ubiquitous language | Always. Name things the way the product names them. |
+| Aggregate | When entities have consistency requirements across them |
+| Domain events | When you want to decouple workflows |
+| Value objects | When primitive types are obscuring domain meaning |
+| Repository | When the storage abstraction has value |
+| Factory | When creation is complex |
+| Anti corruption layer | At boundaries to external systems |
+| Specification | When complex queries are domain concepts |
+| Saga | When transactions span multiple contexts |
+
+## How much does this cost
+
+The cost is the discipline of thinking about model design. A few hours per significant feature to identify the bounded context, name things in the ubiquitous language, and identify the aggregates. The cost is small relative to the savings in architectural cleanup work that does not have to happen.
+
+## Features the DDD subset must have
+
+- Named bounded contexts with clear scope.
+- A documented ubiquitous language per context.
+- Aggregate roots that are the entry points for changes.
+- Module structure that reflects the bounded contexts.
+- A review process that catches language drift.
+- A practice of revisiting the model as the domain evolves.
+
+## Expert opinion
+
+> The teams that adopt the practical subset of DDD get clean module boundaries, shared vocabulary, and protected invariants. The teams that adopt the full method including all the ceremony often slow down. The teams that reject DDD entirely miss the few patterns that genuinely help. The discipline is to pick the subset that fits the domain and skip the rest. The full ceremony is for the rare project that genuinely needs it.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had a tangled codebase where billing logic, product logic, and integration logic were interleaved. The team struggled with every change because the modules were not separate.
+
+We applied the bounded context pattern. Billing got its own module. Product got its own module. Integrations got their own module. Each had its own ubiquitous language. Customer meant slightly different things in each context and the difference was explicit.
+
+The refactoring took five weeks. The benefit was immediate. New features touched fewer modules. Onboarding new engineers became faster because the structure was clear. The team adopted the discipline going forward.
+
+We did not adopt the full DDD method. No domain events. No value objects beyond what felt natural. No saga patterns. The practical subset was enough. The full method would have added ceremony without benefit at the team's stage.
+
+For more on the related work, see [the modular monolith how to buy yourself two years](/blog/the-modular-monolith-how-to-buy-yourself-two-years) and [service decomposition drawing the right lines](/blog/service-decomposition-drawing-the-right-lines).
+
+## Common mistakes teams make
+
+1. Adopting the full DDD method when the subset would have worked.
+2. No bounded contexts. The modules are a tangle.
+3. No ubiquitous language. Translation errors compound.
+4. Aggregates that are too large. Changes touch too much.
+5. Aggregates that are too small. Invariants are not protected.
+6. Treating DDD as theoretical. The patterns are practical.
+7. Refusing to use any DDD because the full method felt heavy.
+8. No review of the model as the domain evolves.
+
+## A 30 day adoption plan
+
+1. **Week one.** Identify the bounded contexts in your current system.
+2. **Week two.** Name the ubiquitous language per context. Document.
+3. **Week three.** Identify the aggregates. Refactor the most painful ones.
+4. **Week four.** Establish the review cadence.
+
+For more on the related work, read [the modular monolith how to buy yourself two years](/blog/the-modular-monolith-how-to-buy-yourself-two-years) and [monolith vs microservices why most startups get it wrong](/blog/monolith-vs-microservices-why-most-startups-get-it-wrong). On the broader architecture side, [designing an MVP that can scale without rewriting it](/blog/designing-an-mvp-that-can-scale-without-rewriting-it) is the natural next read.

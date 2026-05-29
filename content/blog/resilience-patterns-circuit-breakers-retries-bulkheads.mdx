@@ -1,0 +1,62 @@
+---
+slug: "resilience-patterns-circuit-breakers-retries-bulkheads"
+title: "Resilience Patterns: Circuit Breakers, Retries, Bulkheads"
+excerpt: "Distributed systems fail in partial ways. A service that handles partial failures gracefully stays up when dependencies degrade. Here is how circuit breakers, retries, and bulkheads work and when to use each."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/resilience-patterns-circuit-breakers-retries-bulkheads"
+status: "published"
+definition: "Resilience patterns are design techniques that allow distributed systems to continue functioning when individual components fail or degrade. Circuit breakers prevent cascading failures by stopping requests to a failing dependency before the failure spreads. Retries with exponential backoff recover from transient failures without creating retry storms. Bulkheads isolate failures to a subset of resources so that one failing dependency cannot consume all available capacity and degrade unrelated functionality. Together they form the baseline resilience architecture for services that depend on external APIs, databases, and other network-connected components."
+faq: [
+  {"q":"What is a circuit breaker and what problem does it solve?","a":"A circuit breaker monitors calls to a downstream dependency and tracks failure rates. When the failure rate exceeds a threshold (for example, 50% of calls failing in a 10-second window), the circuit breaker 'opens' and stops sending requests to the failing dependency, returning a fallback response immediately. After a configured timeout, the circuit breaker enters a 'half-open' state and allows a test request through. If the test succeeds, the circuit closes and normal traffic resumes. Circuit breakers prevent a failing downstream service from consuming request threads while waiting for timeouts, which would eventually exhaust the thread pool and bring down the calling service."},
+  {"q":"What is the difference between retry and circuit breaker?","a":"Retries address transient failures: network glitches, database connection timeouts, and momentary service unavailability that typically resolve within a few seconds. A retry waits briefly and tries the same request again. Circuit breakers address sustained failures: a downstream service that is experiencing an outage and will not recover within the retry window. Without a circuit breaker, retries continue indefinitely against a failing service, consuming resources and adding latency. The combination is: retry for transient failures (2-3 attempts with backoff), open the circuit breaker after sustained failures (many retries failing in a short window), and resume retrying after the circuit breaker's recovery timeout."},
+  {"q":"What is exponential backoff and why is it important?","a":"Exponential backoff is a retry strategy where the wait time between retries increases exponentially: 100ms, 200ms, 400ms, 800ms. Without backoff, immediate retries on a degraded service add load precisely when the service is already struggling. Exponential backoff reduces the load on a recovering service by spreading retries over time. Jitter (random variation added to each backoff interval) prevents retry synchronization: if 1,000 clients all receive errors simultaneously and retry with the same backoff schedule, they will all retry at the same moment. Jitter spreads the retry traffic over the backoff window, reducing the thundering herd effect."},
+  {"q":"What is a bulkhead and how does it prevent cascading failures?","a":"A bulkhead separates the resource pools used for different operations so that a failure in one operation cannot consume resources needed for others. Named after ship bulkheads that prevent flooding from spreading between compartments. In a thread pool bulkhead, calls to different dependencies use separate thread pools with fixed sizes. If the payment service is slow and all calls are blocking on 30-second timeouts, only the thread pool allocated to payment service calls is exhausted. The thread pools for authentication, product catalog, and user profile service calls remain available, and those features continue working. Without bulkheads, the slow payment service exhausts the global thread pool and brings down the entire application."},
+  {"q":"How do you implement resilience patterns without a dedicated library?","a":"Resilience patterns can be implemented manually (retry loops with exponential backoff, circuit breaker state machines) but are more reliably implemented with a library. In Node.js, the cockatiel library provides retry, circuit breaker, and bulkhead primitives. In Java, Resilience4j is the standard. In Go, the go-resilience and sony/gobreaker libraries provide circuit breaker implementations. Cloud platforms also provide managed circuit breaker implementations: AWS App Mesh and Istio service mesh include circuit breaker capabilities that apply at the infrastructure level without application code changes."}
+]
+---
+
+## What you need to know
+
+- Retries with exponential backoff and jitter handle transient failures. Circuit breakers handle sustained failures. Both are needed for robust distributed system behavior.
+- Without circuit breakers, a failing downstream service drains threads, exhausts connection pools, and cascades failures to the calling service. The calling service goes down because of a dependency it does not own.
+- Bulkheads limit the blast radius of a dependency failure to the specific functionality that depends on that service.
+- Timeouts on every external call are the prerequisite for all other resilience patterns. Without timeouts, retries never give up and circuit breakers never open.
+- Use a library for resilience patterns. Manual implementations miss edge cases that battle-tested libraries handle correctly.
+
+## The core argument
+
+A web service that calls five external dependencies inherits the failure probability of all five. If each dependency has 99.9% availability (one 9-minute outage per week), the calling service's availability without resilience patterns is 0.999^5 = 99.5%, or about 21 hours of downtime per year attributable entirely to dependency failures. With resilience patterns, the calling service can stay up during most dependency failures by degrading gracefully: returning cached data when the cache is unavailable, showing a fallback message when a non-critical service is down, and queuing operations that require the failed service for replay when it recovers.
+
+The implementation order matters. Start with timeouts on every external call. A service that calls a database without a timeout will hang indefinitely on a connection that will never complete, blocking that thread forever. Timeouts are the foundation on which retries and circuit breakers operate. Add retries with exponential backoff for idempotent operations (GET requests, reads). Add circuit breakers for high-traffic paths to dependencies that experience periodic degradation. Add bulkheads when a single dependency's failure is consuming disproportionate resources and affecting unrelated functionality.
+
+The pattern combination that matters for SaaS applications is: short timeouts (500ms to 2 seconds depending on the operation), two to three retries with exponential backoff and jitter for transient failures, circuit breakers that open after 50% failure rate over 10 seconds and half-open after 30 seconds to test recovery, and bulkheads that limit concurrent calls to any single external dependency to a configured maximum. This combination handles the common failure modes that real distributed systems encounter.
+
+## Common mistakes
+
+1. **Not setting timeouts on database connections and external API calls.** Calls without timeouts block indefinitely on network failures, connection timeouts, and hanging servers. Every external call needs a timeout configured at the client level. The default timeout for most HTTP clients is either very long or infinite; always set explicit timeouts.
+
+2. **Retrying non-idempotent operations.** A POST request that creates a new record should not be retried automatically if the first attempt succeeds but the response is lost due to a network error. Retrying creates a duplicate record. Only idempotent operations (GET, DELETE with idempotency keys, POST with idempotency keys) should be retried automatically. Non-idempotent operations should fail fast and let the caller decide whether to retry.
+
+3. **Not adding jitter to exponential backoff.** Retries without jitter from many concurrent clients create synchronized retry waves that hit the recovering service simultaneously. Add random jitter: wait = baseDelay * 2^attempt + random(0, 100ms). This spreads retries across the backoff window and reduces load on a recovering service.
+
+4. **Opening circuit breakers on percentage-based thresholds with too small a sample window.** A circuit breaker that opens when 50% of requests fail in a 5-second window will open immediately if 2 of the first 4 requests fail in a new deployment. Set minimum request count thresholds (do not open the circuit breaker until at least 20 requests have been evaluated in the window) to prevent premature circuit opening from small samples.
+
+5. **Not implementing fallback behavior when the circuit is open.** An open circuit breaker that returns a 500 error is better than an open circuit that blocks indefinitely, but it is worse than an open circuit that returns a cached result, a degraded response, or a graceful "service temporarily unavailable" message. Define the fallback behavior for each circuit breaker when implementing it.
+
+## Where to start
+
+1. **Audit every external dependency call for timeout configuration.** Check every HTTP client, database connection pool, and cache client configuration for explicit timeout settings. Add timeout configuration to any call that does not have one. For API calls: 500ms to 2 seconds. For database queries: 5 to 30 seconds depending on operation type. For long-running operations: longer timeouts with progress tracking.
+
+2. **Install a resilience library and add retry logic to the highest-impact external calls.** For Node.js: cockatiel. For Python: tenacity. Configure retry for GET requests and other idempotent operations on the two or three external services that experience the most transient failures. Add exponential backoff with jitter to the retry configuration.
+
+3. **Add circuit breakers to the calls that, when they fail, would cascade the failure to user-facing functionality.** The payment processor integration, the primary database connection, and any external API called on every user request are the highest-priority circuit breaker candidates. Start with conservative circuit breaker thresholds (70% failure rate over 10 seconds) and tighten based on observed behavior.
+
+## Related reading
+
+- [Rate Limiting Algorithms Compared: Token Bucket, Leaky Bucket, Fixed Window](/blog/rate-limiting-algorithms-compared-token-bucket-leaky-bucket-fixed-window)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)
+- [Pager Fatigue and How to Prevent It](/blog/pager-fatigue-and-how-to-prevent-it)

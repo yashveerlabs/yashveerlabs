@@ -1,0 +1,91 @@
+---
+slug: "the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse"
+title: "The Database You Did Not Think You Needed: When to Add Redis, Elasticsearch, or ClickHouse"
+excerpt: "When your primary database is no longer the right tool for caching, search, or analytics, and what to use instead."
+date: "2024-11-04"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","redis","elasticsearch","clickhouse","database"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-database-you-did-not-think-you-needed-when-to-add-redis-elasticsearch-or-clickhouse"
+status: "published"
+definition: "Postgres can do a lot. So can MySQL. But there are three specific scaling problems where a specialized database outperforms a relational one by an order of magnitude: caching and session storage (Redis), full-text and faceted search (Elasticsearch), and analytical queries over large datasets (ClickHouse). The signal to add a specialized database is when your primary database queries for these use cases start affecting application performance."
+faq: [
+  {"q":"When should I add Redis?","a":"When you are querying the same data repeatedly and it changes infrequently. Session storage, rate limiting counters, feature flag states, and frequently read configuration values are all good Redis candidates. Add it when database queries for these values start adding noticeable latency."},
+  {"q":"When should I add Elasticsearch?","a":"When your users need to search across multiple fields with relevance ranking, autocomplete, or faceted filtering. Postgres full-text search handles simple cases. Elasticsearch handles complex ones. Add it when LIKE queries are slow and your users are complaining about search quality."},
+  {"q":"When should I add ClickHouse?","a":"When you need to run analytical queries over millions of rows in under a second. Reporting dashboards, usage analytics, and billing aggregations are the primary use cases. Add it when your Postgres analytical queries take more than 5 seconds and you cannot fix them with indexing."},
+  {"q":"Can I stay on Postgres longer than I think?","a":"Usually yes. Postgres with proper indexing, connection pooling, and read replicas handles most SaaS workloads up to millions of users. The mistake is adding a specialized database before you have exhausted Postgres optimization. Premature specialization adds operational complexity without the benefit."},
+  {"q":"What is the operational cost of adding a specialized database?","a":"You add another service to run, monitor, and backup. You add a data sync layer to keep it current. You add expertise your team may not have. Factor these costs in before adding any specialized database. The performance benefit needs to outweigh the operational burden."}
+]
+---
+
+## What you actually need to know
+
+- Postgres handles most SaaS workloads. Add a specialized database only when Postgres is measurably the bottleneck for a specific use case.
+- Redis is for data you read many times and write rarely. Session storage, caching, rate limiting.
+- Elasticsearch is for full-text and faceted search where relevance matters. Simple keyword search can stay in Postgres.
+- ClickHouse is for analytical queries over large datasets. Dashboards and aggregations that need sub-second response on millions of rows.
+- Each specialized database adds operational complexity. The performance benefit must justify the maintenance cost.
+
+| Database | Primary Use Case | Add When | Avoid When |
+|---|---|---|---|
+| Redis | Caching, sessions, rate limiting | Repeated reads of slow-changing data | Data requires ACID guarantees |
+| Elasticsearch | Full-text search, autocomplete | LIKE queries are slow, search quality matters | Simple keyword search is sufficient |
+| ClickHouse | Analytical aggregations | Postgres reports take 5+ seconds | Under 1M rows in analytical tables |
+
+## The core argument
+
+The default answer to "should I add Redis/Elasticsearch/ClickHouse" should be no. Not because these tools are bad. They are excellent at what they do. The reason the default is no is that each one adds a service to run, a sync mechanism to maintain, and a failure mode to debug. The operational cost is real and ongoing.
+
+The question to ask is not "would this perform better in a specialized database?" It almost certainly would. The question is "is my current database actually the bottleneck for this use case, and have I exhausted the options available to me before adding another system to maintain?"
+
+I have seen teams add Redis because it seemed like a good idea, then spend two weeks debugging cache invalidation bugs that would not have existed if they had just added a database index first. I have seen teams add Elasticsearch before their search queries were even slow, then maintain a sync layer for years. The right time to add a specialized database is after you have confirmed that your primary database is the bottleneck, after you have verified that optimization cannot solve it, and after you have accepted the operational cost of running another system.
+
+## When Redis is the right call
+
+Redis is an in-memory key-value store. It is extraordinarily fast at reads and writes because everything is in memory. It is the right choice when you are reading the same data many times and that data changes infrequently.
+
+**Session storage** is the clearest use case. Storing session tokens in a database adds a query to every authenticated request. Storing them in Redis makes session validation a sub-millisecond operation.
+
+**Rate limiting** is another strong case. Counting API requests per user per minute in Postgres requires row-level locks and queries that add up under load. Redis atomic increment operations handle this in microseconds.
+
+**Computed value caching** is where Redis earns its keep for most SaaS products. A query that aggregates user activity for a dashboard, run once and cached in Redis for 60 seconds, turns ten database queries per minute into one.
+
+The downside: Redis is in-memory. If the instance restarts without persistence configured, the cache is empty. Design your system to treat the cache as best-effort. Every cached read needs a fallback to the source of truth.
+
+## When Elasticsearch is the right call
+
+Elasticsearch is a distributed search engine. It indexes documents and provides relevance-ranked search across all fields with millisecond response times at scale.
+
+Add Elasticsearch when your users are searching across multiple text fields and relevance matters. The most common triggers: users complaining that search results are not relevant, LIKE queries taking more than 100ms, or a feature requirement for autocomplete and faceted search (filter by multiple criteria simultaneously).
+
+Postgres full-text search is underrated and can handle many search use cases with proper tsvector indexing. Exhaust it before adding Elasticsearch. The sync layer required to keep Elasticsearch current is real maintenance burden. Every write to your primary database needs to sync to Elasticsearch. Sync failures need to be handled. Index mappings need to evolve with your schema.
+
+## When ClickHouse is the right call
+
+ClickHouse is a columnar database optimized for analytical queries. It stores data by column rather than by row, which makes aggregation queries over large datasets extremely fast.
+
+The signal for ClickHouse is specific: analytical queries in Postgres that cannot be fixed with indexing and are taking 5 to 30 seconds. Dashboard queries that aggregate millions of rows, billing reports that sum usage across all customers, usage trend analysis. These are ClickHouse use cases.
+
+The migration path typically looks like this: start writing events to a separate analytical table in Postgres alongside your main tables. When that table grows past a few million rows and queries start taking seconds, migrate it to ClickHouse. The application code changes are minimal because the query syntax is similar.
+
+## Common mistakes teams make
+
+1. Adding Redis before profiling the actual queries. Add indexes first. Profile the slow queries. If the bottleneck is not the query itself but the repeat reads, then add Redis.
+2. Not designing for cache invalidation from the start. Every cached value needs a clear invalidation strategy. Stale caches are the most common Redis bug in production.
+3. Adding Elasticsearch before Postgres full-text search. Postgres tsvector with a GIN index is good enough for most search use cases. Test it before adding another system.
+4. Running Elasticsearch without a sync reliability guarantee. If writes to your database are not guaranteed to sync to Elasticsearch, your search index will drift. Design the sync before adding the system.
+5. Using ClickHouse for operational queries. ClickHouse is for analytical reads. It is not a replacement for Postgres. Keep operational data in Postgres.
+
+## Where to start: a 3-step decision framework
+
+**Step 1: Measure before deciding.** Profile the queries that are slow. Use `EXPLAIN ANALYZE` in Postgres. Identify whether the problem is query design, missing indexes, table size, or repeated reads. Fix the fixable problems first.
+
+**Step 2: Match the problem to the right tool.** Repeated reads of slow-changing data: Redis. Full-text search with relevance: Elasticsearch. Aggregation over millions of rows: ClickHouse. Do not use a tool for a problem it was not designed to solve.
+
+**Step 3: Plan the sync layer before deploying the specialized database.** Every specialized database requires a mechanism to stay current with your primary database. Design and test the sync before putting the specialized database in production. A broken sync is worse than not having the specialized database at all.
+## Related reading
+
+- The SaaS Architecture Stack That Scales to One Million Users
+- [The Database Migration Without Downtime](/blog/the-database-migration-without-downtime)
+- [The Background Sync Problem: Patterns That Survive](/blog/the-background-sync-problem-patterns-that-survive)
+- The Caching Strategy Every SaaS Needs

@@ -1,0 +1,62 @@
+---
+slug: "hosting-cost-optimization-from-ten-thousand-to-a-million-users"
+title: "Hosting Cost Optimization: From Ten Thousand to a Million Users"
+excerpt: "The hosting decisions that are fine at ten thousand users become expensive and fragile at a hundred thousand. Here is the optimization map across each order of magnitude."
+date: "2026-05-23"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing"]
+readingMinutes: 6
+ogImage: "/api/og/blog/hosting-cost-optimization-from-ten-thousand-to-a-million-users"
+status: "published"
+definition: "Hosting cost optimization is the process of matching your infrastructure spend to your actual usage patterns at each stage of growth. The goal is not to run the cheapest infrastructure. The goal is to avoid paying for capacity you do not have and to avoid running out of capacity at the moment you need it most."
+faq: [
+  {"q":"What is the most common hosting overspend at the early stage?","a":"Over-provisioned compute. Founders who start with large instances to avoid performance anxiety often run at five percent CPU utilization for months. Start smaller than you think you need. Add capacity when the metrics demand it, not before."},
+  {"q":"When should I switch from managed hosting to self-managed cloud?","a":"When your monthly hosting bill exceeds about two thousand dollars and you have an engineer who understands cloud infrastructure. Below that threshold, the operational savings from self-managing rarely justify the engineering time required."},
+  {"q":"What is the biggest hosting cost trap founders fall into?","a":"Data egress fees. Bandwidth out of cloud providers, especially AWS, is expensive and grows non-linearly with scale. Most founders do not model egress costs until they receive the first bill that hurts. CDN placement and caching strategy matter more at scale than raw compute pricing."},
+  {"q":"Should I use reserved instances or spot instances for cost savings?","a":"Reserved instances make sense for baseline workloads you run continuously. Spot instances work for batch jobs and non-critical async processing. Mixing both for the right workload types can reduce compute costs significantly in my experience."},
+  {"q":"How do I know when to add a CDN?","a":"When your static assets are being served repeatedly from your origin and your bandwidth costs are climbing. A CDN should be the first optimization you make when scaling beyond early users, before you touch compute or database sizing."}
+]
+---
+
+## What you need to know
+
+- Hosting costs scale non-linearly. A setup that costs 200 dollars per month at ten thousand users can cost 8,000 dollars per month at a million users if no optimization happens in between.
+- The biggest savings opportunities are usually in compute right-sizing, database connection management, and egress cost reduction, not in switching cloud providers.
+- Most hosting cost problems are architecture problems in disguise. Unindexed queries, N+1 patterns, and missing caches show up first as scaling costs.
+- Every cloud provider has a free tier and a commitment discount tier. Understanding which workloads qualify for each one is worth a few hours of your engineer's time.
+- The best time to optimize hosting costs is just before you hit a pricing step function, not after the bill arrives.
+
+## The core argument
+
+The startup hosting cost conversation usually happens in two moments: when the founder first sets up infrastructure and when they receive a bill that surprises them. Neither moment is the right one. The right moment is the transition from each user tier to the next, because that is when the architecture decisions made in the previous tier become visible as costs in the next one. A monolithic server that worked at ten thousand users does not fall over at a hundred thousand. It just costs three times as much to keep running at the same performance level, and you pay that cost every month until you fix the underlying structure.
+
+The optimization levers change at each scale point. At ten thousand users, the primary lever is right-sizing compute. Most early-stage apps are massively over-provisioned because the default instance sizes are generous and the pain of being under-provisioned once is still fresh in the founder's memory. At a hundred thousand users, the leverage shifts to caching and database optimization. The queries that ran fine at low volume now show up in the slow query log, and the origin server is serving files it should be serving from a CDN. At a million users, the optimization becomes architectural: read replicas, regional distribution, background job separation, and egress routing.
+
+The practical trap I see most often is founders who optimize the wrong layer. Switching from AWS to a cheaper provider while leaving N+1 queries in the codebase saves twenty percent on compute and loses it again in database costs within sixty days. The cost problem is almost never the provider. It is the pattern. I have worked through this optimization path on several client projects, and the sequence that works is always: fix the queries, add the cache, right-size the compute, then consider provider or commitment pricing. Doing it in any other order wastes the engineer's time and gives you a lower bill for the wrong reason.
+
+## Common mistakes
+
+1. **Switching cloud providers to save money without addressing architecture.** The cost difference between major cloud providers is smaller than the cost of moving and the cost of fixing bad patterns. Fix the patterns first.
+
+2. **Over-provisioning compute as a buffer against performance issues.** Excess compute is expensive and often masks application problems that will surface at larger scale anyway. Monitor actual utilization and size accordingly.
+
+3. **Not using a CDN for static assets.** Serving images, CSS, and JavaScript from your origin server when a CDN would cost less and deliver faster is one of the most common early-stage hosting mistakes.
+
+4. **Ignoring data egress costs in architecture decisions.** Moving large amounts of data between services, regions, or out of the cloud adds up quickly. Model these costs before designing data pipelines.
+
+5. **Running development and staging environments on production-grade infrastructure.** Non-production environments should run on significantly smaller instances. I have seen staging environments costing more than production because no one questioned the original setup.
+
+## Where to start
+
+1. **Pull three months of billing data and find the top three line items.** In most cases, compute, database, and bandwidth are the top three. Pick the one with the highest growth rate and investigate it first.
+
+2. **Check your database query performance.** Run the slow query log for forty-eight hours. Any query taking more than 100 milliseconds that runs more than a hundred times per day is a hosting cost problem wearing architecture clothes.
+
+3. **Audit your static asset serving.** If your origin server is returning images or JS files directly to browsers, add a CDN layer before anything else. The cost reduction is immediate and the performance improvement is measurable.
+
+## Related reading
+
+- [How to Build a Twelve-Month Software Budget That Survives Reality](/blog/how-to-build-a-twelve-month-software-budget-that-survives-reality)
+- [Cloud Hosting Costs at Scale: What Founders Underestimate](/blog/cloud-hosting-costs-at-scale-what-founders-underestimate)
+- [Reserved Instances and Cost Math: When They Pay Off](/blog/reserved-instances-and-cost-math-when-they-pay-off)
+- [The Software Cost Pyramid: Where Your Money Actually Goes](/blog/the-software-cost-pyramid-where-your-money-actually-goes)

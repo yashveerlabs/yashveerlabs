@@ -1,0 +1,122 @@
+---
+slug: "the-last-20-percent-why-your-ai-generated-saas-fails-at-stripe-and-security"
+title: "The Last 20 Percent: Why Your AI Generated SaaS Fails at Stripe and Security"
+excerpt: "AI code generation handles the easy 80 percent. The last 20 -- payments, auth, and security -- is where generated SaaS products silently fail."
+date: "2024-12-15"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","saas","security","stripe","vibe-coding"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-last-20-percent-why-your-ai-generated-saas-fails-at-stripe-and-security"
+status: "published"
+definition: "The last 20 percent of a SaaS build refers to the areas that AI code generation handles poorly: payment processing, authentication, authorization, and security. These areas require precise implementation of rules that have serious business and legal consequences when wrong -- and AI-generated code in these areas tends to produce plausible-looking implementations that are subtly incorrect. The failures are not visible during development or basic testing; they surface when a real user hits a real edge case."
+faq: [
+  {"q":"What specifically does AI-generated Stripe code get wrong?","a":"Three common failure patterns: not verifying webhook signatures (allowing anyone to send fake payment events), not handling Stripe's idempotency key requirements (causing duplicate charges on retries), and not correctly handling subscription state transitions (allowing users to access paid features after a failed payment or cancellation). Each of these produces business logic that looks correct but fails in production under specific conditions that are hard to test in development."},
+  {"q":"What are the most dangerous AI-generated authentication patterns?","a":"Session management errors are the most common: not invalidating sessions on logout, not rotating session tokens after privilege escalation, and storing session data client-side without verification. Authorization errors follow: checking authentication (is the user logged in?) without checking authorization (is this user allowed to access this specific resource?). The horizontal privilege escalation pattern -- where user A can access user B's data by changing an ID in the URL -- appears frequently in AI-generated API routes."},
+  {"q":"How do I identify security problems in AI-generated code?","a":"Four checks that catch the most common failures: check every API route that returns data for an authorization check that verifies the requesting user owns or has permission to access the specific resource; check Stripe webhook handlers for signature verification; check authentication flows for session invalidation on logout; and check password reset flows for token expiration and single-use enforcement. These four checks catch the majority of serious security failures in AI-generated SaaS code."},
+  {"q":"Is AI-generated code actually less secure than human-written code?","a":"Not categorically. AI-generated code is less secure in areas that require domain knowledge about the consequences of specific implementation decisions -- Stripe's edge cases, OAuth flow subtleties, CSRF prevention. In areas where the correct implementation is well-represented in training data and the consequences of error are immediately apparent, AI-generated code can be as good as human-written code. The problem is that founders using AI code generation often cannot distinguish the areas where the generated code is reliable from the areas where it is not."},
+  {"q":"What should I review manually regardless of how the code was written?","a":"Six areas that warrant manual review on every SaaS project: payment webhook handlers (Stripe signature verification, idempotency), authentication flows (session management, token expiration), authorization on every data-access endpoint (resource ownership checks), password and credential handling (bcrypt, no plaintext), CSRF protection on state-changing operations, and user input validation and sanitization on all external inputs. These areas have high consequences and are worth human review even when the code looks correct."}
+]
+---
+
+## What you actually need to know
+
+- AI code generation produces good scaffolding and bad payment logic. The 80 percent of a SaaS product that is CRUD, UI, and data display is where AI excels. The 20 percent that is Stripe, auth, and security is where it quietly fails.
+- Stripe webhook signature verification is the most common critical omission in AI-generated payment code. Without it, any server on the internet can trigger payment-confirmed events in your system.
+- Horizontal privilege escalation -- user A accessing user B's data by changing an ID -- appears in the majority of AI-generated API routes I have audited. It is invisible until someone deliberately exploits it.
+- AI-generated auth code typically checks authentication (is the user logged in?) without checking authorization (does this user own this specific resource?). These are different checks.
+- The failures are not visible in basic testing. They require specific edge cases or deliberate exploitation to surface.
+
+| Area | What AI Gets Right | What AI Gets Wrong | Consequence |
+|---|---|---|---|
+| Stripe integration | Basic charge creation | Webhook signature verification | Anyone can fake payment events |
+| Stripe subscriptions | Checkout session creation | Subscription state transition handling | Users access paid features after cancel |
+| Authentication | Login/logout flows | Session invalidation, token rotation | Sessions persist after logout |
+| Authorization | Route-level auth checks | Resource-level ownership checks | User A accesses user B's data |
+| Password reset | Token generation | Token expiration, single-use enforcement | Password reset tokens work after use |
+| Input validation | Basic field validation | Server-side re-validation | Client-side bypass produces injection |
+
+## The core argument
+
+The pattern I see repeatedly in AI-generated SaaS codebases is a product that works correctly in the happy path -- a user signs up, subscribes, and uses the product -- and fails in ways that have serious business consequences in the unhappy paths. The subscription that is not properly cancelled. The webhook that can be forged. The API endpoint that returns any user's data to any authenticated user who knows the right ID.
+
+These are not obscure edge cases. They are predictable failure modes in areas where the correct implementation requires understanding the business consequences of getting it wrong. AI models know the Stripe API and the OAuth spec, but they do not know that a missing webhook signature check means every server on the internet can mark your users' payments as successful. They do not know that failing to check resource ownership on a data endpoint means a user can enumerate other users' accounts by incrementing an ID.
+
+The consequence is a class of SaaS products that passes the demo, passes basic testing, and fails when exposed to real users who are either testing the edges deliberately or stumbling into them accidentally. The founder who used AI to build the product often does not have the security background to recognize these failures -- because the code looks correct, the tests pass, and everything works until it does not.
+
+## The Stripe failure modes
+
+**Webhook signature verification.** Stripe sends webhook events to a URL you configure -- payment succeeded, subscription cancelled, invoice failed. The correct implementation verifies that the webhook event came from Stripe by checking the signature header against your Stripe webhook secret. AI-generated webhook handlers frequently skip this check. Without it, any HTTP client anywhere can POST to your webhook URL with a fabricated payload and your system will process it as a real Stripe event. A fictional payment_intent.succeeded event triggers the "subscription activated" code path without any money being paid.
+
+The fix is three lines: retrieve the raw request body before parsing it, call `stripe.webhooks.constructEvent()` with the raw body, the signature header, and the webhook secret, and wrap the whole handler in a try/catch that returns a 400 on signature verification failure. AI-generated code frequently processes the parsed JSON body, which means the signature check cannot work even if you add it later.
+
+**Subscription state transition handling.** Stripe subscription state is more complex than "active" or "cancelled." There are trial periods, incomplete payments, past due states, and grace periods. AI-generated subscription code often checks `subscription.status === 'active'` and considers that sufficient. But a subscription in `past_due` state is not active -- the payment has failed and the customer is in a grace period before cancellation. A subscription in `incomplete` state has never successfully billed. Checking only for `active` allows users to access paid features they have not paid for.
+
+**Idempotency on payment operations.** Stripe allows attaching an idempotency key to any API call to prevent duplicate charges if the request is retried. AI-generated code almost never uses idempotency keys. When a payment request times out and is retried, the user gets charged twice. Stripe will de-duplicate the charge if the same idempotency key is used -- without it, both charges succeed.
+
+## The authorization failure modes
+
+The most common security failure in AI-generated SaaS code is the authorization gap between "this user is authenticated" and "this user is authorized to access this specific resource."
+
+A typical AI-generated API route looks like this:
+
+```javascript
+// GET /api/documents/:id
+export async function GET(req, { params }) {
+  const session = await getSession(req);
+  if (!session) return new Response('Unauthorized', { status: 401 });
+  
+  const document = await db.documents.findById(params.id);
+  return Response.json(document);
+}
+```
+
+This code checks that the user is logged in. It does not check that the document belongs to the requesting user. Any authenticated user can access any document by knowing or guessing its ID. In databases that use incrementing integer IDs (which AI-generated code frequently defaults to), a user can enumerate the entire document database by iterating IDs from 1 upward.
+
+The correct implementation adds the ownership check:
+
+```javascript
+const document = await db.documents.findOne({
+  id: params.id,
+  userId: session.userId  // only return document if it belongs to this user
+});
+if (!document) return new Response('Not Found', { status: 404 });
+```
+
+The 404 (not 401 or 403) is intentional -- returning 403 confirms the resource exists and belongs to someone else, which leaks information. Returning 404 for both "not found" and "not authorized" prevents enumeration.
+
+This pattern appears in nearly every AI-generated codebase I have audited. It is not that the AI does not know about authorization -- it does. It is that the route-level auth check is always generated and the resource-level ownership check is frequently omitted.
+
+## The authentication edge cases
+
+**Session invalidation on logout.** AI-generated logout handlers typically clear the session cookie on the client. They do not always invalidate the session on the server. A session token that is valid on the server until it naturally expires can be replayed after "logout" by anyone who captured the token. This matters most for applications with sensitive data and shared devices.
+
+**Password reset token handling.** Password reset flows require tokens that are time-limited and single-use. AI-generated password reset code sometimes creates tokens without expiration or without marking them as used after a successful reset. An expired or already-used reset link should return an error; if it completes the reset instead, the flow can be exploited by anyone who can observe the link.
+
+**Concurrent session management.** When a user changes their password, all other active sessions should be invalidated. AI-generated code handles the current session but frequently does not invalidate sessions on other devices. A compromised account that has its password changed remains compromised for other active sessions until they expire naturally.
+
+## Common mistakes founders make with AI-generated security code
+
+1. Assuming the code is correct because it works in the happy path. The critical failures in Stripe and auth code are triggered by edge cases that do not appear in basic functional testing.
+2. Not auditing authorization separately from authentication. A codebase can have perfect authentication (all routes check for a valid session) and catastrophic authorization failures (no route checks whether the session user owns the specific resource).
+3. Skipping webhook signature verification because "it is harder to test." Testing webhook handlers requires a real Stripe CLI session or mocked requests, which is more friction than testing a basic API route. This friction causes the check to be skipped.
+4. Using client-side state to determine subscription access. Checking subscription status from a client-side store or cookie without server-side re-verification allows any user to forge their subscription status.
+5. Not testing expired or cancelled subscription access. The happy path test (subscribe and access paid features) does not catch the failure where cancelled subscriptions still work. Test the cancellation flow explicitly.
+
+## Where to start: a 3-step AI-generated SaaS security audit
+
+**Step 1: Audit every API route that returns user data for a resource-level ownership check.** This is the most common failure and the easiest to audit systematically. For every `findById()` or equivalent call, verify that the query includes a condition limiting results to the requesting user's data.
+
+**Step 2: Test the Stripe webhook handler with a forged request.** Send a POST request to your webhook URL with a fake payment_intent.succeeded payload and no valid signature. If your system processes it as a successful payment, the signature verification is missing or broken. Fix the handler before proceeding.
+
+**Step 3: Test subscription access after cancellation.** Subscribe to your product, cancel the subscription through Stripe, and verify that paid features are no longer accessible. Then test what happens when a subscription enters past_due status by using a Stripe test card that fails payment.
+
+## The Code That Looks Right and Is Not
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I have audited five AI-generated SaaS codebases in the past year. Every one of them had a horizontal privilege escalation vulnerability in at least three API routes. Four of the five had missing or broken Stripe webhook signature verification. Three had password reset tokens that did not expire. None of these failures were visible from the user interface; all of them were visible within 20 minutes of reading the API route handlers. The code looks right -- it has the right structure, the right variable names, the right comments. The problem is in the specific checks that are missing, not in the overall structure that is present. That is exactly why these failures are so common: they require knowing what to look for, not just knowing whether the code compiles and runs.
+
+## Related reading
+
+- [The Honest Limits of AI Code Generation in 2026](/blog/the-honest-limits-of-ai-code-generation-in-2026)
+- [The Founder Who Vibe Coded Their MVP: A Postmortem and Rescue Plan](/blog/the-founder-who-vibe-coded-their-mvp-a-postmortem-and-rescue-plan)
+- [The Honest MVP Checklist: 25 Items Before You Launch](/blog/the-honest-mvp-checklist-25-items-before-you-launch)
+- [The Insurance Math of Software Costs: Pay Now or Pay More Later](/blog/the-insurance-math-of-software-costs-pay-now-or-pay-more-later)

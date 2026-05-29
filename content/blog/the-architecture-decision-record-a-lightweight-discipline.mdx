@@ -1,0 +1,88 @@
+---
+slug: "the-architecture-decision-record-a-lightweight-discipline"
+title: "The Architecture Decision Record: A Lightweight Discipline"
+excerpt: "What an ADR is, why teams that write them make better decisions faster, and the format that takes 20 minutes to write and saves months of rework."
+date: "2025-09-12"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","architecture","documentation","engineering"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-architecture-decision-record-a-lightweight-discipline"
+status: "published"
+definition: "An Architecture Decision Record is a short document that captures a significant technical decision, the context that drove it, the alternatives considered, and the reasoning behind the choice. ADRs are not design documents. They are decision logs. The value is not in the writing. It is in the future conversation that does not have to happen because the answer is already written down."
+faq: [
+  {"q":"How long should an ADR be?","a":"One to two pages. If it is longer than two pages, you are writing a design doc, not a decision record. The goal is to capture the decision and the reasoning, not to document the entire system. Constrain the format and the quality of thinking improves."},
+  {"q":"When should I write an ADR?","a":"For any decision that would be expensive to reverse, confusing to explain six months later, or likely to be relitigated by a new engineer. The test is simple: if a future engineer would ask 'why did we do it this way,' write an ADR so the answer already exists."},
+  {"q":"Where should ADRs live?","a":"In the repository, as markdown files. Not in Confluence, not in Notion, not in a Google Doc that nobody opens. Keeping ADRs in the repo means they are versioned with the code, visible in the same place engineers work, and searchable with the same tools."},
+  {"q":"Should I update an ADR when the decision changes?","a":"Write a new ADR that supersedes the old one. Mark the old one as superseded with a reference to the new one. Do not edit the old one. The history of decisions is part of the value. You want to see the original reasoning even when the decision changes."},
+  {"q":"Who should write ADRs?","a":"Whoever made or proposed the decision. Senior engineers and architects most often. Founders who made an early architectural call they want documented. The goal is to capture the reasoning of the person who had the context. Delegating the writing to someone who was not in the decision loses the context."}
+]
+---
+
+## What you actually need to know
+
+- ADRs are decision logs, not design documents. Keep them short or they stop getting written.
+- Store them in the repository as markdown. Confluence and Notion graveyard them.
+- Write a new ADR to supersede an old one rather than editing the original.
+- The value compounds over time. Year one, it feels optional. Year three, it is the only reason you understand why the database is structured the way it is.
+- The discipline is the habit, not the format. The format is flexible. The habit of writing them is what matters.
+
+| Documentation Type | Length | Use Case | When It Gets Ignored |
+|---|---|---|---|
+| ADR | 1 to 2 pages | Significant decisions, reversibility considerations | Never, if kept short |
+| Design doc | 5 to 20 pages | Large features, system design proposals | After the feature ships |
+| Inline comments | 1 to 10 lines | Non-obvious code behavior | When they explain the obvious |
+
+## The core argument
+
+New engineers ask the same question repeatedly when they join a team with technical debt: why did we do it this way? Sometimes the senior engineer remembers. Sometimes they shrug. Sometimes they left the company a year ago. The question usually produces one of three outcomes. A long explanation that should have been written down. A story about a specific incident that caused the decision. Or silence.
+
+ADRs exist to answer that question before it is asked. They are short, structured documents that live in the repository alongside the code they describe. When the new engineer looks at the database schema and notices that the users table has a deleted_at column instead of a boolean deleted flag, they should be able to run a search in the docs folder and find the record of when that decision was made, what alternatives were considered, and why soft deletes made sense at the time.
+
+The discipline is lightweight by design. A full ADR takes 20 to 30 minutes to write. The format is standardized. The benefit compounds over every engineer who ever works on the codebase after the decision. The cost of not writing it is paid in every conversation that reconstructs the reasoning from memory, and every decision that gets relitigated because nobody remembers why the first decision was made.
+
+## The format I use
+
+The format that works across every team I have seen use ADRs consistently is this:
+
+**Title:** A short, specific description of the decision. "Use PostgreSQL as the primary database" is better than "Database decision."
+
+**Date:** When the decision was made.
+
+**Status:** Proposed, Accepted, Superseded. This tells readers at a glance whether the decision is still in effect.
+
+**Context:** What problem were we solving? What constraints were in play? What did we know at the time?
+
+**Decision:** What did we decide? One clear sentence.
+
+**Alternatives considered:** What else did we evaluate? Why did we not pick it?
+
+**Consequences:** What does this decision commit us to? What are the tradeoffs we accepted?
+
+That is the entire format. Five sections, one to two pages. Done.
+
+## Common mistakes teams make
+
+1. Trying to capture every decision, including trivial ones. ADRs for "we used camelCase for variable names" are noise. ADRs for "we chose soft deletes for all user data" are signal.
+2. Writing ADRs in Confluence where they will never be found again. Store them in the repo.
+3. Editing old ADRs when decisions change. Write a new one. Preserve the history.
+4. Making the format so long that people stop writing them. Two pages maximum.
+5. Not reviewing ADRs during onboarding. The first week of onboarding is the right time to read the ten most significant ADRs in the codebase.
+
+## Where to start: a 3-step ADR implementation plan
+
+**Step 1: Create the docs/decisions/ folder in the repository.** Add a README that explains the format and links to a template. The template should be 10 to 15 lines. Commit it today.
+
+**Step 2: Write your first ADR about an existing decision.** Pick the most frequently explained decision in the codebase. Something you have explained to three different engineers in the past year. Write the ADR for that decision today. It will take 20 minutes. The next time someone asks, you have the answer already written.
+
+**Step 3: Add ADR writing to your PR process.** When a PR contains a significant architectural decision, the reviewer asks: "Is this worth an ADR?" The answer is not always yes. But asking the question builds the habit.
+
+## Why I Write These
+
+My name is on this page because I wrote what is on this page. Yashveer Singh Rajpoot. Full stack developer. Founder of Yashveer Labs. The portfolio is on the homepage. The projects are live. The code is real. The work is provable. If you have read this far, you already know whether the voice matches the standard you are looking for. The next move is yours.
+
+## Related reading
+
+- [The Tech Debt Audit: A Two Day Process](/blog/the-tech-debt-audit-a-two-day-process)
+- [The Legacy Codebase: A Senior Engineer's Five Day Audit](/blog/the-legacy-codebase-a-senior-engineers-five-day-audit)
+- [Code Smells That Predict Tech Debt](/blog/code-smells-that-predict-tech-debt)
+- [The Engineering Migration: Patterns That Work](/blog/the-engineering-migration-patterns-that-work)

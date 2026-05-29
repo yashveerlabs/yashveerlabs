@@ -1,0 +1,137 @@
+---
+slug: "why-ai-generated-code-breaks-in-production"
+title: "Why AI Generated Code Breaks in Production"
+excerpt: "AI generated code passes local tests and breaks in production for specific, repeatable reasons. Understanding those reasons is more useful than a general skepticism about the tools."
+date: "2024-12-22"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-ai-generated-code-breaks-in-production"
+status: "published"
+definition: "AI generated code breaks in production for reasons that are different from the reasons hand-written code breaks. The AI optimizes for the test case in front of it, not for the edge cases that appear when real users interact with the system under real conditions. The failure modes are specific and learnable, which means they are also preventable once you know what to look for."
+faq: [
+  {"q":"what are the most common reasons ai generated code fails in production but not in development","a":"Silent error handling, environment-specific assumptions, missing rate limit handling, and concurrency issues that only appear under real load. The AI writes code that works in a clean test environment. Production has noise, concurrent users, external services that go down, and input that does not match the happy path. The AI code often has no plan for any of that."},
+  {"q":"how do you harden ai generated code before deploying to production","a":"Start with error handling. Find every external call, every database query, every place the code can fail, and verify that the failure produces a useful error or a safe fallback rather than a silent exception. Then run the code under load. Then test the unhappy paths explicitly. Most AI generated code has no unhappy path testing because the test cases the AI writes are almost always happy paths."},
+  {"q":"why does ai generated code often fail at external api integrations","a":"Because the AI knows the common case for the API and does not know about rate limits, retry behavior, partial failure modes, or the specific error codes that the API returns for edge cases. It writes the call that works, not the call that handles the cases where the API responds unexpectedly. Those cases show up in production regularly and the code has no plan for them."},
+  {"q":"how does concurrency expose bugs in ai generated code","a":"The AI writes code assuming it is the only thing running. In production, multiple requests execute concurrently. Race conditions in shared state, missing database transaction boundaries, and non-atomic operations that assume sequential execution all produce bugs under concurrent load. These are invisible in single-request testing and appear intermittently in production, which makes them hard to debug."},
+  {"q":"what is the difference between ai generated code failing silently and failing loudly","a":"A loud failure throws an exception, returns an error, or crashes in a visible way. You know immediately. A silent failure catches an exception, returns a 200, logs nothing, and the bad state propagates through the system. Silent failures are more common in AI generated code because the AI often wraps uncertain code in try-catch blocks as a defensive measure, but without meaningful error handling inside the catch."},
+  {"q":"should i add monitoring before or after deploying ai generated code to production","a":"Before. You need visibility into what the code is doing in production before you can trust it. At minimum: error rate monitoring, response time monitoring, and alerting on the external API calls. Without this, when the code fails silently you will not know until a customer tells you or the data is already wrong."},
+  {"q":"how do environment differences between development and production cause ai generated code to break","a":"Environment variables that exist in production but not in development, or have different values. Different database configurations. Different file system permissions. Different network access rules. The AI writes code that works in whatever environment was described in the prompt or shown in the open files. It does not know about the production environment unless told explicitly."}
+]
+---
+
+## What you actually need to know
+
+- AI generated code breaks in production for specific reasons, not random ones. The failure modes repeat across codebases and are learnable.
+- The most common: silent error handling, missing retry logic on external calls, environment variable assumptions, and concurrency bugs that only appear under real load.
+- The AI optimized for making the test case pass, not for handling the cases the test did not cover.
+- A code review that only checks correctness of the happy path will not catch these issues. The unhappy paths need deliberate testing.
+- Most of these failures are preventable with a one-day hardening pass before deployment.
+
+| Failure mode | Frequency | How it presents in production |
+|---|---|---|
+| Silent error handling | Very common | Operation appears to succeed; state is wrong |
+| Missing retry on external API | Common | Intermittent failures under real usage |
+| Environment variable mismatch | Common | Works in dev, fails immediately in production |
+| Concurrency race condition | Moderate | Intermittent data corruption under load |
+| Unhappy path not handled | Very common | Exceptions exposed to users or unhandled rejections |
+| Missing input validation | Moderate | Crashes or data corruption on unexpected input |
+
+## The core argument
+
+The AI writes for the problem in front of it. The problem in front of it, during generation, is: make this work. The test case is a successful request, a valid input, a cooperative external service. The AI makes it work. It passes.
+
+Production is not that. Production is the request that arrives at 3am with a malformed body because the client library on the mobile app has a bug. Production is the database under load that takes 800 milliseconds to respond instead of 30, and the code that has a 500 millisecond timeout. Production is the third party API that returns a 429 because the feature launched and traffic spiked.
+
+None of those scenarios were in the prompt. None of them were in the test case. The AI did not write handling for them because it was not asked to.
+
+The fix is not to stop using AI code generation. The fix is to understand what the AI does not handle by default, and to add that handling before the code goes to production. This is a specific skill. Once you have it, the AI becomes a faster tool. Without it, the AI creates a new class of bugs that are harder to debug than the bugs it replaced.
+
+## The specific failure modes
+
+### Silent error handling
+
+The most common pattern. The AI wraps a risky operation in a try-catch. The catch block logs a message or does nothing. The function returns a success response regardless.
+
+```javascript
+// This is what the AI often generates
+try {
+  await sendEmail(user.email, message);
+} catch (err) {
+  console.log('Email failed');
+}
+// Execution continues as if the email succeeded
+```
+
+In production, the email silently fails, the user never receives it, and there is no error signal anywhere. The business logic that depends on the email having been sent proceeds as if it succeeded.
+
+The fix is to decide at every try-catch: if this fails, what should happen? Rethrow and let the caller handle it, return an explicit error, or add retry logic. Silent swallowing is almost never the right answer in a production system.
+
+### Missing retry and rate limit handling
+
+The AI calls the external API. It handles the success case. It might handle a generic error. It does not handle rate limit responses (429), temporary service unavailability (503), or the retry-after header that tells you how long to wait.
+
+Under real production traffic, these cases occur regularly. Every production integration with an external service needs retry logic with exponential backoff and a maximum retry count. Almost no AI generated integration has this unless the developer explicitly asked for it.
+
+### Concurrency assumptions
+
+The AI writes the function assuming it runs once, sequentially. Production runs it many times, concurrently. If the function reads a value, makes a decision based on it, and then writes a value, a concurrent request can read the same original value before the first write completes. Both proceed with the assumption that they are the only actors. One of them is wrong.
+
+This pattern appears most often in inventory systems, booking systems, financial calculations, and any feature that checks a constraint before performing an action. The check-then-act pattern needs a database transaction or a distributed lock. The AI generates it without one unless the prompt specifically requests it.
+
+## How much does it cost
+
+| Hardening activity | Time investment | What it prevents |
+|---|---|---|
+| Error handling audit (find all catch blocks) | Half day | Silent production failures |
+| External API retry logic review | One day | Intermittent integration failures |
+| Environment variable inventory | Two to four hours | Deployment failures from missing config |
+| Concurrency review on shared state paths | One day | Race conditions under load |
+| Unhappy path test writing for critical flows | One to two days | Unhandled user-facing exceptions |
+| Load test before production launch | Half day | Performance failures on day one |
+
+This is not a large investment relative to the cost of a production incident. A payment that does not process, a booking that double-charges, or a user who loses data is far more expensive than two days of hardening work before launch.
+
+## What to check before deploying AI generated code
+
+- Every try-catch block. What happens when the catch fires? Is it logged? Does the caller know?
+- Every external API call. Is there retry logic? Rate limit handling? A timeout?
+- Every environment variable. Does it exist in the production environment with the right value?
+- Every place where two concurrent requests might interact with the same data. Is there a transaction? A lock?
+- Every place the code receives user input. Is it validated before use?
+- Every place the code sends a success response. Did the underlying operation actually succeed?
+
+## Expert opinion
+
+> The AI writes the happy path with confidence and leaves the unhappy path to whoever is on call when the bug surfaces. That is not a criticism of the tool. It is a property of how the tool was designed and how it is used. The engineer who ships AI generated code to production without reading the error handling is not saving time. They are moving the debugging from before deployment to after it.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A startup was running an AI generated booking system that had been in production for six weeks with no major incidents. Then a legitimate flash of traffic, about four times normal volume, hit the booking endpoint during a promotional campaign. The endpoint created duplicate bookings for about eight percent of users who submitted during that window.
+
+The bug was a check-then-act race condition. The availability check and the booking creation were two separate database operations with no transaction wrapping them. Under normal traffic, the operations were fast enough that conflicts were rare. Under four-times load, many concurrent requests passed the availability check simultaneously and all proceeded to create bookings for the same slot.
+
+The fix was a transaction with a database-level unique constraint as the final guard. The fix took about three hours. The customer support fallout from the duplicate bookings took three days. The architectural issue was visible in the code before launch; it just was not checked for.
+
+For the broader picture of AI generated code quality in production, see [vibe coding rescue: how to take over a codebase written by ChatGPT](/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt). For how to add systematic testing to a codebase that was shipped without it, see [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad).
+
+## Common mistakes
+
+1. Treating passing tests as sufficient proof that code is production ready. Tests test what they test. They do not test the things nobody wrote tests for.
+2. Shipping without monitoring. You cannot know when AI generated code fails silently unless you are watching.
+3. Ignoring the catch blocks. The AI put them there for a reason. Most of them need actual handling, not a log message.
+4. Not testing with production-like data. Local test databases are clean. Production databases have years of inconsistent data.
+5. Skipping the concurrency review because it feels paranoid. Race conditions are not rare. They are predictable given the usage pattern.
+6. Assuming environment parity between development and production. It rarely exists without deliberate effort.
+7. Adding monitoring after the first incident instead of before launch. The first incident is the monitoring telling you something you should have known before.
+
+## A 30 day plan
+
+1. **Week one.** Audit every catch block in the codebase. Categorize each as: rethrows, logs with alert, swallows silently. Fix all silent swallows in the critical paths.
+2. **Week two.** Audit every external API integration. Add retry logic and rate limit handling to any integration that does not have it.
+3. **Week three.** Review the concurrency model for every endpoint that writes data. Add transactions and locks where the check-then-act pattern exists.
+4. **Week four.** Write unhappy path tests for the five highest-risk flows: auth, payments, data writes, external integrations, and anything with a time constraint.
+
+For deeper reading on the comment layer that obscures these failures, see [why AI code comments lie and how to read them critically](/blog/why-ai-code-comments-lie-and-how-to-read-them-critically). For how AI assisted code review can be part of catching these issues before they ship, see [AI assisted code review: a process that actually helps](/blog/ai-assisted-code-review-a-process-that-actually-helps).

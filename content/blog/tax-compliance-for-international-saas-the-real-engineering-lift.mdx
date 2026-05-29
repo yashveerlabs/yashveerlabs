@@ -1,0 +1,61 @@
+---
+slug: "tax-compliance-for-international-saas-the-real-engineering-lift"
+title: "Tax Compliance for International SaaS: The Real Engineering Lift"
+excerpt: "International tax compliance for SaaS is an engineering problem disguised as an accounting one. Here is what it actually takes to build it correctly."
+date: "2026-05-24"
+category: "Business Automation and Ops"
+tags: ["tax", "compliance", "saas", "international", "billing", "vat"]
+readingMinutes: 7
+ogImage: "/api/og/blog/tax-compliance-for-international-saas-the-real-engineering-lift"
+status: "published"
+faq: [
+  {"q":"Do I need to charge VAT to EU customers?","a":"Yes, if you sell digital services (SaaS qualifies) directly to EU consumers (B2C) or to EU businesses without a valid VAT number. Businesses with a valid VAT number handle VAT themselves through the reverse charge mechanism, which means you do not collect it but must still report the transaction."},
+  {"q":"What is the OSS scheme and should I use it?","a":"The One Stop Shop is the EU's simplified VAT registration and reporting scheme for sellers of digital services. Instead of registering in every EU country where you have customers, you register once in one EU member state (or use the non-union OSS for non-EU businesses) and file a single quarterly return. Yes, use it."},
+  {"q":"Is SaaS taxable in all US states?","a":"No. Some states explicitly exempt software as a service. Others tax it as a service. Others tax it as tangible personal property. The taxability of SaaS varies by state and sometimes by product category within a state. A tax advisor with SaaS experience is necessary before making this determination for your specific product."},
+  {"q":"How do I handle currency conversion for tax reporting?","a":"Most tax authorities require that tax amounts be reported in the local currency at the exchange rate at the time of the transaction. Your billing system needs to record both the transaction currency, the amount in transaction currency, and the converted amount in the reporting currency with the exchange rate used. This is a data modeling decision that needs to be made before the first transaction."},
+  {"q":"Can I use the same billing system for US and EU customers?","a":"Yes, but it needs to be built for both from the start. The checkout flow, invoice generation, and tax calculation logic all need jurisdiction-aware behavior. Stripe and other payment processors handle the underlying payment mechanics; the tax logic above that layer is your engineering responsibility or your merchant of record's."}
+]
+---
+
+# Tax Compliance for International SaaS: The Real Engineering Lift
+
+**Tax compliance for international SaaS is the process of correctly calculating, collecting, and remitting VAT, GST, and sales tax across every jurisdiction where your customers live. Most founders assume this is an accounting problem. It is an engineering problem first. The data model, the checkout flow, the invoice format, and the reporting system all need to be built for tax compliance before the first international customer pays you.**
+
+## What you need to know
+
+- VAT applies in the EU, UK, and dozens of other countries; the rates vary by country and by product category
+- GST applies in Australia, Canada, India, New Zealand, and other countries with their own rate structures
+- US sales tax is determined at the state level with economic nexus rules that trigger obligations based on revenue and transaction count
+- Your checkout must collect the customer's location accurately, because the tax rate is based on where the customer is, not where you are
+- The invoice format for B2B customers in the EU requires specific fields (VAT number, country code, line items with tax amounts) that differ from US invoice standards
+
+## The core argument
+
+When a SaaS founder decides to sell internationally, they typically think about pricing, payment methods, and currency. What they underestimate is the compliance infrastructure required to collect tax correctly, issue compliant invoices, and remit collected taxes to each jurisdiction's tax authority. This infrastructure is not optional. In the EU, charging VAT and not remitting it is a criminal offense in some member states, not just a civil penalty.
+
+The engineering lift breaks down into three components. First, the checkout and billing system needs to determine the customer's location accurately, look up the correct tax rate for that location and product type, apply it to the transaction, and store the tax data with the transaction record. This sounds simple until you encounter edge cases: a B2B customer with a valid VAT number (which may zero-rate the transaction under reverse charge), a customer in a US state where software subscriptions are not taxable, or a customer whose billing address and IP address are in different countries. The checkout flow needs to handle all of these, and the decisions about how to handle them need input from a tax advisor, not just an engineer.
+
+Second, the invoice system needs to produce compliant invoices for each jurisdiction. An EU B2B invoice needs your VAT number, the customer's VAT number, the supply type (B2B or B2C), and a breakdown of the tax amount by tax rate. An Australian GST invoice needs an ABN. A US invoice has its own requirements by state. If you issue invoices in PDF format (which most B2B customers require), your invoice generation code needs to produce different formats for different jurisdictions. This is a meaningful development investment, and most early-stage SaaS teams have not budgeted for it.
+
+## Common mistakes
+
+1. **Treating the customer's payment method country as their tax location.** A customer can pay with a card issued in Germany while living in France. The tax location is the customer's place of establishment for B2B customers, or their address for B2C customers. Collect the address explicitly during checkout, do not infer it from the payment method.
+2. **Not validating EU VAT numbers.** The EU provides a VIES API for VAT number validation. If a B2B customer provides an invalid VAT number and you zero-rate the transaction under reverse charge, you are liable for the uncollected VAT. Validate every EU VAT number before applying the zero rate.
+3. **Issuing the same invoice format globally.** A standard US invoice format is not compliant in the EU or Australia. Build jurisdiction-aware invoice generation from the start. Retrofitting this onto an existing billing system is significantly more complex than building it correctly the first time.
+4. **Not tracking tax data separately from revenue data.** The tax you collect belongs to the tax authority, not to your business. Your accounting system, database, and reporting need to treat collected tax as a liability, not as revenue. Mixing these together creates accounting problems that become expensive to unwind.
+5. **Waiting for a customer complaint or a tax notice before implementing compliance.** Tax authorities in the EU and Australia are proactive about auditing foreign SaaS companies. The compliance investment is smaller before you have revenue than after you have a notice requiring you to remit three years of back taxes.
+
+## Where to start
+
+**Step 1: Pick your compliance approach before you write billing code.** The choice is between using a merchant of record (Lemon Squeezy, Paddle) who handles all tax compliance on your behalf, using Stripe Tax plus a filing service, or building your own compliance system. The merchant of record model is correct for early-stage products. The Stripe Tax model is correct for established products with meaningful revenue. Building your own compliance system is never the right first choice.
+
+**Step 2: Register for VAT in the EU using the One Stop Shop (OSS) scheme.** The EU's OSS scheme lets you register in one EU member state and remit VAT for all EU customers through that registration, rather than registering separately in each country. This is available to non-EU businesses through the non-union OSS scheme. Register before your EU revenue reaches the threshold (currently zero for digital services sold B2C to EU consumers from outside the EU).
+
+**Step 3: Instrument your billing data to track tax separately from revenue from the first transaction.** Every transaction record should have a field for tax amount, tax rate, tax jurisdiction, and the customer's tax classification (B2B with VAT number, B2B without VAT number, B2C). This data is required for filing returns and makes audits manageable.
+
+## Related reading
+
+- [Stripe Tax vs Lemonsqueezy vs Manual: Tax Compliance Compared](/blog/stripe-tax-vs-lemonsqueezy-vs-manual-tax-compliance-compared)
+- [Stripe vs Paddle vs Lemonsqueezy in 2026](/blog/stripe-vs-paddle-vs-lemonsqueezy-in-2026)
+- [The Real Cost of Compliance: SOC 2, GDPR, HIPAA Compared](/blog/the-real-cost-of-compliance-soc-2-gdpr-hipaa-compared)
+- [The Subscription Billing Stack in 2026](/blog/the-subscription-billing-stack-in-2026)

@@ -1,0 +1,100 @@
+---
+slug: "the-game-day-how-to-run-a-failure-simulation"
+title: "The Game Day: How to Run a Failure Simulation"
+excerpt: "How to run a structured failure simulation that reveals the gaps in your incident response before a real incident exposes them to customers."
+date: "2025-08-13"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure","incidents","reliability"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-game-day-how-to-run-a-failure-simulation"
+status: "published"
+definition: "A game day is a planned, controlled failure simulation where engineering teams intentionally break things in a production-like environment to test whether their monitoring, alerting, runbooks, and incident response processes actually work. The value is not in the failure itself -- it is in discovering the gaps between the incident response process that exists on paper and the one that executes under pressure. Teams that run game days learn what breaks before customers discover it."
+faq: [
+  {"q":"What is a game day and where did the term come from?","a":"A game day is a planned incident simulation, borrowed from sports where teams practice before the real game. In engineering, it means intentionally causing failures in a controlled environment and treating the response as a real incident. The term was popularized by Amazon's chaos engineering practices and Netflix's Chaos Monkey project, but the practice is applicable at any scale."},
+  {"q":"What is the difference between a game day and chaos engineering?","a":"Chaos engineering (randomly injecting failures in production) is the aggressive form of this practice. A game day is the structured, pre-planned form: specific failure scenarios are chosen in advance, the simulation runs in a staging or production environment with the team on standby, and the focus is on validating and improving the incident response process rather than finding unknown system weaknesses."},
+  {"q":"What failure scenarios should a first game day test?","a":"The three highest-impact scenarios for most SaaS applications: primary database unavailability (what happens when the database cannot be reached?), external API dependency failure (what happens when Stripe, SendGrid, or a critical third-party API returns errors?), and high-traffic spike (what happens when traffic is 5-10x normal?). These three scenarios cover the most common causes of SaaS outages."},
+  {"q":"How do I run a game day without risking real user impact?","a":"Option 1: Use a staging environment that mirrors production configuration. Most failure scenarios can be tested in staging without user impact. Option 2: Run the simulation during a low-traffic window (Sunday morning) in production, with a clear rollback plan and the team on standby. For the first game day, staging is the safer choice -- the goal is to test the process, not to find surprises."},
+  {"q":"What should the outcome of a game day be?","a":"A list of gaps discovered and a prioritized plan to address them. The gaps typically fall into three categories: monitoring gaps (failures that were not detected), runbook gaps (responses that did not have documented procedures), and communication gaps (the team was not sure who owned what during the incident). The game day is only valuable if the gaps it reveals are fixed before the next game day."}
+]
+---
+
+## What you actually need to know
+
+- A game day discovers the gap between your incident response process on paper and the one that executes under pressure. That gap is always larger than expected.
+- The first game day's most valuable output is not the failure -- it is the gaps in monitoring and alerting. Most teams discover in their first game day that failures they thought would be obvious were invisible in their monitoring.
+- Run the first game day in staging with a real incident channel and real escalation procedures. The value is in testing the process, not in the production environment.
+- The game day is not useful if the gaps it reveals are not fixed. Schedule the remediation work before the game day, not after.
+- Game days are most valuable as a regular practice (quarterly for most teams), not as a one-time event.
+
+| Failure Scenario | Detection Method | Common Gap Discovered | Fix Priority |
+|---|---|---|---|
+| Database unavailability | Error rate alert | Alert threshold too high, fires too late | High |
+| External API failure | Dependency health check | No circuit breaker, failure cascades | High |
+| Traffic spike | CPU/memory alert | Auto-scaling not configured correctly | High |
+| Slow query degradation | p99 latency alert | p99 alert missing, p50 looks normal | Medium |
+| Certificate expiry | Monitoring alert | No expiry alert configured | Medium |
+
+## The core argument
+
+Most engineering teams believe their incident response process works because it has never been tested under realistic conditions. The runbooks were written, the alerting was configured, the on-call rotation was established. But the runbook that no one has used is the runbook that will be confusing under the stress of a real incident. The alert that was set to a threshold that never fires is the alert that will not fire when the failure is gradual rather than sudden.
+
+The game day exposes these gaps in a controlled environment where the consequences of finding them are embarrassment and remediation work, not customer impact and revenue loss. Every gap that is discovered in a game day is a gap that will not cause a prolonged outage during a real incident.
+
+I have participated in first game days at companies where the engineering team was confident their monitoring was comprehensive. In every case, the game day revealed monitoring gaps. The most common: alerts were configured for the right conditions but with thresholds that were too high to fire in the early stages of a gradual failure. A database that was degrading slowly, with p99 latency increasing from 50ms to 500ms over 30 minutes, would not have triggered any alert because the alert threshold was set at 1,000ms -- a threshold based on what the team thought of as "clearly bad" rather than "early warning."
+
+## Designing the failure scenarios
+
+The failure scenarios for a game day should be chosen to test the most important parts of the incident response process, not to find the most obscure failure modes. The first game day should test two or three scenarios that cover the failure types the team is most likely to encounter.
+
+**Scenario 1: Primary data store unavailability.** Stop or block access to the primary database (or run a simulated failover to a replica). The test: does the application degrade gracefully or fail hard? Does the monitoring detect the failure within two minutes? Does the on-call engineer receive an alert, and can they execute the database failover runbook without assistance?
+
+**Scenario 2: Critical external dependency failure.** Mock a 500 error response from the most critical external API the product depends on (usually the payment processor or the primary AI API). Does the application handle the error gracefully (show an appropriate error to users) or fail silently or catastrophically? Are the error rates for this dependency monitored separately from the overall application error rate?
+
+**Scenario 3: Elevated traffic or resource exhaustion.** Simulate 5x the normal traffic (using a load testing tool against staging, or by enabling a feature flag for a large customer segment in production). Does the auto-scaling respond correctly? Does the p99 latency stay acceptable? Are there any endpoints that do not handle increased concurrency correctly?
+
+## Running the game day
+
+The game day runs as if it were a real incident. An incident channel is opened, the on-call engineer is the primary responder, and the team observes without intervening unless specifically asked to. The observer role is important -- team members who are not the primary responder watch for the gaps that the responder does not notice under pressure.
+
+The timeline: the facilitator (usually the DevOps engineer or the engineer who owns reliability) triggers the failure scenario at the scheduled time. The responder runs the incident response process: detects the alert, opens the incident, follows the relevant runbook, communicates status, and resolves the failure. The rest of the team observes and notes gaps.
+
+The debrief immediately follows the simulation. While the experience is fresh, the team answers four questions: what went well, what was harder than expected, what was missing (monitoring, runbook, tooling), and what would have made the response faster? The facilitator documents the answers and creates tasks for each gap identified.
+
+## The monitoring gaps that game days reveal
+
+The most common monitoring gaps revealed by first game days:
+
+**Alert threshold set too high.** The alert is configured for the right metric but fires only when the situation is already severe. A 5xx error rate alert that fires at 5 percent may be correct for a sudden outage but misses a gradual degradation from 0.1 percent to 2 percent that affects thousands of users. The fix: add multiple alert thresholds (warning at 0.5 percent, critical at 2 percent) to catch degradations at different severity levels.
+
+**Missing dependency health checks.** The overall application health check passes even when a critical dependency is unhealthy, because the health check does not test the dependency. The fix: health checks that explicitly test critical dependencies return unhealthy when any critical dependency is unavailable.
+
+**No alert for slow degradation.** Alerts that fire on a threshold do not fire when the metric approaches the threshold slowly over a long period. Anomaly detection alerts (alerts that fire when a metric deviates significantly from its recent baseline) catch gradual degradations that threshold alerts miss.
+
+**Alert fatigue from low-signal alerts.** Teams that have too many low-signal alerts (alerts that fire frequently without indicating real problems) start ignoring the alert channel. The game day reveals this when the on-call engineer does not notice the critical alert because it arrived in a channel they have learned to ignore.
+
+## Common mistakes teams make with game days
+
+1. Canceling the game day because "we are too busy right now." A team that is too busy to run a game day will be even busier during the real incident. The game day is most valuable when the team is busy -- it reveals the gaps in their current process, not an idealized version.
+2. Not creating tasks for the gaps discovered. A game day that produces a list of gaps but no remediation plan does not improve the system. The gaps discovered in the game day are the inputs to the next sprint's reliability work.
+3. Making the game day too easy. A failure scenario that is too simple to detect and too simple to resolve produces no learning. The scenario should be challenging enough to reveal real gaps.
+4. Only running game days when something goes wrong. The most valuable game days are the ones run during calm periods, not the ones run reactively after an incident. Proactive game days reveal gaps before real incidents expose them.
+5. Not inviting the right people. The game day should include everyone who would be involved in a real incident: the on-call engineer, the team lead, the communications owner, and the customer success team if they are part of the escalation path.
+
+## Where to start: a 3-step first game day
+
+**Step 1: Choose one failure scenario and design it carefully.** Database unavailability is the highest-value first scenario for most SaaS applications. Write a clear description of how you will simulate it, what the expected monitoring response should be, what the runbook says to do, and what a successful resolution looks like.
+
+**Step 2: Schedule the game day for a two-hour block, with one hour for the simulation and one hour for the debrief.** Invite everyone who would be involved in a real incident. Brief the team on the game day format: one person runs the incident as they normally would, everyone else observes and notes gaps.
+
+**Step 3: After the debrief, create tasks for the three most important gaps within 24 hours.** The game day is only valuable if the gaps are fixed. The first game day typically reveals monitoring gaps -- fix these before the second game day. After three game days, the most significant gaps will be addressed and the incident response process will be significantly more reliable.
+
+## The Practice That Makes Real Incidents Shorter
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The teams I have worked with that run regular game days have meaningfully shorter incident resolution times than those that do not. The first game day always reveals gaps that should have been visible without it -- they were just never tested. The second and third game days reveal subtler gaps. By the fourth game day, the team has built the incident response muscle memory that makes real incidents less stressful and less prolonged. The practice is not comfortable, but the alternative -- discovering the gaps during a real incident at 2am -- is significantly less comfortable.
+
+## Related reading
+
+- [The Deployment Pipeline That Survives Real-World Pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure)
+- [The Engineering Dashboard Every Founder Should Have](/blog/the-engineering-dashboard-every-founder-should-have)
+- [The First Hire in DevOps: When and What](/blog/the-first-hire-in-devops-when-and-what)
+- The Observability Stack That Pays for Itself

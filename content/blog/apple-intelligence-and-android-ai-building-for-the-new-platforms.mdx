@@ -1,0 +1,107 @@
+---
+slug: "apple-intelligence-and-android-ai-building-for-the-new-platforms"
+title: "Apple Intelligence and Android AI: Building for the New Platforms"
+excerpt: "The two largest mobile platforms now ship local AI as part of the operating system. The opportunity for app developers is real, the constraints are real, and the patterns are still settling. Here is the working version for 2026."
+date: "2026-05-18"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","ai","ios","android"]
+readingMinutes: 11
+ogImage: "/api/og/blog/apple-intelligence-and-android-ai-building-for-the-new-platforms"
+status: "published"
+definition: "Apple Intelligence on iOS and the AICore framework on Android both let apps tap into operating system level AI without sending data off device. The platforms cover summarization, transcription, smart suggestions, and image understanding. The opportunity for developers is to ship AI features without paying API costs. The constraint is that the OS controls the capability set and the device tier. Most modern apps should support both pathways."
+faq: [
+  {"q":"What does Apple Intelligence actually give my app?","a":"A handful of system frameworks. Writing Tools for rewriting and summarization, on device transcription for voice, Genmoji for custom emoji, image understanding through Vision, and increasingly integrated foundation models accessible through specific APIs. The capability set expands with each iOS release."},
+  {"q":"What does Android's AICore framework give my app?","a":"Similar capabilities through Gemini Nano. Summarization, smart reply, on device transcription, image classification, and integration points for custom prompts. Available on Pixel devices and increasingly on flagship Android phones from other vendors."},
+  {"q":"What devices support these features?","a":"Apple Intelligence requires recent iPhones, most consistently iPhone 15 Pro and later, and iPad and Mac with Apple Silicon. AICore requires devices with sufficient Neural Processing Unit capacity, currently Pixel 8 and later plus selected Samsung and other flagship devices."},
+  {"q":"Is it worth using these instead of API based models?","a":"For supported features on supported devices, yes. The latency is better, the privacy story is stronger, and the cost is zero. The constraint is that the capability set is fixed by the platform. You cannot fine tune. You cannot replace the model. You inherit what the OS ships."},
+  {"q":"How do I handle older devices that lack these features?","a":"Detect capability at runtime and fall back. The fallback can be a simpler heuristic, a server side API call, or a feature toggle that hides the AI surface for the unsupported user."},
+  {"q":"Does Apple or Google charge for using these features?","a":"No direct charge. The inference happens on the device. Apple and Google both consider this part of the platform value, not a billable service."},
+  {"q":"What about hybrid apps?","a":"React Native and Flutter both have community plugins that wrap the native APIs. The integration is a few days for a senior mobile engineer. The platform features themselves remain native, but the app code can use them through the cross platform layer."}
+]
+---
+
+## What you actually need to know
+
+- Both platforms ship local AI at the OS level in 2026.
+- The features are free to use and respect user privacy by default.
+- Capability set is fixed by the platform. You inherit what is shipped.
+- Older devices need fallbacks. Detect capability at runtime.
+- In my experience, the apps that ship both platform native AI and a thin server side fallback get the best of both worlds.
+
+| Capability | Apple Intelligence | Android AICore |
+|---|---|---|
+| Summarization | Writing Tools | Gemini Nano text |
+| Transcription | On device SpeechKit | On device speech recognition |
+| Image understanding | Vision plus new models | ML Kit plus Gemini Nano |
+| Smart reply | System integration | System integration |
+| Custom prompts | Limited (via system frameworks) | Direct, through AICore APIs |
+
+## The core argument
+
+The arrival of operating system level AI changes the math on which AI features to build and where to run them. For three years the default assumption was that AI in a mobile app meant an API call to OpenAI or Anthropic. The features were powerful but expensive at scale and slow due to network latency. The privacy story was tenuous, because data left the device.
+
+Apple Intelligence and Android AICore change that for a meaningful subset of features. Summarization, transcription, smart suggestions, image understanding can all run locally on supported devices. The team writes against the platform framework. The inference happens on the user's phone. The cost to the team is zero. The latency is short. The privacy story is strong.
+
+The constraint is that the capability set is fixed by the platform. Apple ships Writing Tools and SpeechKit. You can use them. You cannot extend them. Google ships Gemini Nano. You can use it. You cannot fine tune it. The team that wants a custom model still needs to call an API. The team that fits the platform capabilities ships features cheaper and faster than the team that does not.
+
+The right architecture for most apps is a hybrid. Use the platform AI when it covers the use case. Use API based AI when the platform does not cover it. Detect device capability at runtime. Fall back gracefully on devices that do not support the local features. Build the abstraction once so the underlying choice can change as platforms evolve.
+
+## What works on each platform
+
+**Apple Intelligence.** Writing Tools for rewriting, summarization, proofreading. Smart Reply integration in messaging. Genmoji for custom emoji. Image Playground for image generation on supported devices. Foundation models accessible through the Foundation Models framework starting from iOS 18.
+
+**Android AICore.** Gemini Nano for text generation, summarization, and smart reply. ML Kit integration for vision and language tasks. Increasingly direct access to on device language models for custom prompts. The ecosystem is moving fast and the API surface is expanding.
+
+**Both platforms.** On device speech recognition that is usable for production transcription. Image classification at the speed of camera frames. Vision API integration for OCR and object detection.
+
+## What it actually costs
+
+| Path | Cost | Coverage |
+|---|---|---|
+| Apple Intelligence native integration | One to three weeks per feature | iPhone 15 Pro and later |
+| Android AICore integration | One to three weeks per feature | Pixel 8 and later, plus selected flagships |
+| API based AI fallback | Engineering plus API spend | All devices |
+| Hybrid with runtime selection | More engineering, lower run cost | All devices |
+
+The hybrid path costs more in engineering and pays back in lower run cost and broader coverage. For apps with significant install bases on older devices, the API based fallback remains essential for the foreseeable future.
+
+## Features to demand from the architecture
+
+- Runtime detection of platform AI capability per feature.
+- A clean abstraction at the application layer so the same feature can run platform native or API based.
+- Telemetry that distinguishes which path served each request.
+- A way to override the path per user, for testing or privacy preferences.
+- A cost dashboard for the API based path, broken down by feature.
+- A clear policy on which features must support older devices.
+
+## Expert opinion
+
+> The apps that win in 2026 are the apps that combine platform native AI for the supported users with API based AI for the rest. The teams that pick only one path either pay too much for the API or strand a meaningful share of their users on unsupported devices.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client app I worked on this year, the transcription feature uses Apple's on device SpeechKit on supported iPhones and falls back to an API call on older models and on Android. The user experiences the same feature regardless. The team's API bill is significantly lower than it would have been with a single path. Privacy conscious users specifically appreciate that their voice does not leave the device on supported phones.
+
+The opposite story is a competitor app that built every AI feature on a single API. Their cost per user is meaningfully higher than mine, their latency is consistently slower, and their privacy story is weaker. The team has been talking about switching for two quarters. The fact that they have not is because the architecture was never built to allow it.
+
+For more on the broader topic, see [AI in mobile apps on device vs API tradeoffs](/blog/ai-in-mobile-apps-on-device-vs-api-tradeoffs), [the cost of running LLMs in production](/blog/the-cost-of-running-llms-in-production-a-realistic-budget), and [building production grade AI features without an ml team](/blog/building-production-grade-ai-features-without-an-ml-team).
+
+## Common mistakes teams make
+
+1. Assuming every user has the latest device.
+2. Building only the API path, missing the cost and privacy wins of local AI.
+3. Building only the local path, leaving older devices unsupported.
+4. No runtime capability detection. The code crashes on devices that lack the framework.
+5. No telemetry on which path runs. The team cannot tune what it cannot see.
+6. Treating the platform features as static. The capability set expands with each release.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Inventory the AI features in your app. For each, check whether Apple Intelligence or AICore covers it.
+2. **Week two.** Pick one feature to migrate to the platform AI on supported devices. Build the runtime capability check.
+3. **Week three.** Ship the platform AI path behind a flag. Compare cost and user experience to the API path.
+4. **Week four.** Plan the broader rollout. Build the abstraction that lets each feature pick its path based on capability.
+
+For deeper reading, [the mobile app analytics stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026) covers the related telemetry question, and [native iOS development in 2026 SwiftUI Combine and the new stack](/blog/native-ios-development-in-2026-swiftui-combine-and-the-new-stack) covers the native platform context.

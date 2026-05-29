@@ -1,0 +1,125 @@
+---
+slug: "the-quiet-cost-of-skipping-type-safety"
+title: "The Quiet Cost of Skipping Type Safety"
+excerpt: "Type safety has a price to add and a price to skip. The price to skip is paid slowly, in bugs that are hard to trace and refactors that take twice as long as they should."
+date: "2025-09-15"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration","cost"]
+readingMinutes: 13
+ogImage: "/api/og/blog/the-quiet-cost-of-skipping-type-safety"
+status: "published"
+definition: "Skipping type safety is a decision that looks free at the start and reveals its cost over eighteen to twenty-four months. The symptoms are not dramatic. They are slow: bugs that require a debugger to trace, refactors that take three times the estimate, and engineers who spend more time reading code than writing it. I have cleaned up the aftermath of this decision enough times that I no longer see it as a style preference."
+faq: [
+  {"q":"Is adding TypeScript to an existing JavaScript codebase worth the migration effort?","a":"Yes for any codebase that is going to be maintained for more than another year. The migration effort is real, typically four to twelve weeks depending on size, but the compounding benefit starts within the first month. The team catches a class of bugs at compile time that previously only appeared in production."},
+  {"q":"What is the real cost of using JavaScript without TypeScript in a SaaS product?","a":"The cost is not visible on any single day. It accumulates in the time engineers spend verifying what shape a variable holds, in the bugs that slip through because a refactor changed a function signature and nothing caught the mismatch, and in the slower onboarding of new engineers who have to read the code to understand the data model."},
+  {"q":"Does TypeScript prevent all runtime errors in a Node.js application?","a":"No. TypeScript only covers compile-time type errors. Runtime errors from external data, network responses, and database queries are not caught by the type system unless you add runtime validation with a library like Zod. TypeScript and runtime validation are complementary, not substitutes for each other."},
+  {"q":"What is the best approach for gradually adding TypeScript to a JavaScript codebase?","a":"Start with the allow-js and checkJs flags to get partial benefits without converting files. Then convert the highest-risk modules first, the ones that handle data shapes that change frequently. Use strict mode from the beginning on converted files. Avoid adding TypeScript loosely to everything at once, it produces a type-unsafe TypeScript codebase that gives false confidence."},
+  {"q":"How do you make the business case for adding TypeScript to a project where the team is resistant?","a":"Track the time spent debugging the last ten bugs in the affected codebase. If more than half involved tracing the shape of a variable or a function argument through several layers of code, that is the case. The time number is the argument. Most resistance to type safety is aesthetic. The business case is about engineering hours."},
+  {"q":"What is the difference between TypeScript's strict mode and the default configuration?","a":"Strict mode enables several important checks that are off by default, including strict null checks, implicit any errors, and strict function types. A TypeScript codebase without strict mode catches far fewer bugs than one with it. Starting without strict and adding it later is painful. Starting with strict is much easier."},
+  {"q":"When is it acceptable to skip type safety on a new project?","a":"Prototypes and throwaway scripts where the code will not survive more than a few weeks. For any codebase expected to reach production and be maintained, skipping type safety is a decision that has to be revisited later under worse conditions. The setup cost for TypeScript on a new project is measured in hours, not weeks."}
+]
+---
+
+## What you actually need to know
+
+- The cost of skipping type safety is not a one-time payment. It is a slow tax on every hour of development.
+- Type errors that appear in production are harder to fix than type errors that appear in the editor.
+- The migration cost from JavaScript to TypeScript is front-loaded and visible. The cost of not migrating is back-loaded and invisible.
+- Strict mode matters. TypeScript without strict mode catches a fraction of what it could.
+- Runtime validation and compile-time type safety are not the same thing. You need both.
+
+| Approach | Type safety level | When bugs surface | Refactor difficulty |
+|---|---|---|---|
+| Plain JavaScript, no checks | None | Production | Very high |
+| JavaScript with JSDoc types | Low | Editor (partial) | High |
+| TypeScript without strict mode | Medium | Editor and build | Medium |
+| TypeScript with strict mode | High | Editor and build | Low |
+| TypeScript + Zod runtime validation | Very high | Editor, build, and runtime | Lowest |
+
+## The core argument
+
+The argument for skipping type safety is always speed. The team wants to move fast. Adding types feels like friction. The product is changing, the data model is not stable yet, adding types to things that will change tomorrow seems wasteful. This reasoning is coherent in week one.
+
+By month six, the reasoning has started to work against the team. The data model changed four times and none of the changes were tracked anywhere except in the code. The function that used to take a user object now takes a user ID in some callers and a full user in others, because someone changed the signature and the callers updated inconsistently. The refactor that was supposed to take two days has been sitting in a branch for a week because nobody is sure what breaks.
+
+These are not rare edge cases. They are the predictable outcome of a codebase where the type information exists only in the developer's head. Every developer who touches the code has to reconstruct that information from reading. Experienced developers do this faster. New developers do it slowly and make mistakes doing it. The cost compounds every time the team grows.
+
+The quiet part is that this cost never shows up as a line item. It shows up as slow sprints, as bugs that take longer to debug than they should, as refactors that get abandoned because the scope is unclear. The team feels the friction without being able to name it. They attribute it to complexity or code quality in general terms. Type safety would have made the cost visible and eliminated most of it.
+
+## Migrating a JavaScript codebase to TypeScript
+
+### Phase one: partial wins with allow-js and checkJs
+
+The first phase does not require converting any files. Turning on `allowJs` and `checkJs` in the TypeScript config gives the type checker permission to inspect JavaScript files. The feedback is weaker than full TypeScript, but it surfaces a real class of errors immediately, without any file conversions.
+
+This phase takes a day to set up and usually surfaces between ten and forty warnings in a medium-sized codebase. Each warning is a real bug risk. Fix them, leave the config in place, and the team has started the migration without disrupting any existing workflow.
+
+### Phase two: convert the high-risk modules
+
+Start converting files to TypeScript at the modules that carry the most risk: payment logic, authentication, data export, anything that touches the database schema. These are the modules where a type error causes a production incident. Converting them produces the highest return per hour of migration work.
+
+Use strict mode on every converted file from day one. Converting a file to TypeScript without strict mode produces a type-unsafe TypeScript file that catches very little. The benefit of strict mode is not incremental. It is most of the benefit.
+
+### Phase three: extend coverage over time
+
+After the high-risk modules are converted, extend TypeScript coverage file by file as the team touches existing code. The rule is that every file changed for any reason gets converted in the same PR. This ties the migration to the natural rhythm of feature work and avoids a separate migration project that stalls.
+
+## How long does it take
+
+| Codebase size | Migration estimate | Recommended approach |
+|---|---|---|
+| Under 10k lines | 1-3 days | Convert all at once |
+| 10k to 50k lines | 2-4 weeks | Phase by risk level |
+| 50k to 150k lines | 6-12 weeks | Phase by module, file-by-file rule |
+| Over 150k lines | 3-6 months | Long-running migration with dedicated effort |
+
+These estimates assume strict mode from the start on converted files. Adding strict mode to a partially migrated codebase retroactively is more expensive than getting it right the first time.
+
+## What to look for when evaluating type safety debt
+
+- Functions that accept an `object` or `any` parameter where a specific shape is clearly expected.
+- API response handling where the team accesses properties without checking if they exist.
+- Database queries where the result shape is assumed but not validated.
+- Props in a React codebase with no type definitions.
+- Shared utility functions with no documented parameter types.
+- Post-mortems where the root cause was "wrong shape of data passed to function."
+- New engineer onboarding that requires extensive code reading to understand data models.
+
+## Expert opinion
+
+> Type safety is not about writing less code. It is about making the code you write say what it means. When the code says what it means, the next engineer, including you in six months, can read it and trust it. When it does not, every read becomes an investigation. I have watched teams spend more time on type-related debugging than they would have spent adding types in the first place.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A two-year-old Node.js API came in for a refactor engagement. Plain JavaScript throughout, no type annotations, a mix of callbacks and promises that had been partially migrated. The team's biggest complaint was that every feature took twice as long as estimated because they never knew what shape the data was in when it arrived at any given function.
+
+We ran the two-day audit and the type-related friction showed up in every conversation. Four of the last six production incidents involved wrong data shapes. Two were caught in staging. Two were not.
+
+We converted the API's core modules to TypeScript with strict mode over three weeks. The first week alone found eleven latent bugs that had not yet manifested as incidents. One of them was in the billing calculation module. It had been there for seven months.
+
+Six weeks after the migration, the team's bug rate on the converted modules dropped by roughly sixty percent. The refactor estimates became reliable again. The onboarding time for a new engineer dropped from two weeks to four days on the core modules.
+
+For teams weighing whether the migration is worth it, [when to refactor and when to rewrite](/blog/when-to-refactor-and-when-to-rewrite) covers the broader question of when a migration investment pays off. For the test coverage that should accompany any serious type safety migration, [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad) covers the right sequencing.
+
+## Common mistakes teams make
+
+1. Converting files to TypeScript without enabling strict mode. The result is a TypeScript codebase that catches far less than it should and gives false confidence.
+2. Adding `any` types to make the migration faster. A codebase full of `any` is JavaScript with extra steps.
+3. Skipping runtime validation on external data. TypeScript does not protect you from a malformed API response or a database migration that changed a column type.
+4. Migrating all files at once in a big bang without a safety net. Large conversions on untested modules produce migration bugs that are hard to isolate.
+5. Not setting up the TypeScript config correctly before starting. The compiler options matter as much as the type annotations.
+6. Treating type safety as a separate project rather than folding it into normal feature work.
+7. Stopping at partial migration and leaving the high-risk modules in JavaScript. The modules that need types most are the ones that justify the migration.
+
+## A six-week migration plan
+
+1. **Week one.** Enable `allowJs` and `checkJs`. Fix the warnings this surfaces. Set up the TypeScript config with strict mode ready for converted files.
+2. **Week two.** Identify the five highest-risk modules using the [tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) output or a quick review of incident history.
+3. **Week three.** Convert the top two high-risk modules. Add Zod validation for their external data inputs.
+4. **Week four.** Convert the remaining three high-risk modules. Write or improve tests for the converted modules.
+5. **Week five.** Introduce the file-by-file rule: any file touched for a feature change gets converted in the same PR.
+6. **Week six.** Review coverage, update onboarding docs to reflect the new type conventions, and set a target for full conversion.
+
+The broader context for this kind of investment sits in [why TypeScript almost always pays off in SaaS](/blog/why-typescript-almost-always-pays-off-in-saas), which covers the business case in more detail.

@@ -1,0 +1,122 @@
+---
+slug: "the-threat-model-how-to-build-one-in-two-hours"
+title: "The Threat Model: How to Build One in Two Hours"
+excerpt: "A threat model does not have to be a hundred-page document. A useful one fits on a whiteboard, takes two hours to build, and changes how the team makes security decisions for months. Here is the format I use."
+date: "2025-05-29"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","compliance","ai"]
+readingMinutes: 13
+ogImage: "/api/og/blog/the-threat-model-how-to-build-one-in-two-hours"
+status: "published"
+definition: "A threat model is a structured analysis of what could go wrong with a system, who might cause it, and how likely and damaging each scenario is. The point is not to document every possible attack. The point is to surface the highest-risk areas so the team can prioritize security work against actual threats rather than generic best practices checklists."
+faq: [
+  {"q":"How do you build a threat model for a SaaS application quickly without a security background?","a":"Start with your data flows. What data does the system handle, where does it come from, where does it go, who can access it at each step. Then for each flow, ask: what is the worst thing that could happen here and who might cause it. You do not need formal security training to think through these questions. You need honest answers."},
+  {"q":"What is the STRIDE framework and is it actually useful for small teams?","a":"STRIDE stands for Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, and Elevation of Privilege. It is a checklist for thinking through threats systematically. For small teams, it is useful as a prompt list rather than a formal methodology. Go through each category for each component and ask whether the risk is relevant."},
+  {"q":"How often should a threat model be updated after the initial version?","a":"When the architecture changes significantly. When a major new feature adds a new data flow or a new trust boundary. When an incident reveals that the threat model missed something real. For most early-stage products, reviewing the threat model quarterly and updating it when the architecture changes is sufficient."},
+  {"q":"What is a trust boundary in a threat model and why does it matter?","a":"A trust boundary is the line in the system where two components with different trust levels interact. An API endpoint that receives external user input is a trust boundary. A service call that crosses from the internet to a private network is a trust boundary. Trust boundaries are where most attacks occur, because the system must decide what to accept from an untrusted source."},
+  {"q":"How do AI features change the threat model for a SaaS product?","a":"AI features add new attack surfaces. Prompt injection for LLM-based features. Training data poisoning if the model is fine-tuned on user data. Output hallucination leading to downstream decisions based on incorrect information. Privacy risks from user data being sent to a third-party model API. Each of these requires an explicit entry in the threat model."},
+  {"q":"What should a threat model output for a startup to be useful in practice?","a":"A list of the top five to ten risks ranked by likelihood times impact. An owner for each risk. A current status: accepted, mitigated, or in progress. A clear note on any risks the team has explicitly decided to accept and why. This document changes how the team prioritizes security work without requiring a full security program."},
+  {"q":"Is a data flow diagram required for a useful threat model?","a":"Not formally, but sketching the data flows is the fastest way to find the trust boundaries and the high-risk areas. A hand-drawn diagram that shows how data moves from the user through the API to the database and out to third parties takes thirty minutes to produce and makes the threat identification session much more focused."}
+]
+---
+
+## What you actually need to know
+
+- A threat model is a prioritized list of what could go wrong. It is not a certification, a compliance artifact, or a final document.
+- The most valuable output is a ranked list of the five to ten highest-risk scenarios, with owners and current mitigation status.
+- Data flows and trust boundaries are the core inputs. Everything else follows from those.
+- AI features add a new category of threats that most threat models built before 2024 do not cover.
+- In my experience, teams that have a threat model make better security tradeoff decisions. Teams without one make ad hoc decisions that are often wrong.
+
+| Approach | Time to build | Output quality | Practical usefulness |
+|---|---|---|---|
+| Informal whiteboard session, no documentation | 30 to 60 minutes | Ephemeral | Low: insights are lost quickly |
+| STRIDE applied to a data flow diagram | 2 to 4 hours | Structured list of risks | High for small and medium teams |
+| Full formal threat model with external consultant | 2 to 4 weeks | Comprehensive report | High but delayed and expensive |
+| AI-assisted threat model using a structured prompt | 1 to 2 hours | Good starting list, needs expert review | Medium: fast but requires validation |
+
+## The core argument
+
+Most small teams skip threat modeling because it sounds like something enterprise security teams do with dedicated staff and months of time. The actual practice is simpler. You sit down with the people who built the system, sketch the data flows, and spend two hours asking uncomfortable questions about what could go wrong. The output is a document that changes how the team makes security decisions.
+
+The value is not in the document itself. The value is in the shared understanding the team builds during the session. The engineer who implemented the authentication flow explains the trust boundaries out loud. The engineer who built the API gateway describes what gets validated and what gets passed through unchecked. The team hears things they did not know about each other's work. Threats become visible that would not have appeared in a code review.
+
+I have run this session for teams that had never thought formally about security and for teams with dedicated security engineers. The output format is the same. The data flow sketch, the list of threats, the ranking by likelihood and impact, the owner for each risk. The teams that found the most value were the ones running it for the first time, because the shared understanding was entirely new.
+
+The one thing that makes threat modeling fail is treating it as a compliance exercise rather than a decision-making tool. The team that builds a threat model to satisfy an auditor or a security questionnaire will produce a document that reads correctly and changes nothing. The team that builds one to answer the question "where should we spend security engineering time next quarter" will get immediate practical value.
+
+## How to run the session
+
+### Step one: Draw the data flows (30 minutes)
+
+Sketch how data moves through your system. User input arrives at the API. The API validates it and passes it to the application layer. The application layer reads and writes to the database. The database backs up to cloud storage. User data goes to a third-party email provider, an analytics platform, a payment processor. Draw each arrow. Label each component.
+
+The sketch does not need to be formal. A whiteboard photo or a rough Miro board is fine. The goal is to see every place data moves and every place it crosses a trust boundary.
+
+### Step two: Identify trust boundaries (15 minutes)
+
+On the data flow diagram, mark every place where data moves from one trust level to another. The internet to your API. Your API to a third-party service. A user-facing interface to an admin-only service. These are the trust boundaries, and they are where threats concentrate.
+
+### Step three: Apply STRIDE per boundary (45 minutes)
+
+For each trust boundary, work through the six STRIDE categories. Could an attacker spoof identity here? Could data be tampered with in transit? Could an action be repudiated because there is no log? Could information be disclosed unintentionally? Could service be denied? Could a lower-privileged actor escalate to higher privileges?
+
+Not every category applies to every boundary. The ones that do apply generate a threat entry.
+
+### Step four: Rank and assign (30 minutes)
+
+Take the list of threats and rank each by two factors: likelihood (how probable is this attack given the current threat landscape) and impact (how damaging would this attack be if it succeeded). Multiply the two for a rough priority score. Assign an owner to the top five or ten. Document the current mitigation status for each.
+
+## What it requires
+
+| Input | Source | Time to gather |
+|---|---|---|
+| Data flow diagram | Engineers who built the system | 30 to 60 minutes |
+| List of third-party services that touch user data | Engineering or platform team | 15 to 30 minutes |
+| Current authentication and authorization model | Lead engineer or security-minded engineer | 15 minutes |
+| Any previous security findings or incidents | Post mortems, bug reports, audit logs | 15 to 30 minutes |
+| Regulatory or contractual security requirements | Legal, sales, or compliance context | 15 minutes |
+
+## What a useful threat model covers
+
+- A data flow diagram with trust boundaries marked.
+- A list of threats per trust boundary, organized by STRIDE category.
+- A priority ranking for each threat based on likelihood and impact.
+- A named owner for each threat.
+- A current status: accepted, mitigated, in progress, or backlogged.
+- An explicit list of accepted risks with a one-sentence rationale for each. If the team chose not to mitigate a risk, that choice should be documented.
+- A version date and a trigger condition for the next update.
+
+## Expert opinion
+
+> The first threat model a team builds is usually incomplete. That is fine. The incompleteness is visible because the model exists. The team can see the gaps and fill them. The team that has never built a threat model has gaps they cannot see, because there is no document to find them in. An imperfect threat model is more useful than no threat model, by a significant margin.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A fintech startup came to me after a security review had flagged their authentication layer. The reviewer had identified three issues. After we built a threat model together, we found twelve. Nine of the twelve were in parts of the system the reviewer had not examined, because the reviewer had not had the full data flow picture.
+
+The threat modeling session took two and a half hours, including building the data flow diagram from scratch. The output was a prioritized list of fourteen risks. The team spent the next sprint closing the six highest-priority items. Three months later, the same reviewer came back and found no new critical issues. The threat model had changed where the team invested their security time. Without it, the team had been fixing the issues reviewers found. With it, the team was finding issues before reviewers arrived.
+
+The second story is a team that built their threat model as part of a SOC 2 preparation process. The threat model was required by their auditor. The team built it, submitted it, and filed it. Six months later, an incident occurred in a part of the system the threat model had flagged as a medium risk. The finding was there. The action item had been deprioritized. The incident would have been prevented if the team had treated the threat model output as a backlog, not a deliverable. For more on the practice that closes the loop between threat model and real-world security, see [the post mortem culture that improves security](/blog/the-post-mortem-culture-that-improves-security) and [api authentication in 2026 api keys jwts oauth mtls](/blog/api-authentication-in-2026-api-keys-jwts-oauth-mtls).
+
+## Common mistakes
+
+1. Building the threat model from memory without a data flow diagram. Memory misses components. The diagram finds them.
+2. Skipping the ranking step. A list of forty threats with no ranking produces no useful prioritization signal.
+3. No owner per threat. Unowned threats do not get mitigated.
+4. Treating accepted risks as forgotten risks. Document every accepted risk with a rationale. It forces the team to make a conscious choice rather than an accidental omission.
+5. Not updating the model when the architecture changes. A threat model built for version one is wrong for version three.
+6. Running the session without the engineers who built the system. The person who knows the trust boundaries is the person who built them.
+7. Not covering AI features. If the product has LLM integration, prompt injection and data leakage through third-party model APIs need explicit threat entries.
+
+## A two-week plan
+
+1. **Day one.** Schedule the threat modeling session. Invite the engineers who built the core components. Block two hours.
+2. **Days two and three.** Before the session, gather the inputs. Third-party service list, current auth documentation, any previous security findings.
+3. **Session day.** Build the data flow diagram, identify trust boundaries, apply STRIDE, rank the threats, assign owners.
+4. **Day after the session.** Write up the output document. Add current mitigation status for each threat. Identify the top three items that require immediate action.
+5. **Week two.** Move the top three action items into the engineering backlog as real tickets. Plan the first threat model review in ninety days.
+
+For deeper reading, [the security gap how one missing SOC 2 control kills your enterprise deal](/blog/the-security-gap-how-one-missing-soc-2-control-kills-your-enterprise-deal) covers how threat model outputs translate into compliance documentation, and [vulnerability disclosure programs why even small teams need one](/blog/vulnerability-disclosure-programs-why-even-small-teams-need-one) covers what to do when external researchers find the threats you missed.

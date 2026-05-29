@@ -1,0 +1,103 @@
+---
+slug: "authorization-patterns-rbac-abac-rebac-explained"
+title: "Authorization Patterns: RBAC, ABAC, ReBAC Explained"
+excerpt: "RBAC is the default. ABAC is what you reach for when the rules get conditional. ReBAC is what you actually want for B2B SaaS with hierarchical resources. Here is when each one earns its keep."
+date: "2026-05-19"
+category: "Security, Auth, and Compliance"
+tags: ["security","auth","rbac","abac","rebac"]
+readingMinutes: 12
+ogImage: "/api/og/blog/authorization-patterns-rbac-abac-rebac-explained"
+status: "published"
+definition: "RBAC, ABAC, and ReBAC are the three dominant authorization patterns in modern SaaS. RBAC maps users to roles to permissions. ABAC checks attributes of the user, the resource, and the request against a policy. ReBAC encodes authorization as a graph of relationships, the way Google Zanzibar models it. Each one solves a different shape of problem, and the right call depends on how your customers think about access."
+faq: [
+  {"q":"Which authorization pattern should I start with?","a":"RBAC if your product has a small number of roles and the access model is mostly user to organization. ReBAC if you have hierarchical resources like documents inside folders inside teams. ABAC for products that need conditional rules like time of day, geography, or risk score."},
+  {"q":"Can I mix patterns?","a":"Yes, and most mature SaaS does. Start with RBAC for the roles. Layer ABAC on top for conditional rules. Move to ReBAC for any resource model that has hierarchy or sharing. The risk is complexity. The reward is expressiveness."},
+  {"q":"What is the Zanzibar pattern?","a":"Google's authorization system. It models authorization as a graph of relationship tuples like user:alice is editor of document:42. The check function walks the graph to answer can alice edit document 42. Open source implementations include SpiceDB, OpenFGA, and Permify."},
+  {"q":"Is RBAC enough for B2B SaaS?","a":"For early stage yes. As soon as customers ask for shared resources, custom roles, or hierarchical access, RBAC starts to strain. Most teams hit that wall around ten enterprise customers."},
+  {"q":"What is the most common authorization bug?","a":"Insecure direct object reference. A user can access a resource they should not by changing the ID in a URL. The fix is to check authorization on every request, not just on the list view. Centralize the check in middleware."},
+  {"q":"Should I build my own authorization engine?","a":"Almost never. The math does not work past the smallest products. OpenFGA, SpiceDB, and the commercial offerings cover the cases. Build your own only if you are an authorization product."},
+  {"q":"How do I migrate from RBAC to ReBAC?","a":"Slowly. Run both systems in shadow mode for a quarter. Log discrepancies. Migrate features one at a time. The data migration is the easy part. The application logic that depends on the old role checks is the hard part."}
+]
+---
+
+## What you actually need to know
+
+- RBAC is the right default for small products with stable roles.
+- ABAC is the right answer when authorization depends on conditions.
+- ReBAC is the right answer when resources have hierarchy or sharing.
+- The patterns compose. Most mature products use a mix.
+- Centralize the authorization decision in middleware or a dedicated service. Do not scatter it.
+
+| Pattern | Strength | Weakness | Typical fit |
+|---|---|---|---|
+| RBAC | Simple, fast, easy to reason about | Inflexible at scale | Internal tools, early SaaS |
+| ABAC | Conditional rules, fine grained | Policy complexity | Regulated industries |
+| ReBAC | Hierarchical resources, sharing | Operational complexity | Documents, projects, collaboration |
+| Hybrid | Best of all three | Engineering investment | Mature B2B SaaS |
+
+## The core argument
+
+Authorization is where most B2B SaaS products show the difference between the engineer who has shipped this before and the engineer who has not. The early product has a hard coded role check at every controller. The middle product has a roles table and a permissions table and a join. The mature product has a centralized authorization service that the rest of the application calls.
+
+The pattern you reach for depends on what your customers ask for. If they ask for custom roles, you are in RBAC territory. If they ask for sharing a document with a specific user, you are in ReBAC territory. If they ask for rules that depend on time of day or risk score, you are in ABAC territory. Most mature B2B SaaS ends up with elements of all three.
+
+The cost of getting this wrong is real. I have seen products where adding a single new permission required touching forty controllers because the check was scattered. I have seen products where a misconfigured role granted superuser access to a customer admin. Both are symptoms of the same disease. The authorization decision is not centralized.
+
+The right design uses a centralized authorization service. Every request, including internal service to service calls, asks the service whether the action is allowed. The service can be a library, a dedicated process, or a managed product like OpenFGA. The interface is consistent. The check is one line at the call site. The policy lives in one place.
+
+## How much does this cost to build well
+
+| Path | Engineering | Ongoing cost | Best fit |
+|---|---|---|---|
+| RBAC in your application database | One to two weeks | Negligible | Early SaaS |
+| OpenFGA self hosted | Two to four weeks | 50 to 500 USD per month for infra | Growing SaaS with hierarchy |
+| SpiceDB self hosted | Three to six weeks | 100 to 800 USD per month | Same, more enterprise polish |
+| Permit.io or Authzed Cloud | Two to four weeks | 200 to 2000 USD per month | Teams that want a managed option |
+| Build your own | Three to six months | High maintenance | Auth products only |
+
+The numbers come from the projects I have rescued and shipped. The break even for managed products is usually around the third customer with custom authorization requirements.
+
+## Features the implementation must have
+
+- Centralized policy storage with version control.
+- An authorization API the application calls per request.
+- Caching to keep the latency under five milliseconds in the hot path.
+- A consistent answer across web, mobile, and API surfaces.
+- Audit logging of every authorization decision.
+- A clear distinction between authentication and authorization.
+- A migration path between patterns as the product evolves.
+
+## Expert opinion
+
+> RBAC works until the moment a customer asks for the seventh role. ABAC works until the moment a policy needs five conditions. ReBAC works at every scale but costs more to operate. The mature pattern is to start with RBAC, add ABAC for conditional rules, and move the hierarchical surfaces to ReBAC. The teams that pick one pattern and refuse to move are the ones that end up rewriting authorization twice.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client building a workflow platform started with RBAC. Three roles, eight permissions, hard coded in the controllers. The first enterprise customer asked for custom roles per department. The team added a roles table. The second enterprise customer asked for shared documents across departments. The team realized the RBAC model could not express it.
+
+We migrated the document surface to ReBAC using OpenFGA. The rest of the application stayed on RBAC. The dual model required care, but the boundary was clean. The shared document feature shipped in five weeks. The authorization decision moved from scattered if statements in the controllers to a single API call.
+
+The next enterprise customer asked for rules that depended on the user's geographic location. We added ABAC for that surface alone. The total authorization stack now uses all three patterns, each where it fits, with a single API the application calls.
+
+For the related read on this work, see [the permission system that scales with your B2B customers](/blog/the-permission-system-that-scales-with-your-b2b-customers) and [tenant aware authorization the mistake that leaks data](/blog/tenant-aware-authorization-the-mistake-that-leaks-data).
+
+## Common mistakes teams make
+
+1. Scattering authorization checks across controllers. Centralize.
+2. Mixing authentication and authorization in the same code path. They are different decisions.
+3. Caching the authorization decision for too long. Stale checks leak data.
+4. Hard coding role names in business logic. Use permissions, not roles.
+5. Building your own authorization engine to save money. The math fails.
+6. Ignoring the audit trail. Every authorization decision should be loggable.
+7. Treating insecure direct object references as a frontend problem. They are a backend problem.
+
+## A 30 day plan to move from scattered checks to centralized authorization
+
+1. **Week one.** Audit the current authorization logic. Find every check. Map the roles and permissions.
+2. **Week two.** Pick the pattern. RBAC if simple, OpenFGA or SpiceDB if hierarchical, ABAC layer for conditionals.
+3. **Week three.** Build the centralized check. Migrate the first two surfaces.
+4. **Week four.** Migrate the rest. Remove the scattered checks. Add the audit log.
+
+For more on the related work, read [insecure direct object references the bug founders underestimate](/blog/insecure-direct-object-references-the-bug-founders-underestimate) and [SQL injection in 2026 still happening still preventable](/blog/sql-injection-in-2026-still-happening-still-preventable). On the broader compliance side, [audit logs that pass real audits](/blog/audit-logs-that-pass-real-audits) covers the audit trail that authorization decisions feed into.

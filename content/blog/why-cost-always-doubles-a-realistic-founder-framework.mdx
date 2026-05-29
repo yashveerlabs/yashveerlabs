@@ -1,0 +1,127 @@
+---
+slug: "why-cost-always-doubles-a-realistic-founder-framework"
+title: "Why Cost Always Doubles: A Realistic Founder Framework"
+excerpt: "The initial estimate is not the final cost. It is the starting point for a number that reliably ends up higher. Here is the framework I use to help founders understand why, predict the final number more accurately, and make better budget decisions before the work starts."
+date: "2024-08-04"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing","founders"]
+readingMinutes: 13
+ogImage: "/api/og/blog/why-cost-always-doubles-a-realistic-founder-framework"
+status: "published"
+definition: "Cost always doubles because the initial estimate captures the work that is visible at the time of scoping, and every project has work that is not visible until it has started. I use a doubling multiplier as a planning baseline, adjusted down for projects with unusually complete specs and adjusted up for projects in regulated industries or with novel technical requirements."
+faq: [
+  {"q":"why do software projects almost always cost more than the original estimate","a":"Because the estimate is based on the scope that is visible at the time of scoping. Every project has a second layer of scope that only becomes visible once the work starts: the integration complexity, the compliance requirements, the architectural decisions that have to be revisited, and the features that were implied but not specified. This second layer consistently adds between fifty and one hundred percent to the original estimate."},
+  {"q":"what is a realistic contingency budget for a software development project","a":"Twenty to thirty percent for a well defined project with a complete spec. Forty to sixty percent for a project with evolving requirements or significant third party integrations. One hundred percent for a project in a regulated industry or with novel technical requirements. These are not conservative estimates. They are calibrated against real project outcomes."},
+  {"q":"how do professional project managers estimate software cost to account for overruns","a":"The most common technique is three point estimation: best case, expected case, and worst case, with the weighted average used as the working estimate. The more honest technique is to use the expected case as the floor and the worst case as the ceiling, because underestimates are more common than overestimates in software. Experience with similar projects is the most reliable calibration."},
+  {"q":"what percentage of software projects go over budget and by how much","a":"Studies on this vary but consistently show that sixty to seventy percent of software projects exceed their initial estimate. The average overrun is between fifty and one hundred percent. Projects with vague initial specs overrun by more. Projects in regulated industries overrun by more. Projects that change development teams mid project overrun by more. These are not outlier events. They are the median outcome."},
+  {"q":"how do I set a realistic budget for a custom software project from scratch","a":"Start with a detailed scope document. Get a line item estimate against the spec. Add twenty to thirty percent for a well defined project. Add integration complexity cost separately. Add compliance cost if applicable. Then run the initial estimate through the doubling check: if the final number after contingencies is more than sixty percent above the base estimate, either the project is unusually complex or the base estimate is optimistic. Both possibilities are worth investigating before signing."},
+  {"q":"what types of projects are most likely to see their costs double during development","a":"Projects with significant third party integrations. Projects in regulated industries where compliance requirements are not fully understood at scoping time. Projects that change scope frequently. Projects with first time technical teams. Projects where the technology stack is being learned during the build. Any of these factors doubles the probability of a significant cost overrun."},
+  {"q":"how do founders avoid the cost doubling trap on software projects","a":"By writing a complete spec before asking for an estimate. By treating the first estimate as a floor, not a ceiling. By using a formal change order process for every scope addition. By scheduling a technical review at month two to catch early architectural problems. By budgeting explicitly for maintenance from day one. Founders who do these things reliably come in closer to their initial budget. Founders who skip any of them reliably do not."}
+]
+---
+
+## What you actually need to know
+
+- The initial estimate is a description of the visible scope. The final cost is a description of the actual scope.
+- Every project has invisible scope that becomes visible only once work has started.
+- The reliable planning multiplier is two. Not as a sign of poor engineering. As an empirical observation.
+- The doubling happens through three channels: incomplete scope, changing requirements, and technical debt repayment.
+- In my experience, founders who plan for the double are less surprised and more effective decision makers throughout the project.
+
+| Project type | Base estimate accuracy | Typical multiplier | Primary driver of gap |
+|---|---|---|---|
+| Simple CRUD with clean spec | High | 1.2 to 1.4 | Minor discoveries |
+| SaaS with integrations | Medium | 1.5 to 2.0 | Integration complexity |
+| Multi tenant SaaS with billing | Medium | 1.8 to 2.5 | Permissions, billing edge cases |
+| Regulated industry product | Low to medium | 2.0 to 3.5 | Compliance requirements |
+| Novel technical requirements | Low | 2.5 to 4.0 | R and D overhead, rework |
+
+## The core argument
+
+I have tracked the relationship between initial estimate and final cost across a significant number of software projects. The pattern is consistent enough that I now treat the doubling multiplier as a planning baseline rather than a worst case.
+
+The initial estimate is not wrong. It is incomplete. The developer who wrote it described the work they could see at the time of scoping. The work they could not see was not in the estimate. It was in the project anyway.
+
+This is not a developer problem. It is a category problem. Software has a property that most other engineering disciplines do not: the scope of the work is partially unknowable until the work has started. You cannot know the exact complexity of a third party integration until you have read the documentation, called the API, and hit the edge cases. You cannot know the exact cost of a compliance requirement until you have read the regulation and mapped it against your architecture. You cannot know the exact complexity of a multi tenant permissions system until you have modeled the actual user roles your customers need.
+
+Every estimate is made under uncertainty. Every project has a layer of scope that the estimate did not capture. The question is not whether this layer exists. It always exists. The question is how large it is and whether the founder planned for it.
+
+The founders who plan for it are not spending more money. They are spending the same money with better information. The founders who do not plan for it spend the same money under more pressure, with more surprises, and with worse decision making as a result.
+
+## The three channels of cost growth
+
+### Channel one: incomplete initial scope
+
+The spec said three user roles. By month two, the product needed five, each with custom permissions. The spec said one payment method. By month three, the product needed three, each with different tax treatment. The spec said one third party integration. The integration turned out to require webhook handling, reconciliation logic, and a retry system that was not in the estimate.
+
+This channel accounts for roughly forty to fifty percent of cost growth in my observation. It is almost entirely preventable with a more complete initial spec. It is almost never completely preventable, because some scope is genuinely invisible until the work starts.
+
+### Channel two: changing requirements
+
+The product launched and customers wanted something different. A feature that was prioritized turned out to be less important than one that was not in scope. The competitive landscape shifted. The founder changed their mind about the core flow.
+
+Changing requirements are not a failure. They are a signal that the product is learning. The cost of changing requirements is not a punishment. It is the price of learning. The framework for managing this cost is treating every change as a formal scope adjustment with a corresponding budget adjustment, rather than an informal conversation that adds work without adding budget.
+
+### Channel three: technical debt repayment
+
+The decisions made early in a project to meet timeline or budget constraints create work that must be done later. A test suite skipped at month one adds testing overhead to every subsequent change. A database schema that was not normalized requires migration work when the product grows. An authentication system built quickly requires a security review and partial rewrite before enterprise customers will sign.
+
+This channel is the quietest. The cost accumulates silently. The invoice arrives when the product tries to do something new and cannot do it cleanly without first undoing something old.
+
+## How much does it cost
+
+| Initial honest estimate | Planning budget (with doubling reserve) | Actual common outcome | Gap if unplanned |
+|---|---|---|---|
+| 20k | 40k | 28k to 45k | 8k to 25k surprise |
+| 50k | 100k | 65k to 110k | 15k to 60k surprise |
+| 150k | 300k | 200k to 350k | 50k to 200k surprise |
+| 400k | 800k | 500k to 900k | 100k to 500k surprise |
+
+Budgeting to the doubling reserve does not mean spending to the doubling reserve. It means having the capital available and the plan for how it would be used. Most projects come in under the doubling reserve when the reserve is explicitly planned and tracked. The reserve exists to prevent the decision making under pressure that happens when the money runs out at month seven.
+
+## What a realistic budget process looks like
+
+- Start with a complete scope document, not a concept description.
+- Get a line item estimate, not a total.
+- Add the integration complexity separately. One integration is five to fifteen thousand dollars of additional work to do right.
+- Add a compliance line if applicable.
+- Apply the multiplier for the project type from the table above.
+- Assign the reserve as real budget, not theoretical contingency.
+- Define a monthly budget review process before work starts.
+
+## Expert opinion
+
+> Every founder I work with gets the doubling conversation before we start. Some of them push back. They have a tighter budget and they believe their project is the exception. I do not argue with them. I show them the distribution of outcomes from projects like theirs and let them decide. The ones who plan for the double rarely spend it all. The ones who do not plan for it almost always need it and do not have it. That gap in availability is where the real cost lives, not in the actual dollars spent.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS founder came to me with a forty five thousand dollar estimate from a previous developer and a forty eight thousand dollar budget. The scope was a multi tenant analytics product with three third party data integrations and a Stripe billing layer. I reviewed the estimate and flagged four line items that were likely underestimated: the integration error handling, the multi tenant permissions model, the billing edge cases, and the admin audit log.
+
+I estimated those four items at an additional thirty five to fifty thousand dollars on top of the original estimate. The founder did not have that capital. We trimmed the scope: two integrations instead of three, a simplified permissions model for the first version, and a deferred audit log. The revised estimate was fifty two thousand. The project came in at sixty one thousand. The overrun was eighteen percent, not eighty.
+
+The combination of a realistic planning estimate and a deliberate scope trim got the project to a successful launch. Without the honest planning conversation, the project would have run out of money at month five.
+
+For deeper context on where the cost line items actually live, see [the software cost pyramid where your money actually goes](/blog/the-software-cost-pyramid-where-your-money-actually-goes) and [why a twenty thousand dollar app sometimes costs two hundred thousand](/blog/why-a-twenty-thousand-dollar-app-sometimes-costs-two-hundred-thousand).
+
+## Common mistakes
+
+1. Treating the initial estimate as the budget. The estimate is the floor.
+2. No formal contingency. Every project has surprises. Budget for them explicitly.
+3. Not reviewing the estimate at the line item level. The gaps are in the line items.
+4. Adding scope without adjusting the budget. Every addition has a cost.
+5. No monthly budget review. By the time the surprise is visible, it is often too late to course correct cheaply.
+6. Choosing the lowest estimate without understanding what it excludes. Low estimates are almost always low because they exclude something.
+7. No plan for what happens if the budget is consumed before the product is complete. This decision should be made in advance, not under pressure.
+8. Underestimating the compliance line. Regulated industries add real cost. It does not disappear because it was not in the estimate.
+
+## A 90 day plan
+
+1. **Month one, week one.** Write a complete spec. Every feature, every integration, every user role, every compliance requirement. Have a developer review the spec for completeness before asking for an estimate.
+2. **Month one, week two and three.** Get estimates from two or three developers. Compare at the line item level. Identify the items where estimates diverge most. Those divergences are the places where scope is still unclear.
+3. **Month one, week four.** Apply the planning multiplier. Set the reserve. Get the capital committed before starting work.
+4. **Month two.** Start the build with a monthly budget review process in place. The first review at month two is the most important. Early technical decisions are cheapest to change at month two.
+5. **Month three.** Conduct a technical review. Assess whether the architectural decisions made in month one are still correct. Make changes now, not at month eight.
+
+For related reading on how to manage the cost of the project over its full life, see [app maintenance cost a five year forecast model](/blog/app-maintenance-cost-a-five-year-forecast-model) and [why cheap developers cost the most long term](/blog/why-cheap-developers-cost-the-most-long-term).

@@ -1,0 +1,62 @@
+---
+slug: "idempotency-keys-a-pattern-every-senior-engineer-should-master"
+title: "Idempotency Keys: A Pattern Every Senior Engineer Should Master"
+excerpt: "Idempotency keys are a small implementation with an outsized impact on system reliability. Here is the pattern, the edge cases, and the production pitfalls that most introductions skip."
+date: "2026-05-23"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 6
+ogImage: "/api/og/blog/idempotency-keys-a-pattern-every-senior-engineer-should-master"
+status: "published"
+definition: "An idempotency key is a client-generated identifier attached to a write request that allows the server to detect and deduplicate repeated calls to the same operation. The pattern converts a side-effectful operation from one that is unsafe to retry to one that is safe to retry, which is the difference between a payment system that occasionally double-charges and one that never does."
+faq: [
+  {"q":"How should a client generate an idempotency key?","a":"A UUID v4 generated once per intended operation, before the first request attempt. The client stores the key alongside the operation state and reuses it for all retries of the same operation. A new operation gets a new key. The key should be unpredictable to prevent collision, which UUIDs provide."},
+  {"q":"How long should the server store idempotency keys?","a":"Twenty-four hours is the practical minimum for most payment and mutation operations. Longer retention periods help with slower client recovery patterns. The right TTL depends on the maximum realistic delay between the initial request and the last possible retry."},
+  {"q":"What should the server return on a duplicate key?","a":"The same response that was returned for the first successful execution. If the original response was a 201 Created with a resource body, the duplicate response should be the same 201 with the same body. The client should not be able to distinguish a duplicate response from a fresh one."},
+  {"q":"What happens if the first request fails before completing?","a":"If the server received the request but failed mid-execution before storing the result, the same key will arrive again on retry. The server must handle this case: it should detect the in-flight or partially completed state and either complete the operation or return an appropriate error. This is the most complex edge case in idempotency implementation."},
+  {"q":"Do idempotency keys need to be globally unique or just per-endpoint unique?","a":"Per-client, per-endpoint uniqueness is sufficient for most systems. A UUID that is unique per client session is effectively globally unique in practice. Some systems scope idempotency keys per API key or per user to reduce storage requirements."}
+]
+---
+
+## What you need to know
+
+- Idempotency keys convert unsafe-to-retry operations into safe-to-retry ones. This is the design goal, and everything about the implementation should serve it.
+- The key must be generated before the first request, stored by the client, and reused for all retries. A key generated anew for each retry does not provide idempotency.
+- The server-side implementation requires a persistent store for key-to-result mappings and a TTL. In-memory caching is insufficient because server restarts lose the stored keys.
+- The partial execution edge case is the hardest part of the implementation. The server must handle the case where it received the key, began processing, failed mid-execution, and now receives the same key again.
+- Idempotency keys are a server-side implementation that requires client-side cooperation. Document the expected behavior clearly in the API reference.
+
+## The core argument
+
+The pattern that most engineers implement first is the happy path: key comes in, check the store, if absent process and store, if present return the stored result. This works for the common case. The senior engineer distinction is in handling the edge cases: the in-flight request where the server started processing but has not yet stored the result, the race condition where two requests with the same key arrive simultaneously, and the failure where the operation was stored as successful but the response was lost in transit.
+
+The in-flight case requires a two-phase commit pattern: mark the key as processing before executing the operation, mark it as completed with the result after. If a request arrives for a key that is in the processing state, the server should either wait for the first request to complete or return a 409 Conflict that tells the client the operation is in progress. The race condition case requires a database-level unique constraint on the key column, not just an application-level check, to prevent simultaneous processing under concurrent requests.
+
+The lost response case is often overlooked. The operation completed successfully and the result was stored against the key, but the response never reached the client. The client retries. The server returns the stored result. This is the intended behavior. The client must be designed to handle receiving the same response twice, which means the response body should contain enough information for the client to determine that the operation was already completed. Returning the resource ID and state in every mutation response makes this straightforward.
+
+## Common mistakes
+
+1. **Using in-memory storage for key results.** In-memory storage is lost on server restart. A server restart during a high-traffic period means all in-flight idempotency keys become orphaned and retries execute as fresh operations.
+
+2. **Not handling the partial execution case.** An implementation that checks for keys but does not handle the case where execution started and failed will process the operation twice when the same key arrives after a mid-execution failure.
+
+3. **Using timestamps as part of the key.** A timestamp-based key is not safe for retries that happen within the timestamp resolution. Use UUIDs.
+
+4. **Setting the TTL based on convenience rather than client behavior.** The TTL must be longer than the maximum realistic retry window. If clients retry for up to six hours after a network partition, a two-hour TTL is insufficient.
+
+5. **Not including idempotency key support in the API changelog.** Adding or changing idempotency key behavior is a breaking change for clients that have built around the previous behavior. Document it and version it appropriately.
+
+## Where to start
+
+1. **Implement the database schema first.** A table with key, status, result, created_at, and expires_at. Add a unique constraint on key. This schema serves the full pattern including the partial execution case.
+
+2. **Write the middleware that handles the key check.** Before the handler executes: check for existing key. If found and completed, return stored result. If found and processing, return 409. If absent, mark as processing and continue.
+
+3. **Write the handler completion logic.** After the handler executes successfully: update the key status to completed and store the response body. Run this in a transaction with the primary operation.
+
+## Related reading
+
+- [Idempotency in API Design: Why It Matters More Than You Think](/blog/idempotency-in-api-design-why-it-matters-more-than-you-think)
+- [Building APIs That Survive Five Years of Customer Change Requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests)
+- [SaaS Webhook Reliability: From At-Most-Once to At-Least-Once to Exactly-Once](/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)

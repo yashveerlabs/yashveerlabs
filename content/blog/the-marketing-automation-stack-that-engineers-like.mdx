@@ -1,0 +1,136 @@
+---
+slug: "the-marketing-automation-stack-that-engineers-like"
+title: "The Marketing Automation Stack That Engineers Like"
+excerpt: "The marketing automation tools that work with code, not against it: event-based triggers, API-first design, and no drag-and-drop required."
+date: "2026-04-11"
+category: "Business Automation and Ops"
+tags: ["automation","operations","marketing","email","analytics"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-marketing-automation-stack-that-engineers-like"
+status: "published"
+definition: "The marketing automation stack that engineers like is one where behavior is triggered by events, configuration is done in code or structured data rather than drag-and-drop GUIs, the data model is transparent, and the system integrates cleanly with the application via webhooks or a well-documented API. The stacks that engineers dislike are the ones that treat the application as a data source for a separate marketing system that the engineering team cannot reason about, debug, or control from the codebase."
+faq: [
+  {"q":"What is the most engineer-friendly email marketing tool for a SaaS product?","a":"Resend with React Email for transactional email, plus a lightweight behavior-based email tool like Loops or Customer.io for marketing sequences. The combination covers both: Resend handles triggered emails that require application-level data (subscription confirmed, invoice sent, usage milestone reached), while Loops or Customer.io handles multi-step nurture sequences triggered by user behavior events. Both have clean APIs and do not require visual builders for basic use cases."},
+  {"q":"How do I trigger marketing automation from application events?","a":"The pattern: emit user behavior events from the application to an analytics or CDP (Customer Data Platform) tool, then configure the marketing automation tool to trigger sequences based on those events. Segment is the most common CDP for this use case -- it receives events from the application and fans them out to marketing tools (Mailchimp, Customer.io, Intercom) without requiring direct integration between the application and each marketing tool. The alternative is direct API calls from the application to each marketing tool, which creates tight coupling and maintenance overhead."},
+  {"q":"What analytics tools do engineers prefer for marketing attribution?","a":"PostHog for product analytics (open source, self-hostable, feature flags included), Plausible for website analytics (privacy-first, no consent banner required, clean dashboard), and whatever the marketing team requires for paid advertising attribution. The engineering preference is for tools that are event-based (not page-view based), have a real API, and do not require injecting large tracking scripts. PostHog's JavaScript snippet is under 20kb; Google Analytics 4 requires significantly more setup for meaningful event tracking."},
+  {"q":"How should engineers think about the marketing automation data model?","a":"The core entities are users (identified by email or user ID), events (actions users take: signed up, started trial, created project, invited team member), and properties (attributes of the user: plan, company size, signup date). The marketing automation system reads this data to decide what sequence to trigger and when. Engineers should think about which events are meaningful for marketing (not every database write, but the high-level business events) and emit those explicitly, rather than trying to reconstruct them from raw database activity."},
+  {"q":"What is the right way to handle email unsubscribes in a technical implementation?","a":"Email unsubscribes must be managed at the email service provider level, not in the application database alone. When a user unsubscribes from a marketing email, the ESP records the unsubscribe and suppresses future sends. The application should also record the unsubscribe preference and check it before triggering any email sends. Failing to check ESP-level suppression lists is a CAN-SPAM and GDPR compliance risk -- a user who has unsubscribed and continues to receive email is a potential regulatory problem."}
+]
+---
+
+## What you actually need to know
+
+- Marketing automation tools that engineers like are event-based, API-first, and do not require visual builders for standard use cases.
+- Segment or a similar CDP as the event bus prevents direct integration between the application and every marketing tool. One integration (application to Segment) fans out to all downstream tools.
+- Resend handles transactional email well. Customer.io or Loops handles behavioral sequences well. These are different use cases and should not be collapsed into one tool.
+- PostHog for product analytics is the best tool for engineering teams: open source, feature flags included, event-based, and deployable on your own infrastructure.
+- The event schema matters. Define business-level events (user_signed_up, trial_started, first_project_created) explicitly rather than trying to reconstruct them from lower-level database events.
+
+| Layer | Engineer-Friendly Tool | Less Friendly Alternative | Key Advantage |
+|---|---|---|---|
+| Transactional email | Resend | SendGrid | React templates, simple API |
+| Behavioral email sequences | Customer.io / Loops | HubSpot Marketing Hub | Event-based triggers, clean API |
+| Product analytics | PostHog | Mixpanel | Open source, feature flags included |
+| Website analytics | Plausible | Google Analytics 4 | Privacy-first, no consent banner |
+| CDP / event bus | Segment | Manual integration | One integration, many outputs |
+| CRM sync | HubSpot (API) | Salesforce | REST API, reasonable docs |
+
+## The core argument
+
+Marketing automation tools are designed for marketers, not engineers. The visual workflow builders, the drag-and-drop email editors, and the dashboard-centric configuration model are designed to give non-technical users control. The side effect is that engineers who work with these tools cannot reason about them from the codebase -- the automation logic is in a GUI, not in version-controlled configuration, and debugging why an email triggered (or did not trigger) requires logging into a separate dashboard.
+
+The stack I describe here is built around a different principle: marketing behavior is configured as data and triggered by events, in a way that an engineer can understand, version-control, and debug from a terminal. The email template is a React component. The trigger condition is an event name and a property filter. The sequence timing is a JSON configuration. None of it requires a GUI to understand or modify.
+
+This is not anti-marketer. The marketing team can use the dashboards provided by these tools to view campaign performance, manage contacts, and adjust copy without touching code. The difference is that the engineering team can understand and control the trigger logic, the data model, and the integration points -- which are engineering concerns regardless of what tool is used.
+
+## The event-based foundation
+
+Everything in a good marketing automation stack starts with events. An event is a named action that a user takes: `user_signed_up`, `trial_started`, `first_project_created`, `plan_upgraded`, `churned`. Each event has properties: the user identifier, the timestamp, and the attributes relevant to that event.
+
+The application emits these events at the point where the action occurs. For a Next.js application using Supabase, this typically means a server-side event call after the relevant database write:
+
+```typescript
+// After creating a new user
+await analytics.track({
+  userId: user.id,
+  event: 'user_signed_up',
+  properties: {
+    email: user.email,
+    plan: 'trial',
+    signup_method: 'google_oauth',
+    referral_source: params.ref ?? 'direct',
+  }
+});
+```
+
+This event goes to Segment (or directly to PostHog if you are keeping the stack smaller), which fans it out to the configured downstream tools: Customer.io receives it to trigger the onboarding sequence, PostHog receives it for product analytics, HubSpot receives it to create a contact.
+
+The application emits the event once. Each marketing tool receives its copy. No direct integrations, no per-tool API calls scattered through the codebase.
+
+## The email layer
+
+**Transactional email with Resend.** Emails triggered by application events -- welcome emails, invoice notifications, password resets, usage alerts -- belong in Resend. The React Email templates are regular `.tsx` files:
+
+```tsx
+// emails/trial-started.tsx
+export function TrialStartedEmail({ name, trialEndDate }: Props) {
+  return (
+    <Html>
+      <Body>
+        <Heading>Your trial has started, {name}.</Heading>
+        <Text>
+          You have access to all features until {trialEndDate}.
+          Here is what to do first.
+        </Text>
+      </Body>
+    </Html>
+  );
+}
+```
+
+These templates are tested with `email-preview` in development, versioned in the repository, and sent from Resend's API with a single function call. The email that the user receives matches exactly what the template produces -- no WYSIWYG editor surprises.
+
+**Behavioral sequences with Customer.io or Loops.** Multi-step sequences -- onboarding drips, trial expiry reminders, win-back campaigns -- belong in a tool designed for sequence management. Customer.io is the more powerful option with better API support; Loops is simpler and designed specifically for SaaS products. Both are configured with events as triggers rather than time delays or manual segments.
+
+## The analytics layer
+
+PostHog is the product analytics tool I default to for engineering teams because it is open source, self-hostable, and ships with feature flags at no additional cost. The event-based model matches the application's event model: the same `user_signed_up` event that goes to Segment and Customer.io goes to PostHog for funnel analysis.
+
+The feature flag integration is the part that separates PostHog from Mixpanel for engineering teams. Feature flags in PostHog can be used in both the application code (to gate features to specific user segments) and in analytics queries (to compare user behavior across flag variants). Running a feature flag experiment that measures its impact on the conversion funnel without switching between three different tools is a significant workflow improvement.
+
+Plausible handles website-level analytics -- page views, referral sources, conversion events from the marketing site. It is privacy-first (no cookies, no consent banner required in most jurisdictions), the dashboard is clean, and the integration is a single script tag. It does not replace PostHog for product analytics; it handles the marketing site layer that PostHog is not designed for.
+
+## The integration model
+
+The integration model that engineers find maintainable is the hub-and-spoke pattern: one event bus (Segment or PostHog) receives all application events, and downstream marketing tools subscribe to the events they need. Adding a new marketing tool means adding a new destination in Segment's dashboard, not writing new integration code in the application.
+
+The alternative -- direct API calls from the application to each marketing tool -- creates tight coupling that accumulates over time. The application that directly calls HubSpot, Mailchimp, Customer.io, and Mixpanel from the same event handler has four points of failure, four API keys to manage, and four rate limits to respect. When one of these tools changes its API or pricing, the engineering team has to find and update every call site.
+
+The hub-and-spoke model reduces this to one integration point in the application and four configuration entries in the event bus tool. API key management, rate limiting, and retry logic are handled by the event bus, not by application code.
+
+## Common mistakes engineers make with marketing automation
+
+1. Emitting too many events with too little structure. Every database write is not an event. Business events are the high-level actions that represent user intent: signed up, started trial, created first project, invited team member. Low-level technical events (database row created, API call made) are noise that makes the marketing automation data model impossible to reason about.
+2. Hardcoding email templates in the application. Email templates that live in the application codebase require a deployment to change. Email templates in Resend (with React Email) are versioned in the repository and deployed with the application -- which is correct. Email templates in a marketing tool's visual editor are changed by the marketing team without engineering involvement -- which is also correct. The wrong approach is email content as string literals in the application code.
+3. Not tracking email unsubscribes in the application database. The ESP suppression list is the authoritative source for unsubscribe status, but the application should also record it. An application that does not know which users have unsubscribed cannot make good decisions about whether to trigger email sends.
+4. Using the same tool for transactional and marketing email. Transactional email (receipts, confirmations, alerts) should have 100 percent delivery rate and minimal interference from marketing unsubscribes. Marketing email should be unsubscribable and deliverability-optimized separately. Mixing them in the same sending domain and list management creates deliverability problems for transactional email when marketing campaigns generate unsubscribes.
+5. Not testing behavioral triggers in staging. An onboarding sequence that fires incorrectly in production -- too many emails, wrong timing, wrong user segment -- is a user-trust problem. The staging environment should have the same event triggers configured and tested before production deployment.
+
+## Where to start: a 3-step marketing automation setup
+
+**Step 1: Define the five most important user events and emit them from the application.** `user_signed_up`, `trial_started`, `first_core_action_completed`, `plan_upgraded`, `churned` are the baseline for most SaaS products. Emit these to Segment or directly to PostHog before configuring any marketing automation.
+
+**Step 2: Set up the onboarding sequence in Customer.io or Loops, triggered by `trial_started`.** The onboarding sequence is the highest-value automation for most SaaS products. A 3-5 email sequence triggered by trial start and gated on whether the user has completed the first core action covers the most important engagement period.
+
+**Step 3: Connect PostHog to the event stream and verify funnel visibility.** The signup-to-activation funnel (signed up, completed onboarding, invited team member, upgraded) should be visible in PostHog before launching the marketing automation. The funnel data identifies where users drop off and which automation is most likely to improve conversion.
+
+## The Stack That Marketing and Engineering Can Both Work In
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The marketing automation stack for Expert Tutorials uses exactly this architecture: Resend for transactional email, Loops for behavioral sequences, PostHog for product analytics, and Plausible for site analytics. The engineering team owns the event schema and the application integrations. The marketing team owns the sequence configuration and the campaign copy. Neither team is blocked by the other, and the event data is visible to both. That division of responsibility is the thing that makes marketing automation work long-term -- not any specific tool, but the model where each layer is owned by the team with the relevant expertise.
+
+## Related reading
+
+- [The Internal Notification System for Founders](/blog/the-internal-notification-system-for-founders)
+- The Business Automation Stack for a Solo Operator
+- [The Founder Inbox Triage System](/blog/the-founder-inbox-triage-system)
+- [The Modern Email Builder for SaaS Products](/blog/the-modern-email-builder-for-saas-products)

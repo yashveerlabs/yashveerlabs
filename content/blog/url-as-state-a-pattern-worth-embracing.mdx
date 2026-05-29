@@ -1,0 +1,118 @@
+---
+slug: "url-as-state-a-pattern-worth-embracing"
+title: "URL As State: A Pattern Worth Embracing"
+excerpt: "Working notes on url as state: a pattern worth embracing. Written for founders, engineers, and operators who want a clear read on web app and frontend development from someone who has shipped the work."
+date: "2025-11-25"
+category: "Web App and Frontend Development"
+tags: ["frontend","nextjs","react"]
+readingMinutes: 11
+ogImage: "/api/og/blog/url-as-state-a-pattern-worth-embracing"
+status: "published"
+definition: "The URL is the oldest and most underused state management tool in web development. When filter values, pagination, sort order, and active tabs live in the URL instead of a component or a store, pages become shareable, bookmarkable, and resilient to refresh. Most teams discover this pattern late and spend effort retrofitting it. The teams that start with it build better products faster."
+faq: [
+  {"q":"What is URL state management and when should I use it for a React app?","a":"URL state means storing UI values like filters, pagination, search terms, and active tabs in URL query parameters rather than in component state or a global store. Use it whenever the state affects what the user sees in a way they might want to share, bookmark, or return to. If a user would expect the page to look the same after pasting the URL somewhere, that state belongs in the URL."},
+  {"q":"How do I sync URL parameters with React state in a Next.js App Router application?","a":"Use the useSearchParams hook to read query parameters and the useRouter hook with router.push or router.replace to write them. For a clean abstraction, write a custom hook that wraps both and handles serialization. The replace method is better than push for filter changes because it avoids polluting the browser history."},
+  {"q":"What is the difference between push and replace when updating URL state in Next.js?","a":"router.push adds a new entry to the browser history stack. router.replace updates the current entry without adding a new one. For filter and sort changes, replace is almost always correct. The user does not expect to press the back button and see the previous filter value. They expect back to take them to the previous page."},
+  {"q":"Can URL state replace a global state management library for filters and pagination?","a":"For filter and pagination state specifically, yes. You do not need Zustand, Redux, or Context to store the current page number and selected filters. URL params hold that data, survive refresh, and are shareable. The remaining client state library can shrink to UI-only state like modal open and sidebar collapsed."},
+  {"q":"What are the downsides of storing state in the URL?","a":"The URL has a length limit, though it is rarely hit in practice. Complex nested state structures serialize awkwardly. Sensitive data like tokens or user IDs should never go in the URL. State that updates extremely frequently, like a real-time cursor position, is not a good fit. For everything else, the URL is usually the right choice."},
+  {"q":"How do I handle default values when reading URL state in React?","a":"Provide defaults when reading the param. If the param is absent, use the default. A clean pattern is a custom hook that reads a specific param and returns a typed value with a fallback. This makes it easy to add new URL params without changing component logic, and it handles the common case where a user lands on the page without any params set."},
+  {"q":"How does URL state work with server-side rendering in Next.js?","a":"In App Router, search params are available to Server Components via the searchParams prop on page components. This means filters and pagination can be read on the server, used to fetch the right data, and rendered without a client-side hydration step. It is one of the strongest arguments for keeping filter state in the URL rather than in client-side React state."}
+]
+---
+
+## What you actually need to know
+
+- The URL is a global state store. It has been available since the web began. Most teams underuse it.
+- Filters, pagination, sort order, active tab, and search query all belong in the URL.
+- State in the URL survives refresh, can be shared, can be bookmarked, and works with the browser back button correctly.
+- In Next.js App Router, URL params are readable on the server, which means they can drive data fetching without a client-side round trip.
+- In my experience, teams that skip URL state spend months retrofitting it after users complain about non-shareable pages.
+
+| State type | In URL | In component state | In global store |
+|---|---|---|---|
+| Filters and search query | Best fit | Resets on refresh, not shareable | Overcomplicated |
+| Pagination and page size | Best fit | Resets on refresh | Overcomplicated |
+| Active tab or view mode | Good fit | Works but limits linking | Overkill |
+| Modal open/closed | Poor fit | Good fit | Acceptable |
+| Form values mid-entry | Poor fit | Good fit | Rarely needed |
+| High-frequency cursor or slider | Poor fit | Good fit | Sometimes needed |
+
+## The core argument
+
+A user filters a table by status, sorts by date, and navigates to page three. They copy the URL and send it to a colleague. The colleague pastes it and sees the same table, same filters, same sort, same page. That is the product working correctly.
+
+In most apps, it does not work that way. The filters live in React state. They reset on refresh. The URL says nothing about what the user is looking at. The colleague opens the link and sees the default view.
+
+This is a product problem, not just a technical one. Filters that live in state create workflows that cannot be shared or reproduced. Support teams cannot reproduce the state a user was in when a bug occurred. Power users cannot bookmark their preferred configuration. Analytics cannot distinguish between users who filtered for different values.
+
+The fix is straightforward. Move filter state into URL query parameters. The URL becomes the source of truth. The component reads from the URL, renders accordingly, and writes back to the URL when the user changes a filter. Server Components in the App Router can read the same params server-side and use them to fetch the correct data without a hydration round trip.
+
+The resistance I hear most often is that it is more complex than useState. It is more code. For filters and pagination, the extra code is worth writing once and maintaining forever. For ephemeral state like modal open or keyboard focus, useState is still the right choice. The discipline is knowing which category you are in.
+
+## How to implement it in Next.js
+
+### Reading URL params
+
+In App Router, a Server Component's page function receives searchParams as a prop. In a Client Component, useSearchParams from next/navigation reads the current params. The pattern is identical to reading any other piece of state: read the value, provide a default if it is absent, use the value to drive rendering or data fetching.
+
+### Writing URL params
+
+Build a new URLSearchParams from the current params, set the changed value, and call router.replace with the new URL string. Use replace rather than push for filter changes. The user does not want the browser history full of individual filter changes.
+
+A custom hook wrapping this logic pays for itself quickly. The hook accepts the param name, a default value, and a serializer and deserializer for typed values. Every filter component uses the hook and the rest is handled centrally.
+
+### Multiple filters and serialization
+
+The URL handles multiple params cleanly. statusFilter=active and sortBy=date and page=3 are independent params that compose naturally. For array values, use repeated params: tag=react and tag=nextjs. For complex objects, consider a serialized format, though this rarely comes up for real filter states.
+
+## What it actually requires
+
+| Implementation step | Effort | Notes |
+|---|---|---|
+| Moving one filter to URL params | A few hours | Good starting point, proves the pattern |
+| Building a shared useUrlParam hook | Half a day | Pays for itself on the second filter |
+| Updating pagination to use URL params | A few hours | URL pagination is simpler than it looks |
+| Server Component integration for SSR | Half a day | Biggest win for App Router apps |
+| Updating tests to accept URL params as input | Half a day | Test filters by setting URL params, not component state |
+
+## Features to look for in a URL state pattern
+
+- A typed abstraction. Raw strings in the URL; typed values inside components. Conversion happens in one place.
+- Sensible defaults. If a param is absent, the app shows the right default state, not an error.
+- Replace over push for filter changes. History stays clean.
+- Server Component compatibility. The pattern should work for SSR data fetching, not just client rendering.
+- Test-friendly. Tests set URL params rather than manipulating component state directly. This makes filter behavior easier to test and more representative of real use.
+- A clear policy on what goes in the URL and what stays in component state. Written down, shared with the team.
+
+## Expert opinion
+
+> Most teams discover URL state management too late. They build a feature, a user asks for sharing, they discover the filters are in useState, and they spend a sprint retrofitting it. Starting with URL state for anything the user might want to share or reproduce costs almost nothing extra up front and eliminates a category of complaint entirely. The default should be URL first, component state only when the URL is not appropriate.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+On a data exploration tool with about a dozen filter dimensions, the original implementation stored all filters in a Zustand store. The product worked. But when the user refreshed the page, the filters reset. Customer success teams could not reproduce what users reported. Power users emailed each other filter configurations in plain text, which they then had to re-enter manually.
+
+Migrating to URL state took two sprints. The custom hook was written in day one. Each filter component was updated to use the hook over the next week. The Zustand store shrank by about sixty percent. The product team immediately noticed that support tickets describing filter-related bugs dropped, because support could now send users a link that reproduced the exact state.
+
+For the broader state management architecture that URL state fits into, [the state management question in 2026](/blog/the-state-management-question-in-2026) covers where URL state sits relative to other tools, and [the frontend architecture that survives three years of feature sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl) covers how these patterns age over time.
+
+## Common mistakes teams make
+
+1. Using router.push instead of router.replace for filter changes. The browser history fills with intermediate states.
+2. Storing sensitive data in the URL. Tokens, IDs that reveal business information, and user-specific data do not belong there.
+3. No default values when a param is absent. The page breaks for users who land without params.
+4. Trying to serialize deeply nested objects into URL params. The result is unreadable URLs and parsing nightmares. Flatten the state first.
+5. Not updating tests. Tests that set component state directly need to be rewritten to set URL params.
+6. Applying URL state to ephemeral UI like modals and tooltips. These do not benefit and the URLs become noisy.
+7. Not integrating URL state with Server Components when running App Router. The server-side data fetch should use the same params to avoid a double render.
+
+## A 14 day plan
+
+1. **Day one to two.** Audit the app for filter, sort, pagination, and tab state that lives in component state or a store. Make a list. Pick the one with the most user impact for a pilot.
+2. **Day three to five.** Write the shared useUrlParam hook. Port the pilot filter to use it. Confirm the URL updates on change, the state survives refresh, and the back button works correctly.
+3. **Day six to nine.** Port the remaining filters on the same page to the hook. Add server-side reading of the params if the page uses Server Components.
+4. **Day ten to fourteen.** Update tests. Document the pattern and the policy for when URL state is appropriate. Apply the same pattern to pagination.
+
+For deeper reading, [routing patterns that survive real world use](/blog/routing-patterns-that-survive-real-world-use) covers how URL design connects to a broader routing discipline, and [app router vs pages router the migration decision](/blog/app-router-vs-pages-router-the-migration-decision) covers how the choice of Next.js router affects the implementation of this pattern.

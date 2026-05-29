@@ -1,0 +1,138 @@
+---
+slug: "the-garbage-collection-tax-a-backend-story"
+title: "The Garbage Collection Tax: A Backend Story"
+excerpt: "How garbage collection pressure creates latency spikes in Node.js and JVM services -- and the profiling and architectural changes that reduce the tax."
+date: "2025-07-02"
+category: "Performance Optimization"
+tags: ["performance","backend","nodejs","optimization","latency"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-garbage-collection-tax-a-backend-story"
+status: "published"
+definition: "Garbage collection tax is the latency added to request processing when the runtime's garbage collector pauses execution to reclaim memory. In Node.js and JVM-based services, GC pauses are the most common source of latency spikes that are not explained by slow database queries or external API calls. The tax is paid on every GC cycle but is invisible in average latency metrics -- it shows up as p99 and p999 latency outliers that are much higher than p50."
+faq: [
+  {"q":"How do garbage collection pauses affect API latency?","a":"GC pauses stop execution of all application code for their duration. In Node.js, a major GC pause (stop-the-world collection of the old generation) can take 100-500ms. Any requests being processed during the pause experience that entire duration as latency added to their response time. The effect is invisible in p50 latency metrics (most requests complete before a GC fires) but highly visible in p99 and p999 metrics where it shows as latency spikes."},
+  {"q":"How do I tell if GC is causing my latency spikes?","a":"Instrument the GC directly. In Node.js, the `--trace-gc` flag logs GC events to stdout; the `perf_hooks` module provides programmatic GC timing. In Java, `-Xloggc:gc.log -XX:+PrintGCDetails` produces a GC log. If the timing of GC events correlates with the timing of latency spikes, GC is the cause. A correlation coefficient above 0.7 between GC frequency and p99 latency is strong evidence."},
+  {"q":"What causes high GC pressure?","a":"Allocation rate is the primary driver. Code that allocates many short-lived objects puts pressure on the young generation (minor GC) and promotes objects to the old generation if they survive. In Node.js, common sources of high allocation rate: creating many small objects inside loops, building large strings by concatenation rather than array join, deserializing large JSON payloads that are then discarded, and maintaining large in-memory caches that fragment the heap."},
+  {"q":"What is the object pooling pattern and how does it reduce GC pressure?","a":"Object pooling pre-allocates a fixed number of objects (request contexts, buffers, connection objects) and reuses them rather than creating and discarding them on each request. The pool reduces the allocation rate by reusing objects rather than creating new ones, which reduces the amount of work the GC must do. The tradeoff is added complexity in the pool management code and the risk of state leakage between reuses if objects are not properly reset."},
+  {"q":"Is GC tuning usually worth the effort?","a":"Rarely as a first step. The highest-return GC optimizations are architectural: reduce the allocation rate by eliminating unnecessary object creation, reduce object size by using more memory-efficient data structures, and reduce the promotion rate by shortening object lifetimes. GC tuning (adjusting heap sizes, collector settings, generation ratios) is valuable when architectural changes are not possible or have been exhausted."}
+]
+---
+
+## What you actually need to know
+
+- GC pauses cause latency spikes that are invisible in p50 metrics and obvious in p99 and p999 metrics. If your p99 latency is significantly higher than your p50, GC may be the cause.
+- Allocation rate is the primary driver of GC pressure. Code that allocates fewer short-lived objects has lower GC pressure. This is the highest-return optimization.
+- Instrument GC before optimizing. The timing correlation between GC events and latency spikes is the evidence that GC is the bottleneck.
+- Object pooling, streaming, and reducing unnecessary object creation are the architectural patterns that reduce GC pressure effectively.
+- GC tuning (heap sizes, generation ratios) is a last resort. Architectural changes to allocation rate are almost always higher return.
+
+| Optimization | Allocation Rate Impact | Complexity | Return on Investment |
+|---|---|---|---|
+| Reduce JSON parsing (streaming) | High reduction | Medium | Very high |
+| Object pooling for hot path objects | Medium reduction | Medium-high | High |
+| Use Buffers instead of strings for binary | Medium reduction | Low | High |
+| Reduce array creation in loops | Low-medium reduction | Low | Medium |
+| GC tuning (heap/generation sizes) | None (scheduling only) | Medium | Low-medium |
+
+## The core argument
+
+The p99 latency number is the latency that most requests are below -- the 99th percentile. In a service that processes 1,000 requests per second, the p99 is the latency that the 990 fastest requests are faster than and the 10 slowest are slower than. For most services, p50 latency (the median) and p99 latency are correlated: a service with 20ms median latency typically has 60-80ms p99 latency.
+
+The service with a GC problem does not follow this pattern. It has a p50 latency of 20ms and a p99 latency of 400ms. The discrepancy is the GC signature: most requests complete quickly, but the requests that happen to arrive while the GC is running experience the full GC pause duration added to their response time.
+
+This pattern is specific and diagnostic. When you see a p99 that is 5-20x the p50, and the p99 spikes are periodic (not correlated with traffic spikes or external API latency), GC is the likely cause. The confirmation is the correlation between GC event timing and the latency spike timing.
+
+I diagnosed this pattern on a Node.js service that had a median latency of 18ms and a p99 of 380ms. The service was processing customer data export requests that each deserialized a large JSON payload, transformed it, and serialized the result. The transformation created hundreds of intermediate objects per request. Under normal load, the GC was running every 3-4 seconds with a 200-300ms pause. Any request that arrived in the 200ms window of a GC pause experienced that pause as added latency.
+
+## The Node.js GC model
+
+Node.js (V8 engine) uses a generational garbage collector. New objects are allocated in the young generation (new space), which is collected frequently and quickly. Objects that survive one or more young generation collections are promoted to the old generation, which is collected less frequently but with longer pauses.
+
+The young generation collector (Scavenger) runs in a few milliseconds and is rarely the source of significant latency spikes. The old generation collector includes both incremental collection (done in small steps alongside application code) and major GC cycles (stop-the-world collection). The major GC cycles are the source of the 100-500ms pauses that cause p99 latency spikes.
+
+The size of the heap at the time of a major GC affects the duration of the pause. A service with a 2GB old generation heap has longer major GC pauses than a service with a 500MB old generation heap. Reducing heap size by reducing the number of long-lived objects is the most direct way to reduce major GC pause duration.
+
+The promotion rate -- the rate at which objects move from the young generation to the old generation -- is the key metric. High promotion rate means the old generation grows quickly, which means major GC runs more frequently, which means more latency spikes. Objects are promoted when they survive a young generation collection; objects that die quickly are collected cheaply in the young generation without promotion.
+
+## Profiling and measuring GC
+
+The first step before any optimization is measurement. V8's GC can be instrumented through the `--trace-gc` flag or programmatically through the `perf_hooks` module:
+
+```javascript
+const { PerformanceObserver } = require('perf_hooks');
+
+const obs = new PerformanceObserver((list) => {
+  const entry = list.getEntries()[0];
+  if (entry.duration > 50) {  // Log GC events over 50ms
+    console.log(`GC: ${entry.detail.kind}, duration: ${entry.duration}ms`);
+  }
+});
+obs.observe({ entryTypes: ['gc'] });
+```
+
+Correlating this log with the p99 latency time series from the application's metrics confirms whether GC is the source of the latency spikes. If GC events of 200ms duration appear at the same timestamps as p99 latency spikes of 200ms, the evidence is conclusive.
+
+## Reducing allocation rate: the architectural changes
+
+**Stream large payloads instead of parsing them fully.** The most common source of high allocation rate in Node.js services is deserializing large JSON payloads into memory, processing them, and serializing the result. A 10MB JSON payload deserialized to a JavaScript object is 10MB or more of heap allocation. Streaming the JSON (parsing it incrementally with a streaming JSON parser like `jsonstream` or `clarinet`) reduces peak heap usage and allocation rate.
+
+**Reuse buffers for binary operations.** Operations that involve Buffer allocation (reading files, handling multipart form data, processing binary data) can reuse a fixed-size buffer pool rather than allocating new buffers for each operation. The `Buffer.allocUnsafe(size)` API allocates from pre-allocated memory, which is faster than `Buffer.alloc(size)` but requires careful management.
+
+**Reduce intermediate object creation in transformation code.** A transformation pipeline that creates intermediate objects at each step (map, filter, reduce with an intermediate array) can often be rewritten as a single-pass transformation that creates only the output object. This is not always possible or worthwhile, but in the hot path -- the code that runs for every request -- reducing intermediate allocations has measurable GC impact.
+
+**Implement an object pool for hot path objects.** Request context objects, connection objects, and other objects that are created and discarded on every request are candidates for pooling. A simple pool allocates a fixed number of these objects at startup and returns them to the pool rather than discarding them:
+
+```javascript
+class RequestContextPool {
+  constructor(size) {
+    this.pool = Array.from({ length: size }, () => new RequestContext());
+    this.available = [...this.pool];
+  }
+  
+  acquire() {
+    return this.available.pop() || new RequestContext();
+  }
+  
+  release(ctx) {
+    ctx.reset();
+    if (this.available.length < this.pool.length) {
+      this.available.push(ctx);
+    }
+  }
+}
+```
+
+## The JVM context
+
+Java and Kotlin services have a similar GC tax but with more tuning options. The G1GC collector (default since Java 9) is designed to limit pause times; the ZGC and Shenandoah collectors (available from Java 11+) aim for sub-millisecond pause times at the cost of slightly higher CPU usage.
+
+For JVM services where GC pauses are a known problem, the ZGC collector is worth evaluating. The command-line flag is `-XX:+UseZGC`. ZGC uses concurrent collection that runs alongside application threads, producing much shorter stop-the-world pauses than G1GC's full collections.
+
+The architectural principles for reducing GC pressure in JVM services are the same as for Node.js: reduce allocation rate, reduce object lifetimes, and avoid large long-lived objects in the heap. Value types (Java 16+ records for simple cases) reduce heap overhead by using stack allocation for small objects.
+
+## Common mistakes engineers make with GC optimization
+
+1. Tuning GC settings before profiling the allocation rate. Tuning the GC without addressing the root cause (high allocation rate) is optimizing around a problem rather than fixing it.
+2. Increasing heap size to reduce GC frequency. A larger heap means less frequent GC, but each collection takes longer. For services with latency requirements, reducing pause duration (through architectural changes) is more effective than reducing pause frequency.
+3. Not correlating GC events with latency metrics. GC optimization that does not correlate GC events with the latency problem is working without evidence.
+4. Applying object pooling in the wrong places. Object pools add complexity. Pool only the objects in the hot path whose allocation rate is measurably contributing to GC pressure.
+5. Ignoring off-heap alternatives. Some use cases (caches, buffers) are better served by off-heap memory that the GC does not manage. Redis for caches eliminates the GC overhead of in-process caching at the cost of network latency.
+
+## Where to start: a 3-step GC investigation
+
+**Step 1: Measure GC event frequency and duration alongside p99 latency.** Use `perf_hooks` in Node.js or GC logging in the JVM. Plot the GC events and the p99 latency on the same time axis. If they correlate, GC is the latency source.
+
+**Step 2: Use a heap profiler to identify the objects with the highest allocation rate.** In Node.js, `--heap-prof` generates a heap profile that shows which code paths are allocating the most memory. The top three allocation sources are the candidates for optimization.
+
+**Step 3: Implement one architectural change targeting the highest-allocation code path.** Stream a large payload instead of deserializing it fully, pool an object that is allocated and discarded on every request, or rewrite a transformation that creates unnecessary intermediate objects. Measure the GC event frequency and p99 latency after the change.
+
+## The Invisible Tax Made Visible
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Node.js service I described earlier -- p50 of 18ms, p99 of 380ms -- was fixed by streaming the large JSON payloads instead of parsing them fully and by rewriting the hot path transformation to eliminate intermediate object creation. After the changes, the p99 dropped to 45ms and GC major cycles became less frequent by 80 percent. The fix took two days. The investigation and measurement took one day before that. Three days total to reduce p99 latency from 380ms to 45ms -- the kind of improvement that is only possible when you have instrumentation that makes the invisible visible.
+
+## Related reading
+
+- [The Hot Path: Finding and Optimizing It](/blog/the-hot-path-finding-and-optimizing-it)
+- [The HTTP Caching Strategy That Most Teams Get Wrong](/blog/the-http-caching-strategy-that-most-teams-get-wrong)
+- The Database Query That Slowed Everything Down
+- The Observability Stack That Pays for Itself

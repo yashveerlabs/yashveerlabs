@@ -1,0 +1,128 @@
+---
+slug: "designing-an-api-that-customers-will-not-curse-in-five-years"
+title: "Designing an API That Customers Will Not Curse In Five Years"
+excerpt: "An API that customers love at year five was designed for year five. The decisions made at week one shape what is possible in year five. Here is the discipline that produces APIs customers integrate enthusiastically."
+date: "2026-05-22"
+category: "Backend, APIs, and System Design"
+tags: ["api","design","longevity","integration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/designing-an-api-that-customers-will-not-curse-in-five-years"
+status: "published"
+definition: "An API that customers will not curse in five years is the result of decisions made at week one. Stable shapes. Additive evolution. Consistent naming. Clear errors. Cursor based pagination. Versioning that respects existing integrations. The discipline is unglamorous. The result is an API that customers integrate once and keep using rather than tolerating."
+faq: [
+  {"q":"What is the single most important API design rule?","a":"Be consistent. Consistency across endpoints reduces the cognitive load on the customer. Field names, error formats, pagination, authentication, and response envelopes should look the same across the API. The inconsistency that creeps in over time is what makes APIs frustrating to integrate with."},
+  {"q":"How do I avoid breaking changes?","a":"Additive only after launch. Never remove fields. Never change field types. Never change behavior in ways that break existing clients. New behavior goes in new fields, new endpoints, or new versions. The discipline costs a little. The trust it preserves is worth it."},
+  {"q":"What about pagination?","a":"Cursor based for any list that grows. Offset based only for fixed small lists. The cursor based pattern scales. The offset based pattern fails at large data volumes. Picking the wrong one is hard to reverse without breaking clients."},
+  {"q":"How do I handle errors?","a":"Consistent shape across all endpoints. A field for the type. A field for the human readable message. A field for the request ID. Optionally a field for hints on how to fix. The same shape on every endpoint reduces the customer's effort to handle errors."},
+  {"q":"What about authentication?","a":"API keys for server to server. OAuth for user delegated access. Both should be supported on most APIs. The authentication choice should be made deliberately and communicated clearly. Switching auth schemes after launch is one of the most expensive changes."},
+  {"q":"How do I version?","a":"Major version in the URL path or accept header. Minor changes are additive and require no version bump. Major versions are rare and announced months in advance with migration tooling. Most successful APIs go five years on one major version."},
+  {"q":"What is the most common design mistake?","a":"Designing the API for the first customer's specific use case. The shape fits that customer and breaks for the second. The second customer has to write adapter code. The third customer is worse. By the tenth customer the API is a junction of compromises."}
+]
+---
+
+## What you actually need to know
+
+- Consistency across endpoints is the single most important rule.
+- Additive evolution only after launch.
+- Cursor based pagination for growing lists.
+- Consistent error structure across all endpoints.
+- Versioning that respects existing integrations.
+
+| Decision | Right pattern |
+|---|---|
+| Naming | Consistent. snake_case or camelCase. Same across endpoints. |
+| Pagination | Cursor based on growing lists |
+| Errors | Consistent shape with type, message, request ID |
+| Authentication | API keys plus OAuth, picked deliberately |
+| Versioning | Major in URL, additive minor |
+| IDs | Opaque strings, type prefixed |
+| Timestamps | ISO 8601 UTC with Z suffix |
+| Money | Integer minor units, never floats |
+
+## The core argument
+
+An API is a contract that lives much longer than any individual feature. The customer integrates the API once. The integration runs for years. Every breaking change costs the customer engineering time. Every inconsistency costs the customer cognitive load. The API that customers love at year five is the API that respected the contract from year one.
+
+The discipline is small at week one and accumulates value across years. Consistent field naming. Stable shapes. Additive evolution. Cursor based pagination from day one because adding it later requires a migration. Consistent error structure. Clear versioning. Each decision is a small one at week one. The combined effect is an API that customers integrate enthusiastically.
+
+The mistakes are equally consistent. Designing the API for the first customer's specific use case. Inconsistent naming across endpoints. Offset based pagination on growing lists. Different error formats per endpoint. No versioning strategy. Each is small in isolation. The combined effect is an API that customers tolerate while they look for an alternative.
+
+The teams that get this right invest two extra weeks at the start of the API project. Schema review with a senior engineer. Naming convention documented. Error format committed. Pagination strategy picked. Versioning policy documented. The two weeks compound across years of customer integrations.
+
+## The design choices that age well
+
+| Choice | Pattern |
+|---|---|
+| URL design | RESTful with plural nouns, kebab case |
+| Field naming | snake_case or camelCase, picked once |
+| IDs | Opaque strings with type prefix |
+| Timestamps | ISO 8601 UTC ending in Z |
+| Money | Integer cents, decimal currency separate |
+| Nullable | Explicit null, not missing |
+| Enums | Stable string values |
+| Pagination | Cursor based on growing lists |
+| Filtering | Query parameters with documented operators |
+| Sorting | Single field, ascending default |
+| Response envelope | Consistent. data, meta, errors. |
+| Errors | type, message, request_id |
+| Rate limits | Headers on every response |
+| Idempotency | Idempotency-Key header on writes |
+
+## How much does this cost
+
+| Investment | Cost |
+|---|---|
+| Initial design review | One to two weeks |
+| Documentation of conventions | Days |
+| CI checks for consistency | Days |
+| Schema reviews ongoing | Hours per change |
+| Versioning infrastructure | Days |
+| Deprecation framework | One sprint |
+
+## Features the API must have
+
+- A documented schema as the source of truth.
+- A versioning strategy.
+- A deprecation framework with timeline.
+- A changelog customers can read.
+- Consistent error structure.
+- Request ID on every response.
+- Rate limit headers on every response.
+- Idempotency support on write endpoints.
+- Backward compatibility commitment.
+
+## Expert opinion
+
+> The APIs that customers love five years after launch are the APIs that were designed for longevity from week one. The decisions are not exotic. Consistency. Stability. Additive evolution. Clear errors. The team that respects these from the start ships an API that compounds in value. The team that does not produces an API that customers complain about for the entire relationship.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had built their first public API quickly to land one specific customer. The API used inconsistent naming, offset based pagination, and three different error formats depending on which engineer wrote the endpoint. Customer integrations were painful.
+
+We did not break the v1 API. We launched a v2 with strict design discipline. Consistent naming. Cursor based pagination. Single error format. Stable contract. Customers migrated over a year with full tooling support.
+
+Three years later the v2 API has had zero breaking changes. New endpoints get added monthly with the same discipline. The customer integration cost is dramatically lower than v1. The customer satisfaction with the API has been the highest of any product surface.
+
+For more on the related work, see [building APIs that survive five years of customer change requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests) and [the API versioning strategy that survives real world use](/blog/the-api-versioning-strategy-that-survives-real-world-use).
+
+## Common mistakes teams make
+
+1. Designing for the first customer's use case.
+2. Inconsistent naming across endpoints.
+3. Offset based pagination on growing lists.
+4. Different error formats per endpoint.
+5. No versioning strategy.
+6. No changelog.
+7. No deprecation framework.
+8. Treating the API as solved once shipped.
+
+## A two week design exercise
+
+1. **Days one to three.** Pick conventions. Naming, IDs, timestamps, money, enums.
+2. **Days four to six.** Pick error structure. Pick pagination strategy.
+3. **Days seven to nine.** Draft schema for the first endpoints. Review with a senior engineer.
+4. **Days ten to fourteen.** Document conventions. Set up CI checks. Start the changelog.
+
+For more on the related work, read [building APIs that survive five years of customer change requests](/blog/building-apis-that-survive-five-years-of-customer-change-requests) and [pagination patterns cursor vs offset and why it matters](/blog/pagination-patterns-cursor-vs-offset-and-why-it-matters). On the broader API side, [API documentation that developers actually read](/blog/api-documentation-that-developers-actually-read) is the natural next read.

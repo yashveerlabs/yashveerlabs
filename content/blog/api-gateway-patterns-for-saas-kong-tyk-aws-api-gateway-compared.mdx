@@ -1,0 +1,108 @@
+---
+slug: "api-gateway-patterns-for-saas-kong-tyk-aws-api-gateway-compared"
+title: "API Gateway Patterns for SaaS: Kong, Tyk, AWS API Gateway Compared"
+excerpt: "An API gateway is either the cleanest piece of your architecture or the slowest. The right choice depends on whether you optimize for vendor managed simplicity or self hosted control. Here is the call I make per project."
+date: "2026-05-18"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","architecture","saas"]
+readingMinutes: 11
+ogImage: "/api/og/blog/api-gateway-patterns-for-saas-kong-tyk-aws-api-gateway-compared"
+status: "published"
+definition: "An API gateway sits in front of your services and handles auth, rate limiting, routing, and observability before the request reaches your code. Kong and Tyk are the open source leaders. AWS API Gateway is the managed default for teams already on AWS. Each has a clear best fit. The teams that pick wrong end up either paying for features they do not use or self hosting a service they do not have capacity to operate."
+faq: [
+  {"q":"Do I need an API gateway?","a":"Not on day one. Most early stage SaaS can route traffic directly to the application server with nginx or a load balancer in front. The gateway becomes useful once you have multiple services, complex rate limiting, or external API consumers who need stable contracts."},
+  {"q":"When does Kong make sense?","a":"When the team wants self hosted control, an active plugin ecosystem, and is willing to operate the gateway as a real service. Kong runs on Postgres or Cassandra and scales horizontally. The operational cost is real but manageable for teams with infrastructure capacity."},
+  {"q":"How does Tyk differ from Kong?","a":"Tyk is also open source and self hostable, with a slightly different plugin model and a stronger built in dashboard. The choice between Kong and Tyk often comes down to which team finds easier to operate based on documentation taste and existing infrastructure."},
+  {"q":"When is AWS API Gateway the right call?","a":"When the team is already on AWS, the traffic is predictable, and the cost per request is acceptable. Integration with Lambda, IAM, and CloudWatch is smooth. The cost per million requests can be high at scale."},
+  {"q":"What about Cloudflare or Vercel as a gateway?","a":"Cloudflare Workers and Vercel Edge Functions can act as lightweight gateways for many use cases. They handle TLS, basic routing, and simple auth at the edge. For pure managed simplicity at small to medium scale, they are increasingly competitive with dedicated gateway products."},
+  {"q":"What is the cost difference?","a":"AWS API Gateway can run between 1 and 4 dollars per million requests, plus data transfer. Kong self hosted on a small VM runs 50 to 300 dollars a month regardless of request volume, up to capacity. Tyk is similar. At high volume, self hosting wins on cost. At low to moderate volume, managed wins on operational simplicity."},
+  {"q":"How do I migrate between gateways?","a":"Build a clean configuration model that lives in your repo, not in the gateway UI. Tools like declarative Kong configs or Terraform make the gateway recreatable. Migration becomes a port of the configuration, not a port of state."}
+]
+---
+
+## What you actually need to know
+
+- A gateway is not required on day one. Add it when you have real reasons.
+- Kong and Tyk are strong open source options for teams with infrastructure capacity.
+- AWS API Gateway is the managed default for teams already on AWS.
+- The cost crossover between managed and self hosted happens around tens of millions of requests per month.
+- In my experience, gateway choice rarely makes or breaks a SaaS. The discipline of using one well is what matters.
+
+| Option | Hosting | Strength | Watch out for |
+|---|---|---|---|
+| Kong | Self hosted or Konnect cloud | Plugin ecosystem, mature | Operational cost if self hosting |
+| Tyk | Self hosted or cloud | Strong dashboard, similar to Kong | Same operational considerations |
+| AWS API Gateway | Managed | Tight AWS integration | Cost at scale, vendor lock in |
+| Cloudflare Workers | Managed edge | Cheap, fast, simple | Less feature depth than dedicated gateways |
+
+## The core argument
+
+API gateways exist because the cross cutting concerns of an API are real. Authentication, rate limiting, routing, observability, request shaping. Without a gateway, each service rebuilds these. With a gateway, they live in one place that every service inherits from.
+
+The mistake teams make is adding a gateway too early. A startup with three endpoints and one customer does not need a gateway. The team should focus on shipping. The gateway becomes valuable when one of three things happens. The team has multiple services that need consistent auth and rate limiting. The product has external API consumers who need a stable contract independent of the backend evolution. The compliance story requires central logging and access control.
+
+The next mistake is picking the wrong gateway for the team. Kong is powerful and demands operational capacity. AWS API Gateway is convenient and demands acceptance of vendor lock in and per request pricing. Cloudflare Workers is cheap and limits the features available. Each fits a different team.
+
+The framing I use on client projects is to ask three questions. Are you already on AWS deeply. Does the team have capacity to operate another stateful service. Is request volume going to grow fast. If the answers are yes, no, yes, AWS API Gateway is probably right. If the answers are no, yes, yes, Kong or Tyk are probably right. If the answers are no, no, no, you may not need a gateway at all.
+
+## When each one wins
+
+**Kong wins when.** The team wants self hosted control and the operational capacity to run Postgres or Cassandra plus the gateway. The plugin ecosystem covers what you need or you have engineering willing to write plugins. The cost at scale is a real concern.
+
+**Tyk wins when.** Similar to Kong, with a slight preference for built in dashboard and a different plugin model. Pick based on what the team finds easier to operate.
+
+**AWS API Gateway wins when.** You are already on AWS and using IAM, Lambda, or CloudWatch. The traffic is predictable. The team prefers managed over self hosted. The cost per million requests fits the budget.
+
+**Cloudflare Workers wins when.** The gateway needs are simple. Edge performance matters. The team values per request pricing that stays cheap at low to moderate volume.
+
+## What it actually costs
+
+| Gateway | Monthly cost at 50M requests | Operational load |
+|---|---|---|
+| Kong self hosted | 200 to 800 dollars VM, free Kong OSS | Real, requires DBA and ops |
+| Tyk self hosted | 200 to 800 dollars VM | Real, similar to Kong |
+| AWS API Gateway | 50 to 200 dollars at REST, more at HTTP | Low, managed by AWS |
+| Cloudflare Workers | 50 to 250 dollars | Very low |
+
+Numbers above are based on 2026 published pricing and what I see in client engagements. Self hosting gets more competitive as scale grows. Managed gets more competitive at lower volume.
+
+## Features to demand from your gateway choice
+
+- A declarative configuration that lives in your repo. Avoid configuring through a UI as the source of truth.
+- Centralized auth. The gateway handles tokens before requests reach your services.
+- Rate limiting at multiple granularities. Per customer, per endpoint, per IP.
+- Observability hooks. Metrics, logs, traces, all exported to your existing stack.
+- A plugin or extension model for your specific cross cutting concerns.
+- A clear failure mode when the gateway is degraded. Fail open or fail closed depending on policy.
+
+## Expert opinion
+
+> The gateway that fits the team is the right gateway. The gateway with the best benchmarks is often the wrong gateway, because benchmarks rarely include the operational cost of running it. Pick the one your team can operate at three in the morning during an incident.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this plays out in practice
+
+On a client project, the team initially picked Kong because it was the most powerful option. Six months later, they were spending more time operating the gateway than they were operating the product. We moved to AWS API Gateway because they were already on AWS. The migration took three weeks. The operational load dropped by about seventy percent. The cost per request went up slightly, but the team got the engineering hours back.
+
+The opposite story is a team that started on AWS API Gateway and watched the bill grow as the product hit scale. At fifty million requests a month, the gateway alone was costing more than the rest of the infrastructure. They moved to Kong self hosted. The bill dropped by sixty percent. The operational cost was real but the savings paid for two more engineers.
+
+For more on the broader topic, see [REST vs GraphQL vs gRPC](/blog/rest-vs-graphql-vs-grpc-a-decision-matrix-for-founders), [building APIs that survive five years](/blog/building-apis-that-survive-five-years-of-customer-change-requests), and [rate limiting algorithms compared](/blog/rate-limiting-algorithms-compared-token-bucket-leaky-bucket-fixed-window).
+
+## Common mistakes teams make
+
+1. Adding a gateway too early, before there is a real reason.
+2. Self hosting Kong or Tyk without the operational capacity to run it.
+3. Picking AWS API Gateway and being surprised by the bill at scale.
+4. Configuring the gateway through the UI and losing the configuration when the cluster has to be rebuilt.
+5. No observability hooks, so the gateway becomes a black box.
+6. Treating the gateway as a place to put business logic. It is not. The gateway is for cross cutting concerns.
+
+## Where to start, a 30 day plan
+
+1. **Week one.** Decide if you actually need a gateway. Two services and a load balancer often suffice for small SaaS.
+2. **Week two.** If yes, evaluate options. Try Kong on a staging environment if self hosting feels viable. Try AWS API Gateway if managed feels right.
+3. **Week three.** Pick one. Migrate one endpoint to the gateway as a pilot. Confirm auth, rate limiting, and observability behave as expected.
+4. **Week four.** Migrate the remaining endpoints. Move configuration to a declarative format in your repo. Document the failure modes.
+
+For deeper reading, [API gateway patterns for SaaS Kong Tyk AWS API Gateway compared](/blog/api-gateway-patterns-for-saas-kong-tyk-aws-api-gateway-compared) is this post, [API authentication in 2026](/blog/api-authentication-in-2026-api-keys-jwts-oauth-mtls) covers what the gateway is enforcing, and [the stateless API](/blog/the-stateless-api-building-backends-that-scale-horizontally) covers the service design that pairs well with a gateway.

@@ -1,0 +1,62 @@
+---
+slug: "liveblocks-vs-partykit-vs-custom-for-real-time-features"
+title: "Liveblocks vs PartyKit vs Custom for Real Time Features"
+excerpt: "Real-time collaboration is one of the hardest infrastructure problems in web development. Liveblocks and PartyKit remove most of that complexity. Here is how they compare and when building custom still makes sense."
+date: "2026-05-23"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026"]
+readingMinutes: 6
+ogImage: "/api/og/blog/liveblocks-vs-partykit-vs-custom-for-real-time-features"
+status: "published"
+definition: "Real-time features in web applications require persistent connections, state synchronization, conflict resolution, and presence management. Liveblocks is a managed real-time infrastructure platform with purpose-built primitives for collaborative editing, comments, and notifications. PartyKit is a developer-focused platform for building real-time applications using WebSockets at the edge. Custom infrastructure using WebSockets or server-sent events is the third option, requiring more engineering but providing complete control."
+faq: [
+  {"q":"What kinds of real-time features does Liveblocks handle best?","a":"Liveblocks is purpose-built for collaborative document and canvas features: shared cursors, collaborative text editing with conflict resolution, comments and threads, and real-time presence. If you are building a Notion-like editor, a Figma-like canvas, or document collaboration features in a SaaS product, Liveblocks provides the infrastructure and React hooks to build these in days rather than months."},
+  {"q":"What is PartyKit and how is it different from Liveblocks?","a":"PartyKit is a platform for building real-time applications using Cloudflare's Durable Objects as the underlying primitive. It is more general-purpose than Liveblocks: you write the server-side logic for your real-time feature in JavaScript, and PartyKit runs it at the edge. It does not provide opinionated primitives for collaboration the way Liveblocks does, but it gives you more control over the real-time logic for use cases that do not fit the document collaboration mold."},
+  {"q":"When should I build custom WebSocket infrastructure instead of using a platform?","a":"When the real-time use case is genuinely unusual, when data sovereignty requirements prevent using third-party infrastructure, or when the volume of connections and messages makes the cost of a managed platform prohibitive. Most B2B SaaS real-time features do not require custom infrastructure. The development time cost of building custom WebSocket infrastructure correctly is significant."},
+  {"q":"How does Liveblocks handle conflict resolution in collaborative editing?","a":"Liveblocks uses CRDT (Conflict-free Replicated Data Types) for its storage primitives. CRDTs allow multiple users to edit the same data simultaneously and merge their changes without conflicts, even in the presence of network partitions. The conflict resolution logic is implemented in the Liveblocks client libraries. Application code does not need to implement merge logic manually."},
+  {"q":"What is the pricing model for Liveblocks?","a":"Liveblocks is priced on monthly active users and connections. The free tier covers small-scale development and testing. Paid tiers scale with user count, starting at roughly 99 dollars per month for production use. For B2B SaaS where real-time features serve paying enterprise customers, the per-MAU cost is typically justified by the development time saved versus building equivalent functionality."}
+]
+---
+
+## What you need to know
+
+- Real-time infrastructure is genuinely complex to build correctly: WebSocket connection management, reconnection logic, state synchronization, and conflict resolution all require careful implementation.
+- Liveblocks is the right choice for collaborative editing, shared cursors, presence indicators, and comment threads. The primitives are purpose-built for these use cases and the development time is dramatically lower than building custom.
+- PartyKit is the right choice for custom real-time logic that does not fit collaborative document patterns, when edge-deployed WebSocket servers are an architectural requirement.
+- Custom WebSocket infrastructure is justified for volume-based cost optimization at scale, unusual real-time logic, or data sovereignty requirements. It is expensive to build correctly.
+- The key question is whether the real-time feature fits the patterns that Liveblocks or PartyKit were designed for. If it does, the managed platform wins on time-to-production by a wide margin.
+
+## The core argument
+
+The reason managed real-time platforms exist is that building WebSocket infrastructure correctly is one of the hardest infrastructure problems in web development. Connection management, reconnection after network interruptions, message ordering, state synchronization across multiple clients, and conflict resolution for concurrent edits each require careful design. Done incorrectly, the symptoms are subtle: a user sees stale state, two edits conflict silently, a connection drops and the UI does not recover, a user's presence indicator stays active after they leave. These bugs are hard to reproduce and hard to debug.
+
+Liveblocks solves this for a specific category of real-time features: collaborative editing and presence. The value is not just in the WebSocket connection management, which is table stakes, but in the CRDT-based storage primitives that handle concurrent edits correctly. When two users edit the same text simultaneously, Liveblocks merges the edits without data loss using the same mathematical foundations that power Google Docs. Implementing CRDTs from scratch is a research-grade problem. Using Liveblocks, it is a configuration problem. For a SaaS product that wants collaborative features, the choice between Liveblocks and custom is rarely close.
+
+PartyKit fills the space between Liveblocks and fully custom infrastructure. It provides the edge deployment and connection management of a managed platform while leaving the application logic to the developer. This makes it the right choice for real-time features that are genuinely custom: multiplayer game state, live auction bidding, real-time order status dashboards, chat systems with custom moderation logic. The developer writes the server-side logic as a JavaScript class, and PartyKit handles the deployment, scaling, and connection lifecycle. The development model is closer to writing a Node.js WebSocket server than using a collaboration framework.
+
+## Common mistakes
+
+1. **Building custom WebSocket infrastructure when a managed platform covers the use case.** The first version of a custom WebSocket server takes two to three days to build and six months to harden for production reliability. Liveblocks or PartyKit can reach production reliability in two to three days, total.
+
+2. **Using Liveblocks for real-time features that are not collaborative.** Liveblocks is optimized for collaborative document and canvas patterns. Using it for a live order status dashboard or a chat system adds unnecessary complexity. Evaluate whether the use case fits the platform's primitives before adopting it.
+
+3. **Not accounting for real-time feature cost at scale.** Managed real-time platforms charge per connection or per monthly active user. A public consumer product with millions of users interacting in real time may find managed platform costs prohibitive at scale. Evaluate the pricing model at projected growth-stage volume, not just at current volume.
+
+4. **Implementing presence from scratch when it is built into the platform.** Presence (showing which users are online or viewing a document) is a notoriously difficult real-time feature to implement correctly, especially for users with intermittent connectivity. Liveblocks has built-in presence primitives. Using them is faster and more reliable than building presence management from scratch.
+
+5. **Not testing real-time behavior under network degradation.** Real-time features that work perfectly in development often fail in production when users have slow or intermittent connections. Test reconnection behavior, message delivery under packet loss, and state consistency after a network interruption before shipping any real-time feature.
+
+## Where to start
+
+1. **Define the real-time feature requirements precisely.** Is it collaborative editing? Presence? Live updates that do not require concurrent editing? The specificity of the requirement determines which platform fits. Write the requirement before evaluating tools.
+
+2. **Evaluate Liveblocks with their quickstart for collaborative document features.** The React hooks and client library make the initial integration fast. Build a prototype of your collaborative feature in one afternoon before committing to the platform.
+
+3. **Estimate the monthly active user count at twelve months.** Check the pricing for that volume on Liveblocks and PartyKit. If the cost is less than the engineering time to build and maintain custom infrastructure, the platform decision is clear.
+
+## Related reading
+
+- WebSocket vs Server-Sent Events vs Polling: When to Use Each
+- SaaS Architecture and Scaling: Patterns That Last
+- [Inngest vs Hatchet vs Trigger.dev: Async Job Platforms Compared](/blog/inngest-vs-hatchet-vs-trigger-dev-async-job-platforms-compared)
+- Build vs Buy: How Senior Engineers Actually Think About It

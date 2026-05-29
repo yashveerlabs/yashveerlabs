@@ -1,0 +1,96 @@
+---
+slug: "the-engineering-org-chart-at-5-25-and-100-engineers"
+title: "The Engineering Org Chart at 5, 25, and 100 Engineers"
+excerpt: "How engineering team structure evolves across the three most critical inflection points as startups scale -- and the mistakes that make each transition harder."
+date: "2026-02-03"
+category: "Startup Technical Strategy"
+tags: ["startup-strategy","engineering-leadership","org-design","scaling","management"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-engineering-org-chart-at-5-25-and-100-engineers"
+status: "published"
+definition: "The engineering org chart is not a static document. It is the current answer to the question of how the team coordinates work, makes decisions, and grows. The structure that works at five engineers creates coordination problems at twenty-five. The structure at twenty-five engineers creates silos at one hundred. Understanding these inflection points in advance prevents the chaos that comes from outgrowing the current structure without noticing it is happening."
+faq: [
+  {"q":"What is the right span of control for an engineering manager?","a":"Four to seven engineers per manager is the common guideline. Fewer than four and the manager does not have enough scope to develop management skills and may be pulled back into individual contribution. More than eight and the manager cannot provide meaningful development conversations, code review context, or career guidance to each report."},
+  {"q":"When should an engineering team move from functional to product teams?","a":"When the product has enough surface area that engineers can be organized around product areas rather than technical layers and still have enough work within their area to be fully productive. This typically happens between 15 and 25 engineers. Functional teams (frontend team, backend team) create coordination overhead when product features require both."},
+  {"q":"What is the coordination tax at each scale and how do I reduce it?","a":"At 5 engineers: minimal. Communication is direct and synchronous. At 25 engineers: significant. Multiple teams require explicit coordination mechanisms. At 100 engineers: substantial. Org design is the primary lever for reducing coordination tax. The mechanisms: clear team charters (who owns what), stable APIs between teams, and async-first communication reduce the tax at each scale."},
+  {"q":"When do I add a VP of Engineering or CTO?","a":"A VP of Engineering is needed when the engineering leader's time is primarily consumed by people management, process, and coordination rather than technical direction. This typically happens at 20 to 40 engineers. A CTO (if the founder is not technical) is needed earlier -- at the first engineering hire -- to provide technical direction and credibility."},
+  {"q":"How do I run the reorg without destroying morale?","a":"Be transparent about the reason for the change before making it. Share the problem the current structure is creating and how the new structure addresses it. Give teams enough warning to complete in-flight work before the transition. Recognize that any reorg produces temporary productivity loss and plan for it."}
+]
+---
+
+## What you actually need to know
+
+- The engineering org structure is an answer to the coordination question: how do engineers work together without stepping on each other? As the team grows, the answer changes.
+- At five engineers: flat is right. Hierarchy creates bureaucracy before there is work to justify it.
+- At twenty-five engineers: product teams (organized around product areas) outperform functional teams (organized around technical layers) because they reduce the coordination needed to ship features.
+- At one hundred engineers: explicit ownership, clear APIs between teams, and dedicated platform infrastructure become non-negotiable. Without them, coordination cost dominates.
+- Each transition from one structure to the next is painful if it happens in reaction to a crisis rather than in anticipation of the next stage.
+
+| Stage | Structure | Coordination Mechanism | Common Failure |
+|---|---|---|---|
+| 5 engineers | Flat, all-hands | Daily sync, direct communication | Adding hierarchy too early |
+| 25 engineers | Product teams (2-3) | Team leads, written specs | Functional silos, coordination overhead |
+| 100 engineers | Product squads + platform | Formal planning, team charters, APIs | Siloed teams that cannot coordinate on shared infrastructure |
+
+## The core argument
+
+The engineering org chart exists to solve a coordination problem: how does a group of engineers work on the same codebase toward the same goals without constant conflict, duplication, and miscommunication? The answer that works at five engineers is different from the answer that works at twenty-five, which is different from the answer that works at one hundred.
+
+Most startups change their engineering structure reactively. The team has grown from eight to fifteen engineers and the daily standup is no longer useful. There are two natural subgroups based on the features they work on. The first manager hire happens because someone is overwhelmed, not because the structure was designed. This is not inherently wrong -- it is the normal pattern. The problem is when the reactive changes create structures that solve the immediate symptom but create new problems.
+
+The engineering leader who understands the inflection points in advance can design the next structure before the current one fails. The transition is still disruptive -- any reorg involves change -- but it is significantly less disruptive than a reactive restructuring in the middle of a critical product cycle.
+
+## The five-engineer structure
+
+At five engineers, the org chart is flat. The technical founder or first engineering hire functions as the de facto technical leader, but the structure is not hierarchical -- it is flat and collaborative. Everyone knows what everyone else is working on. Decisions happen in conversations. Code review is informal.
+
+The failure mode at this stage is importing management structure that the team has not grown into. An engineering leader who creates manager-report relationships at six or eight engineers is creating overhead without the coordination benefit. The coordination problem at this scale is trivial. Direct communication solves it. Structure creates friction.
+
+The right investment at five engineers is in the technical foundations that will scale: code review culture, CI/CD automation, documentation of architectural decisions, and a clear ownership model for the codebase. These are structural investments that serve the team as it grows, without the overhead of formal hierarchy.
+
+## The twenty-five-engineer structure
+
+Between fifteen and thirty engineers, the flat structure breaks. The daily standup cannot cover what everyone is working on without being two hours long. The codebase is large enough that engineers need context to contribute outside their area. There are enough projects in flight simultaneously that coordination is a real problem.
+
+The structure that works at twenty-five engineers is product teams: two to four teams, each organized around a product area or customer segment, each led by a technical lead who is responsible for the team's coordination and quality. Each team has a stable membership of four to six engineers. Teams own their part of the product end-to-end -- from design to deployment.
+
+The mistake at this stage is organizing by technical layer (frontend team, backend team, data team) rather than product area. Technical layer teams create coordination overhead: every feature that touches both frontend and backend requires cross-team coordination. Product teams internalize this coordination. The startup that moves to product teams in this range ships features faster than the one that keeps functional teams.
+
+The engineering manager role appears at this stage. The first manager is usually a senior engineer who takes on people management responsibilities for a team. The manager at twenty-five engineers is a player-coach: they manage two to four engineers and continue to contribute code. Full-time management is appropriate when the team is large enough to fill a manager's time.
+
+## The hundred-engineer structure
+
+At one hundred engineers, the coordination problem is the dominant challenge. There are enough teams that cross-team dependencies create regular planning problems. The shared infrastructure that every team uses (the CI/CD pipeline, the internal developer tooling, the shared libraries) is degrading because no one owns it. The senior engineers who understand the whole system are becoming bottlenecks because they are the only ones who can answer questions about the interaction between systems.
+
+The structure at this scale has two components: product squads that own product areas, and a platform team that owns the shared infrastructure. The product squads operate autonomously within their domain. The platform team builds the tools and systems that let product squads move fast without stepping on each other.
+
+The senior engineering roles (Staff and Principal) become critical at this scale. These are engineers whose job is not to manage people but to improve the technical system that all the teams work within. They identify the cross-team technical problems, propose solutions, and drive adoption across multiple teams. They are the technical version of the coordination role that senior managers play on the people side.
+
+The planning process at this scale requires explicit cross-team coordination. Quarterly planning sessions where team leads share their priorities and identify dependencies allow the organization to see and resolve conflicts before they become blocking problems during the quarter.
+
+## Common mistakes engineering leaders make with org design
+
+1. Not changing the structure when the team outgrows it. The five-engineer structure at twenty-five engineers is creating coordination problems that are reducing velocity. The signal is there; the leader needs to act on it.
+2. Designing the structure around current people rather than future needs. The org chart should reflect how the team needs to work, not the reporting relationships that were created when specific people were hired.
+3. Creating manager layers before the team is large enough to need them. A three-level management hierarchy at twenty engineers creates bureaucracy that slows decisions.
+4. Not giving platform teams equal status to product teams. The platform team is a multiplier on product teams. Treating it as a secondary function leads to underinvestment and platform degradation.
+5. Running a reorg without communicating the reason. Engineers who do not understand why the structure is changing will assume the worst and update their resumes. Transparency about the problem and the solution makes the transition less disruptive.
+
+## Where to start: a 3-step org design review
+
+**Step 1: Identify the coordination problems the current structure creates.** Where are engineers stepping on each other? Where are features requiring more cross-team meetings than they should? Where is the codebase lacking clear ownership? These are the symptoms of a structure that has been outgrown.
+
+**Step 2: Design the structure for the team you will have in 12 months, not the team you have today.** If the team is at fifteen engineers and growing, design the twenty-five-engineer structure. Staff it with the current team and plan for the hires required to complete it.
+
+**Step 3: Run the transition during a period of lower product pressure.** Reorgs disrupt work. Plan the transition for a period that is not concurrent with a major release or a critical milestone. Give the team two to four weeks of advance notice.
+
+## Structure That Serves the Work
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The org design question is fundamentally a question about what the team is trying to optimize for. Early stage: optimize for speed and shared context. Mid stage: optimize for product ownership and feature velocity. Scale stage: optimize for platform leverage and cross-team autonomy. The structure at each stage should be designed explicitly for the optimization target of that stage.
+
+## Related reading
+
+- [The Engineering Operations Team: When You Need One](/blog/the-engineering-operations-team-when-you-need-one)
+- [The Engineering Career Ladder That Engineers Trust](/blog/the-engineering-career-ladder-that-engineers-trust)
+- [The Engineering All Hands That Engineers Look Forward To](/blog/the-engineering-all-hands-that-engineers-look-forward-to)
+- [The Annual Engineering Review That Engineers Actually Find Useful](/blog/the-annual-engineering-review-that-engineers-actually-find-useful)

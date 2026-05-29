@@ -1,0 +1,61 @@
+---
+slug: "tenant-aware-authorization-the-mistake-that-leaks-data"
+title: "Tenant Aware Authorization: The Mistake That Leaks Data"
+excerpt: "Missing tenant context in authorization checks is the most common data leakage pattern in multi-tenant SaaS. Here is how it happens and how to prevent it."
+date: "2026-05-24"
+category: "Security, Auth, and Compliance"
+tags: ["security", "auth", "multi-tenant", "saas", "authorization"]
+readingMinutes: 7
+ogImage: "/api/og/blog/tenant-aware-authorization-the-mistake-that-leaks-data"
+status: "published"
+faq: [
+  {"q":"What is an IDOR vulnerability?","a":"Insecure Direct Object Reference is a vulnerability where an application allows a user to access a resource by supplying its ID directly, without verifying that the user is authorized to access that specific resource. It is one of the OWASP Top Ten most common web vulnerabilities and is the primary expression of broken tenant isolation."},
+  {"q":"How does PostgreSQL row-level security work?","a":"RLS policies are attached to tables in PostgreSQL. When a query runs, the policy evaluates a condition for every row. Rows that do not match the condition are invisible to the query. By attaching the current user's tenant ID to the database connection and writing policies that filter by tenant ID, you prevent cross-tenant data access at the database level."},
+  {"q":"Is tenant isolation the same as multi-tenancy?","a":"Multi-tenancy is the architecture of serving multiple customers from one application. Tenant isolation is the property that each customer's data is inaccessible to other customers. Multi-tenancy without tenant isolation is a SaaS data breach waiting to happen."},
+  {"q":"What is the difference between authorization and tenant isolation?","a":"Authorization controls what a user can do within their tenant: read, write, admin. Tenant isolation controls which tenant's data a user can access at all. You need both. Authorization without tenant isolation allows users to access data from other organizations. Tenant isolation without fine-grained authorization gives every user in an organization access to everything."},
+  {"q":"How do I handle resources shared across tenants?","a":"Shared resources (public templates, global lookups, shared library items) require a different authorization model. Identify them explicitly and build a clear data model that distinguishes tenant-specific data from shared data. Do not use the same RLS policy for both; write separate policies for shared resources that allow cross-tenant access where intended."}
+]
+---
+
+# Tenant Aware Authorization: The Mistake That Leaks Data
+
+**Tenant-aware authorization is the practice of ensuring that every data access check in a multi-tenant application verifies not just that a user is authenticated, but that they belong to the correct tenant for the resource they are accessing. The missing tenant check is the most common data leakage bug in SaaS applications. It is almost always introduced during fast feature development and almost always discovered too late.**
+
+## What you need to know
+
+- Authentication proves who you are; authorization proves what you can access; tenant isolation proves which organization's data you can reach
+- The missing tenant check typically looks correct in code review because the authorization logic is present; the tenant context is just absent
+- Insecure Direct Object Reference (IDOR) vulnerabilities are the most common expression of broken tenant-aware authorization
+- Row-level security in PostgreSQL is a database-level defense that prevents tenant leakage even when application code has bugs
+- Automated tests for tenant isolation must be written deliberately; standard unit tests almost never catch this class of bug
+
+## The core argument
+
+Multi-tenant SaaS applications store data for many different organizations in the same database. A user from Company A should never be able to access data belonging to Company B, even if they discover Company B's resource IDs. This seems obvious. In practice, it fails constantly, and always in the same way: an API endpoint checks that the user is logged in, checks that they have the right role, and then fetches the resource by ID without checking that the resource belongs to the user's tenant.
+
+A concrete example: a project management SaaS. The endpoint `GET /api/tasks/{taskId}` checks that the user has a valid session. It checks that the user has the `viewer` role. Then it fetches the task by `taskId`. If `taskId=12345` belongs to a different tenant, the endpoint returns that task to the user anyway, because neither check included the tenant context. The user has just read another company's task data. This is a data breach. It violates GDPR, it violates your customer contracts, and if the affected customer discovers it, it will cost you the account and possibly legal action.
+
+The fix is enforcing tenant context at every data access layer. In application code, this means every database query that fetches user data includes a `WHERE tenantId = :currentTenantId` condition. In PostgreSQL with Supabase or a direct connection, this means row-level security policies that attach tenant context to the database session and enforce it at the query level. The database-level enforcement is the strongest protection because it operates even when application code has bugs. I implemented RLS on every table in Nexli from day one precisely because of this failure mode. Database-level defense is the only layer that catches application-level mistakes in authorization checks.
+
+## Common mistakes
+
+1. **Relying solely on application-level authorization without database-level enforcement.** Application code can be wrong. A missing WHERE clause, a copy-paste error, a refactor that drops the tenant filter. Database-level row security is the safety net that application code cannot be.
+2. **Using sequential integer IDs for resources accessible by end users.** If your task IDs are `1, 2, 3...`, an attacker can iterate them. UUIDs or other non-sequential identifiers do not prevent the underlying authorization bug, but they make it significantly harder to exploit.
+3. **Not testing tenant isolation explicitly.** Standard test suites create resources as one user and retrieve them as the same user. Tenant isolation tests create resources as a user from Tenant A and attempt to retrieve them as a user from Tenant B. This test almost never appears in codebases that have not been security-reviewed. Write it.
+4. **Assuming that JWT validation is enough.** JWT validation proves the user is who they claim to be. It does not prove that the resource they are accessing belongs to their organization. The tenant check is a separate step that must be added to every endpoint that returns tenant-specific data.
+5. **Not auditing the authorization path when adding new API endpoints.** New endpoints get added quickly during product development. The authorization checklist needs to include tenant context explicitly, or each new endpoint is a potential tenant isolation gap.
+
+## Where to start
+
+**Step 1: Audit your existing API endpoints for tenant context in every data query.** Take the ten most sensitive endpoints (anything that returns customer data, financial data, or personal information) and trace the database query. Does it include a tenant filter? Write this as a checklist item in your code review template.
+
+**Step 2: Enable row-level security on all tables containing multi-tenant data.** If you are using PostgreSQL, RLS is a built-in feature. Write policies that attach the current tenant ID to the session and enforce it on every read and write. This is one of the highest-value security investments for a multi-tenant SaaS.
+
+**Step 3: Write cross-tenant access tests for every resource type.** Create a test suite that exercises the scenario: Tenant A creates a resource, Tenant B attempts to access it. The expected result is a 403 or 404. If the actual result is a 200 with data, you have found a tenant isolation bug. Run this test suite automatically in CI.
+
+## Related reading
+
+- [Authorization Patterns: RBAC, ABAC, ReBAC Explained](/blog/authorization-patterns-rbac-abac-rebac-explained)
+- [The Permission System That Scales With Your B2B Customers](/blog/the-permission-system-that-scales-with-your-b2b-customers)
+- [OWASP Top Ten for SaaS in 2026](/blog/owasp-top-ten-for-saas-in-2026)
+- [Insecure Direct Object References: The Bug Founders Underestimate](/blog/insecure-direct-object-references-the-bug-founders-underestimate)

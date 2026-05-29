@@ -1,0 +1,109 @@
+---
+slug: "code-splitting-strategies-for-next-js-applications"
+title: "Code Splitting Strategies for Next.js Applications"
+excerpt: "Next.js code splits by route automatically. The team still has to handle component level splitting, dynamic imports, and the boundary between client and server components. Here is the playbook."
+date: "2026-05-20"
+category: "Performance Optimization"
+tags: ["nextjs","code-splitting","performance","bundle"]
+readingMinutes: 12
+ogImage: "/api/og/blog/code-splitting-strategies-for-next-js-applications"
+status: "published"
+definition: "Code splitting in Next.js applications is the practice of breaking the JavaScript bundle into smaller pieces that load only when needed. Next.js handles route based splitting automatically. The team is responsible for component level splitting through dynamic imports, the proper use of server versus client components in the App Router, and the lazy loading of heavy dependencies. Done well, the initial bundle stays small and the user pays the cost only for what they use."
+faq: [
+  {"q":"What does Next.js split automatically?","a":"Each route is its own bundle. Code in app/dashboard does not ship when the user is on app/blog. The framework handles this without configuration. The team gets route based splitting for free."},
+  {"q":"What do I need to split manually?","a":"Heavy components inside a route. Charting libraries used on only some pages within a route. Modals that are not visible initially. Three dimensional scenes that load when in view. Anything large that is not needed on first paint should be dynamic imported."},
+  {"q":"How does the App Router change splitting?","a":"Server components do not ship JavaScript to the client at all. Client components ship only the JavaScript needed for interactivity. The split is at the component boundary marked with use client. The implication is that most of your tree should be server components."},
+  {"q":"What is the right pattern for a heavy chart?","a":"Make the chart a client component. Dynamic import it from the page. Wrap in Suspense with a skeleton fallback. The chart code loads only when the page renders. The skeleton shows during load."},
+  {"q":"What about third party scripts?","a":"Use the Script component with the appropriate strategy. lazyOnload for analytics. afterInteractive for tracking pixels. beforeInteractive only when the script must run before hydration. The default strategy matters."},
+  {"q":"How do I find what to split?","a":"Run the bundle analyzer. Identify the largest contributors to each route's bundle. Decide whether each contributor is needed on first paint. The ones that are not get dynamic imported."},
+  {"q":"What is the right initial bundle size?","a":"Under 200 KB compressed per route. Excellent is under 100 KB. The framework Next.js itself contributes a baseline. The team's code should sit comfortably inside that budget."}
+]
+---
+
+## What you actually need to know
+
+- Next.js splits by route automatically. The team handles component level splitting.
+- App Router server components do not ship JS to the client at all.
+- Dynamic import heavy components that are not needed on first paint.
+- Use the Script component with the right strategy for third party.
+- Target under 200 KB compressed per route. Under 100 KB is excellent.
+
+| Splitting technique | Use case |
+|---|---|
+| Route based (automatic) | Different routes |
+| Dynamic import | Heavy components inside a route |
+| Server components (App Router) | Anything that does not need interactivity |
+| Script component strategy | Third party scripts |
+| Lazy loading of heavy dependencies | Chart libraries, 3D scenes, rich editors |
+| Suspense with fallback | Loading states during dynamic load |
+
+## The core argument
+
+Next.js handles the biggest code splitting decision for you. Route based splitting is automatic. The user visiting the marketing page does not download the dashboard code. The user visiting the dashboard does not download the settings code. The split is the default.
+
+The team's job is the splitting inside each route. The route bundle should contain only what the user needs to see on first paint. Everything else should load when needed. The mistake is treating the route bundle as the splitting unit. A heavy chart that loads only on a specific tab should not be in the route's initial bundle. A modal that opens only on a button click should not be in the route's initial bundle.
+
+The App Router changes the calculus further. Server components do not ship JavaScript to the client at all. The team that builds most of the tree as server components gets the smallest possible client bundle. The use client directive marks the components that need to run on the client. The discipline is to keep that set small.
+
+The teams that take splitting seriously have routes that hit the 100 to 200 KB compressed budget consistently. The teams that do not have routes that grow past 500 KB and feel slow on mobile. The discipline per route is minutes. The compounding effect across the application is large.
+
+## The splitting patterns
+
+| Pattern | Code |
+|---|---|
+| Dynamic import a component | `const Chart = dynamic(() => import('./Chart'), { ssr: false })` |
+| Server component | Default in App Router. No use client directive. |
+| Client component | First line: `'use client'` |
+| Lazy load a third party script | `<Script src="..." strategy="lazyOnload" />` |
+| Suspense boundary | `<Suspense fallback={<Skeleton />}>...</Suspense>` |
+| Conditional load | Only import inside the event handler that needs it |
+
+## How much does this cost
+
+The investment is small. A few hours per route to audit the bundle and apply splitting. The ongoing cost is the discipline to make new heavy components dynamic imported by default. Both are small. The return is faster routes that compound across every user visit.
+
+## Features the splitting strategy must have
+
+- A bundle analyzer report on every pull request.
+- A documented budget per route.
+- CI enforcement of the budget.
+- Default server components in the App Router. Client components named explicitly.
+- A dynamic import convention for heavy components.
+- A Suspense fallback strategy for loading states.
+- A Script component strategy for third party.
+
+## Expert opinion
+
+> The Next.js teams that ship fast in 2026 take advantage of the framework's splitting capabilities and add their own component level discipline. The teams that ship slow either fight the framework's splitting or never add the component level work. The framework gives you the foundation. The team has to build the rest. The investment per route is small. The compounding effect across the application is large.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS dashboard was running a 480 KB compressed initial bundle on its main page. The Largest Contentful Paint on mobile was over four seconds. The team had assumed they had hit the floor of what Next.js could do.
+
+We ran the bundle analyzer. The chart library was 180 KB and only needed on one tab. The rich text editor was 120 KB and only needed in modals. The icon library was 90 KB and imported wholesale.
+
+We dynamic imported the chart and the editor. We migrated the icons to tree shakeable imports. We moved most of the page tree to server components in the App Router.
+
+The initial bundle dropped to 110 KB compressed. The LCP improved to 1.8 seconds. The work took a week of focused frontend time. The user experience improvement was visible immediately.
+
+For more on the related work, see [bundle size the quiet killer of mobile web performance](/blog/bundle-size-the-quiet-killer-of-mobile-web-performance) and [largest contentful paint the metric that changes conversions](/blog/largest-contentful-paint-the-metric-that-changes-conversions).
+
+## Common mistakes teams make
+
+1. Treating the route bundle as the splitting unit.
+2. Importing heavy libraries at the top of the file when dynamic would have worked.
+3. Marking too many components as use client. Loses the server component benefit.
+4. No Suspense boundary. Loading is a blank screen.
+5. Third party scripts loaded with the default strategy. Often wrong.
+6. No bundle analyzer in CI. The bundle drifts.
+7. No budget per route. Cannot prevent regression.
+8. Splitting too aggressively. Many small chunks have their own cost.
+
+## A two week plan to apply splitting
+
+1. **Week one.** Run the bundle analyzer. Identify the heavy components per route.
+2. **Week two.** Apply dynamic imports. Migrate appropriate components to server components. Add Suspense boundaries. Measure the improvement.
+
+For more on the related work, read [bundle size the quiet killer of mobile web performance](/blog/bundle-size-the-quiet-killer-of-mobile-web-performance) and [lazy loading the patterns that work and the ones that backfire](/blog/lazy-loading-the-patterns-that-work-and-the-ones-that-backfire). On the broader performance side, [the real numbers behind a fast web app in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026) is the natural next read.

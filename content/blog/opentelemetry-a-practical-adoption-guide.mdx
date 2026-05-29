@@ -1,0 +1,62 @@
+---
+slug: "opentelemetry-a-practical-adoption-guide"
+title: "OpenTelemetry: A Practical Adoption Guide"
+excerpt: "OpenTelemetry is the vendor-neutral standard for application telemetry. Here is what it actually includes, how to instrument a Node.js or Python service in a day, and how to avoid the common mistakes that make OpenTelemetry harder than it needs to be."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/opentelemetry-a-practical-adoption-guide"
+status: "published"
+definition: "OpenTelemetry (OTel) is an open source observability framework that provides a standardized way to instrument applications for metrics, logs, and distributed traces. It includes instrumentation libraries for most languages, a data collector (the OTel Collector), and a common export format (OTLP) that sends data to any compatible observability backend. Adopting OpenTelemetry for instrumentation means the application code does not change when the observability backend changes."
+faq: [
+  {"q":"What problem does OpenTelemetry solve?","a":"OpenTelemetry solves vendor lock-in at the instrumentation layer. Before OpenTelemetry, instrumenting a service for observability meant using a vendor-specific SDK (Datadog agent, New Relic agent, Dynatrace one). Switching observability backends required re-instrumenting the application. OpenTelemetry provides a single instrumentation layer that exports to any compatible backend via OTLP. The backend can be changed without changing the application code."},
+  {"q":"What are the three components of OpenTelemetry?","a":"The API (the interfaces and data types for creating spans, metrics, and logs), the SDK (the implementation of the API that collects and processes telemetry data), and the Collector (an optional infrastructure component that receives telemetry data from services, processes it, and exports it to backends). In practice: application code uses the API, the SDK handles collection, and the Collector handles routing to multiple backends. Small setups can skip the Collector and export directly from the SDK to the backend."},
+  {"q":"What is auto-instrumentation and how much does it cover?","a":"Auto-instrumentation automatically adds telemetry to common frameworks and libraries without modifying application code. For Node.js, the @opentelemetry/auto-instrumentations-node package automatically instruments Express, HTTP clients, database drivers, and other common libraries. This captures the majority of spans a service generates (incoming requests, outgoing HTTP calls, database queries) without a single line of code change in the application. Auto-instrumentation is the starting point; custom spans are added for business-specific operations that auto-instrumentation does not cover."},
+  {"q":"What backends are compatible with OpenTelemetry?","a":"The major observability backends have native OTLP support: Datadog, Grafana (Tempo for traces, Prometheus for metrics, Loki for logs), Honeycomb, New Relic, Jaeger, Zipkin, and Azure Monitor. The OTel Collector can fan out to multiple backends simultaneously, which allows sending traces to Jaeger for self-hosted storage while also sending to Datadog for alerting. This flexibility is one of OpenTelemetry's main advantages over vendor-specific agents."},
+  {"q":"How long does it take to instrument a service with OpenTelemetry?","a":"For a Node.js or Python service using common frameworks, auto-instrumentation can be configured in under an hour. Installing the packages, initializing the SDK with the OTLP exporter, and verifying that traces appear in the backend is a half-day exercise for an engineer who has not done it before. Custom spans for business logic add time proportional to the number of operations being tracked. A service with reasonable auto-instrumentation coverage can be fully instrumented in one to two days of engineering time."}
+]
+---
+
+## What you need to know
+
+- OpenTelemetry is the vendor-neutral instrumentation standard. Instrument once, export to any backend. New projects should adopt OTel rather than vendor-specific agents.
+- Auto-instrumentation covers the majority of observable operations in a service (HTTP, database, messaging) without code changes. Start there before adding custom spans.
+- The OTel Collector is optional for small setups. Services can export directly to a backend via OTLP. Add the Collector when you need to fan out to multiple backends or do processing before export.
+- OpenTelemetry traces, metrics, and logs are three separate data types with different levels of OTel maturity. Traces are the most mature and where most teams start. Metrics support is production-stable. Logs are the most recently stabilized.
+- The hardest part of OpenTelemetry adoption is not instrumentation; it is context propagation: ensuring trace IDs flow correctly through async operations, message queues, and cross-service calls.
+
+## The core argument
+
+OpenTelemetry has reached the maturity point in 2026 where adopting anything else for new service instrumentation is a deliberate decision to accept vendor lock-in. The auto-instrumentation libraries are stable, the OTLP export format is widely supported, and the operational overhead of the OTel Collector is modest. Teams that instrument with Datadog agent or New Relic agent today will pay the re-instrumentation cost when they switch backends; teams that instrument with OpenTelemetry will not.
+
+The practical adoption path for a Node.js service starts with two packages: `@opentelemetry/sdk-node` for the SDK and `@opentelemetry/auto-instrumentations-node` for framework coverage. The initialization code runs before the application starts, configures the OTLP exporter to point at the backend, and sets resource attributes (service name, version, environment). From that point, every HTTP request handled by Express, every database query through pg or mysql2, and every HTTP request made by the service with Axios or node-fetch generates a span that appears in the observability backend. This is a meaningful amount of observability before writing a single custom span.
+
+The step after auto-instrumentation is adding custom spans for business-critical operations that the frameworks do not cover: payment processing, job queue work, complex calculations, file processing. A custom span wraps a business operation and records its duration, success, and relevant attributes (user ID, order ID, file size). The resulting traces show the full picture of a request: the HTTP layer, the database queries, the business logic operations, and the outgoing calls, all linked by the trace ID and organized in a flame graph that makes performance analysis and debugging straightforward.
+
+## Common mistakes
+
+1. **Not initializing OpenTelemetry before other imports.** The OTel SDK must be initialized before any instrumented libraries are imported, because instrumentation patches are applied when the module is first loaded. An initialization file that is imported at the very top of the entry point, before any other imports, ensures the patches are applied correctly.
+
+2. **Exporting to a backend that does not support OTLP natively.** Some older backends require the OTel Collector with a translation layer (OTLP to Prometheus format, for example). Choosing a backend that natively accepts OTLP removes the Collector requirement for simple setups.
+
+3. **Not propagating trace context across message queues.** When a service sends a message to a queue, the trace context (trace ID, span ID) must be injected into the message headers. When the consuming service processes the message, it must extract the trace context from the headers and create a child span. Without this, traces break at async boundaries and the distributed trace is fragmented.
+
+4. **Adding too many custom attributes to spans.** Spans with hundreds of attributes are expensive to store and export. Add attributes that are genuinely useful for filtering and drilling into traces: user ID, tenant ID, resource type, error code. Avoid adding large payloads (request bodies, response bodies) as span attributes.
+
+5. **Not sampling at the SDK level for high-volume services.** At high request volume, exporting 100 percent of traces is prohibitively expensive. Configure tail-based sampling in the OTel Collector or head-based sampling in the SDK to reduce export volume while retaining traces for errors and slow requests.
+
+## Where to start
+
+1. **Install and initialize the OTel SDK with auto-instrumentation on one service.** For Node.js, this is a one-file initialization change. Verify that spans appear in the backend for standard HTTP requests and database queries. This establishes that the instrumentation pipeline works before adding custom spans.
+
+2. **Add custom spans for the three most business-critical operations.** Identify the operations that take the longest, fail the most, or are most important to monitor. Wrap each in a span with relevant attributes. These custom spans immediately make the traces more useful than auto-instrumentation alone.
+
+3. **Add trace context propagation through any async boundaries.** If the service puts messages on a queue or calls a background job, ensure the trace context is injected into the message and extracted by the consumer. This produces end-to-end traces that cross service and queue boundaries.
+
+## Related reading
+
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Logging Strategy for SaaS: Structured, Searchable, Useful](/blog/logging-strategy-for-saas-structured-searchable-useful)
+- [Incident Severity Levels: A Practical Definition](/blog/incident-severity-levels-a-practical-definition)
+- CI/CD Pipeline Design That Scales Past Ten Engineers

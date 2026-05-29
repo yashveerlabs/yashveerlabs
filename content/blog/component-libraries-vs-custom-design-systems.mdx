@@ -1,0 +1,113 @@
+---
+slug: "component-libraries-vs-custom-design-systems"
+title: "Component Libraries vs Custom Design Systems"
+excerpt: "Component libraries get you shipping in days. Custom design systems give you the look that becomes brand. Most teams need both. The order matters. Here is the progression."
+date: "2026-05-20"
+category: "Web App and Frontend Development"
+tags: ["design-systems","components","ui","frontend"]
+readingMinutes: 12
+ogImage: "/api/og/blog/component-libraries-vs-custom-design-systems"
+status: "published"
+definition: "A component library is a packaged set of UI components you adopt and use. A custom design system is the set of tokens, patterns, and components that your team builds to express your brand. Most teams start with a component library to ship quickly, then build a thin design system layer on top to differentiate. Few teams go full custom. The ones that do usually regret it within two years."
+faq: [
+  {"q":"What should I start with?","a":"A component library. shadcn/ui, Radix, Mantine, MUI, or Chakra. The library handles the unglamorous components like dropdowns, dialogs, and command palettes. Your team focuses on the actual product. Adding a design system layer on top for tokens and brand specific components is a separate later step."},
+  {"q":"What is shadcn/ui specifically?","a":"A collection of components built on Radix primitives and styled with Tailwind. The components are copied into your project rather than installed as a dependency. The team owns the code and customizes freely. It is the most popular approach for modern React SaaS in 2026."},
+  {"q":"When should I build a custom design system?","a":"When the team has shipped enough to know what the brand needs and the off the shelf libraries cannot express it. Usually at year two or three of a product. Earlier than that the team is solving the wrong problem."},
+  {"q":"What is a design token?","a":"A named variable for a design value. Color, spacing, type size, radius, shadow. Tokens are the foundation of any design system. They let the team change the brand by updating tokens rather than touching every component."},
+  {"q":"Should engineers own the design system?","a":"Engineers and designers together. The system is engineering and design. Either alone produces gaps. The healthy pattern is a designer who codes some and an engineer who designs some sharing ownership."},
+  {"q":"How big a team does a design system need?","a":"At small SaaS, a fraction of one engineer plus a fraction of one designer. As the team grows past fifty engineers, a dedicated design systems team of two to four people emerges. Below that, embedded effort works."},
+  {"q":"What about the long term cost?","a":"A custom design system costs significant ongoing effort. New components. Maintenance. Documentation. Migration when the brand shifts. The cost is justified when the system supports a large product surface. Below that the off the shelf library is cheaper for the same outcome."}
+]
+---
+
+## What you actually need to know
+
+- Start with a component library. shadcn/ui or equivalent.
+- Add a design system layer on top when the brand needs it.
+- Tokens are the foundation. Components sit on the tokens.
+- Engineers and designers share ownership.
+- Most teams should not build a fully custom design system.
+
+| Approach | Best fit | Time to ship |
+|---|---|---|
+| Component library only | Most early SaaS | Days |
+| Library plus token layer | Most growth stage SaaS | Weeks |
+| Custom on top of library | Brand differentiation needed | Months |
+| Fully custom | Rare. Large surface justifies it | Years |
+
+## The core argument
+
+The choice between component library and custom design system is usually framed as either or. The reality is layered. Start with the component library. Get the dropdowns, dialogs, command palettes, date pickers, and other unglamorous components for free. Ship the product. Discover what the brand actually needs through real customer interaction.
+
+The next layer is tokens. Brand colors, type scale, spacing scale, radius scale, shadow scale. The tokens are a thin layer. The component library uses them. The custom components your team builds on top use them. The brand becomes consistent.
+
+The next layer is custom components. The ones your product needs that the library does not provide. A specific kind of card layout. A particular form pattern. A dashboard widget unique to your domain. The custom components sit on top of the library and the tokens.
+
+Going fully custom is the trap. The team spends months rebuilding components that the library already provides. The result is a custom version that is usually worse, less accessible, less maintained. The cost is real and the benefit is rarely worth it.
+
+The pattern that works for most SaaS in 2026 is shadcn/ui plus a token layer plus a thin set of custom components specific to the product. The library handles the heavy lifting. The tokens handle the brand. The custom components handle the differentiation. The maintenance is manageable. The shipping is fast.
+
+## The progression by stage
+
+| Stage | Approach |
+|---|---|
+| Pre product | Library only. shadcn/ui or Mantine |
+| MVP | Library plus minimal tokens |
+| Growth | Library plus token layer plus 5 to 15 custom components |
+| Mid stage | Library plus design system plus 30 to 50 custom components |
+| Mature with large surface | Custom design system on top of library primitives |
+
+## How much does this cost
+
+| Approach | Initial cost | Ongoing |
+|---|---|---|
+| Library only | Hours to days | Negligible |
+| Library plus tokens | Days | Hours per month |
+| Library plus design system | Weeks | A few hours per week |
+| Custom design system | Months | A team or a meaningful fraction of one |
+
+## Features the system must have
+
+- Design tokens as the single source of truth for visual values.
+- Documented components with usage examples.
+- Accessibility tested on every component.
+- A clear path to adopt new components.
+- A clear path to deprecate components.
+- Version control on the system.
+- A way for engineers to contribute components back.
+
+## Expert opinion
+
+> Most teams that built fully custom design systems in 2020 are migrating to library plus tokens in 2026 because the maintenance cost was higher than the benefit. The pattern that works is to lean on the library for the unglamorous components, layer tokens on top for the brand, and add custom only where the product genuinely needs it. The work the team does is the work that differentiates the product. The work the library does is the work that nobody pays you for.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had built a custom design system in their first year. Two engineers had spent significant time on it. The design system covered roughly thirty components. The maintenance was an ongoing burden.
+
+We migrated to shadcn/ui with a thin token layer matching their brand. The migration took six weeks. The custom design system was retired. The team gained roughly fifteen percent of engineering capacity that had been spent on design system maintenance.
+
+The brand expression did not suffer. The token layer captured the brand cleanly. The few components that genuinely needed custom were kept. The off the shelf library handled the rest. The team has run on the simpler approach for eighteen months without missing the custom system.
+
+For more on the related work, see [tailwind UI vs shadcn vs headless UI vs build your own](/blog/tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own) and [building cinematic web experiences without killing performance](/blog/building-cinematic-web-experiences-without-killing-performance).
+
+## Common mistakes teams make
+
+1. Building a custom design system before the team has shipped enough to know what is needed.
+2. Treating the design system as a feature rather than infrastructure.
+3. Engineers without designer input. The system is engineering looking.
+4. Designers without engineer input. The system is not implementable.
+5. No tokens. The brand shift requires changes everywhere.
+6. No documentation. The system becomes tribal knowledge.
+7. No deprecation path. Old components linger.
+8. Treating the system as set and forget. It needs ongoing work.
+
+## A 30 day plan to set up the layered approach
+
+1. **Week one.** Pick the component library. shadcn/ui is the safe default.
+2. **Week two.** Define the design tokens. Colors, type, spacing, radius, shadow.
+3. **Week three.** Build the first three custom components your product needs.
+4. **Week four.** Document. Train the team. Ship.
+
+For more on the related work, read [tailwind UI vs shadcn vs headless UI vs build your own](/blog/tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own) and the patterns that make a SaaS feel premium. On the broader frontend side, [building cinematic web experiences without killing performance](/blog/building-cinematic-web-experiences-without-killing-performance) is the natural next read.

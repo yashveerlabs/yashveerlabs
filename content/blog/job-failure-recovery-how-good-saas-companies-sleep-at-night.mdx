@@ -1,0 +1,62 @@
+---
+slug: "job-failure-recovery-how-good-saas-companies-sleep-at-night"
+title: "Job Failure Recovery: How Good SaaS Companies Sleep at Night"
+excerpt: "Every background job will fail eventually. The companies that sleep at night are the ones that built failure recovery into the system from day one, not as an afterthought when something broke in production."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night"
+status: "published"
+definition: "Job failure recovery is the combination of retry strategies, dead letter handling, alerting, and idempotency design that ensures background jobs either complete successfully or fail in a way that is visible, recoverable, and does not corrupt data. A SaaS product with good job failure recovery treats a failing job as a recoverable event rather than a data loss incident."
+faq: [
+  {"q":"What is a dead letter queue and when do I need one?","a":"A dead letter queue (DLQ) is a separate queue or storage location where jobs are moved after they exhaust their retry attempts. It provides a safe place to inspect, debug, and reprocess failed jobs without losing them. Any production job queue needs a DLQ configured before the first real job runs. Jobs that fail silently and disappear are invisible incidents waiting to become customer complaints."},
+  {"q":"How many retry attempts is appropriate for a background job?","a":"Three to five retries with exponential backoff covers the vast majority of transient failures without exhausting the queue. Very short jobs can retry more aggressively. Jobs that involve external API calls should respect rate limits in their retry timing. The right number is the one that gives a transient failure enough attempts to resolve while not delaying the dead letter queue investigation for permanent failures."},
+  {"q":"What is exponential backoff and why does it matter for retries?","a":"Exponential backoff increases the delay between retry attempts by a multiplier each time: first retry after 30 seconds, second after 60, third after 120. This gives the underlying cause time to resolve without hammering a failing dependency. Linear or constant retries can make an already overloaded service worse by adding repeated requests while it is recovering."},
+  {"q":"How do I make background jobs idempotent?","a":"Design the job so that executing it multiple times with the same input produces the same result as executing it once. For jobs that write to a database, use upsert operations with a stable identifier rather than blind inserts. For jobs that call external APIs, use idempotency keys on write operations. For jobs that send notifications, check whether the notification was already sent before sending it."},
+  {"q":"What should happen when a job fails permanently?","a":"It should move to the dead letter queue, trigger an alert or notification to the on-call engineer, and log the failure with enough context to understand what the job was doing and why it failed. The alert should distinguish between a first-failure alert (informational) and a dead letter queue alert (actionable). Someone should be responsible for reviewing the DLQ on a cadence and deciding whether to reprocess, fix, or discard failed jobs."}
+]
+---
+
+## What you need to know
+
+- Every background job will eventually fail. The architecture question is not whether jobs fail but whether failures are visible, recoverable, and isolated from data corruption.
+- Idempotency is the foundation of safe retries. A job that cannot be safely retried without corrupting data is a liability in production.
+- Dead letter queues are not optional in production systems. Jobs that fail permanently without being captured represent invisible data loss.
+- Exponential backoff prevents a failing downstream dependency from being overwhelmed by retry storms. Configure it before the first external API call in a background job.
+- Alerting on dead letter queue depth is the operational practice that converts a silent failure into a visible incident.
+
+## The core argument
+
+The failure mode I see most often in early-stage SaaS products is the silent job failure. A background job fails after exhausting retries, disappears into a void, and the consequence of that failure surfaces three days later when a customer asks why their report did not generate or their integration stopped syncing. The engineering team traces the issue backward, discovers the job was failing, and realizes there was no alerting on the failure. The fix for the immediate problem is a rerun. The fix for the systemic problem is building the visibility infrastructure that was missing.
+
+The job failure recovery architecture has three components. The first is idempotent job design: every job handler must be written so that running it twice with the same input produces the same result as running it once. This is not a nice-to-have; it is the prerequisite for safe retries. Without idempotency, retries risk double-processing: double charges, duplicate notifications, double database writes. Idempotency turns the retry from a risk into a safety mechanism.
+
+The second component is the retry configuration: how many attempts, with what backoff, and what constitutes a retriable versus permanent failure. Transient failures like network timeouts and rate limit responses are retriable. Validation errors and authorization failures are not retriable and should fail immediately to the dead letter queue rather than burning retry attempts. The third component is visibility: dead letter queue alerting, job failure logging with enough context to debug, and a review process that ensures dead letter queue depth stays near zero. When I set up the job infrastructure for Nexli, the standard was simple: every queue has a DLQ, every DLQ has an alert threshold of one, and the on-call rotation includes a DLQ review each morning. A DLQ that never gets reviewed is not a recovery mechanism; it is a graveyard.
+
+## Common mistakes
+
+1. **Not configuring a dead letter queue before going to production.** This is the most common omission. Adding a DLQ after the first production failure means jobs from the failure period are lost. Configure the DLQ before the queue processes its first production job.
+
+2. **Retrying non-retriable errors.** A job that fails because it is trying to process a record that does not exist will fail on every retry. Distinguish between retriable errors (network timeout, rate limit) and permanent errors (validation failure, missing resource) and send permanent errors to the DLQ immediately.
+
+3. **Writing non-idempotent job handlers.** A job handler that inserts a new row without checking for an existing one will create duplicate records on retry. Make every handler explicitly idempotent before deploying it to production.
+
+4. **Not logging enough context on failure.** A failed job log entry that says "Error: connection timeout" without the job payload, the job ID, the affected customer ID, or the step that failed is nearly useless for debugging. Log enough context to reproduce the failure without needing to know what was happening at 2am three days ago.
+
+5. **Not alerting on DLQ depth.** A DLQ that grows silently is a queue of unresolved customer impact. Set an alert threshold of one or two items and respond to every alert. If the DLQ is noisy, the noise is telling you something about the job infrastructure that needs fixing.
+
+## Where to start
+
+1. **Audit every background job queue in your system and verify that a DLQ is configured.** For BullMQ, Sidekiq, or managed platforms like Inngest and Trigger.dev, check the queue configuration. If any queue lacks a DLQ, add it immediately.
+
+2. **Add idempotency checks to the three most frequently failing jobs.** Look at your error logs or job history for the handlers that have the most failures. For each one, verify that running it twice produces the same result and add an idempotency guard if it does not.
+
+3. **Set up an alert on DLQ depth.** A simple alert that fires when the DLQ has more than zero items and routes to the on-call engineer is the minimum. Add it to the same monitoring system that handles your other production alerts.
+
+## Related reading
+
+- [Inngest vs Trigger vs Temporal for Background Jobs](/blog/inngest-vs-trigger-vs-temporal-for-background-jobs)
+- [SaaS Webhook Reliability: From At-Most-Once to At-Least-Once to Exactly-Once](/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once)
+- [Idempotency Keys: A Pattern Every Senior Engineer Should Master](/blog/idempotency-keys-a-pattern-every-senior-engineer-should-master)
+- [Resilience Patterns: Circuit Breakers, Retries, Bulkheads](/blog/resilience-patterns-circuit-breakers-retries-bulkheads)

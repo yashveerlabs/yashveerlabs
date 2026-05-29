@@ -1,0 +1,118 @@
+---
+slug: "why-you-should-ship-your-mvp-with-bugs-and-which-ones-to-keep"
+title: "Why You Should Ship Your MVP With Bugs (and Which Ones to Keep)"
+excerpt: "The goal is not a bug-free MVP. The goal is a bug-tolerant one. Knowing which bugs to ship with and which to fix first is the difference between launching and not launching."
+date: "2024-06-23"
+category: "MVP Development and Startup Builds"
+tags: ["mvp","startup","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-you-should-ship-your-mvp-with-bugs-and-which-ones-to-keep"
+status: "published"
+definition: "Every MVP ships with bugs. The founders who launch are the ones who have decided which bugs are acceptable and which are not, and who have written that line down before the pressure of launch week makes the distinction impossible to think through clearly. I use a three-tier system: fix before launch, fix in week one, and park until they affect a real user. That system has shipped every project I have launched on time."
+faq: [
+  {"q":"Is it acceptable to launch an MVP knowing there are bugs in it?","a":"Yes, with boundaries. The acceptable bugs are the ones that do not affect the core user flow, do not cause data loss, and do not create a security exposure. Cosmetic issues, edge case errors, slow pages on secondary views, and minor UX inconsistencies are all shippable. Authentication issues, data corruption risks, and broken core flows are not."},
+  {"q":"Which bugs should always be fixed before launching an MVP?","a":"Any bug that blocks the core user action. Any bug that causes data loss or corruption. Any authentication or authorization issue. Any bug that exposes user data to the wrong person. Any bug that generates a visible error message with a stack trace or technical detail. Fix these before launch. Everything else is negotiable."},
+  {"q":"How do I triage bugs in a pre-launch MVP sprint?","a":"Three categories. P1: blocks the core flow or causes data loss, fix before launch. P2: degrades the experience but does not block the core flow, fix in week one after launch. P3: cosmetic, edge case, or affects a secondary flow, park until a real user reports it. If you have more than five P1 bugs two days before launch, push the date. If they are all P2 or P3, ship."},
+  {"q":"What happens if I ship with bugs and users complain?","a":"Users at the MVP stage are more tolerant than founders expect, if you have set expectations correctly. A note in the onboarding that says 'this is an early version and we are actively fixing issues' gives users a frame for what they are seeing. What users do not tolerate is bugs they discover without warning combined with unresponsive support. The bug itself is rarely the problem. The communication around it usually is."},
+  {"q":"Should I tell early users the MVP has known bugs?","a":"Yes, briefly and without over-explaining. Something like 'this is an early version and you will find rough edges, please report them and we fix quickly' is enough. This sets expectations, invites feedback, and creates goodwill. Trying to hide known issues from early users destroys trust faster than the bugs themselves would."},
+  {"q":"How many open bugs is too many to ship an MVP?","a":"Zero P1 bugs. Any number of P2 and P3 bugs is acceptable if they are documented and triaged. The number is less important than the category. A product with forty P3 bugs and zero P1 bugs is shippable. A product with two P1 bugs and zero others is not. The category system is the decision framework, not the count."},
+  {"q":"Does shipping with bugs hurt your reputation with early customers?","a":"Rarely, if you are responsive. Early adopters understand they are using an early product. They will forgive bugs if reports are acknowledged quickly and fixes arrive within days, not weeks. What harms reputation is silence after a bug report, or a bug that was reported once and then silently recurs a month later. Responsiveness matters more than perfection at this stage."}
+]
+---
+
+## What you actually need to know
+
+- Perfect is the most expensive bug in any MVP. Waiting to fix every issue before launch is what keeps most products from ever reaching users.
+- There are exactly two categories of bugs that should stop a launch: bugs that break the core flow and bugs that create a security or data integrity risk. Everything else is a decision, not a requirement.
+- The bugs you learn the most from are the ones that real users find after launch, not the ones you find in internal testing.
+- Shipping with known bugs is not irresponsible. Shipping with undocumented bugs is. The documentation is the discipline.
+- The goal of bug triage before launch is not to reach zero. It is to reach a list of what you know and a plan for what to do about it.
+
+| Bug category | Definition | Ship with it? | Fix timing |
+|---|---|---|---|
+| P1: Core flow blocker | Prevents a user from completing the main action | No | Before launch |
+| P1: Data integrity | Causes data loss, corruption, or wrong writes | No | Before launch |
+| P1: Security exposure | Leaks user data, bypasses auth, exposes stack traces | No | Before launch |
+| P2: Experience degrading | Slows, confuses, or frustrates but does not block | Yes | Week one post-launch |
+| P3: Cosmetic or edge case | Minor visual issues, rare paths, secondary flows | Yes | When reported by a real user |
+
+## The core argument
+
+The decision to wait for zero bugs before launching is not a quality decision. It is a launch decision, and it is almost always the wrong one. The codebase will never reach zero bugs. Every fix introduces the possibility of a new bug. Every new feature adds surface area. A product that ships after six months of internal bug hunting is a product that has been tested by the four people who already know how it works, not by the fifty people who will find the things those four people missed.
+
+The bugs that matter are the ones that break the product for a real user doing a real task. Those are a small fraction of the bugs in any early codebase. The rest are fixable after launch, using the signal from actual usage to prioritize what to fix first.
+
+The discipline is not in fixing everything before launch. It is in knowing which bugs you have, categorizing them honestly, and communicating clearly with early users that the product is early. That combination ships products. The alternative, which is to keep fixing until confidence arrives, is how projects end up eleven months into a six-week build.
+
+## How to triage before launch
+
+The process takes one afternoon and a spreadsheet. List every known issue. Assign each one a category: P1 if it blocks the core flow or creates a security or data integrity risk, P2 if it degrades the experience without blocking anything, P3 if it is cosmetic or edge case.
+
+Any P1 bugs fix before launch. There is no negotiation on this. A product that corrupts user data or locks users out of their accounts is not shippable, no matter how tight the timeline is.
+
+P2 bugs are your week-one backlog. Every item on the list gets addressed in the first sprint after launch, prioritized by how often users encounter it.
+
+P3 bugs go in a separate list. You do not fix them proactively. You fix them when a real user reports the specific issue, because real users will help you find which P3 bugs are actually P2 bugs you miscategorized.
+
+### The edge case trap
+
+The most common pre-launch time sink is the edge case. A developer finds a path through the product that throws an error. The error requires two specific inputs in a specific order that no normal user would hit. Fixing it takes a day. The fix introduces a small regression in a different flow. Fixing the regression takes another day.
+
+The discipline is to categorize the edge case honestly. Is it a path a real user would hit in their first session? If not, it is P3. Park it. Ship.
+
+## How long does it take
+
+| Pre-launch bug work | Time required | Who does it |
+|---|---|---|
+| Bug triage session | 2 to 4 hours | Founder and developer together |
+| P1 fix sprint | 1 to 5 days, depending on count | Developer |
+| Writing the known issues list | 1 hour | Developer |
+| Drafting early user communication about known issues | 30 minutes | Founder |
+| P2 backlog planning | 1 hour | Founder and developer |
+
+The total pre-launch bug work is two to seven days if the P1 list is short. If the P1 list has more than five items, either the scope needs to be reduced or the launch date needs to move. A long P1 list is information about the quality of the build, not just the count of remaining work.
+
+## What to look for in your launch-readiness check
+
+- Zero P1 bugs. This is non-negotiable.
+- Every known P2 bug is documented with a reproduction step.
+- The early user communication mentions that the product is early and invites bug reports.
+- There is a support channel. An email address, a Slack link, a simple form. Something users can send a report to and get a response within 24 hours.
+- Error logging is configured. Sentry, LogRocket, or any equivalent. You should hear about crashes before users email you about them.
+- The developer is available for the first week after launch. Not necessarily full time but reachable and prioritizing P1 fixes.
+
+## Expert opinion
+
+> The founders who ship have made peace with imperfection. The ones who do not ship are waiting for a confidence that no amount of internal testing will ever produce. Real users teach you things in twenty minutes that four months of internal review cannot. The only way to access that teaching is to ship.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I launched an MVP for a founder with a P2 list of eleven items and a P3 list of twenty-three. The P1 list was empty after a three-day fix sprint. We shipped on the original date.
+
+In the first two weeks of live usage, real users found seven issues. Two of them were on the P2 list and were fixed in week one as planned. Three of them were on the P3 list and turned out to be more common than we thought, so they were reclassified and fixed in week two. Two of them were bugs we had never seen internally, because they required a browser and screen resolution combination that none of us used.
+
+The four months of internal testing before that launch had not found the two real-user bugs. Twenty minutes of live usage did. That is not an argument against internal testing. It is an argument for not letting internal testing be the reason you do not launch. For the broader pre-launch discipline, [the honest MVP checklist](/blog/the-honest-mvp-checklist-25-items-before-you-launch) covers the full launch-readiness review. For what to do with the bug reports that come in after launch, [the MVP postmortem questions](/blog/the-mvp-postmortem-questions-to-ask-yourself-six-months-in) includes a section on turning early feedback into a prioritized roadmap.
+
+## Common mistakes
+
+1. Treating all bugs as equal. They are not. A P1 and a P3 are different types of problems, not different sizes of the same problem.
+2. Fixing P3 bugs before P1 bugs because the P3 bugs are easier. Fix by priority, not by ease.
+3. Not telling early users the product is early. Silence about known issues reads as indifference when a user finds one.
+4. Shipping without error logging. If the first user to hit a crash is the one who tells you about it, you are already behind.
+5. Moving the launch date for P2 bugs. P2 bugs are the week-one backlog, not the launch blocker.
+6. Closing bug reports without a response. Early users who report bugs and receive no acknowledgment do not report the next bug. They just leave.
+7. Finishing the bug triage in the final 48 hours before launch. The triage should happen five to seven days before launch so there is time to fix P1 issues without a crisis.
+
+## A launch week plan for a product with known bugs
+
+1. **Seven days before launch.** Bug triage session. Every known issue categorized. P1 list finalized.
+2. **Days six and five before launch.** P1 fix sprint. Developer works only on P1 items.
+3. **Four days before launch.** P1 list verified on staging. If any P1 items remain, the launch moves by three days.
+4. **Three days before launch.** Write the known issues document. Internal only. The document names every P2 and P3 item and its planned fix date.
+5. **Two days before launch.** Write the early user communication. One paragraph. "This is an early version. You will find rough edges. Report them here and we fix fast."
+6. **One day before launch.** Final walkthrough of the core flow by someone who did not build it.
+7. **Launch day.** Ship. Monitor error logs actively for the first four hours. Respond to any bug report within the hour.
+
+For more on the process that keeps the post-launch fix cycle moving without losing the build momentum, [agile for early stage startups](/blog/agile-for-early-stage-startups-what-actually-matters) covers the weekly cadence that handles this transition from build mode to iteration mode. For the pre-launch readiness check that sits alongside bug triage, [the two-week MVP sprint plan](/blog/the-two-week-mvp-a-workable-sprint-plan) shows how to compress the final push without cutting the wrong corners.

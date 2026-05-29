@@ -1,0 +1,215 @@
+---
+slug: "the-modular-monolith-how-to-buy-yourself-two-years"
+title: "The Modular Monolith: How to Buy Yourself Two Years"
+excerpt: "The modular monolith is the architecture that avoids both distributed system complexity and big-ball-of-mud coupling -- here is how to structure it."
+date: "2024-10-24"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling","monolith","microservices"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-modular-monolith-how-to-buy-yourself-two-years"
+status: "published"
+definition: "The modular monolith is a single deployable application that is internally organized into well-defined modules with explicit interfaces between them. Each module owns its data and business logic; no module accesses another module's database tables directly. This structure gives teams the deployment simplicity of a monolith while building the internal boundaries that make future extraction to microservices or separate services tractable. The modular monolith is the right architecture for most products until they reach genuine scale, which is 10-50x more users than most teams expect."
+faq: [
+  {"q":"What is the difference between a modular monolith and a traditional monolith?","a":"A traditional monolith has no enforced internal structure: any part of the application can access any other part's database tables, functions, and state directly. This produces the 'big ball of mud' pattern where changes in one area have unpredictable effects on other areas. A modular monolith enforces module boundaries: the Billing module exports specific functions that the User module can call, but the User module cannot directly query the billing_subscriptions table. The interface between modules is explicit; the implementation is encapsulated. This internal structure is what enables future extraction to separate services, if and when that becomes necessary."},
+  {"q":"When should a team stop using a modular monolith and split into services?","a":"When a specific module has scaling requirements that differ significantly from the rest of the application. A notification delivery system that needs to process millions of events per minute benefits from independent scaling. A payments service that has different deployment cadence and compliance requirements may benefit from isolation. A recommendation engine that runs heavy ML inference might need to be on different hardware. These are specific, concrete requirements -- not 'we have 50,000 users' or 'we need to scale.' The modular monolith deployed on adequate infrastructure handles hundreds of thousands of users in most product categories."},
+  {"q":"How do I define module boundaries in a modular monolith?","a":"Group by business domain, not by technical layer. A User module contains the user model, user service, user repository, and user-related API routes -- not a Users folder with all models, a separate Services folder, and a separate Routes folder. The business domain grouping means changes to the user domain are localized to one module. The technical layer grouping means changes to the user domain touch three separate folders. Module boundaries that follow the bounded contexts in the business domain are the ones that remain stable as the product evolves."},
+  {"q":"What are the most important rules for module isolation in a modular monolith?","a":"Three rules: no direct database access across module boundaries (the Billing module queries the billing_subscriptions table; the User module calls Billing module functions, not the table directly), no shared mutable state between modules (no global variables or shared caches that one module writes and another reads), and explicit public interfaces for each module (a module's exported functions are its public API; all other functions are internal). These three rules can be enforced with TypeScript module boundaries, ESLint rules against cross-module imports, and database ownership conventions."},
+  {"q":"How does the modular monolith handle cross-module transactions?","a":"With care. Database transactions that span module boundaries are one of the genuinely hard problems in modular architecture. The preferred approach: design the system to minimize cross-module transactions. When a payment succeeds, the Billing module updates the subscription status and publishes an event ('subscription_activated'); the User module listens for the event and grants feature access. The transaction is in the Billing module; the User module's update is eventual. For cases where true atomic cross-module transactions are required, accept that these cross a module boundary and document them explicitly -- they are the seams where module extraction would be most difficult."}
+]
+---
+
+## What you actually need to know
+
+- The modular monolith is the right default architecture for most products until they reach genuine scale. Premature microservices is one of the most common architectural mistakes in startups.
+- The difference between a modular monolith and a big-ball-of-mud is enforced boundaries: no direct cross-module database access, no shared mutable state, explicit public interfaces.
+- Module boundaries should follow business domains (User, Billing, Notifications, Analytics), not technical layers (Models, Services, Controllers).
+- Cross-module communication via events (publish/subscribe) is better than direct function calls for operations that do not require atomicity.
+- A well-structured modular monolith on adequate infrastructure handles hundreds of thousands of users. Most teams extract services years later than they expect to.
+
+| Architecture | Deployment Complexity | Internal Coupling Risk | Scaling Flexibility | Team Size |
+|---|---|---|---|---|
+| Big-ball-of-mud monolith | Low | Very High | Low | Any (short term) |
+| Modular monolith | Low | Low (if enforced) | Medium | 1-10 engineers |
+| Microservices (premature) | Very High | Low | High | 2-10 engineers (excessive) |
+| Microservices (appropriate) | Very High | Low | Very High | 10+ engineers per service |
+
+## The core argument
+
+The startup that starts with microservices has made a bet that they know their domain boundaries before shipping the first version. This bet is almost always wrong. Domain boundaries become clear from usage patterns, business evolution, and team structure -- not from architecture planning sessions. The microservices architecture that is extracted from a working monolith after two years of production usage is built on real knowledge of the domain. The microservices architecture built before the first users arrive is built on speculation.
+
+The cost of this speculation is distributed system complexity: service-to-service communication, distributed tracing, independent deployments for each service, network failure handling, and the operational overhead of maintaining multiple independent services. For a team of 3-5 engineers building a product that needs to find product-market fit, this overhead consumes engineering capacity that should go into the product.
+
+The modular monolith is the middle path: a single deployable application with enforced internal boundaries that make future extraction tractable. It avoids the operational complexity of microservices while avoiding the coupling of a traditional monolith. The boundaries built into the modular monolith are the same boundaries that would define service boundaries if the application were split -- so the split, if it ever becomes necessary, is guided by real domain knowledge and existing module structure.
+
+## The folder structure
+
+A modular monolith organized by business domain:
+
+```
+src/
+  modules/
+    users/
+      users.model.ts       -- User database schema
+      users.service.ts     -- User business logic
+      users.repository.ts  -- User database queries
+      users.routes.ts      -- User API routes
+      users.types.ts       -- User TypeScript types
+      index.ts             -- Public interface (what other modules can import)
+    
+    billing/
+      billing.model.ts
+      billing.service.ts
+      billing.repository.ts
+      billing.routes.ts
+      billing.types.ts
+      index.ts
+    
+    notifications/
+      notifications.service.ts
+      notifications.queue.ts
+      notifications.templates.ts
+      index.ts
+  
+  shared/
+    database/
+      connection.ts
+      migrations/
+    middleware/
+    utils/
+    types/
+```
+
+The `index.ts` in each module exports only what other modules are allowed to use:
+
+```typescript
+// modules/billing/index.ts
+export { BillingService } from './billing.service';
+export type { Subscription, Plan } from './billing.types';
+// Note: BillingRepository is NOT exported -- internal to billing module
+```
+
+An ESLint rule enforces that other modules import only from `modules/billing/index.ts`, not from internal files:
+
+```json
+// .eslintrc.json
+{
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "patterns": [
+        {
+          "group": ["*/modules/billing/*", "!*/modules/billing/index"],
+          "message": "Import from modules/billing/index only"
+        }
+      ]
+    }]
+  }
+}
+```
+
+## Cross-module communication
+
+When a module needs information from another module, it calls the other module's public interface:
+
+```typescript
+// modules/users/users.service.ts
+import { BillingService } from '../billing';  // only the public interface
+
+export class UserService {
+  constructor(private billing: BillingService) {}
+  
+  async getCurrentPlan(userId: string): Promise<Plan> {
+    // Calls billing module's public function, not the database directly
+    return this.billing.getUserPlan(userId);
+  }
+}
+```
+
+For operations that should propagate asynchronously across module boundaries, use domain events:
+
+```typescript
+// modules/billing/billing.service.ts
+import { EventEmitter } from '../shared/events';
+
+export class BillingService {
+  async activateSubscription(userId: string, planId: string) {
+    await this.repository.updateSubscription(userId, { status: 'active', planId });
+    
+    // Publish event -- other modules listen and react independently
+    EventEmitter.emit('subscription_activated', { userId, planId });
+  }
+}
+
+// modules/users/users.service.ts
+EventEmitter.on('subscription_activated', async ({ userId, planId }) => {
+  await this.grantPlanFeatures(userId, planId);
+});
+```
+
+The Billing module's subscription activation is atomic within its own database transaction. The User module's feature grant is a separate operation triggered by the event. If the feature grant fails, it can be retried without affecting the subscription activation. This eventual consistency is acceptable for most feature-granting scenarios.
+
+## The database ownership model
+
+Each module owns its database tables. The Billing module queries `billing_subscriptions`, `billing_invoices`, and `billing_plans`. The User module queries `users` and `user_profiles`. Neither module queries the other's tables directly.
+
+```typescript
+// modules/billing/billing.repository.ts
+export class BillingRepository {
+  async getUserSubscription(userId: string) {
+    // Can query billing_subscriptions -- this is billing's table
+    return db.select().from(billingSubscriptions)
+      .where(eq(billingSubscriptions.userId, userId))
+      .limit(1);
+  }
+}
+
+// modules/users/users.repository.ts
+export class UserRepository {
+  async getUser(userId: string) {
+    // Can only query users table -- cannot join to billing_subscriptions
+    return db.select().from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+  }
+  
+  // To get subscription info, call BillingService, not query the table
+}
+```
+
+The enforcement mechanism is code review culture and ESLint rules. Some teams use database-level role permissions (each module has its own database role with access only to its tables) for stronger enforcement, but this is only necessary for regulated environments or very large teams.
+
+## When to extract a module into a separate service
+
+Three signals that a specific module warrants extraction to a separate service:
+
+**Scaling requirements diverge.** The notification delivery module processes 50,000 events per minute; the rest of the application handles 500 requests per minute. The notification module needs horizontal scaling; the application does not. Separate deployment allows independent scaling.
+
+**Deployment cadence diverges.** A payments service has strict deployment processes (mandatory review, staging validation, explicit rollout). The rest of the application deploys continuously. Separating payments allows its conservative cadence without blocking the main application's continuous delivery.
+
+**Team ownership becomes clear.** A module that one team always owns and others never touch is a natural service boundary. The team-service alignment is one of Conway's Law's most useful prescriptions: structure the architecture to match the team structure.
+
+## Common mistakes teams make with modular monolith structure
+
+1. Starting with modular structure but not enforcing the boundaries. A modular monolith with a well-designed folder structure but no import restrictions is a traditional monolith with extra steps. The ESLint rule that prevents cross-module internal imports is what makes the structure real.
+2. Putting shared business logic in the `shared/` folder. The `shared/` folder is for technical utilities (database connection, logging, HTTP middleware), not for business logic that multiple modules use. Business logic that multiple modules need is a signal that the module boundary is in the wrong place.
+3. Using a global event bus for operations that require atomicity. Events are for eventual consistency; they are not a replacement for transactions. The payment that must atomically update the subscription and grant feature access cannot use events -- it needs a transaction, and the transaction must stay within a module.
+4. Naming modules after technical concepts instead of business domains. A `services/` module, a `models/` module, and a `controllers/` module is a technical layer structure. A `billing/` module, a `users/` module, and a `notifications/` module is a domain structure. The domain structure produces modules that are stable as the team grows; the technical structure produces modules that are split based on file type rather than cohesion.
+5. Planning to extract to microservices from day one. The team that plans for microservices from the start builds the modular structure but also builds the distributed system infrastructure "to be ready." This produces the operational complexity of microservices without the scaling benefit.
+
+## Where to start: a 3-step modular monolith setup
+
+**Step 1: Identify the four to six primary business domains.** Billing, Users, Notifications, Search, Analytics, and Content are common examples. Each domain becomes a module. Resist adding more than six for the initial structure -- the granularity can be increased later.
+
+**Step 2: Create the module folder structure and write an `index.ts` for each module that exports only the public interface.** This establishes the boundary immediately and makes it concrete. Add the ESLint import restriction rule before any cross-module code is written.
+
+**Step 3: Move existing code into the module structure and fix any cross-module database access.** For an existing codebase, this is the most work. For a new project, this starts correctly from the beginning. Identify each case where one module's code queries another module's tables and replace with a service call.
+
+## The Monolith That Scales
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. I have built the same product with a modular monolith and later worked with a team that had chosen microservices for a product at a similar scale. The microservices team spent 30 percent of their engineering time on infrastructure and service coordination. The modular monolith team spent 5 percent. The microservices team had three engineers who specialized in the distributed system infrastructure; the modular monolith team had none. At 50,000 users, neither product had a scaling problem that the architecture was the bottleneck for. The modular monolith team had 30 percent more engineering capacity available for the product. That is the argument for the modular monolith at early to mid scale: not that it is architecturally superior, but that it preserves engineering capacity for the product, which is the scarce resource that actually determines startup outcomes.
+
+## Related reading
+
+- [The Five Architectural Failures That Killed Startups I Worked With](/blog/the-five-architectural-failures-that-killed-startups-i-worked-with)
+- [The Multi-Tenant Database: One Schema or Many?](/blog/the-multi-tenant-database-one-schema-or-many)
+- [The Hidden Cost of Eventual Consistency: A SaaS Postmortem](/blog/the-hidden-cost-of-eventual-consistency-a-saas-postmortem)
+- The SaaS Architecture Checklist Before You Scale

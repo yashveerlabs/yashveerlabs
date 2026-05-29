@@ -1,0 +1,109 @@
+---
+slug: "error-boundaries-the-pattern-every-react-app-should-use"
+title: "Error Boundaries: The Pattern Every React App Should Use"
+excerpt: "An error in one part of a React app should not take down the whole app. The error boundary pattern is small. Most apps still do not use it. Here is the pattern that prevents the white screen of death."
+date: "2026-05-22"
+category: "Web App and Frontend Development"
+tags: ["react","error-boundary","frontend","reliability"]
+readingMinutes: 11
+ogImage: "/api/og/blog/error-boundaries-the-pattern-every-react-app-should-use"
+status: "published"
+definition: "An error boundary in React is a component that catches errors in its child component tree and renders a fallback UI instead of crashing the whole app. The pattern is built into React. Most apps still do not use it. The result is that an error in one widget can blank the entire page. The fix is a few lines of code per boundary plus a logging integration."
+faq: [
+  {"q":"What is an error boundary?","a":"A React component that implements componentDidCatch or static getDerivedStateFromError. When a child component throws during rendering, the boundary catches the error and renders a fallback. The rest of the page outside the boundary continues to work."},
+  {"q":"Where should I put error boundaries?","a":"Around the entire app for a catch all. Around route segments so a broken route does not break the layout. Around heavy widgets like charts that can fail independently. Around the third party integrations that you do not fully trust."},
+  {"q":"What does a good fallback look like?","a":"Acknowledges the error. Offers a way forward. A clear message, a way to retry, and a way to report. Not a stack trace. Not a blank space. The fallback should make the user feel that the error was handled deliberately."},
+  {"q":"How do I log errors from boundaries?","a":"componentDidCatch is the right hook. Send the error and the React component stack to your error monitoring tool. Sentry, Bugsnag, and similar tools have first class support for React error boundaries."},
+  {"q":"What does the App Router in Next.js give me?","a":"The App Router has built in error.tsx files that act as error boundaries per route segment. The pattern is documented. The team gets a clean fallback per route without writing the boundary manually."},
+  {"q":"What about errors outside rendering?","a":"Error boundaries only catch errors in the React tree during render. They do not catch errors in event handlers, async code, or anywhere else. Those need try catch and explicit error handling. The boundary is one tool, not the whole story."},
+  {"q":"What is the worst error handling mistake?","a":"No boundaries. A single broken widget brings down the whole app. The customer sees a blank page. The team learns about it from support tickets. The fix is a boundary that prevents the cascade."}
+]
+---
+
+## What you actually need to know
+
+- React error boundaries catch errors in the component tree and render fallbacks.
+- Use them around routes, heavy widgets, and third party integrations.
+- The App Router in Next.js provides error.tsx per route.
+- Log to your error monitoring tool from componentDidCatch.
+- Boundaries do not catch async or event handler errors.
+
+| Boundary location | What it protects |
+|---|---|
+| App root | Catch all, prevents white screen |
+| Route segment | Broken route does not break shell |
+| Heavy widget | Chart, editor, integration |
+| Third party integration | Vendor failure isolated |
+| Marketing section | Decorative failure contained |
+
+## The core argument
+
+React error boundaries are one of those built in features that most apps still do not use. The pattern is well documented. The implementation is small. The benefit is that an error in one part of the app does not take down the whole app. The cost of skipping is the white screen that customers report and the team learns about in support tickets.
+
+The pattern is small. A component class with componentDidCatch and getDerivedStateFromError. The component wraps the part of the tree you want to protect. When a child throws during render, the boundary catches the error and renders a fallback. The rest of the page outside the boundary keeps working.
+
+The Next.js App Router has made this even easier. An error.tsx file per route segment acts as an error boundary. The team gets per route protection without writing the boundary manually. The pattern is the default for new App Router projects.
+
+The discipline is to use boundaries at the right granularity. The whole app gets one for catch all protection. Each route gets one so a broken route does not break the layout. Heavy widgets like charts get one because they often fail and the rest of the page should keep working. Third party integrations get one because vendor failures are common.
+
+The other discipline is logging. The boundary catches the error. The team needs to know it happened. Send the error to Sentry or Bugsnag. The error monitoring tool aggregates and surfaces them. The team can prioritize the worst.
+
+## Where to place boundaries
+
+| Location | Reason |
+|---|---|
+| App root | Catch all so the page never goes fully blank |
+| Each route segment | A broken route renders a contained fallback |
+| Each heavy widget | Chart, editor, complex component |
+| Third party integrations | Vendor failures stay contained |
+| Marketing decorations | Cosmetic failures do not break utility |
+| Below the fold | Content the user might not see |
+
+## How much does this cost
+
+The cost of adding boundaries is hours per surface. The cost of the logging integration is a few hours total. The total cost for a meaningful app is one or two sprints. The savings is the customer experience that does not break when a component fails.
+
+## Features the error handling must have
+
+- Error boundaries at multiple granularities.
+- Fallback UI that acknowledges the error and offers action.
+- Logging to an error monitoring tool.
+- Per route boundaries in App Router.
+- Try catch around async code and event handlers.
+- Telemetry on error boundary trip rate.
+- A practice of testing the fallback path.
+- A way to recover without full reload.
+
+## Expert opinion
+
+> Error boundaries are one of the highest leverage React patterns that most apps still skip. The implementation is small. The protection is real. The teams that use them ship apps that survive component failures. The teams that do not use them ship apps that white screen when a chart library throws an unexpected error. The discipline is to use boundaries by default and to fail gracefully at every level.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS reported that some customers were seeing blank pages after a recent release. The investigation found a third party charting library that crashed under specific data conditions. The crash propagated up and React unmounted the whole tree.
+
+We added error boundaries around every chart. The fallback was a small message and a retry button. The same data condition still caused the chart to fail but the rest of the page kept working. The blank page reports stopped.
+
+We added more boundaries at the route level and around the heavy widgets. The error monitoring tool surfaced several errors that had been silent before. The team fixed the underlying issues. The customer experience improved meaningfully.
+
+For more on the related work, see [building forms that customers love](/blog/building-forms-that-customers-love) and the patterns that make a SaaS feel premium.
+
+## Common mistakes teams make
+
+1. No error boundaries.
+2. One boundary at the app root only. Too coarse.
+3. No logging integration. Errors are invisible.
+4. Fallback is a stack trace. Frightens the user.
+5. Fallback offers no action. User has to refresh.
+6. Boundaries that swallow errors silently.
+7. No try catch around async code.
+8. Treating React's default error behavior as acceptable.
+
+## A two week plan to add boundaries
+
+1. **Week one.** Add app root boundary. Add per route boundaries. Integrate with error monitoring.
+2. **Week two.** Add boundaries around heavy widgets and third party integrations. Test the fallback paths.
+
+For more on the related work, read the patterns that make a SaaS feel premium and [crash reporting and mobile stability a bare minimum setup](/blog/crash-reporting-and-mobile-stability-a-bare-minimum-setup). On the broader reliability side, [designing for failure a backend engineers mental model](/blog/designing-for-failure-a-backend-engineers-mental-model) is the natural next read.

@@ -1,0 +1,120 @@
+---
+slug: "trunk-based-development-for-saas-teams"
+title: "Trunk Based Development for SaaS Teams"
+excerpt: "Long-lived feature branches are a coordination tax. Trunk based development replaces them with short-lived branches, feature flags, and a single integration point. The teams that practice it ship faster with fewer integration incidents."
+date: "2024-11-26"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 11
+ogImage: "/api/og/blog/trunk-based-development-for-saas-teams"
+status: "published"
+definition: "Trunk based development is a source control practice where every engineer integrates to a single main branch at least once per day. Long-lived feature branches are replaced by short-lived branches of one to two days maximum, combined with feature flags to hide incomplete work. I've seen this practice cut integration incidents in half and reduce deployment anxiety on every team I've introduced it to."
+faq: [
+  {"q":"What is trunk based development and how is it different from GitFlow?","a":"Trunk based development uses a single integration branch where everyone merges at least daily. GitFlow uses long-lived branches for features, releases, and hotfixes. GitFlow creates large merge events that accumulate conflicts. Trunk based development prevents conflict accumulation by keeping integration windows short and frequent."},
+  {"q":"Do I need feature flags to practice trunk based development?","a":"For teams of more than two or three engineers, yes. Feature flags let you merge incomplete work to trunk without exposing it to users. Without feature flags, trunk based development forces you to only merge complete features, which defeats the purpose of continuous integration. Feature flags are the mechanism that makes partial work safe to ship."},
+  {"q":"How do small teams adopt trunk based development without breaking production?","a":"Start with a branch lifetime rule: no branch lives longer than two days. Add a basic feature flag system for any work that is not complete. Configure CI to run on every push to trunk. Add a deployment pipeline that can roll back in under five minutes. The combination makes trunk safe to merge to continuously."},
+  {"q":"What happens to code review in trunk based development?","a":"Code review is still required, but it happens on short-lived branches before merge, not on long-lived branches after weeks of divergence. Reviews are smaller and faster because the diff is small. The review quality is higher because the reviewer can hold the change in their head. Pair programming can replace async review for small changes."},
+  {"q":"How do we handle long-running features in trunk based development?","a":"Feature flags. The feature code is merged to trunk incrementally, hidden behind a flag that is off by default. The team ships the flag as off for weeks if necessary. When the feature is complete and tested, the flag turns on for internal users, then a beta cohort, then everyone. The long-lived feature becomes a series of small, safe merges."},
+  {"q":"Is trunk based development suitable for a SaaS product with multiple customers on different versions?","a":"If you are running a single deployed version of your SaaS, yes. If you are running customer-specific versions, the answer is more complicated. Multi-version SaaS is a different architecture problem. Most B2B SaaS products should be on a single version with customer-specific configuration rather than customer-specific code."},
+  {"q":"How do I measure whether trunk based development is working for my team?","a":"Track the mean branch lifetime, the frequency of integration incidents after merge, the deployment frequency, and the time from commit to production. Teams that have adopted trunk based development well show branch lifetimes under two days, higher deployment frequency, and fewer post-merge incidents. The CI failure rate on trunk is also a useful signal."}
+]
+---
+
+## What you actually need to know
+
+- Trunk based development means every engineer merges to main at least once per day. No exceptions.
+- Long-lived feature branches are the source of most integration incidents. Short branches prevent them.
+- Feature flags are not optional. They are the mechanism that makes continuous integration safe.
+- CI must run on every push to trunk and the build must be kept green at all times.
+- In my experience, the transition from GitFlow to trunk based development takes two to four weeks and the team never wants to go back.
+
+| Practice | Trunk based development | GitFlow | GitHub Flow |
+|---|---|---|---|
+| Branch lifetime | Hours to two days | Weeks to months | Days to one week |
+| Integration frequency | Multiple times per day | At release or merge | At PR merge |
+| Feature flag dependency | Required for incomplete work | Optional | Optional |
+| Merge conflict risk | Very low | High at integration | Low |
+| Release flexibility | Via flags and CI | Via release branches | Via tags |
+| Best fit | Continuous deployment SaaS | Versioned release software | Small teams, simple flows |
+
+## The core argument
+
+Long-lived feature branches feel safe. The engineer is working in isolation. Nothing they do can break anyone else. The branch accumulates days or weeks of work. Then it merges. The merge is large. The diff is large. The code reviewer has to hold a week of context in their head. The merge conflicts are significant. The integration tests reveal problems that were invisible in isolation. The team spends two days untangling the integration.
+
+Multiply that by four engineers with four feature branches and the coordination tax is enormous. The team is not integrating continuously. They are integrating in large, unpredictable batches. The incidents are concentrated at merge time. The post-merge CI failures are common. The deploys are stressful.
+
+Trunk based development inverts this. The integration happens continuously, in small increments, with a fast CI pipeline as the safety net. Each merge is small enough to review quickly and revert cleanly if necessary. The team deploys more frequently because each deploy is smaller. The deploy anxiety disappears because any individual deploy carries little risk.
+
+The objection I hear most is that trunk based development requires feature flags and feature flags are complex. This is partly true and mostly irrelevant. A basic feature flag system, even a configuration file in the repository, is one day of engineering. The operational simplicity it enables is worth orders of magnitude more.
+
+## The feature flag system that makes it work
+
+### What a minimal feature flag system looks like
+
+A feature flag is a named boolean that controls whether a code path is active. The simplest implementation is an environment variable or a configuration file. The production flag is off. The engineer merges the code. The code path is dead until someone turns the flag on.
+
+A slightly more capable system stores flags in a database with per-tenant and per-user overrides. This is what you need for gradual rollouts. The feature is on for internal users, then for a beta cohort, then for all customers. Each stage is a flag update, not a deployment.
+
+Feature flag libraries like Unleash, Flagsmith, and LaunchDarkly handle the advanced cases. For early SaaS, the database-backed implementation is sufficient and has lower operational overhead.
+
+### Cleaning up flags
+
+The lifecycle of a flag is: create, enable internally, enable for beta, enable for all, remove. The remove step is the one teams skip. A codebase with fifty dead feature flags is harder to read than one without flags at all. Set a policy: flags that have been on for all customers for more than thirty days get a cleanup ticket. The flag removal is a routine merge that simplifies the code.
+
+## How long does it take
+
+| Task | Time to complete |
+|---|---|
+| Establish branch lifetime rule and communicate to team | Half a day |
+| Configure CI to run on every trunk push | One day |
+| Build or adopt a basic feature flag system | One to two days |
+| Migrate in-flight long-lived branches to flag-gated short merges | Two to five days |
+| Establish automated rollback process | One day |
+| Onboard full team with pairing sessions | Three to five days |
+
+The total transition for a four to six person team is two to three weeks. The benefits appear within the first week. Integration incidents drop immediately because the merge sizes shrink immediately.
+
+## Features to demand from the practice
+
+- A hard branch lifetime limit. Two days maximum. Teams that let this slip lose the benefit.
+- CI that runs on every push to trunk and blocks merges on failure. A broken trunk is an emergency.
+- A feature flag system with per-tenant override capability. Gradual rollouts are not optional at B2B SaaS scale.
+- A deployment pipeline that can roll back a single commit in under five minutes.
+- Observability on the trunk build health. Alert on consecutive failed builds.
+- A code review culture that moves fast on small diffs and demands more on large ones.
+- A flag cleanup policy with a defined maximum flag age before mandatory removal.
+
+## Expert opinion
+
+> Every time I inherit a codebase that is deep in GitFlow, the first thing I notice is the fear. Engineers are afraid to merge. They let branches age because merging is painful. The pain is proportional to the branch age, which means the longer they wait the worse it gets. Trunk based development breaks the cycle. The first week is uncomfortable because the team does not trust that small merges are safe. By the third week they are wondering why they ever worked any other way.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A six-person SaaS engineering team was running GitFlow with feature branches averaging eleven days old. Integration incidents happened on every release, which was every two weeks. The post-merge debugging sessions regularly ran six to eight hours. The team was demoralized about releases.
+
+We transitioned over three weeks. Week one: established the branch lifetime rule, ran a session on feature flags, and helped migrate the three in-flight branches to flag-gated incremental merges. Week two: enforced the branch age limit in code review, built the basic flag system, and ran CI on every trunk push. Week three: the team merged eleven times in five days. The integration incidents dropped to zero for the first two-week cycle after transition.
+
+The one regression was a flag that was left on for internal users and never graduated to all customers. The feature sat behind the flag for six weeks before someone noticed. We added the flag age alert as a result. For the related deployment practice, see [feature flags a SaaS engineers best friend](/blog/feature-flags-a-saas-engineers-best-friend) and [the deployment pipeline that survives real-world pressure](/blog/the-deployment-pipeline-that-survives-real-world-pressure).
+
+## Common mistakes teams make
+
+1. Treating the branch lifetime limit as a guideline. It must be a rule. The first exception breaks the culture.
+2. No feature flags. The team cannot merge incomplete work and integration frequency drops.
+3. Broken trunk builds that stay broken for hours. The build must be treated as a production incident.
+4. Merging large PRs that defeat the purpose of short integration windows. Review culture must enforce small diffs.
+5. No rollback automation. Without fast rollback, the team is afraid to deploy frequently.
+6. Flags that never get cleaned up. The codebase fills with dead conditionals.
+7. Skipping the CI pipeline for "quick fixes." Every merge must go through CI. No exceptions.
+
+## A three week adoption plan
+
+1. **Week one, day one.** Announce the branch lifetime rule. Two days maximum. No exceptions starting next Monday.
+2. **Week one, days two and three.** Audit in-flight branches. Identify which need flags to be safely merged incrementally.
+3. **Week one, days four and five.** Build the feature flag system. Start with environment variables or a config file if that is sufficient.
+4. **Week two, day one.** Configure CI to run on every push to trunk. Alert on consecutive failures.
+5. **Week two, days two through five.** Enforce the branch age limit in code review. Review and merge frequently. Pair on the first conflicts.
+6. **Week three.** Add the deployment rollback pipeline. Establish the flag cleanup policy. Measure the deployment frequency and the integration incident rate.
+
+For related reading on the CI and deployment infrastructure, see [ci cd pipelines that engineers trust a pattern library](/blog/ci-cd-pipelines-that-engineers-trust-a-pattern-library) and [feature flags as a deployment strategy](/blog/feature-flags-as-a-deployment-strategy).

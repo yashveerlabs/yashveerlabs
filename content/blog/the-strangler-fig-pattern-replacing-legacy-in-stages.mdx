@@ -1,0 +1,127 @@
+---
+slug: "the-strangler-fig-pattern-replacing-legacy-in-stages"
+title: "The Strangler Fig Pattern: Replacing Legacy in Stages"
+excerpt: "The strangler fig is the only migration pattern I trust for large legacy systems. It keeps the old system running while the new one grows around it, one surface at a time, until the original can be retired."
+date: "2025-08-30"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","refactor","migration"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-strangler-fig-pattern-replacing-legacy-in-stages"
+status: "published"
+definition: "The strangler fig pattern replaces a legacy system incrementally by routing traffic surface by surface to a new system that grows around the old one. The old system continues running until enough surfaces have been migrated that it can be retired. I use this pattern on every large migration where a big bang cutover would be too risky and a direct rewrite would take longer than the business can sustain."
+faq: [
+  {"q":"What is the strangler fig pattern in software engineering and where does the name come from?","a":"The strangler fig pattern is a migration technique where a new system gradually takes over the functions of an old one by intercepting requests surface by surface. The old system keeps running until it handles nothing and can be retired. The name comes from the strangler fig tree, which grows around an existing tree until the host is eventually replaced."},
+  {"q":"When should I use the strangler fig pattern instead of a big bang migration?","a":"Use the strangler fig for any migration where a big bang cutover carries unacceptable risk. Systems with many integrations, unclear documentation, complex data models, or where rollback would be painful. The pattern is the right call for almost every production system migration above a certain size."},
+  {"q":"How do you choose which surfaces to migrate first in a strangler fig migration?","a":"Start with the surfaces that are safest to migrate, not the most important ones. Low-traffic, well-understood features with good test coverage. These produce early confidence that the new system works without exposing the migration to high-stakes traffic. Save the highest-volume and highest-risk surfaces for when the new system has been proven."},
+  {"q":"How long does a strangler fig migration typically take for a medium-sized SaaS?","a":"Three to twelve months for most medium-sized SaaS applications. The duration depends on the number of surfaces being migrated, the quality of the test coverage, and how much the team can work in parallel with normal product development. Migrations that can absorb twenty to thirty percent of engineering capacity tend to finish in reasonable timelines."},
+  {"q":"What is the hardest part of running a strangler fig migration?","a":"The seventy percent wall. Once most surfaces are migrated, the remaining twenty to thirty percent is usually the most complex and least documented part of the old system. The team is also fatigued. Planning for this phase explicitly, with dedicated effort and clear milestones, is what determines whether the migration actually completes."},
+  {"q":"How do you handle shared data between the old system and the new system during a strangler fig migration?","a":"Dual write is the standard approach. Both systems write to the same datastore, or the new system mirrors writes to the old. Reads shift gradually as confidence builds. Divergence between the two systems is the main failure mode and should be monitored actively throughout the migration. A reconciliation process catches drift before it becomes an incident."},
+  {"q":"What does retiring the old system at the end of a strangler fig migration actually involve?","a":"Removing the routing layer, deleting the old code, and cleaning up any dual-write or compatibility code. This phase often gets deferred indefinitely. Set a retirement date at the start of the migration and treat it as a commitment. A legacy system that continues to run after the migration is nominally complete becomes the seed of the next migration."}
+]
+---
+
+## What you actually need to know
+
+- The strangler fig is the right default for any meaningful legacy migration. Big bang is the exception.
+- Traffic routing is the mechanism. The new system intercepts requests for migrated surfaces. The old system handles the rest.
+- Start with the safest surfaces, not the most important ones. Build confidence before moving high-stakes traffic.
+- The seventy percent wall is real. The last thirty percent is harder and slower than the first seventy.
+- Set a retirement date for the old system at the start. Without a date, the old system runs forever.
+
+| Migration approach | Risk level | Rollback ease | When to use |
+|---|---|---|---|
+| Big bang cutover | High | Hard | Small, well-tested systems only |
+| Strangler fig, surface by surface | Low | Easy | Most production migrations |
+| Branch by abstraction | Low | Easy | Migrations within a single codebase |
+| Parallel run with reconciliation | Very low | Easy | Critical systems with zero tolerance for divergence |
+
+## The core argument
+
+The strangler fig pattern exists because software systems almost always contain undocumented behaviors. The legacy system the team wants to replace has been in production for years. It handles edge cases that nobody wrote down. It has integrations that were added in a hurry and never documented. It serves data in formats that downstream consumers depend on and nobody mapped.
+
+A big bang migration reveals all of this at once, at 2 am, after the cutover. The team scrambles to figure out which behavior changed, which integration broke, which edge case the new system does not handle. The rollback, if there is one, is painful.
+
+The strangler fig reveals these problems one at a time. Each surface migration is a small, contained change. The old system is still running and handling everything the new system has not yet taken over. When a problem surfaces on a migrated path, the fix is small and the blast radius is limited. The team learns the real behavior of the old system while building the new one.
+
+The cost of this approach is time and complexity. The team operates two systems for months. The routing layer, the proxy or gateway that decides which system handles each request, adds a new piece of infrastructure to maintain. The data story, especially if the two systems have different models, requires careful dual-write management. These costs are real. They are worth paying against the alternative of a high-stakes cutover.
+
+## Running the migration
+
+### Step one: build the routing layer
+
+Before any traffic shifts, the routing mechanism needs to be in place. An API gateway, a feature flag system, or a proxy layer that can direct traffic for a given path or surface to either the old system or the new one. The routing layer is not glamorous. It is the piece that makes the whole pattern work, and it needs to be solid before migration begins.
+
+### Step two: pick the first surface
+
+The first surface should be boring. Low traffic, well understood, ideally with test coverage. The goal of the first migration is to prove that the pattern works in your environment, not to move the needle on coverage. Pick something where being wrong is recoverable.
+
+### Step three: migrate, validate, move on
+
+Each surface follows the same cycle. Build the new implementation. Write tests that verify it matches the old behavior. Route a small percentage of traffic to the new implementation. Monitor for divergence. Increase the traffic percentage. When the new implementation is handling one hundred percent of the traffic for that surface, mark the surface done and move to the next.
+
+The monitoring step is not optional. The strangler fig works because divergence is caught early and contained. A migration that moves traffic without watching the metrics is not a gradual migration. It is a slow big bang.
+
+### Step four: manage the seventy percent wall
+
+Plan for the point where seventy percent of surfaces are migrated. At that point, the old system still handles the most complex and least documented behaviors. The team has been on the migration for months. The motivation is lower. The work is harder. Address this explicitly in the migration plan. Reserve dedicated time and energy for the final phase. Set a date for retirement that creates urgency.
+
+## How long does it take
+
+| System size | Migration duration | Recommended pace |
+|---|---|---|
+| Small service, 5-10 surfaces | 4-8 weeks | Full team focus |
+| Medium SaaS, 20-40 surfaces | 3-6 months | 20-30% of team capacity |
+| Large application, 50+ surfaces | 6-18 months | Dedicated migration track |
+| Monolith to services | 12-36 months | Long-running program |
+
+The pace matters as much as the duration. Migrations that absorb more than thirty percent of engineering capacity stall the product and exhaust the team. Migrations that absorb less than fifteen percent rarely finish.
+
+## What a good strangler fig migration requires
+
+- A routing layer that can direct traffic per surface with no downtime changes.
+- Monitoring that detects divergence between the old and new systems in real time.
+- Test coverage for each surface before its traffic shifts, not after.
+- A documented inventory of every surface in the old system at the start. Surprises in the final phase are what kill migrations.
+- A retirement date for the old system set at the beginning, not the end.
+- A communication plan for internal teams and, where relevant, for external integrators.
+- A named owner for the migration who is accountable for the retirement date.
+
+## Expert opinion
+
+> The strangler fig is the only migration pattern I have seen succeed consistently on systems above a certain size. The teams that try to big bang a complex legacy migration do not succeed more often than the teams that use the strangler fig. They just fail faster. The pattern requires patience. The patience is the thing that makes it work.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A five-year-old monolith needed to be decomposed into services. The team had tried a big bang approach eighteen months earlier and abandoned it after four months when they realized the scope was impossible to manage. They came to me with a codebase that was now two years further along and more entangled.
+
+We started with the strangler fig and the inventory. Before writing a line of new code, we ran a [two-day tech debt audit](/blog/the-tech-debt-audit-a-two-day-process) to map the forty-seven surfaces and rank them by risk. We built a simple routing layer using the existing API gateway. The first migration was the public status page, which was low-traffic and essentially static. It took three days. It proved the routing layer worked.
+
+Over seven months, we migrated thirty-one of the forty-seven surfaces to independent services. The remaining sixteen were the complex, poorly documented core. Those took another four months. The old monolith was retired eleven months after the migration started, on the date we had set at the beginning.
+
+Three issues surfaced during the migration that would have been catastrophic in a big bang. All three were contained because the old system was still running when they appeared.
+
+For teams deciding between this approach and a full rewrite, [when to refactor and when to rewrite](/blog/when-to-refactor-and-when-to-rewrite) covers the decision framework. For the broader migration strategy question, [big bang vs gradual migration: a decision map](/blog/big-bang-vs-gradual-migration-a-decision-map) is the companion read.
+
+## Common mistakes teams make
+
+1. Building the routing layer after starting the first surface migration. The routing layer comes first.
+2. Starting with the most important surface to demonstrate business value. Start with the safest surface to build confidence.
+3. Not monitoring for divergence actively. Silent divergence is the most dangerous failure mode.
+4. No inventory of surfaces at the start. Discovery surprises in the final phase stall the migration.
+5. Letting the seventy percent wall derail the timeline. Plan for it explicitly.
+6. No retirement date for the old system. Without a date, the old system runs indefinitely after the migration is nominally complete.
+7. Running the migration with a separate team. The team that owns the old system has to own the new one.
+8. Skipping test coverage before shifting traffic. Problems in untested surfaces are invisible until production.
+
+## A migration kickoff plan
+
+1. **Week one.** Build the routing layer. Test it in staging. Do not touch any production traffic yet.
+2. **Week two.** Complete the surface inventory. Rank surfaces from safest to riskiest. Set the retirement date for the old system.
+3. **Week three.** Migrate the first surface. Low traffic, well understood. Validate for one week before moving on.
+4. **Weeks four and beyond.** Work through the ranked list. One to three surfaces per week depending on complexity. Monitor divergence at each step.
+5. **Final phase.** Reserve dedicated time for the last thirty percent. Do not run this phase alongside a busy product sprint.
+6. **Retirement.** Remove the routing layer. Delete the old code. Document the lessons.
+
+For teams working on the test coverage that should accompany each surface migration, [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad) covers the practical approach in detail.

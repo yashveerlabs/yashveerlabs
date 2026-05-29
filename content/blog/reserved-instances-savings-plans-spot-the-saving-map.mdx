@@ -1,0 +1,62 @@
+---
+slug: "reserved-instances-savings-plans-spot-the-saving-map"
+title: "Reserved Instances, Savings Plans, Spot: The Saving Map"
+excerpt: "AWS has three distinct mechanisms for reducing compute costs below on-demand pricing. Using the wrong one for a workload leaves money on the table or creates unnecessary interruption risk. Here is the map."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/reserved-instances-savings-plans-spot-the-saving-map"
+status: "published"
+definition: "AWS Reserved Instances, Savings Plans, and Spot Instances are three mechanisms for reducing compute costs below on-demand pricing. Reserved Instances commit to a specific instance type for 1 or 3 years in exchange for a 30-70% discount. Savings Plans commit to a dollar amount of compute spend per hour for 1 or 3 years in exchange for discounted rates across eligible services. Spot Instances use spare AWS capacity at up to 90% discount but can be interrupted with 2 minutes notice when AWS needs the capacity. Each mechanism is appropriate for a different workload profile."
+faq: [
+  {"q":"What is the key difference between Reserved Instances and Savings Plans?","a":"Reserved Instances commit to a specific EC2 instance type, size, region, and operating system. Savings Plans commit to a dollar amount of compute spend per hour and apply discounts across any eligible compute usage. Savings Plans are more flexible: if you change instance types or start using Fargate or Lambda, the Savings Plan discount still applies. Reserved Instances provide slightly higher discounts for perfectly stable workloads where the instance type will not change. In practice, Compute Savings Plans (the most flexible type) are often the better starting point because they accommodate workload evolution without requiring modification."},
+  {"q":"What workloads are appropriate for Spot Instances?","a":"Spot Instances are appropriate for workloads that can tolerate interruption with 2 minutes notice and can resume from where they left off, or where work loss is acceptable. Appropriate workloads: batch processing jobs, CI/CD build runners, machine learning training jobs, image/video processing pipelines, and any stateless compute that can be restarted without data loss. Inappropriate workloads: web application servers that are serving live user traffic, database instances, stateful services that cannot tolerate sudden termination, and any workload where a 2-minute notice period is insufficient for graceful shutdown."},
+  {"q":"How do you use Spot Instances without application interruptions?","a":"Using Spot Instances without service interruptions requires designing for interruption: using multiple Spot capacity pools (multiple instance types and availability zones in the same auto-scaling group), implementing graceful shutdown logic that handles the 2-minute interruption notice by stopping new work and completing in-progress work, maintaining a small on-demand baseline that handles traffic during Spot capacity rebalancing, and using Spot with auto-scaling groups that replace interrupted instances automatically. The application must be architected for statelessness (or checkpointing for batch jobs) to take full advantage of Spot without service degradation."},
+  {"q":"What is the Spot capacity pool and why does diversification matter?","a":"A Spot capacity pool is a specific combination of instance type, operating system, and availability zone. Each pool has its own supply and demand dynamics that determine price and interruption probability. Spot capacity pools with high demand (the latest-generation general-purpose instances in popular regions) are interrupted more frequently. Diversifying across multiple instance types and availability zones reduces interruption risk because interruptions in one pool do not affect capacity in other pools. An auto-scaling group configured to use 5 to 10 different instance types in 3 availability zones is significantly more resilient to Spot interruptions than one configured for a single instance type."},
+  {"q":"Can you mix Reserved Instances, Savings Plans, and Spot in the same architecture?","a":"Yes, and this is the recommended approach for cost optimization at scale. The typical pattern: Savings Plans or Reserved Instances cover the baseline load (what you always need running), on-demand covers the normal variation above baseline, and Spot covers burst capacity for workloads that can tolerate interruption. For a web application: reserve the minimum viable capacity (3 instances) with Savings Plans, scale up to 10 instances with on-demand for normal traffic peaks, and use Spot for background jobs and batch processing that runs alongside the web tier. This layered approach optimizes cost for each workload profile."}
+]
+---
+
+## What you need to know
+
+- Compute Savings Plans are the most flexible AWS cost reduction mechanism and the right starting point for most teams. They apply across EC2, Fargate, and Lambda without workload-specific commitment.
+- Reserved Instances are slightly more economical than Savings Plans for perfectly stable, unchanging workloads. They are worth considering after Savings Plans are established.
+- Spot Instances provide the highest savings (up to 90%) but require interruption-tolerant workload design. Do not put production web servers on Spot without interruption handling.
+- The layered approach (Savings Plans for baseline, on-demand for variation, Spot for batch) is the cost-optimal architecture for most teams.
+- Measure utilization before committing. Under-utilized commitments cost more than no commitment.
+
+## The core argument
+
+Most teams approach cloud cost optimization reactively: the bill is high, someone looks at the cost breakdown, and they buy some reserved instances for the biggest line items. This works but leaves significant savings on the table because it does not account for the different optimization mechanisms available for different workload types.
+
+The right approach is to categorize every workload by its utilization pattern and interruption tolerance, then apply the appropriate cost reduction mechanism to each category. Stable workloads with defined instance requirements belong on Reserved Instances or Savings Plans. Variable workloads that scale unpredictably benefit from Savings Plans' flexibility over Reserved Instances' rigidity. Batch jobs, CI/CD runners, and ML training workloads belong on Spot because they can be designed to tolerate interruption and the 60 to 90 percent cost reduction is significant for compute-intensive work.
+
+The layered strategy is the full picture. Savings Plans cover the baseline compute commitment with a discount applied automatically to whatever compute types you are using. On-demand handles the variation above baseline, which occurs unpredictably and does not merit a commitment. Spot handles workloads that can be interrupted, run offline, or can restart from checkpoints. The combination typically reduces the overall compute bill by 40 to 60 percent compared to all-on-demand, depending on workload profile and commitment level.
+
+## Common mistakes
+
+1. **Putting stateful or customer-facing workloads on Spot without interruption handling.** Web servers that are terminated mid-request lose in-flight traffic. Databases that are terminated lose uncommitted transactions. If a workload must handle an interruption gracefully (complete in-progress work, drain connections), that handling must be implemented before the workload moves to Spot.
+
+2. **Buying Reserved Instances for workloads that are going to change.** A Reserved Instance for a specific instance type that gets superseded by a newer generation leaves you locked into the old instance type for the rest of the term (or paying to convert to the new type). For workloads that are likely to scale up or change instance families, Savings Plans or Convertible Reserved Instances accommodate the change without waste.
+
+3. **Not setting up Spot instance interruption handling in the auto-scaling group.** AWS provides a 2-minute interruption notice via instance metadata and EventBridge. Not handling this notice means the instance is terminated without graceful shutdown. Configure the auto-scaling group's lifecycle hooks to respond to the interruption notice with graceful shutdown and replacement instance launch.
+
+4. **Using Savings Plans without understanding the commitment duration implications.** A 3-year Savings Plan commitment made at current compute spending levels assumes the spending level will remain stable or increase for three years. If the application is retired or significantly scaled down, the Savings Plan continues billing at the committed rate. Start with 1-year commitments before extending to 3-year.
+
+5. **Overlooking RDS and ElastiCache for reservation.** Database and cache workloads are often the most stable compute workloads (they do not scale out automatically in response to traffic) and are often significant line items in the cloud bill. RDS Reserved Instances and ElastiCache Reserved Nodes provide the same discount structure as EC2 and are often easier to commit to because the utilization is very stable.
+
+## Where to start
+
+1. **Analyze the last 3 months of AWS compute spend by service and instance type.** Use AWS Cost Explorer grouped by service and instance type to identify the largest cost drivers. Workloads that appear consistently in the top 5 cost items across all three months are candidates for reservation. Workloads that only appear in some months are more variable and require more careful analysis.
+
+2. **Start with a Compute Savings Plan at 50-70% of average hourly compute spend.** This provides a meaningful discount on the baseline load without over-committing. The Savings Plan discount is applied automatically to the cheapest eligible usage, so it benefits multiple services simultaneously without requiring instance-specific reservations.
+
+3. **Identify one batch workload to move to Spot.** Choose a workload that is currently running on on-demand, can be restarted without data loss (CI/CD builds, data pipeline jobs, image processing), and runs regularly. Move it to Spot with a fallback on-demand instance type in the same auto-scaling group. Measure the cost reduction and the interruption frequency to validate the pattern before expanding Spot usage.
+
+## Related reading
+
+- [Reserved Instances and Cost Math: When They Pay Off](/blog/reserved-instances-and-cost-math-when-they-pay-off)
+- [Render vs Fly.io vs Railway vs Heroku in 2026](/blog/render-vs-fly-io-vs-railway-vs-heroku-in-2026)
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- Software Costs That Founders Underestimate

@@ -1,0 +1,127 @@
+---
+slug: "workflow-engines-when-you-need-temporal-when-you-need-cron"
+title: "Workflow Engines: When You Need Temporal, When You Need Cron"
+excerpt: "Cron, a job queue, and a workflow engine are three different tools for three different problems. Picking the wrong one costs months. Here is a clear decision map."
+date: "2024-11-17"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/workflow-engines-when-you-need-temporal-when-you-need-cron"
+status: "published"
+definition: "A workflow engine runs multi step processes that have state, branching logic, and the need to survive failures and restarts. Cron schedules recurring single tasks. A job queue runs discrete background work. The three tools overlap in marketing but not in design. Choosing a workflow engine for a cron job is over-engineering. Choosing a cron job for a multi-step business process is a reliability disaster."
+faq: [
+  {"q":"when should a saas product use temporal instead of a simple job queue","a":"When you have a process that spans multiple steps, potentially over minutes or hours, where each step can fail independently and needs its own retry logic, and where the state of the process must survive a worker restart. Payment reconciliation, multi-step onboarding, provisioning flows, and long running data migrations are the right cases for Temporal. Simple discrete jobs are not."},
+  {"q":"what is the difference between temporal and inngest for saas background workflows","a":"Both run durable multi-step workflows. Temporal is self-hosted or uses Temporal Cloud, has a steeper learning curve, and is more appropriate for teams comfortable with the operational overhead. Inngest is fully managed, integrates more simply into a Next.js or serverless stack, and is the faster path to a workflow engine for most product teams. Temporal offers more control at the cost of complexity."},
+  {"q":"when is a simple cron job the right choice for a saas product","a":"For simple recurring tasks with no state and no dependency on other steps. Database cleanup, report generation at midnight, subscription renewal checks, cache warming. Cron is correct when the job runs, succeeds or fails, and the next run starts fresh. If a failure in one run needs to inform the next run, you need something with state."},
+  {"q":"how do I migrate from cron jobs to a proper workflow engine in a saas product","a":"Start by identifying which cron jobs have grown into multi step processes held together by database flags and status columns. Those are the candidates. Pick one, map the steps explicitly, and rewrite it as a workflow. Run the old cron job and the new workflow in parallel for one to two weeks before cutting over. Do not migrate everything at once."},
+  {"q":"what are the operational costs of running temporal for background workflows","a":"Temporal Cloud is roughly 25 USD per million workflow actions, which is affordable for moderate volume. Self-hosted Temporal requires running the Temporal server, a database backend (Postgres or Cassandra), and worker processes. The engineering overhead of running it self-hosted is significant. For most product teams, Temporal Cloud or a managed alternative like Inngest is the right choice."},
+  {"q":"how do workflow engines handle failures in multi step processes","a":"Each step in the workflow has its own retry policy. A step that fails retries according to its policy without restarting the entire workflow from the beginning. The workflow state is persisted between steps. If a worker crashes mid-workflow, the next available worker picks up from the last successful step. This durability is the core value proposition of a workflow engine over a job queue."},
+  {"q":"can I use a job queue instead of a workflow engine for multi step saas processes","a":"You can, and many teams do, until it becomes painful. The pattern is usually: step one job, step two job, step three job, coordinated by database status fields. This works until the process has five or more steps, steps fail in complex ways, you need to audit the state of in-flight processes, or you need to pause and resume a process based on an external event. At that point, a workflow engine is the correct tool."}
+]
+---
+
+## What you actually need to know
+
+- Cron is for simple recurring tasks with no cross-run state.
+- A job queue is for discrete background work that runs once per trigger.
+- A workflow engine is for multi-step processes with state, branching, and durable execution.
+- The three tools are not interchangeable. Using the wrong one makes the right problem much harder.
+- Most early stage SaaS products need cron and a job queue. A workflow engine is earned, not assumed.
+
+| Tool | Best fit | State management | Step level retries | Observability |
+|---|---|---|---|---|
+| Cron (native, Cloud Scheduler) | Scheduled single tasks | None | No | Minimal |
+| Job queue (Postgres, BullMQ) | Discrete triggered work | None | At job level | Good |
+| Inngest | Multi-step managed workflows | Durable | Yes, per step | Built in dashboard |
+| Trigger.dev | Multi-step managed workflows | Durable | Yes, per step | Built in dashboard |
+| Temporal Cloud | Complex durable workflows | Durable | Yes, per step | Web UI, full history |
+| AWS Step Functions | AWS-native workflows | Durable | Yes, per step | CloudWatch |
+
+## The core argument
+
+Cron, a job queue, and a workflow engine are presented in similar marketing language. "Run background work." "Schedule tasks." "Handle async processes." The vocabulary overlaps enough that many teams pick the first option that sounds right and spend months paying for that choice.
+
+The distinction is simpler than the marketing suggests. Cron schedules recurring work. A queue runs work triggered by events. A workflow engine runs work that has steps, state, and the need to survive failures without starting over. Each tool does one thing well. None of them does all three.
+
+The team that runs a subscription renewal check on a cron job is making the right choice. The team that runs a user onboarding flow on a cron job with a dozen database flags tracking which step each user is on has invented a broken workflow engine. I have inherited several of those. They break in different ways at every scale. The state tracking is always incomplete. The failure handling is always wrong. The observability is usually zero.
+
+The team that reaches for Temporal on day one for sending welcome emails has the opposite problem. Temporal is a serious piece of infrastructure. It is the right tool for the right problem. Sending a single email is not that problem.
+
+The practical question is where to draw the line. The answer I use: if the process has three or more sequential steps with different failure modes, if any step can wait on an external event, or if you need to know the state of an in-flight process at any given moment, reach for a workflow engine. Otherwise, a queue is sufficient.
+
+## The three tools, concretely
+
+### Cron
+
+Cron is correct for: nightly report generation, subscription trial expiry checks, cache cleanup, scheduled data sync from a third party, anything that runs on a schedule and starts fresh each time.
+
+The failure model is simple. If the job fails, it either retries or it does not, depending on the scheduler. The next run starts fresh. There is no state to recover. Managed cron options like Cloud Scheduler, Render Cron Jobs, and in-queue schedulers all work well. The operational overhead is minimal.
+
+### Job queue
+
+A queue is correct for: welcome email on sign up, file processing after upload, webhook delivery, report generation triggered by user action, third party API calls, anything that runs once in response to an event.
+
+The failure model is retry with exponential backoff and dead letter handling. Each job is independent. A failed job does not affect other jobs. The queue has no concept of steps or state between jobs. If you find yourself using a queue job to set a database flag that the next queue job checks, you are building a poor version of a workflow engine.
+
+### Workflow engine
+
+A workflow engine is correct for: user onboarding that spans multiple days, payment reconciliation across multiple systems, provisioning flows that call multiple APIs in sequence, document processing pipelines with human review steps, anything that has steps and needs to know where it is.
+
+The engine persists the workflow state after each step. A worker crash does not lose the workflow. The workflow resumes from the last successful step. Each step has its own retry policy. The engine can pause the workflow until an external event arrives, such as a user clicking a confirmation link or a payment completing.
+
+## What it costs
+
+| Option | Setup time | Monthly cost at moderate scale | Operational overhead |
+|---|---|---|---|
+| Native cron (in existing scheduler) | Hours | Negligible | Minimal |
+| Cloud Scheduler (GCP) | Half a day | Under 5 USD | Minimal |
+| Job queue (already have Postgres) | Half a day | Negligible | Negligible |
+| Inngest | One day | Free to 250 USD | Minimal, managed |
+| Trigger.dev | One day | Free to 250 USD | Minimal, managed |
+| Temporal Cloud | Two to three days | 25 USD per million actions | Medium |
+| Self-hosted Temporal | One to two weeks | Infrastructure cost | High |
+
+## Features to look for
+
+- Durable state persistence. Workflow state survives worker restarts.
+- Per-step retry policies with configurable backoff.
+- Workflow visibility. You can see every in-flight workflow, its current step, and its history.
+- Event-driven step triggers. A workflow can pause and wait for an external signal.
+- Cancellation and termination. You can stop a workflow in progress.
+- Versioning. You can deploy new workflow code without breaking in-flight workflows.
+- Local development support. You can run the workflow engine in development without a production dependency.
+
+## Expert opinion
+
+> I have watched teams reach for Temporal when they needed a queue, and reach for cron when they needed a workflow engine. The first group spent their initial sprint learning an infrastructure tool instead of shipping product. The second group spent the next year maintaining a state machine built out of database flags and job logic. Both mistakes are expensive. The workflow engine conversation should start when the team has a concrete problem that cron and queues cannot solve cleanly. Before that point, it is a solution looking for a problem.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client had a user onboarding flow that took three to five business days to complete. It involved provisioning a resource, waiting for a third party API to confirm provisioning, sending a series of guided setup emails at specific intervals, and notifying the sales team at the end. The flow was implemented as four cron jobs, each checking a status column on the user record.
+
+The status column had twelve possible values by the time I saw the codebase. Five of them were dead states that users could reach but never escape from without manual intervention. The sales team had a spreadsheet for tracking users stuck in dead states. There were consistently thirty to fifty of them at any given time.
+
+We migrated the flow to Inngest over two weeks. The workflow is readable code with named steps. Each step has its own retry policy. The Inngest dashboard shows every in-flight onboarding, its current step, and any failures. The dead states are gone because the workflow handles the failure cases explicitly. The sales team spreadsheet is gone.
+
+The migration was two weeks of work that eliminated a class of recurring support burden. The codebase is smaller. The behavior is more predictable. For related infrastructure, [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip) covers the queue layer this sits on top of, and [why your saas should have a job queue from day one](/blog/why-your-saas-should-have-a-job-queue-from-day-one) covers the simpler adjacent tool.
+
+## Common mistakes
+
+1. Using a cron job with database flags to simulate a workflow. It breaks in every direction and is impossible to debug.
+2. Reaching for Temporal before having a concrete multi-step process problem. The operational overhead is real.
+3. No visibility into in-flight workflows. When something goes wrong, you have no way to inspect the state.
+4. Workflow code that cannot handle retries. The engine will retry steps. The code has to be safe to run more than once.
+5. No versioning strategy. Deploying new workflow code while old workflows are in flight causes state mismatches.
+6. Using a workflow engine for simple scheduled tasks. Cron is correct for that. The engine adds cost and complexity with no benefit.
+7. One retry policy for all steps. A step that calls a third party API needs different backoff than a step that writes to your database.
+
+## A four week plan
+
+1. **Week one.** Audit existing cron jobs and background work. Identify any that have grown into multi-step processes. Map the steps explicitly.
+2. **Week two.** For the identified multi-step processes, pick a workflow engine. For teams on Next.js or serverless, Inngest or Trigger.dev. For teams with more complex needs, evaluate Temporal Cloud.
+3. **Week three.** Migrate one multi-step process to the workflow engine. Run the old and new implementations in parallel. Compare outputs.
+4. **Week four.** Cut over. Migrate remaining candidates. Document which work belongs in cron, which belongs in the queue, and which belongs in the workflow engine. New processes follow the map.
+
+For deeper reading on the job layer below workflows, [background jobs at scale Inngest Trigger Cron and beyond](/blog/background-jobs-at-scale-inngest-trigger-cron-and-beyond) covers the managed options in detail.

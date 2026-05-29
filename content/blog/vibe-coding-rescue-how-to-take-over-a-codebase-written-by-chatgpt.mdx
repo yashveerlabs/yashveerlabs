@@ -1,0 +1,124 @@
+---
+slug: "vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt"
+title: "Vibe Coding Rescue: How to Take Over a Codebase Written by ChatGPT"
+excerpt: "Most AI generated codebases are not unworkable. They just have patterns that degrade fast under real usage. The rescue process is methodical, not heroic, and it starts with understanding what the AI was optimizing for."
+date: "2024-12-16"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 12
+ogImage: "/api/og/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt"
+status: "published"
+definition: "Vibe coding rescue is the process of taking over a codebase that a founder or junior engineer built primarily through AI code generation, then making it maintainable, testable, and safe to extend. The work is not glamorous. It involves reading confusing comments, untangling duplicated logic, and adding tests to code that was never designed to be tested. I do this kind of work regularly and the pattern is consistent enough to explain."
+faq: [
+  {"q":"how do you take over a codebase that was written entirely by chatgpt or cursor","a":"Start by reading the structure before touching any code. Map the route handlers, the database schema, and any third party calls. Run the test suite if one exists. If it does not, that tells you something important. The goal in the first week is to understand the shape of the thing, not to fix it."},
+  {"q":"what are the most common problems in ai generated codebases that engineers inherit","a":"Duplicated logic across files, missing error handling, inconsistent naming, environment variables that are hard coded in some files and properly loaded in others, and no tests. The AI optimized for making the demo work, not for what happens when something breaks in production."},
+  {"q":"how long does vibe coding rescue typically take for a small saas","a":"For a project built by one person over three to six months of vibe coding, a responsible rescue takes four to eight weeks. That includes auditing, writing tests for the critical paths, fixing the worst structural problems, and documenting what was inherited. Faster is possible but usually means something important got skipped."},
+  {"q":"should i rewrite an ai generated codebase or rescue it","a":"Rescue first, rewrite only if the foundation is unsalvageable. Most AI generated codebases can be made maintainable without a full rewrite. The rewrite decision should come after you understand the system well enough to scope it accurately, which usually takes two to three weeks of rescue work."},
+  {"q":"how do i add tests to a codebase that has none","a":"Start with integration tests on the routes that handle money, auth, or data deletion. These are the highest risk areas. Unit tests come later. The goal is not coverage as a number; it is having tests that would have caught the last three bugs. Write those first."},
+  {"q":"can i trust the documentation and comments in an ai generated codebase","a":"Partially. AI generated comments often describe what the code does at the time it was written. After someone edits the code without updating the comment, the comment lies. Verify every comment against the actual implementation before trusting it. This is not optional in a rescue."},
+  {"q":"what tools help most when doing a vibe coding rescue on a nodejs or typescript project","a":"A good static analysis pass with ESLint and TypeScript strict mode to surface undefined types and unreachable code. A dependency audit with npm audit to find known vulnerabilities. A schema visualization tool to understand the database shape. And grep, honestly, to find every place a given variable or function is used."}
+]
+---
+
+## What you actually need to know
+
+- AI generated codebases are usually functional at the demo layer and fragile at the production layer. The gap is real and specific.
+- The AI optimized for getting code to run, not for handling the edge cases that appear three months after launch.
+- The most dangerous parts are the silent failure paths: missing error handling, no logging, no tests.
+- Rescue is not rewrite. The goal is to understand and stabilize, not to replace everything you did not personally write.
+- The founder who built it is usually not to blame. They used the tools they had and got further than most. Now the work needs to change.
+
+| Approach | Suitable for | Watch out for |
+|---|---|---|
+| Stabilize and extend | Most small AI generated projects | Leaving root causes unfixed while adding features |
+| Incremental rewrite by module | Projects with clear module boundaries | Module rewrites that break the integrations between them |
+| Full rewrite | Codebases where the data model is fundamentally wrong | Scope creep, schedule slippage, lost domain knowledge |
+| Handoff to AI again | Nothing critical at stake | The same problems compound the second time |
+
+## The core argument
+
+The founder built it in three months with Cursor, or ChatGPT, or both. They have users. They might have revenue. The codebase works most of the time but nobody on the team can extend it confidently, and every deploy carries a small dread that something unrelated will break. That is the moment I usually get called.
+
+The first thing I tell them is that the codebase is not a disaster. It is a prototype that got production traffic. Those are different things. A disaster is unsalvageable. A prototype under production traffic needs a specific kind of work: understanding it, adding the guard rails that were skipped, and creating a foundation for the next phase of development. That work is methodical and it takes time.
+
+The second thing I tell them is that the AI did not write bad code. It wrote code that was optimized for the prompt it received. Prompts at 2am from a founder who is trying to get a feature shipped are not architecture prompts. They are get-this-working prompts. The AI delivered. The gap is between what was delivered and what a maintainable production system needs.
+
+What follows is the actual process. Not a framework. Not a checklist you can rush. The process I run when I take over one of these codebases and need to make it safe to build on.
+
+## How the rescue process works
+
+### Week one: orient before you touch anything
+
+Read the repo top to bottom before writing a single line of code. Map the directory structure. List every route, every model, every external API call. Run the app locally if you can. Read the environment variables and understand what each one does.
+
+The goal of week one is a written document: what this codebase does, where the data goes, what breaks when which service is down. That document does not exist yet. You are writing it.
+
+### Week two: the hard truth audit
+
+This is where you find the patterns that will cause problems. Duplicated business logic in multiple route handlers. Third party API calls with no retry logic. Database queries with no error handling. Secrets in source code. Functions that do five things and are named for one of them.
+
+Write down every problem you find. Categorize: security issues, data integrity risks, maintenance friction. Do not fix anything yet. The list needs to exist before you start changing things.
+
+### Week three and beyond: fix in priority order
+
+Security and data integrity problems go first. Auth gaps, missing input validation, exposed secrets, SQL injection vectors if the codebase is using raw queries. These are not optional.
+
+Then tests for the critical paths. You cannot safely change code you cannot verify. The minimum viable test suite covers auth, payment flows, and any action that modifies or deletes data.
+
+Then structure. Consolidate the duplicated logic. Name things consistently. Add error handling to the external calls. Document the non-obvious parts.
+
+## How much does it cost
+
+| Project size | Rescue timeline | Typical cost range |
+|---|---|---|
+| Solo vibe-coded MVP, under 10k lines | Four to six weeks | 8,000 to 15,000 dollars |
+| Small team project, 10k to 40k lines | Six to twelve weeks | 15,000 to 35,000 dollars |
+| Larger AI-assisted build, 40k+ lines | Twelve to twenty weeks | 35,000 to 80,000 dollars |
+| Ongoing maintenance after rescue | Monthly retainer | 2,000 to 6,000 dollars per month |
+
+These are the ranges I see in my own engagements and from conversations with other independent engineers in this space. The wide range on larger projects reflects how different the quality of AI generated code can be. Some founders were disciplined about prompting structure; their codebases rescue faster.
+
+## What to look for when you inherit one of these
+
+- Whether the app has any tests at all, and if so what they cover.
+- Whether secrets are managed correctly or scattered through the codebase.
+- Whether error handling exists on database and external API calls, or whether failures are silent.
+- Whether the database schema has foreign keys and constraints, or whether data integrity is enforced only in application code.
+- Whether there is a deployment process or whether someone has been pushing to production by hand.
+- Whether the comments in the code match what the code actually does.
+
+## Expert opinion
+
+> Most vibe-coded projects I rescue have the same four problems: no tests, silent error handling, duplicated logic, and comments that describe the original intention rather than the current implementation. The rescue is not about blaming the AI or the founder. It is about closing the gap between what was built to demo and what needs to exist to scale.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A founder reached out after their Node.js SaaS started dropping payments. The payment flow had been built with ChatGPT over two nights and worked fine in staging. In production, a specific edge case in the Stripe webhook handler was silently swallowing errors. The webhook would receive an event, the handler would throw, and the error was caught by a generic try-catch that logged nothing and returned a 200 to Stripe anyway. Stripe stopped retrying. Payments were lost.
+
+We fixed the immediate issue in about four hours. The harder part was spending the next three weeks auditing every other place in the codebase where the same pattern existed: try-catch blocks that ate errors without logging them. We found eleven. Three of them were in paths that had not been exercised in production yet but would have caused identical silent failures.
+
+For more on what production failure looks like in AI generated codebases, see [why AI generated code breaks in production](/blog/why-ai-generated-code-breaks-in-production). For the related question of how AI code review can help catch these patterns before they reach production, see [AI assisted code review](/blog/ai-assisted-code-review-a-process-that-actually-helps).
+
+## Common mistakes during a rescue
+
+1. Fixing things before you understand them. Changes made without understanding the full picture often break something downstream.
+2. Rewriting instead of rescuing. Full rewrites during a rescue almost always take three times longer than planned.
+3. Skipping the test baseline. If you do not add tests before you change things, you have no way to verify you did not break anything.
+4. Trusting the comments. AI generated comments describe intent at time of generation, not the current behavior. Verify everything.
+5. Ignoring the deployment process. A codebase that deploys inconsistently produces bugs that are almost impossible to reproduce.
+6. Not talking to the founder. The founder knows things about the business logic that are not in the code anywhere. Ask them before you change the rules encoded in the app.
+7. Treating every AI pattern as wrong. Some AI generated patterns are fine. The goal is to find the ones that will cause real problems, not to rewrite everything that looks unfamiliar.
+8. Declaring done too early. A rescue that stabilizes the critical paths but leaves the secondary paths untouched will produce the next incident in six weeks.
+
+## A 60 day plan
+
+1. **Days one to seven.** Read the entire codebase. Write the orientation document. Map routes, models, external calls, environment variables.
+2. **Days eight to fourteen.** Run the audit. Categorize every problem by severity. Do not change anything yet.
+3. **Days fifteen to twenty-one.** Fix all security and data integrity issues. These cannot wait.
+4. **Days twenty-two to thirty-five.** Write integration tests for the highest risk paths: auth, payments, data deletion.
+5. **Days thirty-six to fifty.** Fix structure. Consolidate duplicated logic. Add error handling to external calls. Rename confusing things.
+6. **Days fifty-one to sixty.** Document what exists. Write a handoff document for the team. Establish a review process for future AI generated code.
+
+For broader reading on what to expect when AI code generation shifts from helping to hurting, see [when AI code generation stops saving you time](/blog/when-ai-code-generation-stops-saving-you-time-and-starts-costing-you). For the quality layer, [the last 20 percent post on AI generated SaaS](/blog/the-last-20-percent-why-your-ai-generated-saas-fails-at-stripe-and-security) covers the specific integration points where AI generated code tends to fail.

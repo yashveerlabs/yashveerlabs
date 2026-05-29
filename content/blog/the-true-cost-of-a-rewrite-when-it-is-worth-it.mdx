@@ -1,0 +1,113 @@
+---
+slug: "the-true-cost-of-a-rewrite-when-it-is-worth-it"
+title: "The True Cost of a Rewrite: When It Is Worth It"
+excerpt: "Rewrites feel like fresh starts. They are usually expensive, often unnecessary, and occasionally the right call. Here is the honest framework for deciding."
+date: "2024-08-17"
+category: "Software Costs and Budgeting"
+tags: ["budget","cost","pricing"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-true-cost-of-a-rewrite-when-it-is-worth-it"
+status: "published"
+definition: "A rewrite replaces a working system with a new one built from scratch, and it costs more than the original build in almost every case because you are building the replacement while maintaining the original. The real cost is the original build cost plus six to eighteen months of parallel operation plus the risk of the new system replicating the old problems. It is worth it in a narrow set of circumstances and only when the alternatives have been genuinely evaluated."
+faq: [
+  {"q":"how much does a full software rewrite typically cost compared to the original build","a":"Between one and a half and three times the original build cost in most cases. The multiplier comes from the parallel operation period where both systems run simultaneously, the knowledge transfer from old to new, the replicated testing effort, and the business disruption of a long migration. A 100,000 dollar original build typically costs 150,000 to 300,000 to rewrite."},
+  {"q":"when is a rewrite actually worth it versus a refactor","a":"A rewrite is worth it when the architecture prevents the business from scaling in a way that incremental refactoring cannot fix, when the stack is genuinely end-of-life with no migration path, or when the codebase has been so thoroughly corrupted by tech debt that the cost to incrementally improve it exceeds the cost to replace it. In most other cases a structured refactor is cheaper and less risky."},
+  {"q":"why do software rewrites fail so often","a":"The second system syndrome is the most common cause. The team designs the rewrite with all the features of the original plus all the features they wished the original had, making the rewrite more complex than the original. The other common cause is underestimating the knowledge embedded in the original system. The bugs that look like bugs are often edge case handling for real business rules."},
+  {"q":"what is the strangler fig pattern and when should i use it instead of a rewrite","a":"The strangler fig pattern gradually replaces the original system by building the new system around it, routing traffic to the new components as they are ready. It is slower than a full rewrite but significantly less risky. Use it when the original system is still in production, when the business cannot tolerate a big-bang migration, and when the team can define clean boundaries between old and new components."},
+  {"q":"how long does a typical saas rewrite take","a":"Six to eighteen months for a moderately complex SaaS. The timeline depends on the size of the original system, the team size, and how much of the original feature set needs to be replicated before cutover. Teams consistently underestimate this timeline. A more useful heuristic is to estimate the original build time and multiply by one point five."},
+  {"q":"should i tell customers about a rewrite in progress","a":"Not in detail. Customers care about the product working, not the internal architecture. What they need to know is whether features will be delayed, whether there will be downtime, and whether their data is safe. Communicate those things honestly. Do not narrate the internal engineering conversation."},
+  {"q":"what technical debt level justifies a rewrite rather than continued refactoring","a":"There is no clean threshold. The signal I look for is whether the marginal cost of adding a feature has doubled or tripled compared to early in the codebase's life. If a feature that should take one week takes three weeks because of the debt, and that pattern is consistent across the team, the debt is compounding faster than it can be paid down incrementally. That is the signal."}
+]
+---
+
+## What you actually need to know
+
+- A rewrite costs between one and a half and three times the original build.
+- Most rewrites fail because the team underestimates the knowledge embedded in the original system.
+- The strangler fig pattern is usually a better choice than a full rewrite for systems still in production.
+- The cases where a rewrite is genuinely the right answer are real but narrow.
+- In my experience, the decision to rewrite is made emotionally about seventy percent of the time and rationally about thirty percent of the time.
+
+| Approach | Cost | Risk | Timeline | Best for |
+|---|---|---|---|---|
+| Full rewrite | 150 to 300 percent of original build | High | 6 to 18 months | End-of-life stack, catastrophic debt |
+| Strangler fig migration | 80 to 150 percent of original build | Medium | 12 to 36 months | Live systems, survivable debt |
+| Structured refactor | 30 to 80 percent of original build | Low to medium | 3 to 12 months | Specific debt, bounded problems |
+| Do nothing | Near zero now, compounding later | High long-term | Ongoing | Never a real strategy |
+
+## The core argument
+
+The rewrite conversation usually starts with a feeling, not a business case. The engineering team is frustrated. The codebase has become slow to work in. Features take longer than they should. The test suite is failing more often than it is passing. Someone says "we should just rewrite it" and the idea spreads. It feels like relief.
+
+The feeling is understandable. The problem is that the feeling is not a financial argument. A rewrite is a capital allocation decision. It requires the same rigor as any other decision to spend six to eighteen months of engineering budget. The standard should be: can you demonstrate that the cost of the rewrite is lower than the cost of continuing with the current system? Not lower than the ideal future system. Lower than the real alternatives.
+
+Most of the time, the answer is no. A structured refactor using the strangler fig pattern, or a targeted technical debt reduction sprint, is cheaper and less risky than a full rewrite. The strangler fig approach, where you build the new system incrementally around the old one and migrate traffic as new components are ready, avoids the parallel operation problem that makes rewrites expensive. You get the same architectural improvement at lower cost and lower risk.
+
+The cases where a full rewrite is genuinely justified are real. A stack that has reached true end-of-life with no migration path. A codebase that has been so corrupted by years of rushed development that the marginal cost of a feature has tripled compared to the early codebase. An architectural flaw so fundamental that it prevents the business from operating at the scale the business requires. These situations exist. They are not common. And even in these cases, the cost needs to be modeled honestly before the decision is made.
+
+## What actually makes rewrites expensive
+
+The direct cost is obvious: engineering time to build the new system. The less obvious costs are what kill rewrite projects.
+
+Parallel operation is the largest hidden cost. While the rewrite is in progress, the original system keeps running. Bugs in the original still need to be fixed. The original still needs to be maintained. You are paying for two systems simultaneously. The longer the rewrite takes, the longer you pay for both.
+
+The knowledge problem is the second hidden cost. The original codebase contains years of learned behavior. The things that look like bugs are often edge case handling for real business rules. The weird date calculation that seems wrong is handling a billing edge case that a customer called about eighteen months ago. When you rewrite from scratch, you rebuild that knowledge from scratch too. Except this time you do not have the customer complaints to teach you. You ship the new system, the edge cases surface in production, and you spend weeks building back what you had.
+
+Second system syndrome is the third hidden cost. When given the opportunity to start fresh, teams consistently over-design the replacement. Every feature request that was declined in the original becomes a requirement for the rewrite. The result is a new system that is more complex than the old one, takes longer to build, and ships with its own set of problems.
+
+## How much does it cost
+
+| Original build cost | Full rewrite low estimate | Full rewrite high estimate | Strangler fig low estimate | Strangler fig high estimate |
+|---|---|---|---|---|
+| 30,000 | 35,000 | 70,000 | 20,000 | 40,000 |
+| 80,000 | 100,000 | 200,000 | 55,000 | 110,000 |
+| 200,000 | 280,000 | 500,000 | 140,000 | 280,000 |
+| 500,000 | 700,000 | 1,200,000 | 350,000 | 650,000 |
+
+The ranges reflect the variance in parallel operation time, team experience with the new stack, and how cleanly the original system can be replaced. The strangler fig estimates assume a reasonably modular original system.
+
+## What to look for before committing to a rewrite
+
+- A genuine technical argument for why incremental refactoring cannot solve the problem.
+- A cost model that includes parallel operation, not just the new build estimate.
+- An assessment of the knowledge risk: what business logic lives in the original that is not documented anywhere.
+- A clear migration plan for data and for customers during the cutover.
+- A team that has done a rewrite before. First-time rewrite projects almost always run long.
+- An honest conversation about whether second system syndrome is already in the requirements.
+
+## Expert opinion
+
+> Most rewrite decisions I have seen were made because the team was unhappy, not because the business case was there. The unhappiness was real. The architecture was genuinely painful. But unhappiness is not a budget. The right question is not whether the rewrite would feel better. It is whether the rewrite is cheaper than the alternatives over three years.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client came to me with a Rails 4 application that had been in production for six years. The team wanted to rewrite it in a modern stack. The original build had cost roughly 120,000 dollars. The rewrite estimate from the team was 90,000, which seemed cheaper. When I modeled the parallel operation period (estimated at nine months), the maintenance on the original during that window, the data migration work, and the knowledge transfer overhead, the real rewrite cost was 200,000 to 220,000.
+
+We chose the strangler fig pattern instead. We identified the three modules with the highest maintenance cost and rebuilt them first, routing traffic to the new modules as they were ready. Total cost over eighteen months was about 85,000. The architecture improved incrementally. The original system never went down during migration. The business kept shipping features throughout.
+
+The cases where I have recommended a full rewrite are real but few. One was a system built by a vendor who had gone out of business, in a proprietary language with no documentation. The strangler fig approach had no viable entry point. The full rewrite was the only path. That project cost twice the original build and took fourteen months. Worth it in that specific case. Not a generalizable recommendation.
+
+For context on the cost of the technical debt that drives rewrite conversations, see [the tech debt audit a two day process](/blog/the-tech-debt-audit-a-two-day-process) and [why most rewrites fail](/blog/why-most-rewrites-fail).
+
+## Common mistakes
+
+1. Making the rewrite decision based on team frustration rather than cost analysis.
+2. Modeling the cost of the new build but not the cost of parallel operation.
+3. Underestimating the business logic embedded in the original system.
+4. Not considering the strangler fig pattern as an alternative.
+5. Allowing second system syndrome to inflate the scope of the replacement.
+6. No documented migration plan before the rewrite starts.
+7. Declaring the rewrite complete before the original is fully decommissioned. Both systems in production indefinitely is the worst outcome.
+
+## A six-month decision and planning framework
+
+1. **Month one.** Quantify the cost of the status quo. What does a feature take now versus eighteen months ago? What is the maintenance cost per quarter?
+2. **Month two.** Evaluate the strangler fig alternative seriously. Define the module boundaries. Estimate the cost of incremental migration.
+3. **Month three.** If the full rewrite is still the leading option, build the cost model including parallel operation and knowledge transfer.
+4. **Month four.** Get an independent review of the plan. Someone who has done a rewrite and has no stake in the outcome.
+5. **Month five.** Make the decision. Document the rationale. Set the success criteria.
+6. **Month six.** Start the work with an agreed scope and a migration plan.
+
+For related reading on the discipline that prevents rewrites from being necessary, [app maintenance cost a five year forecast model](/blog/app-maintenance-cost-a-five-year-forecast-model) covers the maintenance investment that keeps codebases healthy, and [the strangler fig pattern replacing legacy in stages](/blog/the-strangler-fig-pattern-replacing-legacy-in-stages) walks through the alternative approach in detail.

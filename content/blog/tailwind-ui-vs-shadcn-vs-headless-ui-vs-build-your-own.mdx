@@ -1,0 +1,61 @@
+---
+slug: "tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own"
+title: "Tailwind UI vs shadcn vs Headless UI vs Build Your Own"
+excerpt: "Four approaches to UI components for React applications. Here is which one fits your team size, timeline, and design system ambitions."
+date: "2026-05-24"
+category: "Comparisons and Vendor Decisions"
+tags: ["tailwind", "shadcn", "headless-ui", "components", "frontend", "react"]
+readingMinutes: 7
+ogImage: "/api/og/blog/tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own"
+status: "published"
+faq: [
+  {"q":"Is shadcn/ui the same as Radix UI?","a":"No. Radix UI provides the unstyled, accessible component primitives. shadcn/ui is a collection of pre-styled components built on top of Radix UI primitives using Tailwind CSS. You can use Radix UI directly if you want more control over the styling approach."},
+  {"q":"Does Tailwind UI require a Tailwind CSS Pro subscription?","a":"No. Tailwind UI is a one-time purchase, not a subscription. You pay once and get access to all current components and future additions. The price is $299 for the component library or $149 for a single section (marketing or application UI)."},
+  {"q":"Can I use shadcn/ui without Tailwind CSS?","a":"shadcn/ui components are styled with Tailwind CSS. You can adapt them to other CSS approaches, but the out-of-the-box experience requires Tailwind. If your project does not use Tailwind, Radix UI with your own CSS solution is a better starting point than shadcn/ui."},
+  {"q":"Is building your own component library ever the right choice?","a":"Yes, when you have a design system with specific requirements that existing libraries cannot meet cost-effectively, when you are building a component library as a product itself, or when you have a large enough team to maintain it. For most SaaS applications, building your own is premature optimization."},
+  {"q":"How does Headless UI differ from Radix UI?","a":"Both provide unstyled accessible component primitives. Headless UI is from the Tailwind Labs team and integrates naturally with Tailwind CSS workflows. Radix UI has a broader component coverage and a larger ecosystem. shadcn/ui uses Radix as its foundation. For new projects, Radix via shadcn/ui is the more common choice."}
+]
+---
+
+# Tailwind UI vs shadcn vs Headless UI vs Build Your Own
+
+**Four approaches dominate React component development in 2026: Tailwind UI (a paid library of pre-built components), shadcn/ui (a copy-paste component library built on Radix), Headless UI (unstyled accessible components from the Tailwind Labs team), and building your own from scratch. Each makes sense in a specific context. The mistake is treating any one of them as universally correct.**
+
+## What you need to know
+
+- Tailwind UI is a one-time purchase that gives you production-quality components with minimal setup; ideal for moving fast without design resources
+- shadcn/ui is the dominant free choice for React applications in 2026; you own the code, it is built on Radix UI primitives, and it integrates with Tailwind
+- Headless UI provides accessibility behavior without any styling; you bring all visual design yourself
+- Building your own components is almost never the right first choice; it is the right choice when you have design system requirements that none of these meet
+- The real cost is not the component library itself but the time to customize it to match your design
+
+## The core argument
+
+The component library decision is fundamentally a time-versus-control tradeoff. Tailwind UI and shadcn/ui compress weeks of component development into hours. Headless UI gives you full visual control at the cost of doing all the CSS yourself. Building from scratch gives you maximum control at the cost of significant development time and the risk of shipping inaccessible components.
+
+shadcn/ui has become the clear community favorite for React applications in 2026. The reason is the model: you do not install shadcn/ui as a package dependency. You copy the component source code into your project. This means you own the code entirely, can modify it without forking a library, and do not worry about the library version breaking your build. The components are built on Radix UI primitives, which handle the accessibility behavior (keyboard navigation, ARIA attributes, focus management) correctly. The styling is Tailwind, which most React teams are already using. For Nexli and for the component work on Velmora, shadcn/ui was the starting point for every component we needed that it covered.
+
+Tailwind UI's value proposition is speed and polish for people who do not want to think about design. The components look excellent out of the box. They cover marketing pages, application UI, and ecommerce patterns. If you are building a product where you need a professional-looking interface quickly and you do not have a designer, Tailwind UI's one-time cost is a good investment. The tradeoff versus shadcn/ui is that Tailwind UI components are copied into your project as HTML/JSX patterns rather than as composable React components, which means they are less reusable in an application context. Headless UI from Tailwind Labs sits in a different category: it is for teams that have a designer who has created a custom visual language and needs the accessibility behavior implemented correctly without any default styling. The accessibility primitives are excellent. The absence of any default styling means you are writing significant CSS before a single component looks like anything.
+
+## Common mistakes
+
+1. **Using Tailwind UI patterns for an application when they are designed for marketing pages.** Tailwind UI has two sections: marketing components and application UI. The marketing components are designed for landing pages, not for interactive product interfaces. Use the application UI section for product components.
+2. **Installing shadcn/ui and then treating it like a normal package.** shadcn/ui components are meant to be customized after you add them to your project. If you add a Button component and never open the file, you are not using shadcn/ui correctly. The model is own-and-modify, not install-and-import.
+3. **Building custom components before checking if shadcn/ui covers the need.** shadcn/ui covers most common component needs: Dialog, Dropdown, Command, Table, Form, Toast, Calendar, and more. Check the library before deciding to build from scratch.
+4. **Mixing multiple component libraries in one project.** Using shadcn for some components, Headless UI for others, and Material UI for a third set creates styling inconsistencies and dependency conflicts. Pick one foundation and stick to it.
+5. **Underestimating the time to customize any library to match a custom design.** All four approaches require customization work. Tailwind UI and shadcn/ui get you 80 percent of the way to a custom design quickly. The last 20 percent, making it match your specific design system, takes time. Budget for it.
+
+## Where to start
+
+**Step 1: Assess your design resources.** If you have a designer with a component spec, shadcn/ui or Headless UI give you the right foundation. If you are a solo developer building a product without a designer, Tailwind UI or shadcn/ui with minimal customization gets you to launch fastest.
+
+**Step 2: For most React applications in 2026, start with shadcn/ui.** Run `npx shadcn-ui@latest init` in your Next.js project. Add the components you need as you need them. Customize each one after adding it to match your design system. This is the correct workflow.
+
+**Step 3: Build a component showcase page early in the project.** A single page that renders every component in your library in its primary states gives you a visual reference, catches styling regressions when you update Tailwind, and serves as documentation for new team members. This is worth investing an hour in.
+
+## Related reading
+
+- [shadcn/ui in Production: A Practical Read](/blog/shadcn-ui-in-production-a-practical-read)
+- [Component Libraries vs Custom Design Systems](/blog/component-libraries-vs-custom-design-systems)
+- [CSS Architecture: Tailwind vs CSS Modules vs Vanilla Extract](/blog/css-architecture-tailwind-vs-css-modules-vs-vanilla-extract)
+- [The Frontend Architecture That Survives Three Years of Feature Sprawl](/blog/the-frontend-architecture-that-survives-three-years-of-feature-sprawl)

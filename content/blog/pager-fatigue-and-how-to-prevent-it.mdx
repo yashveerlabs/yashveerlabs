@@ -1,0 +1,62 @@
+---
+slug: "pager-fatigue-and-how-to-prevent-it"
+title: "Pager Fatigue and How to Prevent It"
+excerpt: "Pager fatigue happens when on-call engineers stop trusting alerts because too many of them are false positives. Here is what causes it, what it costs, and how to build an alerting system that engineers respond to instead of dismissing."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/pager-fatigue-and-how-to-prevent-it"
+status: "published"
+definition: "Pager fatigue is the degradation in on-call response quality caused by too many alerts, too many false positives, or too many alerts that require no action. Engineers experiencing pager fatigue begin to dismiss alerts without investigating, acknowledge pages and go back to sleep, or route all alerts to a low-priority queue that is effectively ignored. The consequence is that real incidents are missed or responded to slowly, which defeats the purpose of alerting. Prevention requires reducing alert volume, increasing alert precision, and ensuring every alert that fires requires a human response."
+faq: [
+  {"q":"What is the signal-to-noise problem in alerting?","a":"Signal-to-noise ratio in alerting describes the proportion of alerts that indicate real problems (signal) versus alerts that fire without requiring action (noise). A high-noise alerting system produces frequent pages for conditions that resolve on their own, conditions that were expected, or conditions that are below the threshold of requiring immediate attention. Engineers in high-noise environments learn that most alerts do not matter, which causes them to slow their response to all alerts, including the ones that do."},
+  {"q":"What is the difference between a symptom-based alert and a cause-based alert?","a":"A symptom-based alert fires when users are experiencing a problem: high error rate, slow response times, failed checkout flows. A cause-based alert fires when a potential cause of a problem is detected: high CPU usage, full disk, elevated memory pressure. Symptom-based alerts are more actionable because they directly indicate user impact. Cause-based alerts often fire without producing user impact, which is a source of noise. The recommended approach is to alert on symptoms (user-visible problems) and use cause-based metrics for dashboards that engineers investigate after a symptom alert fires."},
+  {"q":"What is a runbook and why is it essential for on-call health?","a":"A runbook is a documented procedure for responding to a specific alert type: what the alert means, what queries to run, what actions to take, and when to escalate. Alerts without runbooks require the on-call engineer to figure out the response from first principles at 3am, which is slow and error-prone. Every alert that is expected to fire in production should have a runbook. Runbooks also serve as a quality check: if the runbook is empty (no clear action) or outdated (describes a system that no longer exists), the alert itself should be evaluated for removal."},
+  {"q":"What does a healthy on-call rotation look like?","a":"A healthy on-call rotation produces one to three actionable pages per week per on-call engineer. Pages are resolved in under 30 minutes on average. The post-incident review for each page results in either a runbook improvement, an alert adjustment, or a bug fix that prevents recurrence. Engineers do not report dreading on-call. A rotation where engineers are paged more than five times per shift, pages frequently require more than an hour to resolve, and there is no post-incident process is an unhealthy rotation that will produce attrition."},
+  {"q":"How do you audit an alerting system for noise?","a":"Review the last 30 days of alert history. For each alert type, calculate: how often it fired, how many fires required action, how many were resolved without intervention, and average time to resolution. Alerts where more than 50 percent of fires required no action are candidates for recalibration. Alerts that fire more than once per day are candidates for threshold review. Alerts that have fired zero times in the last 90 days are candidates for removal. The goal is an alerting portfolio where every alert has a clear and consistent signal-to-action relationship."}
+]
+---
+
+## What you need to know
+
+- Every alert that fires without requiring action degrades the alerting system. Engineers who see too many false positives begin treating all alerts as false positives, including the real ones.
+- Alert on symptoms (user-visible impact), not causes (internal system metrics). High CPU is a cause; high error rate is a symptom. Alert on error rate and use CPU as a diagnostic metric.
+- Every alert that fires in production should have a runbook. If there is no documented response, either the runbook is missing or the alert should not fire.
+- The target for a healthy on-call rotation is one to three actionable pages per week per engineer. More than this is a signal that the alerting system needs calibration, not that the engineers need to respond faster.
+- Post-incident reviews are the primary mechanism for reducing pager fatigue over time. Each review should produce an alert adjustment, a runbook update, or a code change that prevents recurrence.
+
+## The core argument
+
+Pager fatigue is an engineering culture and systems problem, not a willpower problem. Engineers who get paged too often and too often for nothing learn that the alerting system cannot be trusted. That learning is rational: if 70 percent of pages require no action, the rational response is to treat the next page as a 70 percent chance of being ignorable. The consequence is that the 30 percent of pages that are real incidents receive slow, low-quality responses from engineers who have been conditioned to dismiss the alert first and investigate second.
+
+The root cause is almost always the same: alerts were added reactively (after an incident, someone adds an alert for the condition that caused it) without being removed when they become noisy, and without a quality standard for what a good alert looks like. An alerting system that grows by adding alerts but never removes them accumulates noise exponentially. Conditions that were once rare become common as the system changes; alerts tuned for one traffic volume behave differently at ten times that traffic; threshold values chosen during initial setup become wrong as the system evolves.
+
+The discipline that prevents pager fatigue is alert ownership. Every alert should have an owner responsible for its accuracy: a team or engineer who reviews it quarterly, adjusts thresholds when the signal drifts, and removes it when the condition it monitors is no longer meaningful. Alerts without owners become nobody's problem, and nobody's problems accumulate until they are everybody's problem. In my experience working with on-call teams, the teams with the healthiest rotations are the ones where alert quality is treated as a first-class engineering responsibility with the same accountability as code quality.
+
+## Common mistakes
+
+1. **Adding alerts after incidents without evaluating whether they would have caught the incident earlier.** An alert for the condition that caused last week's incident is valuable only if that condition reliably precedes user impact and if the alert threshold is actionable. An alert that fires at the same time users are already reporting the problem adds noise without improving response time.
+
+2. **Setting alert thresholds on absolute values rather than relative changes.** A threshold of "error count greater than 100 per minute" is inappropriate for a service whose baseline is 10,000 requests per minute (1 percent error rate is normal) and also for a service whose baseline is 100 requests per minute (a single error doubles the rate). Alert on error rate percentage and on rate of change, not on absolute values.
+
+3. **Not testing alert severity levels.** Treating every alert as P1 produces the worst pager fatigue: every condition wakes engineers at 3am regardless of whether it requires immediate action. Establish severity levels (P1: user-facing outage requiring immediate response, P2: degradation requiring response within an hour, P3: something to investigate next business day) and route alerts to the correct severity.
+
+4. **Using alerting as a substitute for monitoring.** Alerting should notify engineers of conditions requiring action. Monitoring dashboards should show system health during normal operation. Teams that have alerts for every metric they care about produce both pager fatigue and alert desensitization without gaining better visibility into normal operation.
+
+5. **Not running post-incident reviews for alert-induced false positives.** Post-incident reviews are typically triggered by real incidents. They should also be triggered by high-noise periods: when the on-call engineer receives five pages in a shift that required no action, that is an incident of alerting system quality that deserves investigation and a corrective action.
+
+## Where to start
+
+1. **Audit the last 30 days of alert history.** For each alert, calculate the action rate (what percentage of firings required a response?). Alerts below 50 percent action rate are the highest-priority targets for threshold recalibration or removal. Create a list sorted by action rate ascending.
+
+2. **Add a runbook link to every alert that fires.** For each alert that fired in the last 30 days, verify that a runbook exists and is current. If no runbook exists, write one or evaluate whether the alert should be removed. This exercise reveals which alerts are producing pages that engineers do not know how to handle.
+
+3. **Establish a weekly alert quality review.** Spend 30 minutes per week reviewing which alerts fired, which required action, and which did not. Use this review to adjust thresholds, remove unused alerts, and create new runbooks. Alert quality improves incrementally through consistent attention, not through one-time cleanup projects.
+
+## Related reading
+
+- [Observability in 2026: Metrics, Logs, Traces](/blog/observability-in-2026-metrics-logs-traces)
+- [Incident Severity Levels: A Practical Definition](/blog/incident-severity-levels-a-practical-definition)
+- [Logging Strategy for SaaS: Structured, Searchable, Useful](/blog/logging-strategy-for-saas-structured-searchable-useful)
+- CI/CD Pipeline Design That Scales Past Ten Engineers

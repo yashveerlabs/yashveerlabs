@@ -1,0 +1,62 @@
+---
+slug: "inngest-vs-hatchet-vs-trigger-dev-async-job-platforms-compared"
+title: "Inngest vs Hatchet vs Trigger.dev: Async Job Platforms Compared"
+excerpt: "Three strong async job platforms with meaningfully different architectures. Here is how Inngest, Hatchet, and Trigger.dev compare on developer experience, reliability, and production fit for SaaS teams."
+date: "2026-05-23"
+category: "Comparisons and Vendor Decisions"
+tags: ["comparisons","vendor-evaluation","tools-2026"]
+readingMinutes: 6
+ogImage: "/api/og/blog/inngest-vs-hatchet-vs-trigger-dev-async-job-platforms-compared"
+status: "published"
+definition: "Async job platforms handle background work that should not block a web request: sending emails, processing uploads, syncing data, running scheduled reports. Inngest, Hatchet, and Trigger.dev are the three platforms competing for this space in 2026, each with a different take on how to write, observe, and scale background jobs in a TypeScript-first environment."
+faq: [
+  {"q":"What is the main difference between Inngest and Trigger.dev?","a":"Inngest is event-driven: you write functions that respond to events you emit from your application. Trigger.dev is task-oriented: you define tasks and call them directly. Both support retries, delays, and fan-out patterns. Inngest's event model maps well to existing application events like user.created or payment.processed. Trigger.dev's task model feels more familiar to engineers used to background job libraries."},
+  {"q":"When does Hatchet make sense over the other two?","a":"Hatchet is designed for complex, multi-step workflows with durable execution guarantees. If you need workflows that run for hours or days, wait for human approval steps, or fan out into hundreds of parallel subtasks, Hatchet's workflow engine is more expressive than Inngest's step model or Trigger.dev's task model. It is also self-hostable, which matters for teams with data residency requirements."},
+  {"q":"Which platform has the best observability?","a":"Inngest and Trigger.dev both have strong built-in dashboards showing job runs, retries, and step-level traces. Hatchet has a self-hosted UI that provides similar visibility. In my experience, Inngest's event timeline view is the most useful for debugging fan-out scenarios where multiple functions respond to the same event."},
+  {"q":"Can these platforms replace a traditional queue like BullMQ or SQS?","a":"For most SaaS use cases, yes. These platforms abstract the queue, worker, and retry logic behind a higher-level API. The tradeoff is that you take on a dependency on their infrastructure or self-hosting setup. Teams that need very high throughput or very low latency may find traditional queues more appropriate, but the developer experience gap is significant."},
+  {"q":"How do these platforms handle failures and retries?","a":"All three support configurable retry counts with exponential backoff. Inngest and Trigger.dev provide per-step retry configuration, which means a five-step workflow can retry an individual failing step without rerunning the entire workflow from the beginning. This step-level retry granularity is one of the key advantages of these platforms over raw queues."}
+]
+---
+
+## What you need to know
+
+- All three platforms run TypeScript functions as background jobs with built-in retries, delays, and observability. The architecture differences matter more than the feature list.
+- Inngest's event model makes it natural to extend an existing application event system. If you are already emitting events for user actions, wiring Inngest functions to those events requires minimal new plumbing.
+- Trigger.dev's task model is the fastest to adopt for teams that want to call background jobs directly from their application code without thinking in events.
+- Hatchet is the right choice when you need long-running workflows, complex fan-out patterns, or self-hosted deployment for compliance reasons.
+- The build vs buy question applies here. These platforms significantly reduce the time to production for background job infrastructure, but they introduce a dependency on their service continuity.
+
+## The core argument
+
+The reason these platforms exist is that the naive approach to background jobs, a BullMQ queue with Redis and a worker process, requires a meaningful amount of infrastructure to operate reliably: queue management, worker scaling, dead letter handling, retry configuration, and observability instrumentation. All of that needs to be set up, maintained, and monitored. For a team building a SaaS product, this infrastructure is not the product and every hour spent on it is an hour not spent on the feature that customers pay for.
+
+Inngest solves this with a hosted execution layer. You write a TypeScript function that handles an event, register it with the Inngest SDK, and the platform handles delivery, retries, and observability. The event model is the key design choice: your application emits events with a name and payload, and any registered function that listens for that event is triggered. This decoupling is powerful for multi-function workflows and for extending behavior without modifying existing code. The limitation is that if you want to call a background job directly without emitting an event, the event model introduces an abstraction layer that can feel indirect.
+
+Trigger.dev takes the direct call approach. You define tasks and call them with `trigger.task.trigger()` from your application code. The result is a background job system that feels like calling a function that runs later, which is the mental model most engineers already have. The platform also has a strong story for scheduled and cron-based jobs, and the developer experience for local development with live preview is well-executed. Hatchet sits at the other end of the complexity spectrum: it is purpose-built for durable, long-running workflows where you need to define multiple steps, wait for external events or human input, and guarantee that work completes even if the process fails mid-execution. If you are building anything resembling an approval flow, a multi-stage data pipeline, or a workflow that could run for days, Hatchet's model is more capable than either of the other two.
+
+## Common mistakes
+
+1. **Using async job infrastructure for work that should be synchronous.** Not everything needs to be a background job. If a task takes less than 200 milliseconds and the user is waiting for the result, running it as an async job adds latency and complexity without benefit.
+
+2. **Not configuring dead letter handling.** Every platform has a way to capture jobs that have exhausted their retries. Not configuring this means failed jobs disappear silently. Set up dead letter inspection before your first production deployment.
+
+3. **Conflating one-off jobs and scheduled jobs.** Scheduled jobs that run every hour are architecturally different from event-triggered jobs. Use the platform's cron scheduling features for time-based work rather than emitting events from a separate cron job that triggers a background function.
+
+4. **Not testing retry behavior during development.** Retries in production often expose bugs that do not appear on the first execution. Use each platform's local development tools to deliberately trigger retries and verify that your job handlers are idempotent.
+
+5. **Choosing a platform based on pricing tier for your current scale.** These platforms are priced differently at higher volumes. Evaluate pricing at the scale you expect to reach in twelve months, not at your current volume. A platform that is free at low volume may be expensive at growth-stage volume.
+
+## Where to start
+
+1. **Identify the five background tasks in your application that cause the most operational pain.** These are the retry candidates, the timeout failures, the jobs you check manually. These become your initial migration targets.
+
+2. **Run a prototype with both Inngest and Trigger.dev.** Both have strong local development setups. Spend two hours with each and pick the one that matches your mental model and your existing application event structure.
+
+3. **Deploy the first job in production with alerting on failures.** Do not wait until you have migrated every job. Ship one job to production, verify the observability, and then expand incrementally.
+
+## Related reading
+
+- [Inngest vs Trigger vs Temporal for Background Jobs](/blog/inngest-vs-trigger-vs-temporal-for-background-jobs)
+- [SaaS Webhook Reliability: From At-Most-Once to At-Least-Once to Exactly-Once](/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once)
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)
+- Queue Architecture for SaaS: When Simple Becomes Insufficient

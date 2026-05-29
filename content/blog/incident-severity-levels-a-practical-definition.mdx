@@ -1,0 +1,62 @@
+---
+slug: "incident-severity-levels-a-practical-definition"
+title: "Incident Severity Levels: A Practical Definition"
+excerpt: "Severity levels are the vocabulary your team uses to decide how fast to move and who to wake up. Here is a practical framework for defining them in a way that actually gets used during incidents."
+date: "2026-05-23"
+category: "DevOps, Deployment, Infrastructure"
+tags: ["devops","deployment","infrastructure"]
+readingMinutes: 6
+ogImage: "/api/og/blog/incident-severity-levels-a-practical-definition"
+status: "published"
+definition: "Incident severity levels are a classification system that tells the team how urgent an incident is, who needs to be notified, and what the expected response time is. A well-defined severity model prevents both under-response, where a critical outage is treated as a low-priority ticket, and over-response, where every minor alert triggers a full incident bridge."
+faq: [
+  {"q":"How many severity levels does a startup actually need?","a":"Three is enough for most early-stage teams: critical, moderate, and low. Critical means the product is down or data is at risk. Moderate means functionality is degraded but the product is usable. Low means something is broken but it has a workaround and no customer is immediately blocked. Four levels are appropriate when you have distinct tiers of customers with different SLA commitments."},
+  {"q":"Who decides the severity level of an incident?","a":"The first person to detect and declare the incident, typically the on-call engineer or the incident commander. The severity can be upgraded during the incident as new information emerges. The person who declares severity is responsible for triggering the appropriate notification chain immediately, not after the cause is confirmed."},
+  {"q":"What is the difference between severity and priority?","a":"Severity describes the impact of an incident on the system and customers. Priority describes the order in which incidents should be worked relative to each other. A high-severity incident is almost always high priority, but a low-severity incident affecting a high-value customer might be elevated in priority above a moderate-severity incident affecting a small account."},
+  {"q":"How do you define severity for data integrity incidents?","a":"Data integrity incidents should default to the highest severity regardless of customer impact visibility. A bug that corrupts data silently is more dangerous than an outage because the impact compounds over time before it is discovered. Define any incident involving data loss, corruption, or unauthorized exposure as critical regardless of how many customers are currently affected."},
+  {"q":"Should severity levels map directly to SLA commitments?","a":"Yes. Each severity level should have a defined response time and resolution target that corresponds to your SLA tier. Critical means first response within fifteen minutes and a status page update within thirty. Moderate means first response within two hours. Low means first response within one business day. If your SLAs differ by customer tier, your severity matrix should reflect that."}
+]
+---
+
+## What you need to know
+
+- Severity levels only work when the whole team agrees on the definitions before an incident starts. Definitions debated during an outage waste time that should go toward resolution.
+- The purpose of a severity level is to trigger a specific response chain automatically. If the level does not determine who gets called and when, it is not doing its job.
+- Data integrity incidents deserve special handling. Silent data corruption is almost always more damaging than visible downtime, and severity definitions should reflect that.
+- Severity levels should map to SLA commitments. If you have enterprise customers on uptime SLAs, the severity definition is the mechanism that activates your contractual obligations.
+- Underdeclaring severity is a common failure mode. Engineers are optimistic about resolution time and reluctant to wake people up. The severity definition should make the decision before the incident, not during it.
+
+## The core argument
+
+The incident that goes badly is almost never the one where the team does not know how to fix the problem. It is the one where nobody knows who is in charge, the wrong people are notified too late, and the customer communication goes out three hours after the resolution instead of fifteen minutes after detection. Severity levels solve the coordination problem before the incident starts. They replace judgment calls made under pressure with documented decisions made when nobody is stressed.
+
+The practical severity framework I use has three levels for most early-stage teams. Critical covers anything where the core product is unavailable, payment processing is broken, or data integrity is at risk. The on-call engineer pages the CTO or lead engineer immediately, a status page update goes out within fifteen minutes, and the incident commander role is active from minute one. Moderate covers degraded functionality where customers are impacted but can still use the product. The on-call engineer handles it independently, escalates if not resolved within thirty minutes, and posts an update within two hours. Low covers non-blocking issues with workarounds available, handled during business hours with no customer communication required unless the issue persists beyond the next business day.
+
+The matrix that supports these levels defines, for each severity, the initial notification chain, the customer communication trigger, the update frequency while the incident is active, and the post-mortem requirement. Critical incidents always get a post-mortem. Moderate incidents get a post-mortem if the resolution takes longer than two hours or if the same issue has recurred. Low incidents get a ticket and a fix but not a post-mortem. Building this matrix takes about two hours. Using it during a real incident saves three to five hours of coordination overhead compared to an improvised response.
+
+## Common mistakes
+
+1. **Defining severity by cause rather than impact.** A database query that is running slowly is not inherently a critical incident. Whether it is critical depends on whether customers are blocked. Define severity by observable customer impact, not by what broke.
+
+2. **Not including data integrity in the severity definitions.** Most startup incident frameworks define severity by uptime and availability. Data corruption incidents are more dangerous and need explicit handling at the highest severity level by default.
+
+3. **Setting notification thresholds too high for critical incidents.** Some teams define critical as "100 percent of customers are affected." This means a significant outage affecting 40 percent of customers gets treated as moderate until the scope is confirmed. Define critical as "any confirmed or suspected impact to core functionality or data integrity."
+
+4. **Not tying severity to SLA obligations.** If you have enterprise customers on contractual uptime commitments, the severity declaration is what activates your contractual response obligations. The severity matrix and the SLA matrix should be designed together.
+
+5. **Treating severity as permanent.** Severity should be upgraded or downgraded as the incident evolves. An incident that starts as moderate and turns out to affect payment processing should be upgraded to critical immediately. Build the upgrade trigger into your runbook.
+
+## Where to start
+
+1. **Write the three-level severity matrix for your current team size.** Define critical, moderate, and low by customer impact, not technical cause. Specify the notification chain, first communication timing, and update frequency for each level. One page, shared with everyone on the team.
+
+2. **Add severity to your incident declaration process.** When an incident is declared, the first decision is severity. Build this into your runbook so that the on-call engineer is prompted to declare severity before doing anything else.
+
+3. **Review your last three incidents and apply the matrix retroactively.** Were they declared at the right severity? Did the response match the level? Use the gaps between actual response and ideal response to refine the definitions before the next incident.
+
+## Related reading
+
+- [Incident Response for Startups: A Playbook](/blog/incident-response-for-startups-a-playbook)
+- [Runbooks That Actually Get Used During Incidents](/blog/runbooks-that-actually-get-used-during-incidents)
+- [Status Pages That Build Trust During Outages](/blog/status-pages-that-build-trust-during-outages)
+- On-Call Rotations Without Burning Out Your Team

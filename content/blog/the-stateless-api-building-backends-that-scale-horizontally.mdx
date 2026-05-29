@@ -1,0 +1,117 @@
+---
+slug: "the-stateless-api-building-backends-that-scale-horizontally"
+title: "The Stateless API: Building Backends That Scale Horizontally"
+excerpt: "A stateless API is the simplest scaling primitive available. When the server holds no session state, every request can land on any instance. That property is what makes horizontal scaling work. The teams that skip this design decision pay for it the first time they try to add a second server."
+date: "2024-10-29"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 11
+ogImage: "/api/og/blog/the-stateless-api-building-backends-that-scale-horizontally"
+status: "published"
+definition: "A stateless API holds no session or user-specific data in server memory between requests. Each request carries everything the server needs to process it: a token, a tenant ID, whatever context is required. The server can be restarted, replaced, or multiplied without affecting in-flight sessions. This is the prerequisite for horizontal scaling, blue-green deploys, and zero-downtime restarts."
+faq: [
+  {"q":"what does it mean for an api to be stateless and why does it matter for scaling","a":"Stateless means the server holds no per-request or per-session data in memory between requests. Everything needed to process a request comes in with the request itself, usually via a token or signed payload. This matters for scaling because you can add instances freely. Any instance can handle any request. There are no sticky sessions and no need for shared in-process memory."},
+  {"q":"how do I move from a stateful session-based api to a stateless jwt-based api","a":"The migration has two parts. First, issue JWTs or opaque tokens that carry or reference the session data the server was previously holding in memory. Second, remove the server-side session store or make it external. The migration can be done incrementally by routing new logins to the stateless path while existing sessions expire naturally over days or weeks."},
+  {"q":"what is the difference between stateless apis and restful apis","a":"They overlap but are not the same thing. REST is an architectural style with constraints on resource design and hypermedia. Statelessness is one of REST's constraints, but teams can build RESTful APIs that are not truly stateless. The stateless property is the one that matters most for scaling. You can have a non-RESTful API that is stateless and scales horizontally just fine."},
+  {"q":"where should session state live if not in the api server memory","a":"A shared external store. Redis is the most common choice: it is fast, has TTL built in, and is widely supported. The key is that the store is outside the API process so any instance can reach it. Alternatives include database-backed session stores for teams that want fewer moving parts, and signed stateless tokens that carry the session data directly and need no external store at all."},
+  {"q":"what are the security tradeoffs of jwt tokens versus server side sessions","a":"Server-side sessions are revocable: you delete the session and the user is logged out immediately. JWTs are not revocable by default: the token is valid until it expires. The common mitigations are short expiry times combined with refresh tokens, and a token revocation list for high-security scenarios. Neither approach is strictly better. Teams with strong session revocation requirements often use opaque tokens backed by a server-side store rather than self-contained JWTs."},
+  {"q":"can a stateless api work with websockets or long-lived connections","a":"Yes, with some care. The initial handshake can use the same token-based authentication. The challenge is that long-lived connections do introduce per-connection state in the server process. The pattern is to keep the connection state minimal and recoverable, and to store anything important externally so reconnections to a different instance can resume cleanly."},
+  {"q":"how does stateless api design affect deployment and zero downtime restarts","a":"It is the key enabler. If the server holds no in-memory session state, you can drain connections, restart the process, and bring it back without any user noticing. Blue-green deployments work cleanly. Rolling restarts work cleanly. Autoscaling works cleanly. The teams that have sticky sessions tied to specific instances cannot do any of these without sessions breaking."}
+]
+---
+
+## What you actually need to know
+
+- Statelessness is not a best practice. It is a prerequisite for horizontal scaling, zero-downtime restarts, and clean autoscaling.
+- Server-side session stores in process memory are the most common violation. Move session state to Redis or a signed token.
+- JWTs carry state in the token itself. Opaque tokens carry a reference that points to state in an external store. Both work. The tradeoffs are around revocation.
+- Every file upload, every cache, every piece of data that only one server instance knows about is a statefulness problem.
+- The teams that design stateless from the beginning deploy with confidence. The teams that retrofit statelessness onto a stateful app spend a week debugging sticky-session edge cases during every scaling event.
+
+| Approach | State location | Revocability | Horizontal scaling | Operational cost |
+|---|---|---|---|---|
+| In-process session store | Server memory | Immediate | Not possible | None |
+| Shared Redis session store | External Redis | Immediate | Yes | Low |
+| Self-contained JWT | Token payload | Requires revocation list | Yes | None |
+| Opaque token + Redis | External Redis | Immediate | Yes | Low |
+| Database-backed session | Postgres/MySQL | Immediate | Yes | Query overhead |
+
+## The core argument
+
+The first time a team tries to add a second server, they discover whether the API is stateless. If it is, adding the second server takes twenty minutes. If it is not, adding the second server takes a week of debugging, because users randomly get logged out when their request lands on the wrong instance.
+
+I have debugged this more times than I want to count. The root cause is almost always in-process session storage. The framework defaults to it. The team does not override it. The app works fine on one server. The app fails in unpredictable ways on two. The fix is moving the session store to Redis or moving to token-based auth. Neither is hard. But doing it after the fact, on a live app, with users, requires a careful migration.
+
+The stateless design is also what makes zero-downtime deployments possible. If the server holds session state in memory, restarting it loses that state. Users get logged out. If the server holds no state in memory, you can restart it, replace it, or scale it to zero and back without users noticing.
+
+There is a version of this argument that sounds like premature optimization. "We are just one server for now, why does it matter?" It matters because the right time to fix the session store is at the start, not when you are trying to scale. The migration from in-process sessions to Redis is straightforward in theory and complicated in practice when the app is live and the session model is tangled into authentication, authorization, and feature flags.
+
+## How to actually build a stateless API
+
+### Authentication without server memory
+
+The two patterns. Self-contained tokens, usually JWTs, carry the user ID, tenant ID, and any claims the server needs. The server validates the signature and trusts the payload. No database read required. Expiry is enforced by the token's exp claim.
+
+The tradeoff is revocation. A valid JWT cannot be invalidated until it expires. Short expiry times (fifteen minutes to one hour) combined with refresh tokens reduce the window. For high-security requirements, a small Redis-backed revocation list covers terminated sessions without forcing a full server-side session model.
+
+Opaque tokens are a reference. The server looks up the token in Redis and gets the session data back. More flexible, immediately revocable, slightly more latency. This is the right choice for products where session revocation matters: financial tools, admin access, anything where "log out of all devices" is a real requirement.
+
+### Handling file uploads and temporary state
+
+File uploads that land on one server and get processed there are a statefulness problem. The right pattern is a two-step flow: the client gets a signed upload URL from the API, uploads directly to object storage (S3, GCS), and then calls the API to trigger processing. The API never holds the file. Any instance can handle any request in the process.
+
+Temporary state like wizard progress or multi-step form data follows the same logic. Store it in the client, in a signed cookie, or in Redis. Not in the server process.
+
+## How much does it cost
+
+| Component | Engineering time | Monthly cost | Notes |
+|---|---|---|---|
+| JWT-based auth | A few days | Negligible | No external dependency |
+| Redis session store | Half a day | 15 to 50 USD | Add Redis to the stack |
+| Signed upload URLs | Half a day | S3/GCS storage cost | No additional service |
+| Revocation list in Redis | One day | Included in Redis cost | Small additional key space |
+| Migration from in-process sessions | One to two weeks | Negligible | The expensive part is the migration |
+
+## What a stateless API requires
+
+- No in-process session store. The framework default is usually in-process. Override it.
+- A token strategy with defined expiry and a rotation plan.
+- External state for anything that needs to survive a server restart.
+- File upload flows that use object storage directly, not server-side temporary files.
+- Health checks that do not depend on server-local state, so the load balancer can route to any instance.
+- A clear answer to "where does user context come from in a request?" If the answer is "from memory," the API is not stateless.
+
+## Expert opinion
+
+> The stateless API is not an advanced topic. It is a foundational one that a lot of teams skip because the stateful version works fine at small scale. The problem shows up later, when the team tries to do something that requires more than one server, and the architecture does not support it. I have seen this cost teams three weeks of urgent remediation during a scaling event. The original decision that caused it took about thirty seconds.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS analytics product had been running on a single server for eighteen months. Authentication used the default in-process session store provided by the framework. The product worked reliably. Then the team landed a large customer whose usage patterns required a second server to handle the load spikes.
+
+The first attempt to add a second server produced immediate failures. Users were randomly redirected to login. Reports that were queued on one server never appeared on the other. Support tickets spiked within hours of the deploy. The team rolled back within a day.
+
+The fix was a three-week migration: moving sessions to Redis, replacing file upload flows with signed URLs, and auditing every piece of code that assumed single-server execution. None of it was technically hard. All of it was expensive in engineering time and customer confidence. For related architecture work, [the read-heavy workload strategies that move the needle](/blog/the-read-heavy-workload-strategies-that-move-the-needle) covers what happens once the stateless API is in place and you need to handle high query volume, and [the twelve-factor app in 2026 still relevant slightly updated](/blog/the-twelve-factor-app-in-2026-still-relevant-slightly-updated) provides the broader framework that stateless design sits inside.
+
+## Common mistakes teams make
+
+1. Using the framework's default in-process session store without realizing it.
+2. Treating JWTs as inherently stateless while backing them with a server-side session anyway.
+3. File upload handlers that write to the local disk of the server handling the request.
+4. Caches that live in the server process and are not shared across instances.
+5. Feature flag evaluations that hit a local in-memory store that goes stale across instances.
+6. Missing the distinction between request-scoped context (fine) and cross-request state (not fine).
+7. Not testing multi-instance behavior until the first real scaling event.
+
+## A two week plan to make your API stateless
+
+1. **Day one.** Audit the current session and authentication mechanism. Where does user context live between requests?
+2. **Days two and three.** If in-process sessions, stand up Redis and migrate the session store. Test that sessions survive a server restart.
+3. **Days four and five.** Audit file handling. Identify any uploads that write to server-local disk.
+4. **Days six and seven.** Migrate file handling to signed upload URLs and object storage.
+5. **Week two.** Audit any other in-process state: caches, feature flags, background job locks.
+6. **Day fourteen.** Deploy two instances behind a load balancer without sticky sessions. Test all authentication and upload flows.
+
+For deeper reading on related infrastructure decisions, [why vercel cannot be your entire backend](/blog/why-vercel-cannot-be-your-entire-backend) covers where stateless API design fits in the modern deployment landscape, and [background-job-queues-the-architecture-decision-founders-skip](/blog/background-job-queues-the-architecture-decision-founders-skip) covers the queue layer that often surfaces statefulness problems.

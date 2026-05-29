@@ -1,0 +1,119 @@
+---
+slug: "crdts-in-production-a-real-world-look"
+title: "CRDTs in Production: A Real World Look"
+excerpt: "CRDTs solve a specific class of distributed problems and create complications everywhere else. The teams that use them well pick the problem deliberately. The teams that adopt them as a default regret it."
+date: "2026-05-20"
+category: "Backend, APIs, and System Design"
+tags: ["crdt","distributed-systems","collaboration","backend"]
+readingMinutes: 12
+ogImage: "/api/og/blog/crdts-in-production-a-real-world-look"
+status: "published"
+definition: "CRDTs, Conflict-Free Replicated Data Types, are data structures designed to support concurrent edits across multiple replicas without coordination. They allow each replica to update independently and converge to the same state. CRDTs are the right tool for real time collaboration, offline first apps, and specific eventual consistency scenarios. They are the wrong tool for almost everything else."
+faq: [
+  {"q":"What is a CRDT in plain terms?","a":"A data structure where merging two copies always produces the same result regardless of the order. Two users editing the same document with a CRDT will eventually see the same final document even if their edits arrive in different orders. The merge is mathematically guaranteed to be consistent."},
+  {"q":"When does a CRDT actually fit?","a":"Real time collaborative editing like Google Docs or Figma. Offline first mobile apps with sync. Distributed systems where coordination is too expensive. Each of these has the specific shape of needing concurrent updates without central coordination."},
+  {"q":"What are the costs?","a":"CRDTs grow over time as edit history accumulates. The merge logic is complex. Some operations are awkward to express. The mental model is different from a normal database. Engineers need to think differently about state."},
+  {"q":"What is Yjs?","a":"Yjs is a CRDT library for JavaScript that handles text, lists, maps, and other data types. It is the most popular CRDT library in production. Used by tools like Liveblocks, Tldraw, and many others for real time collaboration."},
+  {"q":"What is the alternative to a CRDT?","a":"Operational Transformation. Server side coordination with locking. Last writer wins. Each is simpler than a CRDT in some way and worse in others. The right alternative depends on the specific requirements."},
+  {"q":"What is the most common CRDT mistake?","a":"Using a CRDT for a problem that does not require concurrent edits. The complexity is paid without the benefit. The simpler database approach would have worked. The team learns this the hard way."},
+  {"q":"How big do CRDTs get?","a":"They grow with edit history. A long lived document accumulates a meaningful tail. Garbage collection of old operations is possible but lossy. Plan for the growth. A CRDT that grows unboundedly becomes a problem."}
+]
+---
+
+## What you actually need to know
+
+- CRDTs fit real time collaboration, offline first sync, and uncoordinated distributed systems.
+- They are the wrong tool for almost everything else.
+- They grow with edit history. Plan for the growth.
+- Yjs is the dominant library for JavaScript.
+- The mental model is different from a normal database.
+
+| Use case | CRDT fit |
+|---|---|
+| Real time document collaboration | Yes, primary fit |
+| Real time canvas collaboration | Yes |
+| Offline first mobile sync | Yes |
+| Multi region eventual consistency for specific data | Sometimes |
+| Standard CRUD operations | No |
+| Transactional data | No |
+| Audit logs | No |
+| Single user app state | No |
+
+## The core argument
+
+CRDTs are an elegant solution to a specific problem. Two or more users edit the same data at the same time. The system has to merge their changes without losing edits and without requiring a central coordinator. The CRDT solves this mathematically. The merge is associative, commutative, and idempotent. Whatever order the edits arrive, the result is the same.
+
+The cases that need this solution are real but narrow. Real time collaborative editing. Offline first mobile sync. Specific distributed systems that cannot rely on a central coordinator. For these cases the CRDT is often the only sane approach.
+
+The cases that do not need this solution are far more common. A standard B2B SaaS where one user edits at a time. A transactional system where the database handles concurrency. An audit log that is append only by nature. For these, the CRDT is complexity without benefit.
+
+The teams that adopt CRDTs preemptively pay the complexity tax without the corresponding capability use. The teams that adopt them for the right problem get a capability that is hard to replicate any other way. The discipline is to recognize when the problem fits.
+
+## The shape of the problem CRDTs solve
+
+| Symptom | CRDT relevant? |
+|---|---|
+| Two users editing the same document at the same time | Yes |
+| User edits a document offline, syncs later | Yes |
+| Two services updating the same record without coordination | Sometimes |
+| Backend writes that need to be merged across regions | Sometimes |
+| Standard CRUD with row level locking | No |
+| Append only event log | No |
+| Single user state | No |
+
+## How much does this cost
+
+| Aspect | Cost |
+|---|---|
+| Library learning | A few weeks for a senior engineer |
+| Initial implementation | One to two sprints per surface |
+| Garbage collection design | One sprint |
+| Storage growth | Real for long lived documents |
+| Operational complexity | Real for any production CRDT |
+
+## Features the CRDT implementation must have
+
+- A clear use case that requires concurrent uncoordinated edits.
+- A library suited to the data type (Yjs, Automerge).
+- A garbage collection strategy.
+- A migration path if the data outgrows the CRDT.
+- Persistence that scales with the data size.
+- Observability on growth.
+- A clear contract with the rest of the application.
+
+## Expert opinion
+
+> CRDTs are one of those technologies that fit some problems exquisitely and fit most problems badly. The teams that have a real time collaborative editing problem reach for them and are right. The teams that adopt them because they read about them and want to use them are usually wrong. The complexity is real. The benefit is real only when the problem matches. The honest evaluation matters more than the technical depth.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client was building a real time collaborative whiteboard. Multiple users would draw, write, and edit shapes on the same canvas at the same time. The team had started with a server side state with locks and was struggling with the user experience.
+
+We migrated the state to Yjs. The canvas synchronized across users in real time without the lock contention. Edits flowed naturally. The user experience improved dramatically. The complexity of the implementation was real but worth it for this specific case.
+
+A different client wanted CRDTs for their standard B2B SaaS data model. There was no real concurrent editing. The CRDT would have been overkill. We talked them out of it. The simpler database approach shipped in weeks instead of months.
+
+For more on the related work, see [Liveblocks vs PartyKit vs custom for real time features](/blog/liveblocks-vs-partykit-vs-custom-for-real-time-features) and [eventual consistency in plain language for founders](/blog/eventual-consistency-in-plain-language-for-founders).
+
+## Common mistakes teams make
+
+1. Adopting CRDTs for problems that do not need concurrent uncoordinated edits.
+2. Underestimating the growth of CRDT state over time.
+3. No garbage collection strategy.
+4. No migration path.
+5. Treating CRDTs as a general purpose database replacement.
+6. Skipping the learning investment. Quick CRDT work goes wrong.
+7. No observability on growth.
+8. Treating Yjs as the right answer regardless of problem shape.
+
+## A decision framework
+
+1. **Step one.** Identify the specific problem. Concurrent editing? Offline first? Distributed without coordination?
+2. **Step two.** Confirm the standard database approach cannot handle it.
+3. **Step three.** Pick the CRDT library suited to the data shape.
+4. **Step four.** Plan for garbage collection and growth.
+5. **Step five.** Pilot on one surface before adopting broadly.
+
+For more on the related work, read [Liveblocks vs PartyKit vs custom for real time features](/blog/liveblocks-vs-partykit-vs-custom-for-real-time-features) and [event driven architectures when they help and when they hurt](/blog/event-driven-architectures-when-they-help-and-when-they-hurt). On the broader collaboration side, [offline first mobile apps a reality check](/blog/offline-first-mobile-apps-a-reality-check) is the natural next read.

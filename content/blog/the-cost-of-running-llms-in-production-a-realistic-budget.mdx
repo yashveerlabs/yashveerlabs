@@ -1,0 +1,61 @@
+---
+slug: "the-cost-of-running-llms-in-production-a-realistic-budget"
+title: "The Cost of Running LLMs in Production: A Realistic Budget"
+excerpt: "LLM API costs in production look different from development costs. Here is how to build a realistic budget before your AI features go live."
+date: "2026-05-24"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai", "llm", "cost", "budget", "production", "openai", "anthropic"]
+readingMinutes: 7
+ogImage: "/api/og/blog/the-cost-of-running-llms-in-production-a-realistic-budget"
+status: "published"
+faq: [
+  {"q":"What is prompt caching and how much does it save?","a":"Prompt caching stores the computed representation of a prompt prefix so that repeated requests with the same prefix do not recompute the input processing. Anthropic and OpenAI both offer prompt caching features that reduce input token costs for cached prefixes by 50 to 90 percent. For features with long system prompts (2,000+ tokens), prompt caching is one of the highest-ROI cost optimizations available."},
+  {"q":"How do I choose between OpenAI and Anthropic models for cost?","a":"Compare the models on your specific use case by running both on a sample of real inputs and evaluating quality. Then compare the cost per acceptable-quality output. The cheapest model that meets your quality bar is the right choice. Neither provider is universally cheaper; it depends on the task type, input length, and output length profile."},
+  {"q":"Is self-hosting an open-source LLM cheaper than using an API?","a":"At high volume (millions of requests per month), self-hosting on GPU infrastructure can be cheaper than API usage. At typical SaaS scale (tens of thousands to hundreds of thousands of requests per month), API usage is almost always cheaper when you factor in the GPU infrastructure cost, the engineering cost of managing the deployment, and the operational cost of keeping up with model updates."},
+  {"q":"What percentage of my AI feature cost should be the LLM API versus the infrastructure around it?","a":"At low volume, the LLM API dominates the cost (80 to 90 percent). As volume scales, the infrastructure cost (compute for retrieval, database for conversation history, monitoring and logging) becomes a larger proportion. At high volume, optimizing the API cost and the infrastructure cost are equally important."},
+  {"q":"How do I estimate token usage before building the feature?","a":"Use the tokenizer tool provided by the model provider (tiktoken for OpenAI models, the Claude tokenizer for Anthropic) to count tokens in your planned system prompt and a representative sample of user inputs and expected outputs. This gives you the per-request token estimate that drives your cost projection."}
+]
+---
+
+# The Cost of Running LLMs in Production: A Realistic Budget
+
+**LLM API costs in development are trivial. LLM API costs in production scale with usage in ways that most founders do not anticipate until the first monthly invoice arrives. The gap between "this seems cheap in testing" and "this is expensive at real user volume" is one of the most common AI product budget surprises. This post provides the framework for estimating production LLM costs before you ship, not after.**
+
+## What you need to know
+
+- LLM pricing is based on tokens (roughly 0.75 words per token), and both input and output tokens are billed separately at different rates
+- Production costs are typically five to twenty times higher than development costs because of prompt overhead that was not visible during testing
+- Context window size has a direct cost implication: longer system prompts, chat history, and retrieved documents all add to the input token cost per request
+- Caching LLM responses for repeated queries can reduce costs by 40 to 80 percent depending on query repetition rates
+- The real production cost of an AI feature includes the LLM API cost plus the infrastructure to handle retries, timeouts, fallbacks, and monitoring
+
+## The core argument
+
+The most common AI budget mistake is testing with short prompts and minimal context in development, then discovering in production that the real system prompts are much longer, the chat history that needs to be included for context grows with each conversation turn, and the retrieved documents from the RAG layer add thousands of tokens per request. The development test case cost was $0.001 per request. The production request cost is $0.02 per request. At 100,000 requests per month, that is $2,000 per month instead of $100.
+
+Token cost varies significantly by model. At the time of writing, frontier models from OpenAI and Anthropic range from a few cents per million tokens for smaller models to several dollars per million tokens for the largest. Choosing the right model for each use case is the single highest-leverage cost optimization decision available. A customer support triage feature that classifies intent and routes requests does not need a frontier model. A feature that generates complex technical documentation may need one. Routing different features to appropriately sized models is standard practice at cost-conscious AI product teams.
+
+The system prompt is where most teams leave money on the table. A system prompt that is 2,000 tokens long adds 2,000 tokens of cost to every single request, regardless of the user's input length. For a conversational feature with 10,000 daily conversations, that system prompt overhead alone costs (using approximate mid-range pricing) around $2 to $4 per day. Over a month, that is $60 to $120 just from the prompt overhead. Optimizing the system prompt to remove redundant instructions, compress examples, and eliminate filler text is one of the cheapest and most effective cost reductions available. I apply this discipline to every AI feature I build, including the AI assistance features in Nyxera.
+
+## Common mistakes
+
+1. **Not accounting for prompt overhead when estimating costs.** The system prompt, conversation history, and retrieved context all add to the input token count on every request. Estimate the average total input length in production, not the average user message length.
+2. **Using a frontier model for every feature.** The largest, most capable model is not necessary for every use case. Classification tasks, simple formatting, and templated generation often work equally well with smaller, cheaper models. Use the smallest model that produces acceptable quality for each specific feature.
+3. **Not implementing LLM response caching.** Many AI features generate the same or similar outputs for similar inputs. Semantic caching (storing responses for inputs that are semantically similar) or exact caching (storing responses for identical inputs) can reduce costs significantly for use cases like FAQ answering, documentation lookup, and template generation.
+4. **Not setting usage limits per user or per day.** An unrestricted AI feature can be abused or used at a volume you did not anticipate. Implement rate limits and per-user usage caps from launch. A user who discovers they can generate unlimited content will sometimes use it at a volume that makes that user unprofitable.
+5. **Not monitoring cost per user or per feature.** Aggregate LLM cost is a lagging indicator. Cost per user and cost per feature tell you which features or usage patterns are expensive and allow proactive optimization before the cost compounds.
+
+## Where to start
+
+**Step 1: Build a cost model for each AI feature before shipping it.** For each feature: estimate average input tokens (system prompt + context + user message), average output tokens, estimated requests per day, and the model's per-token pricing. This gives you the daily cost estimate for that feature at launch-day usage.
+
+**Step 2: Implement prompt optimization as part of every AI feature's development cycle.** Before shipping, take the system prompt and apply the token budget discipline: remove examples that are not necessary, compress instructions that are verbose, and cut any content that does not directly improve output quality. Every token you remove from the system prompt reduces cost on every request, permanently.
+
+**Step 3: Set up cost monitoring per feature, per user tier, and per day.** Most LLM providers provide usage APIs. Build a lightweight dashboard or use a tool like LangSmith or Helicone to monitor cost attribution. Review it weekly when a feature launches, monthly as it matures.
+
+## Related reading
+
+- [Streaming AI Responses to Users: An Architecture Primer](/blog/streaming-ai-responses-to-users-an-architecture-primer)
+- [Caching AI Responses: Patterns That Cut Costs by 60 Percent](/blog/caching-ai-responses-patterns-that-cut-costs-by-60-percent)
+- [Token Economics: Why Your AI Bill Surprised You and How to Fix It](/blog/token-economics-why-your-ai-bill-surprised-you-and-how-to-fix-it)
+- [OpenAI vs Anthropic vs Open Source: A 2026 Founder Decision Framework](/blog/openai-vs-anthropic-vs-open-source-a-2026-founder-decision-framework)

@@ -1,0 +1,114 @@
+---
+slug: "headless-ui-libraries-radix-headless-ui-ariakit"
+title: "Headless UI Libraries: Radix, Headless UI, Ariakit"
+excerpt: "Radix is the dominant headless UI library in 2026. Headless UI ships with Tailwind UI. Ariakit is the deepest in accessibility. Three credible options. Each fits a different stack."
+date: "2026-05-22"
+category: "Web App and Frontend Development"
+tags: ["headless-ui","radix","react","accessibility"]
+readingMinutes: 11
+ogImage: "/api/og/blog/headless-ui-libraries-radix-headless-ui-ariakit"
+status: "published"
+definition: "Headless UI libraries provide component behavior and accessibility without imposing styling. Radix UI is the dominant choice in 2026 because shadcn/ui is built on it. Headless UI ships with Tailwind UI from the Tailwind team. Ariakit is the deepest in accessibility coverage. Each library handles the hard parts of building accessible interactive components so the team can focus on styling."
+faq: [
+  {"q":"What does a headless UI library actually do?","a":"Provides the behavior of interactive components without the styling. Keyboard navigation. Focus management. ARIA attributes. State coordination. The team applies their own styling on top. The hard parts of accessibility and interaction are solved. The visual design is yours."},
+  {"q":"Why does Radix dominate?","a":"shadcn/ui is built on Radix. The shadcn/ui pattern of copying components into your project rather than installing a dependency has become the most popular approach for React UI. The components are styled with Tailwind. The behavior comes from Radix. The combination is the modern default."},
+  {"q":"When does Headless UI win?","a":"For teams that have invested in Tailwind UI. The two libraries are built by the same team and work together cleanly. The components are similar to Radix in scope. The integration with Tailwind UI templates is the differentiator."},
+  {"q":"When does Ariakit win?","a":"For teams that prioritize accessibility depth above all else. Ariakit has the broadest component coverage and the deepest accessibility implementation. The trade off is a smaller ecosystem and less momentum. For teams that take accessibility most seriously, Ariakit is credible."},
+  {"q":"What about Reach UI?","a":"Was an early option that has lost momentum. Most teams that started on Reach have migrated to Radix or stayed on Reach without active development. New projects rarely pick Reach in 2026."},
+  {"q":"What components do these libraries cover?","a":"Dialogs. Dropdown menus. Popovers. Tooltips. Tabs. Accordions. Switches. Sliders. Combo boxes. Command palettes. Each is the hard part of a UI library. The headless libraries cover the common ones. Teams build the uncommon ones."},
+  {"q":"What is the worst headless UI mistake?","a":"Rolling your own accessibility on a custom component when a headless library would have done it. The custom implementation usually has accessibility bugs. The library has solved them. The cost of using the library is small. The cost of accessibility bugs is real."}
+]
+---
+
+## What you actually need to know
+
+- Radix is the dominant choice in 2026 because of shadcn/ui.
+- Headless UI fits Tailwind UI teams.
+- Ariakit is the deepest in accessibility.
+- All three handle the hard parts of accessible interactive components.
+- Rolling your own custom is rarely worth the accessibility risk.
+
+| Library | Best fit | Ecosystem |
+|---|---|---|
+| Radix UI | Most React teams | Largest, shadcn/ui based |
+| Headless UI | Tailwind UI users | Tailwind ecosystem |
+| Ariakit | Accessibility focused | Smaller but deep |
+| Reach UI | Legacy projects | Declining |
+| Base UI | MUI users | Material design ecosystem |
+
+## The core argument
+
+Headless UI libraries are one of the best things that happened to React in the last few years. The libraries handle the hard parts of building accessible interactive components. Keyboard navigation. Focus management. ARIA attributes. State coordination. The team applies their own styling on top. The result is accessible, interactive UI that looks the way the brand wants.
+
+Radix has won the dominant position because shadcn/ui is built on it. The shadcn/ui pattern of copying components into your project has become the most popular approach for React UI in 2026. The components are styled with Tailwind. The behavior comes from Radix. The team owns the code rather than depending on a library version.
+
+Headless UI is the second strong option. Built by the Tailwind team. Ships cleanly with Tailwind UI templates. Similar scope to Radix. Different ecosystem fit. For teams already invested in Tailwind UI, Headless UI is the natural choice.
+
+Ariakit is the deepest in accessibility. The team that prioritizes accessibility above all else should evaluate Ariakit seriously. The trade off is a smaller ecosystem and less momentum behind it. The components themselves are excellent.
+
+The mistake most teams make is rolling their own custom accessible components. The custom implementation usually has accessibility bugs that the team does not notice. The user with a screen reader cannot navigate. The keyboard only user cannot reach the dropdown. The headless library has solved these problems already. The cost of using it is small. The accessibility benefit is real.
+
+## The honest decision
+
+| Question | Radix | Headless UI | Ariakit |
+|---|---|---|---|
+| Using shadcn/ui? | Yes | No | No |
+| Using Tailwind UI? | Possible | Yes | Possible |
+| Accessibility priority? | Strong | Strong | Strongest |
+| Need broadest ecosystem? | Yes | Less | Less |
+| Want fewest dependencies? | Less | Less | Yes (some components) |
+| New project? | Most likely | Some | Less common |
+
+## How much does this cost
+
+| Library | Cost |
+|---|---|
+| Radix UI | Free open source |
+| Headless UI | Free open source |
+| Ariakit | Free open source |
+| shadcn/ui code | Copied into your project |
+| Tailwind UI templates | 299 USD one time |
+| Engineering time to integrate | Hours per component |
+
+## Features the headless UI setup must have
+
+- Documented component pattern. Which library and how to use it.
+- Style layer on top of the library. Tailwind, CSS modules, or vanilla extract.
+- Accessibility testing in CI.
+- Custom components built with the library's primitives where possible.
+- Documentation of which components are custom and why.
+- A path to migrate libraries if needed.
+
+## Expert opinion
+
+> The headless UI libraries are one of the modern React stack's strongest features. The team gets accessibility and interaction patterns for free. The styling is yours. The custom components that the libraries do not cover are still custom. The library handles the common ground. The teams that adopt this approach ship accessible UI without becoming accessibility experts. The teams that roll their own ship UI that has accessibility bugs they did not know they introduced.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had hand rolled a dropdown component that was the basis for many features. The dropdown had keyboard navigation that worked on the obvious cases and failed on edge cases. A screen reader user reported that they could not navigate the menu.
+
+We migrated to Radix. The dropdown component became a thin styling layer on top of Radix Menu. The keyboard navigation worked properly. The screen reader announcements were correct. The bugs that had been in the custom version disappeared.
+
+The migration took two weeks across the application. The benefit has held for two years. The team has not had an accessibility complaint about the dropdown since.
+
+For more on the related work, see [component libraries vs custom design systems](/blog/component-libraries-vs-custom-design-systems) and [tailwind UI vs shadcn vs headless UI vs build your own](/blog/tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own).
+
+## Common mistakes teams make
+
+1. Rolling your own accessible components.
+2. No accessibility testing in CI.
+3. Mixing multiple headless libraries inconsistently.
+4. Style layer that fights the library's behavior.
+5. Custom components that should have used library primitives.
+6. No documentation of which library is used where.
+7. Treating accessibility as someone else's problem.
+8. Skipping the library because it adds bundle size.
+
+## A two week adoption plan
+
+1. **Week one.** Pick the library. Adopt for two new components.
+2. **Week two.** Migrate the most painful existing custom components. Document the patterns.
+
+For more on the related work, read [component libraries vs custom design systems](/blog/component-libraries-vs-custom-design-systems) and [tailwind UI vs shadcn vs headless UI vs build your own](/blog/tailwind-ui-vs-shadcn-vs-headless-ui-vs-build-your-own). On the broader frontend side, [building cinematic web experiences without killing performance](/blog/building-cinematic-web-experiences-without-killing-performance) is the natural next read.

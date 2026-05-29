@@ -1,0 +1,101 @@
+---
+slug: "aws-vs-gcp-vs-azure-a-founder-framework"
+title: "AWS vs GCP vs Azure: A Founder Framework"
+excerpt: "The hyperscalers have converged on capability. The real difference for founders in 2026 is ergonomics, ecosystem, and where your team has muscle memory. Here is the framework I use to pick."
+date: "2026-05-19"
+category: "Comparisons and Vendor Decisions"
+tags: ["aws","gcp","azure","cloud","comparisons"]
+readingMinutes: 13
+ogImage: "/api/og/blog/aws-vs-gcp-vs-azure-a-founder-framework"
+status: "published"
+definition: "AWS is the default for breadth, market share, and enterprise procurement. GCP is the default for data heavy workloads, BigQuery, and Kubernetes ergonomics. Azure is the default for Microsoft shops, regulated industries, and customers that already buy Microsoft. The capability gap between the three has nearly closed. The right choice for a founder in 2026 is the one that matches the team and the customer base, not the one that wins benchmark articles."
+faq: [
+  {"q":"Which cloud is cheapest for a startup?","a":"All three are similar at small scale once startup credits are applied. GCP has historically had the most generous startup program. AWS has the largest free tier. Azure has the deepest discounts for Microsoft customers. The pricing for raw compute is within ten percent of each other at small scale."},
+  {"q":"Which cloud has the best free tier?","a":"AWS has the most line items in the free tier. GCP has the most generous free tier for the always free products. Azure free tier is more limited but has a 200 USD credit for the first 30 days. For most startups the differences are noise."},
+  {"q":"Where do startup credits come from?","a":"All three have official startup programs. Accelerators and VCs typically have higher tiers. AWS Activate, Google for Startups, and Microsoft for Startups Founders Hub are the entry points. The credits usually range from 5000 to 100000 USD depending on stage."},
+  {"q":"Should I pick the cloud my team already knows?","a":"Yes if all else is roughly equal. Familiarity is worth roughly six months of velocity. The exception is if your customers will require a different cloud for compliance reasons. Then pick what the customers need."},
+  {"q":"Is multi cloud worth it for a startup?","a":"No. Multi cloud has real benefits for large enterprises with negotiating leverage. It has almost no benefits for startups under a hundred million in revenue. The operational complexity is real and the cost savings rarely materialize."},
+  {"q":"What if my customers are European?","a":"All three have European regions and data residency commitments. The differences are at the margin. AWS Frankfurt is the most mature. GCP Belgium and Netherlands are solid. Azure has the broadest EU coverage. The choice depends on which specific countries your customers care about."},
+  {"q":"Should I run on the cheaper second tier clouds?","a":"For very early MVPs, Fly.io, Render, Railway, and Vercel are all credible. The cost is lower at small scale. The ceiling is lower at very large scale. The transition cost when you outgrow them is real. Start there only if your growth is unclear."}
+]
+---
+
+## What you actually need to know
+
+- The three hyperscalers have converged on capability for the workloads most startups run.
+- AWS has the deepest catalogue. GCP has the best data stack. Azure has the enterprise relationships.
+- Team familiarity is worth six months of velocity.
+- Multi cloud is the wrong call for almost every startup.
+- Startup credits cover the first year or two for almost every credible application.
+
+| Cloud | Strength | Weakness | Best fit |
+|---|---|---|---|
+| AWS | Breadth, ecosystem, market share | Pricing complexity | Most B2B SaaS |
+| GCP | Data, Kubernetes, ergonomics | Smaller catalogue, smaller enterprise sales | Data heavy products |
+| Azure | Microsoft integration, enterprise relationships | UI complexity | Microsoft shops, regulated industries |
+
+## The core argument
+
+I have built and run production systems on all three hyperscalers. The honest answer for a startup founder in 2026 is that the choice matters less than it used to. The capabilities have converged. The pricing is within ten percent at small scale. The ecosystem differences exist but have shrunk.
+
+What still matters is fit. AWS wins for teams with AWS muscle memory and customers who expect AWS. GCP wins for teams that lean into BigQuery and the data stack, or who like the Kubernetes ergonomics. Azure wins for teams selling into Microsoft heavy enterprises, regulated industries, or where the customer already has Azure spend.
+
+The trap to avoid is picking the cloud that wins on a benchmark article. The benchmark wins are usually one workload deep. The cloud you live on for the next five years needs to win across compute, storage, networking, identity, observability, security, and procurement. That picture is closer to a tie than the articles suggest.
+
+The other trap is multi cloud. The case for multi cloud is real for large enterprises with hundreds of millions in cloud spend. The case for multi cloud at startup scale is mostly bad. The operational tax compounds. The cost savings rarely materialize. The cognitive overhead of running two control planes is high.
+
+## How the cost math actually works
+
+Take a B2B SaaS at modest scale. Two backend services, a database, a Redis, a CDN, a small object store. The all in monthly compute is roughly 300 to 800 USD on any of the three at list price. Reserved instances or committed use discounts cut that by twenty to forty percent.
+
+Startup credits cover the first year or two. AWS Activate offers up to 100k USD for funded startups. Google for Startups offers up to 200k USD on the highest tier. Microsoft for Startups Founders Hub offers up to 150k USD plus GitHub Enterprise and OpenAI credits. The credits are real money but they come with strings, including the implicit string of being on that cloud after the credits run out.
+
+The hidden costs are similar across the three. Egress fees, NAT gateway charges, snapshot storage, idle resources. The first three months of any AWS account are usually thirty to fifty percent more than the engineer expected. The same is true on GCP and Azure. Cost engineering is its own discipline once the bill crosses a few thousand dollars per month.
+
+## Features to demand from any cloud choice
+
+- A managed Postgres or equivalent. RDS, Cloud SQL, Azure Database.
+- A managed Kubernetes if you go that route. EKS, GKE, AKS.
+- A serverless compute option. Lambda, Cloud Run, Container Apps.
+- A managed key vault. Secrets Manager, Secret Manager, Key Vault.
+- A native identity service. IAM, IAM, Entra ID.
+- A native observability stack. CloudWatch, Cloud Logging, Monitor.
+- A native CI integration. CodeBuild, Cloud Build, DevOps.
+
+## Expert opinion
+
+> The founder who agonizes for three months over AWS versus GCP is the founder who has not yet built anything in production on either. The teams that have shipped on both clouds know that the choice is rarely the bottleneck. Pick the one your team can move on and ship the product. The cloud bill is real but smaller than the cost of slow product velocity.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client building a data analytics product asked me which cloud to pick. The team was three engineers, all with AWS background. The product was data heavy, with a BigQuery sized analytical workload. The first ten customers were US based startups.
+
+The honest read was that BigQuery on GCP was a meaningful advantage for the analytical workload. The team's AWS background was a meaningful advantage for everything else. We picked AWS for the application plane and used BigQuery as a managed service alongside it. The egress cost was real but smaller than the cost of forcing the team off AWS for everything.
+
+Three years later the product runs on AWS with BigQuery, Snowflake, and a small Azure footprint for one enterprise customer that demanded it. The architecture is mixed but the operational core stays on AWS. The team has not regretted the choice.
+
+For more on the related infrastructure decisions, see [AWS ECS vs EKS vs Fargate a SaaS founder comparison](/blog/aws-ecs-vs-eks-vs-fargate-a-saas-founder-comparison) and [how to read AWS Azure and GCP invoices without crying](/blog/how-to-read-aws-azure-and-gcp-invoices-without-crying).
+
+## Common mistakes founders make
+
+1. Picking the cloud the loudest person on the team wants.
+2. Trying to be multi cloud at startup scale.
+3. Ignoring the team's muscle memory.
+4. Picking the cloud that wins a single benchmark.
+5. Forgetting to apply for startup credits.
+6. Ignoring egress costs in the architecture.
+7. Skipping reserved instances or committed use discounts after the first year.
+8. Treating the cloud bill as fixed when it can be engineered.
+
+## A one week decision plan
+
+1. **Day one.** Map the next two years of customer requirements. Compliance, data residency, integrations.
+2. **Day two.** Inventory the team. Who has built what on which cloud.
+3. **Day three.** Build a working hello world on each candidate cloud. Time the integration honestly.
+4. **Day four.** Apply for startup credits on the leading candidate.
+5. **Day five.** Make the call. Write the memo. Get sign off.
+6. **Days six and seven.** Build the account, the billing alerts, and the initial infrastructure as code.
+
+For more on the broader vendor landscape, read [the vendor audit every funded startup should run once a year](/blog/the-vendor-audit-every-funded-startup-should-run-once-a-year) and [Vercel vs Netlify vs Cloudflare Pages](/blog/vercel-vs-netlify-vs-cloudflare-pages). On the cost side, [reserved instances and cost math when they pay off](/blog/reserved-instances-and-cost-math-when-they-pay-off) is the natural next read.

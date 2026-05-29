@@ -1,0 +1,122 @@
+---
+slug: "the-read-heavy-workload-strategies-that-move-the-needle"
+title: "The Read Heavy Workload: Strategies That Move the Needle"
+excerpt: "Working notes on the read heavy workload: strategies that move the needle. Written for founders, engineers, and operators who want a clear read on backend, apis, and system design from someone who has shipped the work."
+date: "2025-04-13"
+category: "Backend, APIs, and System Design"
+tags: ["backend","api","system-design"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-read-heavy-workload-strategies-that-move-the-needle"
+status: "published"
+definition: "A read-heavy workload is any system where reads outnumber writes by a significant ratio, typically ten to one or higher. The strategies that help are not all equal. I separate the ones that move the needle from the ones that look good in a talk but cost more to run than the problem they solve."
+faq: [
+  {"q":"What is the most effective first strategy for optimizing a read-heavy database workload?","a":"Indexing. Before adding caches, replicas, or CDNs, run your slow query log for a week and look at the queries that appear most often with the worst execution times. Most read-heavy performance problems are indexing problems. A single missing index on a high-frequency query can account for eighty percent of the database load."},
+  {"q":"When does a read replica actually help versus when does it just add complexity?","a":"A read replica helps when your primary database is CPU-bound on reads, not writes. If your write volume is the bottleneck, adding a replica does not help because the replica is still replicating those writes. Replicas earn their cost when analytical or reporting queries are competing with transactional reads on the same primary."},
+  {"q":"How do you decide between Redis caching and adding a read replica for a read-heavy SaaS?","a":"Redis caching helps when the same data is read repeatedly with low write frequency on that data, like a product catalog or a user settings object. A read replica helps when queries are complex, join-heavy, or analytical and caching the result is impractical. In most SaaS products, you add Redis before a replica, because the cache hit rate changes the math on whether a replica is needed at all."},
+  {"q":"What are the risks of caching database reads aggressively in a production SaaS?","a":"Stale data and cache invalidation bugs. If a cache key is not invalidated when the underlying data changes, users see stale data until the TTL expires. In systems with write-through or write-around cache patterns, invalidation logic becomes a source of bugs that are hard to reproduce. The safest approach is a short TTL on anything that changes frequently and a long TTL only on data that is genuinely stable."},
+  {"q":"What is database connection pooling and why does it matter for read-heavy workloads?","a":"Connection pooling reuses existing database connections instead of opening a new one per query. Under read-heavy load, each new connection adds latency and consumes server resources. A pooler like PgBouncer sits between your application and the database, limiting the total connection count and recycling connections efficiently. Without pooling, a traffic spike can exhaust the database connection limit before the database itself is under memory or CPU pressure."},
+  {"q":"When should a team consider moving read workloads to a purpose-built read store like Elasticsearch or a data warehouse?","a":"When the query pattern requires full-text search, faceting, aggregations across millions of rows, or joins across tables that the transactional database was not designed to handle at speed. Moving those workloads to a dedicated read store is better than forcing the primary database to grow hardware to support a query pattern it was not optimized for. The tradeoff is eventual consistency and the operational cost of keeping the read store current."},
+  {"q":"How do CDNs help with read-heavy workloads for a SaaS application?","a":"CDNs help with static and semi-static content served over HTTP: images, documents, API responses that can be cached at the edge. For SaaS specifically, CDN caching of JSON API responses works when the response does not vary per user. Multi-tenant SaaS with per-user data rarely benefits from CDN API caching unless there is a significant public or shared content surface."}
+]
+---
+
+## What you actually need to know
+
+- Most read-heavy performance problems are indexing problems. Fix those first, before reaching for caches or replicas.
+- Caching solves frequency. Replicas solve volume. They are not interchangeable.
+- Connection pooling is the infrastructure change with the highest return for the least complexity. Teams skip it for too long.
+- Not every read workload benefits from the same strategy. Analytical queries, search queries, and transactional reads each have a different optimal fix.
+- In my experience, teams that reach for a read replica before auditing their slow query log often find the replica makes the bill bigger without making the product faster.
+
+| Strategy | What it solves | What it does not solve | Typical cost increase |
+|---|---|---|---|
+| Index optimization | Slow specific queries | High total read volume | Near zero |
+| Connection pooling (PgBouncer) | Connection exhaustion under load | Query speed | Low |
+| Redis cache layer | Repeated reads of the same data | Complex or unique queries | Low to medium |
+| Read replica | Total read volume, analytical queries | Write bottleneck, cache misses | Medium |
+| Dedicated read store (Elasticsearch, BigQuery) | Full-text, faceting, large aggregations | Transactional reads | Medium to high |
+
+## The core argument
+
+The phrase "read-heavy workload" covers a lot of territory. A product page that ten thousand users view concurrently is a read-heavy workload. A dashboard that runs a five-table join on a million rows every time someone loads it is also a read-heavy workload. A search box that full-text scans a table with no index is a read-heavy workload. The strategies that help each of those are different, and applying the wrong one is how teams end up spending money on infrastructure that does not move the latency numbers.
+
+The hierarchy I follow is this. First, audit the slow query log. That is a free operation that takes a few hours and almost always surfaces a small number of queries responsible for most of the load. Fix those with indexes or query rewrites. Then measure again. Most teams find that one index adds takes them from a slow dashboard to an acceptable one without any new infrastructure.
+
+If the index work is done and the load is still high, the next question is whether the problem is repeated reads or volume. Repeated reads of stable data belong in a cache. Volume that exceeds what the primary can handle belongs on a replica. They are not the same problem and they do not have the same solution.
+
+Connection pooling belongs in before either of those. An application server that opens a new database connection per request will exhaust the connection limit long before the database is out of CPU. PgBouncer is the standard pooler for Postgres and the configuration is measured in hours, not days.
+
+## The strategies in order
+
+### Index audit first
+
+Before anything else, enable the slow query log and let it run for a week. Look at the queries that appear most often and have the worst execution times. Use EXPLAIN ANALYZE on each one. Most will show a sequential scan on a table that has a usable column in the WHERE clause with no index on it. Adding that index is often a ten-minute change that reduces query time by ninety percent.
+
+### Connection pooling next
+
+PgBouncer sits between your application and Postgres and reuses connections. Without it, a sudden spike in API traffic opens hundreds of new database connections simultaneously. Postgres handles this badly above a few hundred connections. PgBouncer caps the connection count at a level Postgres can handle and queues the overflow. The setup is a Docker container and a configuration file. It is not complicated and it protects the database from load spikes that have nothing to do with query efficiency.
+
+### Cache layer for repeated data
+
+Redis caching pays off when the same data is fetched repeatedly within a short window and the write frequency on that data is low. User settings, product catalogs, permission objects, and feature flag configurations are the common examples. Cache them with a TTL of a few minutes and invalidate explicitly on write. The cache hit rate tells you whether the approach is working. If it is below sixty percent, the data changes too frequently for the cache to be worth the invalidation complexity.
+
+### Read replica for query volume
+
+A read replica earns its place when the primary is CPU-bound on reads and the reads cannot be cached or reduced. Analytical dashboards that run against live data, reporting queries, and admin-side views of large tables are the typical candidates. Route those queries to the replica at the application layer using a read-write split. The replica introduces replication lag, so anything that requires reading your own write immediately must stay on the primary.
+
+### Dedicated read stores for specialized workloads
+
+Full-text search belongs in a purpose-built search service, not a LIKE query on a text column. Aggregations over millions of rows at interactive speed belong in a data warehouse or an OLAP-optimized store, not the transactional primary. Moving those workloads out of the primary is not about performance. It is about fitness. The transactional database was designed for row-level consistency, not bulk analytical scans.
+
+## What it actually costs
+
+| Approach | Monthly infra cost at 50k users | Engineering time to implement |
+|---|---|---|
+| Index optimization | Zero | 1 to 2 days |
+| PgBouncer | 10 to 30 dollars (small VM) | Half a day |
+| Redis cache | 30 to 150 dollars | 2 to 5 days |
+| Read replica | 100 to 400 dollars | 1 to 2 days setup, ongoing tuning |
+| Elasticsearch for search | 150 to 600 dollars | 1 to 3 weeks |
+| Data warehouse (BigQuery, Redshift) | 100 to 1000 dollars | 2 to 6 weeks |
+
+## What to look for in a healthy read strategy
+
+- A slow query log review on a regular cadence, at minimum quarterly.
+- Cache hit rate monitoring. A falling hit rate means data volatility has increased and TTLs need reviewing.
+- Replication lag alerts on any replica. A replica more than five seconds behind is a reliability risk for any workload that tolerates eventual reads.
+- A documented read-write split policy. Engineers should know which queries go to the replica and why.
+- Connection count monitoring on Postgres itself. If it is regularly above eighty percent of the limit, PgBouncer or a tuning pass is overdue.
+- A search service for any full-text or faceted query, rather than a LIKE or ILIKE in SQL.
+
+## Expert opinion
+
+> The pattern I see most is teams that add a read replica because the database looks busy, then discover the replica is not solving the problem because the busy queries are a handful of unindexed sequential scans. The replica replicates all the writes and adds cost, but the slow queries are still slow on the replica too. The index audit is boring work. It is also the highest return work available on a read-heavy database, almost every time.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client running a SaaS dashboard product was seeing P95 dashboard load times above four seconds. The team's first instinct was to add a read replica and route all dashboard queries to it. I asked them to run EXPLAIN ANALYZE on the three slowest queries before provisioning anything. Two of the three queries were doing sequential scans on tables with over a million rows, on columns that had no index. Adding three indexes reduced P95 load time to under four hundred milliseconds. No new infrastructure. Total engineering time was about six hours.
+
+The third query was a legitimate candidate for a replica, a five-table join that was pulling data for an analytics panel. We added a read replica, routed only that query to it, and added a replication lag alert at two seconds. The replica is still in production and has never caused a visible staleness issue because the analytics panel shows data with a three-minute refresh and the lag stays under a second. The right scope for a replica turned out to be one query, not the whole application.
+
+For more on the consistency tradeoffs that come with replicas and caches, see [ACID vs BASE: when each belongs in your architecture](/blog/acid-vs-base-when-each-belongs-in-your-architecture) and [the replication lag problem: how to detect and defend](/blog/the-replication-lag-problem-how-to-detect-and-defend).
+
+## Common mistakes
+
+1. Adding a read replica before auditing the slow query log. The replica costs money. The audit is free.
+2. Caching data with a long TTL that changes more frequently than the TTL allows. Users see stale data and file bugs.
+3. Skipping connection pooling until the database starts dropping connections. PgBouncer should go in before traffic gets significant.
+4. Routing all reads to the replica, including reads that must see their own writes. This produces consistency bugs that are hard to reproduce.
+5. Using LIKE queries for full-text search at scale. A LIKE on an unindexed text column is a sequential scan regardless of how the rest of the query is optimized.
+6. Not monitoring cache hit rates. A cache nobody is hitting is just extra infrastructure to maintain.
+7. Treating analytical and transactional queries as the same workload. They have different access patterns and often need different solutions.
+
+## A 30-day plan
+
+1. **Week one.** Enable the slow query log on your primary database if it is not already on. Let it run for a full week. Collect the ten slowest queries by total execution time.
+2. **Week two.** Run EXPLAIN ANALYZE on each. Add indexes for any sequential scan on a filtered column. Measure before and after. In most cases this is the whole fix.
+3. **Week three.** Add PgBouncer if you are not using a pooler. Monitor connection counts. Add Redis caching for any data that appears in more than five percent of API requests.
+4. **Week four.** Assess whether a read replica is now warranted. If yes, scope it to the specific queries it will serve. Add replication lag monitoring before routing any traffic.
+
+For the related discipline of write-heavy workload handling, see [the write heavy workload: a different set of tradeoffs](/blog/the-write-heavy-workload-a-different-set-of-tradeoffs) and [zero-downtime database migrations](/blog/zero-downtime-database-migrations-a-step-by-step-guide) for the operational discipline that keeps the database healthy through schema changes.

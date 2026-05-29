@@ -1,0 +1,120 @@
+---
+slug: "the-performance-regression-that-hides-in-ci"
+title: "The Performance Regression That Hides in CI"
+excerpt: "CI catches broken tests, not slower tests. The performance regression that ships quietly is the one your pipeline has no budget check for. Here is the discipline that catches it before production."
+date: "2025-07-15"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-performance-regression-that-hides-in-ci"
+status: "published"
+definition: "A CI performance regression is a latency or throughput degradation introduced by a code change that passes functional tests but is never caught because the pipeline has no budget check wired to the build. It ships quietly, accumulates over weeks, and surfaces only when a customer complains or a metric dashboard finally gets reviewed. The fix is a budget gate, not more manual review."
+faq: [
+  {"q":"What does a performance regression in CI actually look like?","a":"It looks like a passing build. A new query runs without errors, a new component renders correctly, and the tests go green. But the endpoint that used to answer in 180 milliseconds now takes 420 milliseconds because the query lost its index. No functional test catches that."},
+  {"q":"How do I add a performance budget check to a CI pipeline?","a":"Wire a load test or synthetic benchmark that runs against a preview environment on every pull request. Tools like k6, Artillery, or Lighthouse CI compare the result against a stored baseline and fail the build if any metric crosses the threshold. The baseline should live in version control alongside the code."},
+  {"q":"What metrics should a CI performance budget cover?","a":"For APIs: p95 latency per endpoint, throughput at target load, error rate under load. For frontend: Largest Contentful Paint, Total Blocking Time, bundle size. Cover whatever the user actually experiences, not internal timing that has no user impact."},
+  {"q":"How much slower does a pipeline get when you add performance tests?","a":"A focused benchmark suite targeting the ten most critical endpoints adds two to eight minutes to the build. That is acceptable. Running a full load test against every endpoint on every commit is not. Sample the critical path on every PR and run the full suite nightly."},
+  {"q":"Which tool is best for catching backend performance regressions in CI?","a":"k6 is the most practical for most teams. It is scriptable, integrates with GitHub Actions and GitLab CI, and produces output that is easy to threshold. Artillery is a good alternative if your team prefers YAML over JavaScript. Both are open source with cloud options."},
+  {"q":"How do I set the baseline for a CI performance budget when I have no historical data?","a":"Run the benchmark suite against the current main branch three times and average the result. Document that number as the baseline. Set the budget at the current number plus a small regression buffer of ten to fifteen percent. The number improves from there as the team ships optimizations."},
+  {"q":"Why do performance regressions compound quietly over months before anyone notices?","a":"Because each individual regression is small enough to pass a visual review, and the team has no automated gate. A ten millisecond regression per PR adds up to three hundred milliseconds over thirty PRs. Each one looked fine in isolation. The aggregate is what customers feel."}
+]
+---
+
+## What you actually need to know
+
+- CI catches functional correctness, not latency. A test that asserts the right response code tells you nothing about how long the response took.
+- Performance regressions accumulate in small increments across many PRs, each one individually invisible.
+- The fix is a budget gate wired to the build, not a manual review process that depends on someone remembering to check.
+- The baseline needs to live in version control, not in a spreadsheet or someone's memory.
+- Most teams need one to two weeks to wire a usable benchmark suite into CI. The discipline pays back immediately.
+
+| Approach | What it catches | When it runs | Maintenance |
+|---|---|---|---|
+| No performance check | Nothing | Never | None |
+| Manual benchmark review | Regressions someone thinks to check | Ad hoc | None, but also useless |
+| Lighthouse CI on frontend | LCP, TBT, bundle size | Every PR | Low |
+| k6 or Artillery in CI | API latency, throughput, error rate | Every PR or nightly | Medium |
+| Synthetic monitoring | Real endpoint checks from outside | Continuous | Low |
+
+## The core argument
+
+The test suite checks that your code does what you said it would do. It does not check that your code does it quickly. Those are separate concerns, and the second one is almost universally untested. That gap is where performance regressions live.
+
+The typical story goes like this. An engineer adds a feature. The feature involves a new query. The query works. The tests pass. The PR merges. Four weeks later, the p95 for that endpoint is eighty percent higher than it was before the feature. The team has no idea which change caused it because four weeks and dozens of PRs have merged since then.
+
+The frustrating part is that this is entirely preventable. A benchmark that runs on the PR, compares against the baseline, and fails the build if latency crosses the threshold would have caught it on day one. The problem is not that the tools do not exist. The problem is that most teams never wire them up.
+
+There is a cultural layer here too. Engineers treat a failing test as something to fix. Engineers treat a performance metric as something to note. Until the performance metric fails the build, it gets noted and not fixed. Wiring it to the build changes the incentive. The regression has to be addressed before the code merges. That is the only enforcement that works.
+
+## What a CI performance gate actually looks like
+
+### The baseline file
+
+A JSON file committed to the repo, updated manually when the team ships a deliberate optimization. It holds the expected p95, p99, and throughput for each critical endpoint. The benchmark compares measured results against this file.
+
+### The benchmark script
+
+A k6 or Artillery script that runs a realistic load against a preview environment. Not a stress test. A normal load at expected concurrency. Five to twenty virtual users, one to three minutes of run time. Long enough to get a stable measurement, short enough to fit in a PR check.
+
+### The threshold check
+
+A step in the CI pipeline that reads the benchmark output and compares it against the baseline. If any endpoint's p95 is more than fifteen percent above baseline, the step fails and the build stops. The PR cannot merge until the regression is addressed or the baseline is intentionally updated with a documented reason.
+
+### The nightly full suite
+
+The PR check covers the critical path. A nightly job runs the full suite against main. The nightly run is the safety net for anything the PR check missed.
+
+## What it requires
+
+| Component | Engineering time to set up | Ongoing cost |
+|---|---|---|
+| k6 or Artillery scripts for critical endpoints | 1 to 3 days | Low |
+| Baseline JSON file in version control | Half a day | Minimal |
+| GitHub Actions or GitLab CI integration | Half a day | Low |
+| Preview environment for benchmark runs | Already needed for integration tests | Medium infra cost |
+| Nightly full suite and alerting | 1 day | Low |
+
+## Features to look for in a CI performance tool
+
+- Scriptable load scenarios, not just canned tests, so you can simulate realistic request patterns.
+- Threshold configuration that lives in code, not in a web dashboard that requires a login to change.
+- Output that integrates with PR checks and shows the delta against baseline, not just raw numbers.
+- Support for environment variables, so the same script works against staging and production.
+- A way to mark a threshold breach as intentional so the team can merge a known regression with documentation attached.
+
+## Expert opinion
+
+> The team that catches a performance regression in a pull request spends thirty minutes on it. The team that catches it after it has been in production for six weeks spends a sprint on it. The math is not close. Wiring the budget to the build is the highest leverage thing a team can do for sustained performance.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A product team I worked with was shipping a high volume search feature. The feature itself worked well. Over the course of two months and about forty merged PRs, the search endpoint went from a p95 of 220 milliseconds to a p95 of 780 milliseconds. Nobody noticed until a customer on a slow connection started submitting support tickets.
+
+When we looked at the git log, the regression was not in one place. It was in seven separate PRs, each adding a small cost. One added a redundant join. One removed a cache that had been there for a reason nobody remembered. One added a client side filter that was doing work the database used to do. Each PR looked fine in isolation. The aggregate was a disaster.
+
+We spent three days setting up k6 benchmarks for the top fifteen endpoints and wiring them into the CI pipeline. See [the hot path: finding and optimizing it](/blog/the-hot-path-finding-and-optimizing-it) for what we did once we had identified the slow operations. Within two weeks, the first budget breach caught a new regression before it reached production. The engineer who introduced it fixed it in the same afternoon. That is the outcome the tooling is designed to produce. For the broader monitoring picture, [backend performance budgets: how to set them](/blog/backend-performance-budgets-how-to-set-them) covers how to pick the thresholds that make the gate meaningful.
+
+## Common mistakes
+
+1. Running the benchmark against production instead of a preview environment, which risks causing latency for real users during the test.
+2. Setting thresholds so loose that a real regression passes anyway. If the current p95 is 200 milliseconds and the threshold is 2000 milliseconds, the gate catches nothing useful.
+3. Not committing the baseline to version control, so it drifts or disappears.
+4. Running a stress test on every PR instead of a normal load benchmark, which makes the suite too slow and the team disables it.
+5. No owner for the benchmark suite. Scripts that nobody maintains drift out of sync with the API and stop catching the regressions that matter.
+6. Failing to differentiate between the PR gate and the nightly suite. Both are needed. The PR gate is fast and critical path only. The nightly suite is comprehensive.
+7. Treating a threshold breach as optional. If the build does not block on a breach, the gate is a suggestion, not a gate.
+8. No process for intentionally updating the baseline. Engineers will add tech debt to avoid dealing with the gate if there is no legitimate way to update the numbers.
+
+## A 14 day plan to wire performance into CI
+
+1. **Day one and two.** Identify the ten endpoints or frontend pages with the highest traffic. These are the critical path for the benchmark suite.
+2. **Day three to five.** Write k6 or Artillery scripts for each. Start simple: one realistic request scenario per endpoint, a normal load of ten virtual users for two minutes.
+3. **Day six.** Run the scripts against your staging environment three times and record the p50, p95, and p99 for each. These become the baseline. Commit the baseline file to the repo.
+4. **Day seven and eight.** Wire the benchmark suite into the CI pipeline. Run it on every PR against the preview environment. Set the threshold at fifteen percent above baseline.
+5. **Day nine and ten.** Test the gate by introducing a deliberate regression in a branch. Confirm the build fails and the output is readable.
+6. **Day eleven and twelve.** Set up the nightly full suite. Wire it to an alert channel so the team sees failures the next morning.
+7. **Day thirteen and fourteen.** Document the process. Who owns the baseline updates, what the process is for intentional regressions, and when the nightly results are reviewed.
+
+For more on the measurement side, [API response times: how to track what matters](/blog/api-response-times-how-to-track-what-matters) is the companion piece. For the frontend side of the budget, [frontend performance budgets: a pattern that sticks](/blog/frontend-performance-budgets-a-pattern-that-sticks) covers the same discipline applied to LCP and bundle size.

@@ -1,0 +1,122 @@
+---
+slug: "webhooks-the-reliable-pattern-that-most-companies-get-wrong"
+title: "Webhooks: The Reliable Pattern That Most Companies Get Wrong"
+excerpt: "Webhooks look simple until they are not. Delivery failures, ordering problems, and missing retry logic turn a straightforward integration pattern into a support burden. Here is how to build them correctly from the start."
+date: "2024-11-12"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong"
+status: "published"
+definition: "A webhook is an HTTP callback that a SaaS product sends to a customer endpoint when an event occurs. It is the primary mechanism for real time event notification in B2B integrations. The failure modes are well understood and consistently ignored: no retries, no signatures, no ordering guarantees, no dead letter handling. I have seen the same mistakes on products at every scale, from early stage to post-IPO."
+faq: [
+  {"q":"how do I make webhook delivery reliable in a saas product","a":"Use a background queue for delivery rather than sending synchronously from the event handler. Implement exponential backoff retries with a maximum attempt count. Store each delivery attempt and its response. Alert on consistent failures to a given endpoint. Customers should be able to see delivery history and replay failed events from your dashboard."},
+  {"q":"what is the correct way to sign webhook payloads for security","a":"Compute an HMAC signature over the raw request body using a per customer secret key. Include the timestamp in the signed payload to prevent replay attacks. Send the signature in a request header. Document the verification algorithm clearly. Customers should verify the signature before processing the event. Stripe and GitHub use this pattern and their implementation is worth studying."},
+  {"q":"should webhooks guarantee event ordering for customers","a":"At-least-once delivery with no ordering guarantee is the realistic model for most SaaS products. Ordering requires significantly more infrastructure and slows throughput. Instead, include a sequence number or timestamp on each event. Customers who need ordering can buffer and sort. Document your delivery model explicitly so customers know what to expect and design their consumers accordingly."},
+  {"q":"how do I handle webhook endpoint failures without losing events","a":"Never discard an event because the endpoint returned an error or timed out. Retry with exponential backoff. After exhausting retries, move the delivery to a dead letter state and alert the customer. Give customers a way to replay events from a specific time window. The event should be durable from the moment it is created, not dependent on the consumer being available."},
+  {"q":"what events should a saas product expose as webhooks","a":"Any event that external systems would reasonably want to react to. Common examples include resource created, updated, and deleted events; payment succeeded and failed; subscription changed; user invited and removed; export completed. Start with the events your enterprise customers ask about during sales conversations. Expand based on integration partner requests."},
+  {"q":"how do I test webhook delivery in development and staging","a":"Use a tool like ngrok or a webhook inspection service to capture and inspect deliveries. Build an event replay feature in your admin panel from the start. Write integration tests that spin up a local HTTP server, trigger the event, and assert the correct payload was delivered with the correct signature. Do not rely on manual testing for webhook correctness."},
+  {"q":"what is the difference between at most once at least once and exactly once webhook delivery","a":"At most once means you try once and move on. Events can be lost. At least once means you retry until you get a success response. Events can be delivered more than once. Exactly once is theoretically possible but practically very expensive and often not worth the complexity. Most production SaaS products implement at least once delivery and document that consumers should be idempotent."}
+]
+---
+
+## What you actually need to know
+
+- Webhooks are at the center of most B2B integrations. Getting them wrong has real customer impact.
+- Delivery must be asynchronous and backed by a queue with retry logic. Synchronous delivery fails customers when their endpoint is slow or down.
+- Sign every payload. Customers need to verify authenticity. An unsigned webhook is a security problem waiting to happen.
+- At-least-once delivery with idempotency keys is the correct contract. Exactly-once is expensive and rarely necessary.
+- Give customers visibility into delivery history and replay capability. They will ask for it and you will be better at supporting them.
+
+| Delivery model | Reliability | Implementation cost | Customer experience |
+|---|---|---|---|
+| Synchronous fire and forget | Poor | Minimal | Frequent delivery failures |
+| Queue backed, no retry | Moderate | Low | Events lost on endpoint failure |
+| Queue backed, exponential backoff retry | Good | Medium | Events delivered even across short outages |
+| Queue backed retry plus dead letter and replay | Production grade | Medium to high | Full visibility and recovery path |
+| Dedicated webhook platform (Svix, Hookdeck) | Production grade | Low (vendor) | Same as above, faster to build |
+
+## The core argument
+
+Most teams build webhooks the same way. The event fires, the application calls the customer endpoint, and the response either succeeds or fails. If it fails, nothing happens. No retry. No record. No alert. The customer's system misses the event and has no way to know it happened.
+
+I have seen this pattern at companies with hundreds of enterprise customers and millions in ARR. The webhook code is usually one of the oldest parts of the codebase, written when the product was small and never revisited. The support queue has a steady stream of tickets from customers saying their integration stopped working. The engineering team investigates, finds the delivery failed, manually triggers a resend, and closes the ticket. Every week.
+
+The fix is straightforward. Webhooks are an asynchronous communication channel. They need the same treatment as any other async work: a queue, retry semantics, dead letter handling, and observability. The event payload should be stored durably the moment it is created. Delivery is a separate concern. If the customer endpoint is down, the event is not lost. It waits in the retry queue and delivers when the endpoint recovers.
+
+Signing is the other consistent failure. A webhook without a signature gives the customer no way to verify the payload came from your system. Any actor that can make an HTTP POST to the customer's endpoint can inject fraudulent events. HMAC signatures with a per customer secret key solve this. The implementation is small. The security benefit is real.
+
+## Building the delivery system correctly
+
+### The event store
+
+Every event should be stored durably before any delivery attempt. The event has an ID, a type, a tenant, a payload, a timestamp, and a delivery status. The event ID is stable. If you deliver the same event twice, the customer can deduplicate on event ID.
+
+The event store is the source of truth. Delivery attempts reference the event. Failures reference the delivery attempt. Replays reference the event. This structure makes the system debuggable. When a customer reports a missing event, you can look up the event in the store, find the delivery attempts, and see exactly what happened.
+
+### The delivery worker
+
+Delivery runs in a background job. The event is inserted. A job is enqueued to deliver it. The job calls the customer endpoint. If the call succeeds (2xx response), the delivery is marked complete. If the call fails (non-2xx, timeout, or connection error), the job is retried with exponential backoff.
+
+The timeout for the customer endpoint call should be short. Five to ten seconds. Customers who need longer processing should return a 200 immediately and process the event asynchronously. Document this expectation. Customers who hold the connection open for minutes will cause worker resource exhaustion.
+
+### Signatures
+
+Compute the signature over the raw request body concatenated with the delivery timestamp. Use HMAC-SHA256 with the customer's secret key. Send the signature and timestamp in headers. Document the verification algorithm with code examples in every language your customers use. Regenerating the secret key should be self-serve from the customer's settings.
+
+## What it costs
+
+| Component | Engineering effort | Ongoing cost |
+|---|---|---|
+| Basic async delivery with retry | Three to five days | Negligible if using existing queue |
+| Event store with delivery history | Two to three days | Storage cost, roughly 10 to 50 USD per month at moderate scale |
+| Customer facing delivery log and replay | One sprint | Engineering, minimal infrastructure |
+| HMAC signature verification | Half a day | None |
+| Dedicated webhook platform (Svix, Hookdeck) | One to two days integration | 50 to 500 USD per month depending on volume |
+
+## Features to demand from the implementation
+
+- Durable event store with stable event IDs.
+- Asynchronous delivery via background queue.
+- Exponential backoff with a configurable maximum attempt count.
+- Dead letter state for exhausted events, with customer notification.
+- Per customer secret keys with self-serve rotation.
+- HMAC signature on every payload.
+- Customer facing delivery log showing status, response code, and timestamp.
+- Event replay from a time window.
+- Endpoint health tracking. Automatic disabling after sustained failures, with re-enable path.
+
+## Expert opinion
+
+> The teams that build webhooks correctly from the start have integration partners who trust them. Their enterprise customers self-serve. Their support queues are quiet on the integration side. The teams that build them incorrectly spend years in reactive mode. They replay events manually, debug delivery failures over support tickets, and eventually rewrite the webhook system under pressure from a large customer. I have been in both situations. The first one is much better.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A B2B SaaS client had been running webhooks for two years. Delivery was synchronous, inside the event handler, with no retry logic. About eight percent of deliveries failed on any given day because customer endpoints were slow or temporarily unavailable. The team ran a weekly manual process to identify failed events and trigger resends. It took about three hours per week and was still missing things.
+
+We built a proper delivery system over three weeks. Event store with delivery history, background delivery worker, exponential backoff retry, dead letter handling, customer facing log and replay. The eight percent failure rate dropped to under one percent over the following month. The manual resend process was eliminated. Two of the three largest customers specifically mentioned the improved reliability in their quarterly reviews.
+
+The replay feature turned out to be unexpectedly valuable. Three customers used it within the first month to recover from their own system outages. They did not have to file a support ticket. They went to their settings, selected the time window, and replayed the events they had missed. That capability alone justified the sprint spent building it.
+
+For related infrastructure patterns, [the outbox pattern a SaaS reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) covers the database side of guaranteed delivery, and [saas webhook reliability from at most once to at least once to exactly once](/blog/saas-webhook-reliability-from-at-most-once-to-at-least-once-to-exactly-once) goes deeper on delivery semantics. For background job foundations, [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip) is the natural companion read.
+
+## Common mistakes
+
+1. Synchronous delivery in the event handler. The customer endpoint being slow or down fails your application logic.
+2. No retry logic. Events are lost permanently on any transient failure.
+3. No event store. There is no way to debug failures or replay events.
+4. No signatures. Customers have no way to verify payload authenticity.
+5. No customer facing delivery log. Every integration failure becomes a support ticket.
+6. Short timeout on retry window. Giving up after two or three retries over minutes misses customers with multi-hour outages.
+7. No endpoint health management. Continued delivery attempts to a dead endpoint waste resources and delay detection.
+8. Undocumented delivery model. Customers do not know whether to expect at-most-once or at-least-once, so they do not design their consumers correctly.
+
+## A three week plan
+
+1. **Week one.** Build the event store and delivery worker. Async delivery, exponential backoff retry, dead letter handling. Migrate existing webhook delivery to the new system.
+2. **Week two.** Add HMAC signatures. Build the customer facing delivery log. Add endpoint health tracking and automatic disable after sustained failures.
+3. **Week three.** Build event replay. Document the delivery contract (at-least-once, idempotency keys). Publish verification code examples. Notify integration partners of the new capabilities.
+
+For ongoing reliability, [async job failure recovery patterns that actually work](/blog/async-job-failure-recovery-patterns-that-actually-work) covers the queue side of sustained failure handling.

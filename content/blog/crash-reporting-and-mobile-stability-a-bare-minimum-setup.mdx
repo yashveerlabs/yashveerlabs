@@ -1,0 +1,124 @@
+---
+slug: "crash-reporting-and-mobile-stability-a-bare-minimum-setup"
+title: "Crash Reporting and Mobile Stability: A Bare Minimum Setup"
+excerpt: "Mobile crashes that you do not see do not get fixed. The bare minimum stability setup is small. The teams that skip it discover crashes through App Store reviews instead of through their tooling."
+date: "2026-05-20"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","crash-reporting","stability","monitoring"]
+readingMinutes: 11
+ogImage: "/api/og/blog/crash-reporting-and-mobile-stability-a-bare-minimum-setup"
+status: "published"
+definition: "Crash reporting for mobile apps is the system that captures every crash, deduplicates them, prioritizes them, and surfaces them to the engineering team. The bare minimum setup is one of the highest leverage investments a mobile team can make. Without it, crashes are invisible until customers complain. With it, crashes get fixed before customers notice."
+faq: [
+  {"q":"What is the simplest crash reporting setup?","a":"Sentry, Bugsnag, or Crashlytics integrated into the mobile app. The integration is roughly an hour. The dashboards show crashes grouped by signature with frequency and affected users. The team can prioritize by impact."},
+  {"q":"What is crash free user rate?","a":"The percentage of users in a session who did not experience a crash. The standard target is 99.5 percent or better. Below 99 percent the app feels unreliable. Above 99.8 percent the crashes are rare enough that most users never see one."},
+  {"q":"How quickly should I fix a crash?","a":"Critical crashes affecting more than 1 percent of sessions within days. Moderate crashes within sprints. Rare crashes when the cause becomes clear. The triage is by impact, not by recency."},
+  {"q":"What about non crash issues?","a":"App not responding events, where the UI freezes without crashing. These are sometimes more important than crashes because the user feels them more. The crash reporting tool usually captures these too."},
+  {"q":"What about debug versus release symbols?","a":"Upload the debug symbols to the crash reporting tool. The reports become readable. Without symbols the reports are stack addresses that need manual lookup. The symbol upload is automated in most CI pipelines."},
+  {"q":"How do I prevent crashes proactively?","a":"Test on real devices in CI. Use static analysis tools. Catch errors in code review. Beta test before each release. The proactive work prevents the crashes that the reactive work would have fixed."},
+  {"q":"What about user privacy?","a":"Crash reports include device info, app state, and sometimes user actions. Configure the tool to scrub PII. Get user consent if needed. The reports are necessary for stability but should not include sensitive data."}
+]
+---
+
+## What you actually need to know
+
+- The bare minimum setup is one hour. Skip it at your peril.
+- Crash free user rate is the headline metric. Target 99.5 percent or better.
+- Upload debug symbols. Reports become readable.
+- Triage by impact. Critical crashes get fixed in days.
+- ANR events sometimes matter more than crashes.
+
+| Setup element | Time required |
+|---|---|
+| SDK integration | One hour |
+| Symbol upload in CI | Half a day |
+| Alert configuration | A few hours |
+| Dashboard setup | A few hours |
+| Team rotation for triage | Process work |
+| Total bare minimum | One day |
+
+## The core argument
+
+A mobile crash that nobody sees does not get fixed. The user opens the app. The app crashes. The user opens it again. The user opens it a third time. The user deletes the app or leaves a one star review. The team learns about the crash from the review, which is the worst time to learn.
+
+The fix is crash reporting. Every modern mobile crash reporting tool integrates in roughly an hour. The dashboards show crashes grouped by signature. The team prioritizes by impact. The critical crashes get fixed in days. The mobile stability metrics improve quickly.
+
+The teams that skip crash reporting are not making a deliberate choice. They are usually new to mobile and have not learned that crash reporting is the difference between a stable app and an unstable one. The cost of the integration is hours. The cost of not having it is the difference between a healthy app and a one star app.
+
+The bare minimum setup is small. SDK integration. Debug symbol upload in CI. Basic alert configuration. Dashboard for the team. Triage rotation. Each step is straightforward. The combination produces visibility into the app's stability that the team did not have without it.
+
+## The setup steps
+
+| Step | Detail |
+|---|---|
+| SDK integration | Add to the mobile app, initialize on launch |
+| Debug symbol upload | Automated in CI for each release |
+| Source map upload | For React Native or hybrid apps |
+| Alert on critical crashes | Slack or email when a crash exceeds a threshold |
+| Dashboard | Crashes per release, crash free user rate trend |
+| Triage rotation | Engineer who reviews crashes weekly |
+| Pre release verification | Smoke tests on real devices in CI |
+| User feedback integration | Crash linked to user reported issues |
+
+## How much does this cost
+
+| Tool | Cost |
+|---|---|
+| Sentry | Free tier covers small apps. 26 USD per month for growing apps. |
+| Bugsnag | Free tier available. 50 USD per month for growing apps. |
+| Crashlytics | Free. Bundled with Firebase. |
+| Embrace | Higher tier for deeper mobile observability. |
+| Instabug | Higher tier with replay and user feedback. |
+
+The cost is small. The return is mobile stability that customers feel.
+
+## Features the crash reporting setup must have
+
+- Automatic capture of all uncaught exceptions.
+- Crash grouping by signature.
+- User affected count per crash.
+- Frequency over time.
+- Release tagging on every crash.
+- Device and OS breakdown.
+- User context where appropriate.
+- Symbol resolution for readable stack traces.
+
+## Expert opinion
+
+> Crash reporting is one of those investments where the cost is hours and the return is the difference between an app that customers trust and one they delete. The teams that ship mobile without it usually learn the hard way. The teams that ship it on day one wonder how anyone could ever skip it. The setup is a one day project. The return compounds across every release for the life of the app.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client's mobile app had been live for four months without crash reporting. The App Store reviews were dropping. The team did not know why. We integrated Sentry in a morning.
+
+The first day showed a crash affecting roughly 14 percent of sessions in a specific code path. The team had no idea. The crash happened during a payment flow when the user went into low memory state. The fix was a few lines of code.
+
+The crash free user rate rose from roughly 89 percent to 99.2 percent within two releases. The App Store reviews improved over the next month. The team adopted crash reporting as a permanent practice.
+
+The lesson was that the crash had been there the whole time. The team had not seen it. The tool surfaced it. The fix was easy.
+
+For more on the related work, see [the mobile app analytics stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026) and [the mobile build pipeline Fastlane EAS and the path of least pain](/blog/the-mobile-build-pipeline-fastlane-eas-and-the-path-of-least-pain).
+
+## Common mistakes teams make
+
+1. No crash reporting at all.
+2. SDK installed but symbols not uploaded. Reports are unreadable.
+3. No alerts. Crashes accumulate before anyone notices.
+4. No triage rotation. The dashboard is unread.
+5. Ignoring ANR events. Some are worse than crashes.
+6. PII in crash reports. Privacy issue.
+7. No release tagging. Cannot tell which release introduced the crash.
+8. Treating crash free user rate as solved at 95 percent. The bar is higher.
+
+## A one day setup plan
+
+1. **Hour one.** Pick the tool. Integrate the SDK.
+2. **Hour two and three.** Set up symbol upload in CI.
+3. **Hour four.** Configure alerts.
+4. **Hour five.** Set up the dashboard.
+5. **Hour six.** Define the triage rotation.
+6. **Hours seven and eight.** Test the pipeline with a deliberate test crash. Verify the report.
+
+For more on the related work, read [the mobile app analytics stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026) and [mobile performance profiling a founders reading guide](/blog/mobile-performance-profiling-a-founders-reading-guide-450). On the broader observability side, [Sentry vs Datadog vs New Relic for errors and performance](/blog/sentry-vs-datadog-vs-new-relic-for-errors-and-performance) is the natural next read.

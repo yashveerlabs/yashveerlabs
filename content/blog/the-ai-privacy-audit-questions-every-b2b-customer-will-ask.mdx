@@ -1,0 +1,85 @@
+---
+slug: "the-ai-privacy-audit-questions-every-b2b-customer-will-ask"
+title: "The AI Privacy Audit: Questions Every B2B Customer Will Ask"
+excerpt: "The privacy questions enterprise buyers ask before approving AI features. What to prepare, what to document, and how to answer honestly."
+date: "2025-01-24"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","privacy","b2b","compliance"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-ai-privacy-audit-questions-every-b2b-customer-will-ask"
+status: "published"
+definition: "When a B2B enterprise buyer evaluates your AI-powered SaaS, their security team runs a privacy audit before approving the deal. The questions are predictable. The answers are not easy to fake. Founders who prepare for this audit in advance close deals faster and lose fewer late-stage deals to procurement. The ones who do not have done a thing after signatures."
+faq: [
+  {"q":"What is the most common reason AI features fail enterprise security reviews?","a":"Data retention policies. Enterprise buyers want to know exactly how long user inputs to your AI features are stored, where they are stored, and who has access. If your answer is 'it goes to the OpenAI API and we are not sure what they keep,' the deal stalls."},
+  {"q":"Does using OpenAI's API mean my customers' data is used for training?","a":"Not by default under the standard API terms, as of 2024. But you need to verify this with the specific API terms in effect, enable zero data retention where available, and be able to show your customer the relevant documentation. 'I think so' is not an acceptable answer in a security review."},
+  {"q":"What is a data processing agreement and do I need one for AI features?","a":"A DPA is a contract that governs how a processor handles personal data on behalf of a controller. If your AI feature processes personal data, yes, you need a DPA with your AI provider and you may need to offer one to your enterprise customers. GDPR makes this a legal requirement for EU data subjects."},
+  {"q":"Should I build my own LLM infrastructure to avoid these questions?","a":"Only if the privacy requirements are extreme and you have the engineering capacity. Self-hosted models eliminate third-party data sharing questions but introduce infrastructure, compliance, and maintenance costs that are often higher than the deal value for early-stage SaaS."},
+  {"q":"How do I show a customer that their data does not train the model?","a":"Document the API call configuration that opts out of training. Show them the relevant section of your AI provider's terms. If you use prompt caching or server-side conversation storage, document the retention period. Auditors want documentation, not verbal assurances."}
+]
+---
+
+## What you actually need to know
+
+- Enterprise buyers run structured security questionnaires before approving AI features. These are not optional and they are not negotiable.
+- The four areas every questionnaire covers: data storage, data sharing, model training, and access controls.
+- You cannot fake your way through a privacy audit. Build the documentation before you need it.
+- The deals that stall in procurement are almost always the ones where the AI privacy posture was an afterthought.
+- Self-hosting is not automatically more private. It introduces a different set of risks.
+
+| Privacy Posture | Enterprise Sales Friction | Compliance Effort | Best For |
+|---|---|---|---|
+| Third-party API, no docs | Very high | Low upfront, high later | Prototypes, not enterprise |
+| Third-party API, documented DPA | Moderate | Medium | Most early-stage B2B SaaS |
+| Self-hosted model | Low for data questions, new questions for infra | High | Healthcare, legal, financial |
+
+## The core argument
+
+The first time a security questionnaire landed on my client's desk for an enterprise deal, we had not thought about it. The questionnaire had 47 questions. Twelve of them were directly about AI data handling. We had answers to two of them. The deal went into a 90-day legal review and almost died there.
+
+The questions enterprise buyers ask about AI features are not unreasonable. They are the questions any careful buyer should ask when a third party is processing their customers' data with an opaque system. Which model is running. Where the inputs go. How long they are retained. Who can see them. Whether they influence future model behavior. Whether there is a DPA in place. Whether the AI provider is sub-processing under your agreement.
+
+Founders who dismiss this as bureaucracy are wrong. Enterprise buyers are accountable to their own regulators. If your AI feature is processing EU personal data, GDPR applies. If it is processing health data, HIPAA may apply. If it is processing financial data, the customer's compliance team is involved. The questions are not bureaucracy. They are the price of doing business with serious companies.
+
+The good news is that the questions are predictable. I have seen enough security questionnaires to know exactly what they ask. The answers are also mostly achievable without switching AI providers or building your own infrastructure. The work is documentation and policy, not engineering.
+
+## The twelve questions you will be asked
+
+Every security questionnaire I have seen for AI features covers these areas in some form.
+
+**Data storage.** Where is user input stored? How long? Who has access? Is it encrypted at rest and in transit?
+
+**Third-party sharing.** Which AI providers receive data? Are they sub-processors under your DPA? Do you have a DPA with them? What are their retention policies?
+
+**Model training.** Is user data used to train models? How do you enforce the opt-out? Can you provide documentation?
+
+**Access controls.** Who in your organization can see user inputs to the AI features? Is there an audit log? Is access role-based?
+
+**Incident response.** What happens if the AI provider has a data breach? How quickly will you notify affected customers? What is the breach notification timeline?
+
+**Data residency.** Where is data processed? Are there options for EU-only processing? Can customer data be restricted to specific regions?
+
+**Model transparency.** Can you describe what model is used? Is it proprietary? What is the model version lifecycle?
+
+**Deletion.** When a customer deletes their account, is AI-processed data deleted from your system and from the AI provider's system?
+
+## Common mistakes teams make
+
+1. Sending AI features to enterprise customers without a DPA in place. This is a legal exposure, not just a sales risk.
+2. Assuming the AI provider's data practices are private-by-default. Read the terms. Document what you find.
+3. Handling all twelve questions verbally in a sales call. Buyers need documentation. Write it down.
+4. Not having a zero data retention policy with your AI provider. Most providers offer this. Enable it.
+5. Treating privacy as a legal problem rather than a product architecture problem. The easiest answers come from building privacy into the system, not documenting around it.
+
+## Where to start: a 3-step audit preparation plan
+
+**Step 1: Document your AI data flow.** For every AI feature in your product, draw the data path. User input to your API to the AI provider. Note where data is stored at each step, for how long, and under what conditions. This document is the foundation of every answer you will give.
+
+**Step 2: Get a DPA with your AI provider.** OpenAI, Anthropic, Google, and AWS all offer data processing agreements. Sign the one that applies to your use case. Keep a copy. Reference it in your customer agreements.
+
+**Step 3: Enable zero data retention where available.** Most API providers offer settings that prevent inputs from being used for training or logged beyond the request lifecycle. Enable these settings and document that they are enabled. Show the documentation to auditors.
+## Related reading
+
+- [The Compliance Risk of AI in B2B SaaS](/blog/the-compliance-risk-of-ai-in-b2b-saas)
+- [The Privacy and Data Boundary Problem in AI Integrations](/blog/the-privacy-and-data-boundary-problem-in-ai-integrations)
+- [The Data Processing Agreement: A Founder's Practical Read](/blog/the-data-processing-agreement-a-founders-practical-read)
+- [GDPR for SaaS Builders: What You Must Have on Day One](/blog/gdpr-for-saas-builders-what-you-must-have-on-day-one)

@@ -1,0 +1,62 @@
+---
+slug: "multi-tenant-background-jobs-fair-scheduling-and-noisy-neighbors"
+title: "Multi Tenant Background Jobs: Fair Scheduling and Noisy Neighbors"
+excerpt: "One customer running a large batch job should not delay every other customer's jobs. Here is how to design fair scheduling for background jobs in a multi-tenant SaaS product."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 6
+ogImage: "/api/og/blog/multi-tenant-background-jobs-fair-scheduling-and-noisy-neighbors"
+status: "published"
+definition: "Fair scheduling in multi-tenant background jobs is the practice of preventing any single tenant from monopolizing the job queue at the expense of others. Without fairness controls, a tenant who submits 10,000 jobs simultaneously blocks all other tenants from processing any jobs until their queue is exhausted. Fair scheduling algorithms allocate processing capacity across tenants proportionally, ensuring that every tenant makes progress regardless of the relative size of their job queues."
+faq: [
+  {"q":"What is the noisy neighbor problem in multi-tenant job queues?","a":"The noisy neighbor problem occurs when one tenant submits a large batch of jobs that fills the worker pool, preventing other tenants' jobs from executing until the batch is complete. A single customer importing 50,000 records can block every other customer's notification jobs, scheduled reports, and webhook deliveries for hours. The impact is often invisible in monitoring that does not segment by tenant."},
+  {"q":"What is a simple fair scheduling algorithm?","a":"Weighted round-robin is the simplest effective algorithm: process one job from tenant A, then one from tenant B, then one from tenant C, cycling through all tenants with active jobs. This ensures every tenant advances at roughly the same rate regardless of queue depth. More sophisticated algorithms weight by SLA tier (enterprise customers get higher priority) or by recent usage (tenants who have used less capacity recently get a boost)."},
+  {"q":"How do I implement per-tenant job queues in BullMQ or similar libraries?","a":"Create a separate BullMQ queue per tenant or use queue namespacing with tenant IDs as prefixes. The worker selects the next job to process by cycling through tenant queues (round-robin) rather than consuming from a single global FIFO queue. The trade-off is higher queue management overhead, but the fairness benefit is significant for multi-tenant products with large variance in tenant job volume."},
+  {"q":"What is the difference between job priority and fair scheduling?","a":"Priority assigns a value to individual jobs and processes higher-priority jobs first. Fair scheduling ensures proportional progress across tenants independent of individual job priority. Both can coexist: within a tenant's allocation, jobs can be prioritized internally. But priority without fairness does not prevent noisy neighbor: a high-priority batch from one tenant still blocks other tenants."},
+  {"q":"When does multi-tenant job fairness become important?","a":"When tenants can trigger variable volumes of background work, and when the consequences of delayed jobs are visible to tenants who did not cause the delay. The threshold is typically when you have more than five or ten tenants with meaningfully different job volumes, or when any tenant can submit a job batch that takes more than a few minutes to process."}
+]
+---
+
+## What you need to know
+
+- A single global FIFO job queue is unfair by design in multi-tenant systems. The tenant who submits the most jobs at once processes first, blocking everyone else.
+- Per-tenant queues with round-robin scheduling is the simplest effective fairness mechanism. It distributes worker capacity across all tenants with active jobs.
+- The noisy neighbor problem is invisible in aggregate monitoring. Segment job queue depth and processing latency by tenant to see whether fairness issues exist.
+- Enterprise tier customers can be given priority allocation without eliminating fairness for standard tier customers.
+- Fairness controls become important early. A product with five enterprise customers and unpredictable batch workloads needs fairness controls before the first customer complains.
+
+## The core argument
+
+The noisy neighbor problem in background jobs is the infrastructure equivalent of a loud neighbor in an apartment building: their behavior affects everyone else in the building, and they may not know it is happening. In a SaaS product with a global job queue, a large customer running an import job that queues 20,000 records will process those 20,000 jobs before any other customer's jobs run, assuming a FIFO queue. The delay to other tenants can be minutes to hours depending on job processing speed and worker count.
+
+The simplest fix is per-tenant queues with round-robin scheduling. Instead of one global queue where jobs are processed in submission order, each tenant has their own queue and the worker rotates through tenants with active jobs. Tenant A's 20,000 jobs do not block tenant B's 50 jobs because the worker alternates between them. Tenant A's queue takes longer to process, but every other tenant's jobs are interleaved with it. This fairness model does not require complex algorithms or SLA tier definitions to implement correctly.
+
+The implementation in BullMQ or similar libraries involves creating a queue per tenant (or per tenant segment) and a scheduler process that selects the next queue to process from. The scheduler maintains a round-robin cursor across active queues (queues with at least one pending job) and selects a job from the current queue in the rotation. When a queue empties, it is removed from the rotation. When a new job arrives for an empty tenant queue, the queue re-enters the rotation. This basic implementation covers the fairness requirement for most multi-tenant SaaS products and takes two to three days to implement.
+
+## Common mistakes
+
+1. **Not segmenting job metrics by tenant.** A job queue dashboard that shows aggregate depth and processing time hides noisy neighbor situations. Add tenant_id to every job and create per-tenant queue depth metrics. The noisy neighbor becomes visible when you can see that one tenant's queue depth is 50,000 while all others are under 100.
+
+2. **Using priority without fairness.** Assigning higher priority to enterprise customers ensures their jobs run before standard tier jobs, but does not prevent a large enterprise batch from blocking other enterprise customers. Combine priority tiers with intra-tier fairness.
+
+3. **Not rate-limiting job submission per tenant.** Fairness controls in the consumer do not prevent a tenant from submitting 100,000 jobs in a single batch. Rate-limiting job submission at the API layer prevents the worst noisy neighbor scenarios by slowing the submission rate before the jobs reach the queue.
+
+4. **Not documenting the fairness model for customers.** Enterprise customers who expect their jobs to complete within an SLA need to understand the fairness model and any burst limits that apply. Document this in your API documentation and mention it in enterprise contracts.
+
+5. **Not testing fairness under realistic load.** A fairness implementation that works for two test tenants may not distribute correctly under twenty concurrent tenants with variable queue depths. Load test the scheduler with a realistic mix of tenant queue sizes before deploying.
+
+## Where to start
+
+1. **Add tenant_id to every background job and measure per-tenant queue depth.** Set up a dashboard or alert that shows the maximum queue depth across tenants. If one tenant's queue is consistently much larger than others, you have a fairness problem worth fixing.
+
+2. **Implement per-tenant queues with round-robin scheduling.** Create separate queues per tenant and a scheduler that cycles through active queues. Test with two tenants: one with 1,000 jobs and one with 10 jobs. Verify that both tenants' jobs progress simultaneously.
+
+3. **Set a per-tenant job submission rate limit.** Limit each tenant to a maximum of N new jobs per minute, with burst allowance for brief spikes. This prevents a single tenant from filling the entire queue in one request.
+
+## Related reading
+
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)
+- [Inngest vs Trigger vs Temporal for Background Jobs](/blog/inngest-vs-trigger-vs-temporal-for-background-jobs)
+- Multi-Tenant Architecture: Shared vs Isolated Data Models
+- [Message Queues Compared: SQS, Kafka, RabbitMQ, Redis Streams](/blog/message-queues-compared-sqs-kafka-rabbitmq-redis-streams)

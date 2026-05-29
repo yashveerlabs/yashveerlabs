@@ -1,0 +1,133 @@
+---
+slug: "the-top-five-architectural-failures-in-ai-assisted-codebases"
+title: "The Top Five Architectural Failures in AI Assisted Codebases"
+excerpt: "AI tools write code fast. They also repeat the same five structural mistakes across almost every codebase I inherit. Knowing the pattern lets you catch it before it compounds."
+date: "2024-12-23"
+category: "AI Integration and Vibe Coding Rescue"
+tags: ["ai","llm","rag"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-top-five-architectural-failures-in-ai-assisted-codebases"
+status: "published"
+definition: "AI assisted codebases fail architecturally in predictable ways. The tools are good at local correctness and bad at global coherence. They produce code that works in isolation and breaks at integration points. I have seen the same five failures across dozens of projects, and every one of them was preventable with a small amount of upfront structure."
+faq: [
+  {"q":"What are the most common architectural mistakes in codebases written with AI coding assistants?","a":"The five that show up most consistently are: missing abstraction layers, duplicated logic across modules, no error boundary strategy, hardcoded configuration scattered through the codebase, and data access patterns that bypass the schema. Each one is cheap to prevent and expensive to fix after the fact."},
+  {"q":"How do I audit an AI generated codebase for architectural problems?","a":"Start with the dependency graph. If everything imports from everything, you have no real architecture. Then look for duplicated business logic, usually in files with similar names. Check every direct database call outside a dedicated data layer. Check every try-catch for meaningful handling. That four step pass will find most of the structural debt."},
+  {"q":"Can AI tools themselves help fix architectural failures in codebases they generated?","a":"Partly. AI tools are good at extracting duplicated logic once you point them at specific files. They are not good at designing the right abstraction before you tell them what it should look like. The architectural decisions still need a human. Use the tool for the extraction work once the design is settled."},
+  {"q":"Why do AI coding tools produce flat unstructured project layouts?","a":"Because most AI training data is tutorial code, which is flat by design. Tutorials do not need layered architecture. They need to fit on a screen and be readable in sequence. Production codebases have different constraints that the model does not weight heavily unless you prompt it explicitly."},
+  {"q":"How long does it take to fix architectural debt in a vibe coded project?","a":"Depends on how deep the codebase is. A project with ten thousand lines of AI generated code typically takes two to four weeks of dedicated remediation to get to a defensible architecture. The work is not usually clever. It is mostly extraction, moving, and testing."},
+  {"q":"Should I rewrite an AI generated codebase or fix it in place?","a":"Fix in place unless the business logic itself is broken or the original requirements were wrong. Rewrites feel faster and end up slower. The working behavior of the original codebase, even if structurally bad, contains information the rewrite will lose. I have cleaned up a dozen of these and I have never recommended a full rewrite for structural reasons alone."},
+  {"q":"What does good architecture look like in an AI assisted project?","a":"The same as it does in any project. A data layer that owns all persistence. A service layer that owns business logic. A controller or handler layer that owns HTTP or event handling. Configuration in one place. Error handling that is deliberate, not scattered. The AI tools can maintain this structure once you establish it. They just will not establish it on their own."}
+]
+---
+
+## What you actually need to know
+
+- AI coding tools optimize for the line of code, not for the shape of the system. Every file they produce can be correct while the system as a whole is incoherent.
+- The failures are not random. The same five structural problems appear across almost every AI assisted codebase I have taken over.
+- Most of these failures are invisible during development and surface at integration, at scale, or at the first production incident.
+- Catching them early is cheap. Catching them after six months of building on top of them is expensive.
+- The fix is not to stop using AI tools. It is to establish structure before you start generating and audit structure before you ship.
+
+| Failure type | Typical symptom | Detection method |
+|---|---|---|
+| Missing abstraction layers | Direct DB calls from controllers | Grep for ORM imports in non-data files |
+| Duplicated business logic | Same validation in three files | Search for similar function names across modules |
+| No error boundary strategy | Unhandled rejections in production | Review try-catch coverage in service layer |
+| Scattered configuration | Hardcoded strings and values throughout | Search for string literals matching env-like patterns |
+| Bypassed schema | Runtime type mismatches | Audit data access points against schema definitions |
+
+## The core argument
+
+When I take over a codebase that was written primarily with AI tools, the first thing I do is not read the code. I look at the file structure. The file structure tells me the architectural story in ten seconds. If everything is flat, if there are fifty files in a single directory, if the naming is vague and inconsistent, I know what the next two weeks will look like.
+
+AI tools write code that is locally coherent. Any single function, any single file, is usually readable and often correct. What the tools do not do is maintain a mental model of the whole system. They do not ask themselves whether the abstraction they are introducing already exists three files over. They do not check whether the pattern they are applying in this module is consistent with the pattern used in the adjacent module. They write each piece as if it is the first piece.
+
+The compounding problem is that the founders who built these codebases were moving fast. They were using the AI to go from idea to running software in days or weeks, which is a genuinely impressive thing to do. Speed was the point. Structure was not the point. The architecture debt arrived silently, accumulated across hundreds of commits, and announced itself loudly at the first moment the product needed to do something non-trivial.
+
+The five failures I describe here are not exotic. They are the obvious failures that any experienced engineer would predict. That is precisely why they matter. If the failures are predictable, they are preventable. A small amount of structural discipline at the start of an AI assisted project costs almost nothing and saves weeks of remediation later.
+
+## The five failures in detail
+
+### Failure one: missing abstraction layers
+
+The most common. AI tools write direct database queries in controller functions. They put business logic in API routes. They call third party services from inside React components. There is no layer separation because the tool was not asked to create layer separation, and the tutorial code it learned from does not have it either.
+
+The cost shows up when you need to change anything. Changing the database schema means hunting through fifty files for direct queries. Changing a third party integration means finding every place the SDK was called. Changing business logic means hoping you found all the copies.
+
+### Failure two: duplicated business logic
+
+The AI does not remember what it wrote twenty minutes ago. Ask it to validate an email address in a registration handler and it writes a validator. Ask it to validate an email address in a profile update handler and it writes a different validator. Ask it to validate an email address in an admin panel and it writes a third one.
+
+None of the three validators are wrong, exactly. But they are not the same. Over time they diverge as one gets updated and the others do not. The divergence is subtle and the bugs it produces are subtle. I have seen this pattern produce two-hour debugging sessions over a single character difference in a regex.
+
+### Failure three: no error boundary strategy
+
+AI generated code handles errors where the error is caught and ignores the question of what should happen to the user, the request, or the downstream system. Every try-catch logs to the console and returns null. The service layer has no concept of recoverable versus non-recoverable errors. The API layer has no standard error response format.
+
+The production result is 500 errors that say nothing, silent failures that produce corrupt data, and customer support tickets that contain no useful diagnostic information.
+
+### Failure four: scattered configuration
+
+Hardcoded values everywhere. The API base URL is a string literal in four different files. The retry count is the number 3 in two different service classes. The feature flag check is a string comparison to a hardcoded environment name in six places. None of this is in a configuration object. None of it is in environment variables. It is embedded in the logic wherever the AI happened to need it.
+
+### Failure five: bypassed schema
+
+AI tools know about schemas but do not always use them consistently. They will define a TypeScript interface at the top of a file and then three functions down pass a plain object to a function that expects that interface, without any validation at the boundary. The schema exists as documentation, not as enforcement.
+
+The runtime result is type mismatches that only appear when specific data combinations are exercised, usually in production.
+
+## How much does it cost
+
+| Remediation scope | Estimated time | Risk level |
+|---|---|---|
+| Abstract data layer on a small project | 3-5 days | Low, well understood extraction |
+| Deduplicate business logic across the codebase | 2-4 days | Medium, requires test coverage first |
+| Add error boundary strategy | 2-3 days | Low, mostly additive |
+| Centralize configuration | 1-2 days | Low, mechanical work |
+| Add schema enforcement at data boundaries | 3-6 days | Medium, requires runtime validation library |
+| Full structural remediation of a medium project | 3-5 weeks | Medium with tests, high without |
+
+These are my estimates from actual client projects. The wide ranges reflect the difference between a codebase with reasonable test coverage and one with none. Tests are always the first investment before any structural change.
+
+## What to look for before you inherit the problem
+
+- A data access layer: one place where all database interaction lives. If it does not exist, create it before adding any feature.
+- A single source of truth for business logic: validation, calculation, and transformation in a service layer, not in handlers.
+- A documented error handling strategy: what categories of errors exist, what the API response looks like for each, what gets logged.
+- Configuration in one place: environment variables or a config module. No hardcoded strings that will need to change per environment.
+- Schema enforcement at the entry points: validate inputs before they touch the service layer.
+
+## Expert opinion
+
+> The most predictable thing about AI generated codebases is the structure. I can usually describe the architectural problems before I have read a single function. The tools write locally correct code and globally incoherent systems. The discipline is establishing the global structure before the local code runs. Once you have the layers, the AI is excellent at filling them in.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+I took over a booking management product last year that had been built almost entirely with AI tools over four months. Eleven thousand lines of code, zero meaningful abstraction layers. Every API route contained its own database queries, its own validation, and its own error handling. The founder had built a genuinely useful product. The codebase made it nearly impossible to change.
+
+The first two weeks were structural. Extract a data layer. Extract a validation layer. Write tests against the existing behavior before moving anything. The tests were how I confirmed that the extracted code was equivalent to the original. Once I had tests and layers, every subsequent change was predictable. The last two weeks of the engagement shipped features that would have taken months in the original structure.
+
+For more on the broader process of taking over AI generated codebases, see [vibe coding rescue](/blog/vibe-coding-rescue-how-to-take-over-a-codebase-written-by-chatgpt). For the specific question of whether to fix or rewrite, [the true cost of a rewrite](/blog/the-true-cost-of-a-rewrite-when-it-is-worth-it) covers the calculus in detail.
+
+## Common mistakes
+
+1. Trying to refactor architecture without tests. The extraction will change behavior in ways you do not expect.
+2. Fixing failures in isolation instead of in order. Centralizing configuration before you have a data layer means you are configuring a mess.
+3. Using the AI tool to design the new architecture. It will propose something reasonable that is not quite right for your constraints. You need to own the design.
+4. Doing the structural remediation incrementally while also shipping features. The two activities conflict. Reserve sprint capacity for remediation.
+5. Treating code duplication as a style problem rather than a correctness risk. Two diverged copies of the same logic will eventually produce two different answers.
+6. Skipping the dependency graph audit. Without it you will miss circular dependencies that make extraction impossible without breaking things.
+7. Declaring victory after the structure looks clean. Structural remediation only holds if the team knows the conventions. Document them.
+8. Starting with the hardest failure first. Scattered configuration is the easiest to fix. The quick win builds confidence before you tackle the harder extractions.
+
+## A 30-day plan
+
+1. **Day one.** Map the dependency graph. Identify the ten worst coupling points. Rank them by how much new code is being written on top of them.
+2. **Days two to five.** Write characterization tests against the existing behavior at the ten worst points. You need a safety net before you move anything.
+3. **Week two.** Extract the data layer. Move all database access into a dedicated module. Update every caller. Run the tests.
+4. **Week three.** Extract the service layer. Move business logic out of handlers. Introduce error categories and a standard API error response format.
+5. **Week four.** Centralize configuration, deduplicate validators, and add schema enforcement at entry points.
+
+For the related reading on AI code quality and production readiness, see [why AI generated code breaks in production](/blog/why-ai-generated-code-breaks-in-production) and [when AI code generation stops saving you time](/blog/when-ai-code-generation-stops-saving-you-time-and-starts-costing-you).

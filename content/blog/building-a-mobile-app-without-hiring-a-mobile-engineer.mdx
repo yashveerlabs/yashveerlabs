@@ -1,0 +1,124 @@
+---
+slug: "building-a-mobile-app-without-hiring-a-mobile-engineer"
+title: "Building a Mobile App Without Hiring a Mobile Engineer"
+excerpt: "A web first team can ship a credible mobile app in 2026 without a dedicated mobile engineer. Expo and React Native have closed the gap. Here is the realistic plan, the trade offs, and the limits."
+date: "2026-05-20"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","expo","cross-platform"]
+readingMinutes: 12
+ogImage: "/api/og/blog/building-a-mobile-app-without-hiring-a-mobile-engineer"
+status: "published"
+definition: "A web team using React on the front end can ship a competent mobile app in 2026 using Expo and React Native. The build pipeline, the deployment, the over the air updates, and most platform integrations are available out of the box. The limits are real for graphics heavy, performance sensitive, or deeply native integration work. Most B2B SaaS mobile apps land comfortably inside the limits."
+faq: [
+  {"q":"Can a React web team actually ship a real mobile app?","a":"Yes for most business app categories. CRUD apps, dashboards, content consumption, simple capture flows, and authenticated tools all ship cleanly. The challenges are at the edges. Heavy animation, real time graphics, complex camera or sensor work, and deep OS integration are still better served by native engineers."},
+  {"q":"How long does the first mobile app take?","a":"Six to twelve weeks for a real launch from a web team that has not shipped mobile before. The first sprint is learning Expo and the deployment pipeline. The next sprints are porting the application logic and adapting the UI. The last sprint is the App Store and Play Store submission process."},
+  {"q":"What is the maintenance load?","a":"For a SaaS app with no special platform requirements, expect 20 to 30 percent of one engineer's time after launch in the first six months, dropping to 10 to 15 percent after a year. The maintenance includes dependency updates, OS version compatibility, and small platform specific bugs."},
+  {"q":"What about the App Store submission process?","a":"It is a real cost. Plan a sprint for the first submission. Apple's review is the longer pole. Have screenshots, descriptions, privacy declarations, and contact emails ready. Subsequent updates submit cleanly once the first is approved."},
+  {"q":"When should I actually hire a mobile engineer?","a":"When the app crosses into deep native territory. Complex camera and sensor work. Custom animations beyond what React Native handles. Performance critical paths that need native code. Specific platform integrations like watch apps or widgets."},
+  {"q":"What about Flutter?","a":"Flutter is excellent and a real option. For web first teams, React Native via Expo wins on team continuity. For mobile first teams or apps with heavy custom UI, Flutter often wins on quality. Both are credible. Pick the one that fits the team."},
+  {"q":"How does this affect the team's structure?","a":"The web team owns the mobile app. The product manager owns both surfaces. A senior engineer leads the mobile work. The team learns the platform constraints over the first project. By the second project the gap from native is small."}
+]
+---
+
+## What you actually need to know
+
+- Expo and React Native have closed the gap for most business app categories.
+- Six to twelve weeks for a credible first app from a web team.
+- The maintenance load is 20 to 30 percent of one engineer for the first six months.
+- The App Store submission process is its own sprint.
+- Hire a mobile engineer when the app crosses into deep native territory.
+
+| App category | Web team can ship? | Notes |
+|---|---|---|
+| CRUD business app | Yes | Comfortable fit |
+| Dashboard and reports | Yes | Comfortable fit |
+| Authenticated tools | Yes | Comfortable fit |
+| Content consumption | Yes | Comfortable fit |
+| Camera and document capture | Yes with care | Use the standard libraries |
+| Maps and location | Yes | React Native Maps is mature |
+| Custom heavy animation | Probably not | Native usually wins |
+| Real time graphics | No | Native required |
+| Wearable apps | No | Native required |
+
+## The core argument
+
+The default assumption in many teams is that mobile means hiring a mobile engineer. That assumption is increasingly outdated. The tooling around Expo and React Native has matured to the point where a competent web team can ship a credible mobile app without dedicated mobile talent for most business app categories. The savings are real. The constraints are also real.
+
+The savings start with hiring cost. Senior mobile engineers in the US are 180k to 260k USD per year, plus equity. The cost of using your existing web engineering team is the time they invest in learning the platform. That investment pays off across every mobile project the team ever does.
+
+The savings continue in team coherence. A single team that owns both surfaces moves faster than two teams that hand off work to each other. Decisions stay in one place. The web and the mobile evolve together rather than diverging.
+
+The constraints are at the edges. The heavy native work is still better done by mobile engineers. Custom animations, intensive graphics, deep sensor work, and watch or widget extensions all benefit from a native specialist. Most business apps do not need any of that. The ones that do should hire the specialist.
+
+## The toolchain in 2026
+
+Expo is the SDK and the deployment platform. It handles the build process, the over the air updates, the App Store submission tooling, the credentials management, and the development environment. The free tier handles most early stage teams. The paid tier adds priority builds and longer build minutes.
+
+React Native is the UI framework. The new architecture has shipped and the performance is closer to native than the older bridge. The component ecosystem covers most needs. The styling system maps cleanly from web React.
+
+The native modules ecosystem covers most platform features. Camera, location, push notifications, biometrics, file system, sharing, deep links. Most are written and maintained by the React Native or Expo community. The quality varies. The popular ones are reliable.
+
+The CI pipeline is EAS Build, GitHub Actions, or a similar combination. The deployment to TestFlight and the Play Console internal testing is automated. The over the air updates allow you to ship JavaScript only changes without going through App Store review.
+
+## How much does this cost
+
+| Line item | Year one cost |
+|---|---|
+| Expo subscription | Free to 1200 USD |
+| Apple Developer account | 99 USD |
+| Google Play account | 25 USD one time |
+| App Store assets and screenshots | 1k to 5k USD |
+| Push notification service | Free to 200 USD per month |
+| Engineering time | One engineer at 30 to 50 percent for the project |
+
+The total cost is dramatically lower than hiring a mobile engineer. The trade off is the time invested by the existing team in learning the platform. That investment compounds.
+
+## Features the app must have
+
+- Over the air update path for JavaScript only fixes.
+- A real CI pipeline that builds for both platforms.
+- Push notifications wired through a managed provider.
+- Crash reporting integrated.
+- Deep linking from email and web.
+- Authentication that shares sessions with the web app.
+- Offline tolerance for the surfaces that need it.
+- A submission checklist that survives Apple's review.
+
+## Expert opinion
+
+> The mobile gap has closed for most business apps. The teams I see succeed are the ones that committed their existing web engineers to learn the platform rather than hiring a specialist for a six month project. The specialist hire makes sense when the app has serious native requirements. For everything else the existing team can do it. The investment pays back across every future mobile project.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A SaaS client wanted a companion mobile app for their web product. Their team was three React engineers, none of whom had shipped mobile. The instinct was to hire a senior mobile engineer.
+
+We ran the math. The senior mobile engineer would cost 220k USD per year, take three months to hire, and ramp another two months on the product. The total time to a launched mobile app was projected at nine to eleven months.
+
+The Expo path was different. The senior React engineer led the project. The other two engineers contributed parts. The first version shipped at week ten. The total engineering cost was roughly 70k USD against the projected 250k for the dedicated hire over the same period. The app has run for eighteen months with the same team owning it.
+
+For more on the related work, see [Flutter vs React Native vs Native in 2026 a founder decision matrix](/blog/flutter-vs-react-native-vs-native-in-2026-a-founder-decision-matrix) and [should you build for iOS or Android first as a startup](/blog/should-you-build-for-ios-or-android-first-as-a-startup).
+
+## Common mistakes teams make
+
+1. Hiring a mobile engineer before trying the Expo path.
+2. Underestimating the App Store submission process.
+3. Skipping over the air updates. Every fix needs a review.
+4. No crash reporting. The team is blind.
+5. No deep linking. The marketing and product teams cannot drive traffic.
+6. Trying to share too much code between web and mobile. The platforms diverge naturally.
+7. Forgetting privacy declarations on Apple's side.
+8. Treating the mobile app as a port of the web. The mobile constraints differ.
+
+## A 12 week plan
+
+1. **Weeks one and two.** Pick the engineer who will lead. Set up Expo. Build the hello world.
+2. **Weeks three and four.** Port the authentication and the first three screens.
+3. **Weeks five and six.** Port the next batch of screens. Wire push notifications.
+4. **Weeks seven and eight.** Add deep linking, crash reporting, analytics.
+5. **Weeks nine and ten.** Polish the platform specific UX. iOS and Android both feel right.
+6. **Week eleven.** Submit to TestFlight and Play Console internal testing.
+7. **Week twelve.** Submit for public release. Plan the launch.
+
+For more on the related work, read [the first mobile app build a founders six phase plan](/blog/the-first-mobile-app-build-a-founders-six-phase-plan) and [the mobile build pipeline Fastlane EAS and the path of least pain](/blog/the-mobile-build-pipeline-fastlane-eas-and-the-path-of-least-pain). On the broader cross platform decision, [native iOS development in 2026 SwiftUI Combine and the new stack](/blog/native-ios-development-in-2026-swiftui-combine-and-the-new-stack) is the natural next read.

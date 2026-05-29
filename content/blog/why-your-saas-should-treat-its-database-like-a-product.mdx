@@ -1,0 +1,125 @@
+---
+slug: "why-your-saas-should-treat-its-database-like-a-product"
+title: "Why Your SaaS Should Treat Its Database Like a Product"
+excerpt: "The database is the most durable thing you will build. Most SaaS teams treat it like implementation detail. The ones that treat it like a product build something that survives five years of feature growth without a rewrite."
+date: "2024-12-12"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling"]
+readingMinutes: 12
+ogImage: "/api/og/blog/why-your-saas-should-treat-its-database-like-a-product"
+status: "published"
+definition: "Treating the database like a product means making deliberate decisions about schema design, naming conventions, migration discipline, access patterns, and data lifecycle. It means the database has documentation, a changelog, and owners. It means schema changes go through a review process. Most SaaS teams do none of this. The ones that do have a database that ages gracefully instead of becoming the main source of technical debt."
+faq: [
+  {"q":"what does it mean to treat a saas database like a product in practice","a":"It means the schema has documented decisions behind it. Column names follow a convention and the convention is written down. Migrations have a review process. The data lifecycle is explicit: when records are created, updated, soft deleted, or hard deleted. Access patterns are known and indexes are maintained for them. Someone owns the schema the way a product manager owns a roadmap."},
+  {"q":"how should saas teams handle database schema migrations without downtime","a":"Every migration should be backward compatible for at least one deploy cycle. Add columns as nullable before backfilling. Never rename a column in one step. Never drop a column immediately after removing it from code. Use a three step process: add the new column, deploy code that writes to both old and new, backfill, deploy code that reads from new only, drop the old column. Zero downtime migrations require discipline, not heroics."},
+  {"q":"what are the most important database naming conventions for a saas product","a":"Consistent table names (plural nouns: users, organizations, subscriptions). Consistent foreign key names (user_id, organization_id). Consistent timestamp columns (created_at, updated_at, deleted_at). Consistent status column patterns. Consistent soft delete patterns. The specific convention matters less than consistency. A schema where half the tables use snake case and half use camel case is a tax on every engineer who touches it."},
+  {"q":"when should a saas product use soft deletes versus hard deletes","a":"Soft deletes are correct when records have audit significance, when foreign key constraints would cascade dangerously, or when the business needs a recovery path. Hard deletes are correct for genuinely transient data with no audit value and no business need for recovery. The mistake is using soft deletes everywhere by default, which produces a schema full of deleted_at columns and queries full of WHERE deleted_at IS NULL conditions."},
+  {"q":"how do you handle multi-tenant data isolation at the database level in a saas product","a":"The two main patterns are shared schema with tenant_id on every table, or database-per-tenant. Shared schema is cheaper and simpler. Database-per-tenant is more isolated and easier to export or migrate for a single customer. Most SaaS products start with shared schema. Enterprise customers sometimes demand database-per-tenant as a contractual requirement. The migration from shared to isolated is expensive enough that it is worth modeling both options at design time."},
+  {"q":"what database indexes does a typical saas product need from the start","a":"Indexes on every foreign key column. Indexes on columns used in WHERE clauses for the most common queries. Indexes on (tenant_id, created_at) for time-ordered per-tenant listings. Indexes on status columns where the cardinality is meaningful. Avoid indexing every column. Indexes have a write cost. The slow query log tells you where you need more indexes."},
+  {"q":"how should saas teams document their database schema","a":"A schema changelog that records why each significant change was made, not just what changed. Entity relationship diagrams for the core tables, updated when the schema changes significantly. Inline comments on tables and columns where the name alone is ambiguous. A conventions document that new engineers read before touching the schema. The investment is a few hours initially and a few minutes per migration."}
+]
+---
+
+## What you actually need to know
+
+- The schema is the most durable artifact in the codebase. Business logic changes. The schema outlasts it.
+- Naming conventions enforced from day one cost almost nothing. Enforcing them later is a multi-month project.
+- Zero downtime migrations are a discipline, not a technique. Every schema change should be backward compatible for at least one release cycle.
+- Soft deletes have a real cost. Use them deliberately, not by default.
+- The database needs an owner. Not a DBA specifically, but someone who reviews schema changes the way engineers review application code.
+
+| Practice | Effort to adopt early | Cost of retrofitting later | Risk if skipped |
+|---|---|---|---|
+| Naming conventions | Hours | Weeks to months | Schema inconsistency compounds with every table |
+| Migration discipline (backward compatible) | Days to establish process | High, every migration is a risk | Downtime incidents during deploys |
+| Soft delete policy | Hours | Medium | Orphaned data, query complexity |
+| Index strategy | Ongoing, low per-query | Medium (slow queries compound) | Performance degradation at scale |
+| Schema changelog | Minutes per migration | Cannot be reconstructed retroactively | No record of why decisions were made |
+| Multi-tenant isolation strategy | Design time | Very high | Data leak risk, enterprise deal blockers |
+
+## The core argument
+
+I have done due diligence on dozens of SaaS codebases. The database is almost always the place where the earliest decisions are still visible and the most painful debt lives. A naming convention decision made in month one is still there in year five. A soft delete added to every table "just in case" is still generating WHERE deleted_at IS NULL clauses in every query five years later. A foreign key constraint skipped to move faster is still creating orphaned records that require quarterly cleanup scripts.
+
+The application code gets refactored. The frontend gets rewritten. The APIs get versioned. The database accumulates. Every table added under time pressure without review is a tax on every engineer who touches it for years.
+
+Treating the database like a product does not mean over-engineering the schema on day one. It means making deliberate decisions, writing them down, reviewing schema changes the way you review application code, and establishing conventions that the team enforces. It costs almost nothing in the first month. It saves significant engineering time in year two and beyond.
+
+The analogy I use: if the application code is the product, the schema is the foundation. You can repaint the product. You can add rooms. But moving a load-bearing wall after the building is occupied is expensive and dangerous. Schema decisions are load-bearing walls. Treat them accordingly.
+
+## The practices that matter
+
+### Naming conventions
+
+Pick a convention and write it down before the first table is created. Snake case, plural noun table names, consistent foreign key naming, consistent timestamp column names. The specific choices matter less than consistency. A schema where some tables are singular and some are plural, where some foreign keys are user_id and some are userId, is a source of daily friction.
+
+Document the convention in the repository. New engineers read it before creating their first table. Schema reviews check adherence to it.
+
+### Migration discipline
+
+Every migration should be backward compatible for at least one release cycle. This means: add columns as nullable. Do not rename columns in a single migration. Do not drop columns immediately after removing them from application code. The three step pattern for column changes (add, backfill, drop old) is worth the overhead. The alternative is downtime incidents during deploys.
+
+Use a migration tool that enforces sequential ordering and records which migrations have run. Never manually edit the database in production without a corresponding migration. The migration file is the source of truth for how the schema got to its current state.
+
+### Soft delete policy
+
+Decide when to soft delete and when to hard delete. The default should not be soft delete everywhere. Soft deletes have real costs. They require a deleted_at column on every table that uses them. They require WHERE deleted_at IS NULL on virtually every query. They create confusion about what "active" means. They accumulate data that the team eventually wants to purge.
+
+Soft deletes are correct for: records with audit significance, records referenced by foreign keys that would cascade dangerously, records where the business needs a recovery path. Hard deletes are correct for: genuinely transient data, logs and events with a defined retention window, records that have no foreign key dependents and no audit significance.
+
+## What it requires
+
+| Investment | Time | Notes |
+|---|---|---|
+| Write the conventions document | Two to four hours | One page. Table naming, column naming, FK naming, timestamp naming. |
+| Schema changelog setup | One hour | Can be comments in migration files or a separate file |
+| Migration review process | Ongoing, minutes per migration | Same pull request process as application code |
+| Index audit (quarterly) | One to two hours | Run the slow query log, identify missing indexes, remove unused ones |
+| Soft delete audit | Four to eight hours once | Identify which tables genuinely need soft deletes and which do not |
+| ERD documentation | Four to eight hours initially | Update when schema changes significantly |
+
+## Features to look for in schema management
+
+- A migration tool with sequential ordering and run tracking (Flyway, Liquibase, Prisma Migrate, Alembic).
+- A review process for schema changes that includes a backward-compatible migration check.
+- A conventions document that is enforced in review.
+- A soft delete policy that is explicit and deliberate.
+- Index coverage on all foreign keys and common query patterns.
+- A schema changelog that records why decisions were made.
+- Documented multi-tenant isolation strategy.
+
+## Expert opinion
+
+> The database is the part of the codebase that most accurately reflects the actual domain model, including all the decisions, mistakes, and half-measures that accumulated over the years. I have seen schemas that are works of intentional design, where every table name is clear, every relationship is documented, and every migration has a reason attached. I have seen schemas that are archaeological sites, where you can read the product history in the layer of deprecated columns. The teams with intentional schemas move faster at every stage. The schema review costs ten minutes. The consequences of skipping it last years.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A three year old SaaS came to me for a performance audit. The immediate problem was slow queries. The underlying problem was a schema that had grown without conventions, without review, and without a soft delete policy. There were forty-seven tables with a deleted_at column, including tables that stored immutable event records. There were queries with six-way joins that hit no indexes. There were column names in three different naming styles across the same table.
+
+The performance work took two weeks. The schema conventions work took another four weeks, including a migration to standardize naming on the highest traffic tables and a soft delete audit that resulted in removing deleted_at from twenty-one tables that did not need it. The queries that had been consistently slow improved by sixty to eighty percent after the missing indexes were added.
+
+The team established a schema review checklist during the project. Every migration now goes through it before merge. The checklist is eight items and takes five minutes to complete. Three engineers told me in the retrospective that it had already caught mistakes that would have required follow-up migrations.
+
+For related reading on the query side, [the slow query log a discipline every saas team should practice](/blog/the-slow-query-log-a-discipline-every-saas-team-should-practice) covers the ongoing performance discipline, and [zero downtime database migrations a step by step guide](/blog/zero-downtime-database-migrations-a-step-by-step-guide) covers migration execution in depth.
+
+## Common mistakes
+
+1. No naming convention. Every engineer names tables and columns differently. The schema is inconsistent by month six.
+2. Soft deletes everywhere by default. Every query needs WHERE deleted_at IS NULL. Every table carries a column that most of them do not need.
+3. No migration review. Schema changes merge without a backward-compatible check. Downtime incidents follow.
+4. Missing indexes on foreign keys. Every foreign key join is a sequence scan until the query starts taking seconds at scale.
+5. No schema changelog. Why was this column added? What was the user_v2 table for? Nobody knows.
+6. Multi-tenant isolation decided under pressure. Shared schema is fine until an enterprise customer demands isolation and the cost of migration becomes clear.
+7. Dropping columns immediately after removing them from code. The previous deploy is still running and referencing the column when it disappears.
+8. Treating schema review as optional. Application code is reviewed. Schema changes are equally load-bearing.
+
+## A 30 day plan
+
+1. **Week one.** Write the conventions document. Table naming, column naming, foreign key naming, timestamp naming. Review existing schema against it. Identify the highest-traffic tables that violate it.
+2. **Week two.** Audit soft deletes. Which tables genuinely need them and which do not. Plan migrations to remove them from tables that do not.
+3. **Week three.** Run the slow query log. Identify missing indexes on the most expensive queries. Add them via backward-compatible migrations.
+4. **Week four.** Establish the migration review checklist. Backward-compatible check, index check, convention check, soft delete check. Apply it retroactively to any pending migrations.
+
+For deeper reading on the performance side, [database indexes a practical primer for saas engineers](/blog/database-indexes-a-practical-primer-for-saas-engineers) covers index strategy in full, and [schema design decisions that haunt you at million user scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale) covers the longer term consequences.

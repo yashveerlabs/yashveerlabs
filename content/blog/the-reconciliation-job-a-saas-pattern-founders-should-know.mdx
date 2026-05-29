@@ -1,0 +1,120 @@
+---
+slug: "the-reconciliation-job-a-saas-pattern-founders-should-know"
+title: "The Reconciliation Job: A SaaS Pattern Founders Should Know"
+excerpt: "The reconciliation job is the background process that finds and fixes the gap between what your system thinks is true and what is actually true. Most SaaS products need one. Most founders do not know it until something goes wrong."
+date: "2024-12-03"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","scaling","founders"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-reconciliation-job-a-saas-pattern-founders-should-know"
+status: "published"
+definition: "A reconciliation job is a scheduled background process that compares two sources of truth, finds discrepancies, and either fixes them automatically or surfaces them for manual review. In SaaS the most common version compares local subscription state against the billing provider. But the pattern appears everywhere there are two systems that need to agree. It is the safety net under distributed state."
+faq: [
+  {"q":"What does a reconciliation job actually do?","a":"It reads your internal state, reads the external source of truth (usually a billing provider or a partner API), compares the two, and either corrects the drift automatically for well-understood cases or creates a task for human review when the discrepancy is ambiguous. The job runs on a schedule, often nightly or hourly."},
+  {"q":"When do I need a reconciliation job?","a":"As soon as you have two systems that need to agree on state. Billing provider and your subscription table. Payment gateway and your invoice records. External inventory system and your product catalog. Any time a webhook can fail silently and leave your system out of sync, you need a reconciliation job to catch the drift."},
+  {"q":"What is the difference between a reconciliation job and just handling webhooks correctly?","a":"Webhooks are the real-time path. The reconciliation job is the correction path when the real-time path fails. Networks partition. Processes crash. Webhook handlers have bugs. The reconciliation job is not a replacement for good webhook handling; it is the layer that catches what falls through."},
+  {"q":"How do I prevent the reconciliation job from creating duplicate corrections?","a":"Idempotency. Every correction action must be safe to apply more than once. When the job finds a discrepancy and corrects it, running the job again should produce the same result, not a double correction. Design the correction logic before you design the job schedule."},
+  {"q":"What is the reconciliation report?","a":"A record of every run: how many records were checked, how many discrepancies were found, how many were auto-corrected, and how many require human review. The report is the observability surface for the job. Without it you do not know whether the job is working, finding nothing because everything is fine, or finding nothing because it is broken."},
+  {"q":"How often should the reconciliation job run?","a":"For billing state, nightly is the minimum and hourly is better for active products. For financial records, nightly before any reports run. For inventory or external catalog data, depends on how often the external system changes. The schedule should match the acceptable window of drift."},
+  {"q":"Can the reconciliation job break things?","a":"Yes, if auto-correction logic is wrong. A job that resets subscription state for all accounts because of a bug in the comparison logic is a serious incident. The safest approach is to start with report-only mode, run it for a week, review the output, then enable auto-correction for low-risk cases first."}
+]
+---
+
+## What you actually need to know
+
+- Webhooks fail. Networks partition. Processes crash. The reconciliation job is what catches the state drift that results.
+- The pattern is always the same: compare two sources of truth, categorize discrepancies, correct or escalate.
+- Start in report-only mode. Ship auto-correction only for discrepancy types you fully understand.
+- Idempotency in the correction logic is not optional. The job will run multiple times on the same records.
+- Teams that skip the reconciliation job discover they needed it during their first billing incident.
+
+| Approach to state synchronization | Reliability | Complexity | When it breaks |
+|---|---|---|---|
+| Webhooks only | Medium | Low | Network failures, handler bugs, retries |
+| Polling only | Low | Medium | High latency, rate limits, missed events |
+| Webhooks plus reconciliation job | High | Medium | Rare; discrepancies caught on next job run |
+| Event sourcing with replay | High | High | Complex to build and operate |
+| Manual sync on customer complaint | Very low | Minimal | Constantly |
+
+## The core argument
+
+Distributed systems drift. That is not a flaw in your architecture. It is physics. Two systems that communicate over a network will, at some point, disagree about the state of the world. The webhook that should have updated your subscription table arrived during a deploy. The retry that should have fired did not. The batch job that syncs accounts from your billing provider timed out halfway through. The state is wrong and nobody knows yet.
+
+The reconciliation job is the pattern that catches this. It runs on a schedule, reads both sides of the agreement, finds the gap, and does something useful about it. For most SaaS products the most important instance is the billing reconciliation: compare your local subscription records against what the billing provider says is true. But the same pattern applies to any pair of systems that need to agree.
+
+What I find surprising is how many SaaS products do not have this. They have webhook handlers. They have retry logic. They believe the system is consistent because it usually is. The first time a billing cycle runs while the webhook handler is broken, they find out the hard way. A week of subscription state corruption is a very expensive way to learn about reconciliation.
+
+The job is also a monitoring tool. A reconciliation report that finds zero discrepancies is information. It tells you the real-time path is working. A report that finds a hundred discrepancies tells you something upstream is broken. Teams that treat the reconciliation report as a daily dashboard catch upstream failures faster than teams that wait for customer complaints.
+
+## The structure of a reconciliation job
+
+### Phase one: data collection
+
+Fetch the local records. Fetch the external records. Align them by a shared key, usually a billing provider customer ID or subscription ID. Identify the set that exists in both systems, the set that exists only locally, and the set that exists only externally.
+
+### Phase two: comparison
+
+For each matched record, compare the fields that should agree. Subscription status. Plan tier. Renewal date. Trial expiry. Each field comparison produces a result: match, mismatch, or missing. Aggregate the results into discrepancy categories.
+
+### Phase three: correction or escalation
+
+For each discrepancy category, a policy. Auto-correct if the right answer is unambiguous and the correction is low risk. Escalate to a review queue if the right answer requires human judgment or the correction could have customer-visible consequences. Log everything.
+
+The correction logic must be idempotent. Running it twice on the same record produces the same state, not a doubled change.
+
+## What it requires
+
+| Component | Engineering time | Notes |
+|---|---|---|
+| Basic billing reconciliation (report only) | Three to five days | Compare local vs provider, surface discrepancies |
+| Auto-correction for clear cases | Three to four days | Idempotent fixes for unambiguous drift |
+| Review queue for ambiguous cases | Two to three days | Operations interface for human review |
+| Reconciliation report and alerting | Two days | Daily report, alert on discrepancy threshold |
+| Extension to second system (inventory, partners) | Two to three days per pair | Pattern is reusable |
+
+## What the reconciliation system must have
+
+- A defined scope: which systems, which fields, which frequency.
+- A dry-run mode that reports without correcting. Start here.
+- Idempotent correction logic for every auto-fix case.
+- A review queue for discrepancies that require human judgment.
+- A reconciliation report per run with counts for checked, matched, auto-corrected, and escalated.
+- Alerting when the discrepancy rate exceeds a threshold.
+- A run log that shows start time, end time, and outcome for every execution.
+- Retry handling for the job itself, with a dead-letter path for persistent failures.
+
+## Expert opinion
+
+> The reconciliation job is one of those things where the absence is invisible right up to the moment it is not. The teams that build it early have a boring, quiet billing history. The teams that skip it have an incident on a Sunday afternoon because a webhook silently failed three weeks ago and three hundred subscriptions are now in the wrong state.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A subscription SaaS client came to me after a billing incident. Their Stripe webhook handler had a bug that was silently failing for a specific payment method type. The bug had been present for eleven days. In that time, forty-two accounts had renewed but were still marked as past-due in the application. Support had been receiving confused tickets. Nobody had connected the pattern because each ticket looked like an isolated problem.
+
+We spent two days writing a billing reconciliation script in report-only mode. It found the forty-two accounts immediately. We corrected them manually and fixed the webhook handler. Then we spent another week turning the script into a proper scheduled job with a nightly report and an alert when discrepancy counts crossed a threshold. The job has run nightly for eighteen months since. It has surfaced two more upstream issues before customers noticed.
+
+The second issue it caught was a Stripe API change that shifted the format of a trial end date field. The reconciliation report showed trial expiry dates drifting on new subscriptions. We found and fixed the parsing bug within six hours of the first report. Without the job, we would have found it when trial users could not access the product after their trial ended. For the underlying delivery reliability pattern, see [the outbox pattern a saas reliability cheat code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code) and [background job queues the architecture decision founders skip](/blog/background-job-queues-the-architecture-decision-founders-skip).
+
+## Common mistakes teams make
+
+1. Relying entirely on webhooks. The real-time path will fail at some point.
+2. Shipping auto-correction before running in report-only mode. You will not understand the discrepancy categories until you have seen them in production.
+3. Non-idempotent correction logic. Two runs of the job create double corrections.
+4. No reconciliation report. The job runs, finds or does not find discrepancies, and you have no idea which.
+5. Running the job too infrequently. A nightly job on an active product still allows a day of drift.
+6. No alerting on discrepancy count. The report goes to a log nobody reads.
+7. Extending auto-correction to ambiguous cases too quickly. Human review exists for a reason.
+8. Building the reconciliation job as a one-off script. It needs to run reliably for years.
+
+## A two-week plan
+
+1. **Days one to three.** Identify the highest-risk pair of systems. For most SaaS, that is local subscription state versus the billing provider.
+2. **Days four to six.** Write the comparison logic in report-only mode. Fetch both sides, align by ID, compare the fields that should agree.
+3. **Days seven to nine.** Run the report against production in read-only mode. Review the output. Categorize the discrepancy types you see.
+4. **Day ten.** Wire the job to the [background queue infrastructure](/blog/why-your-saas-should-have-a-job-queue-from-day-one). Set a nightly schedule.
+5. **Days eleven and twelve.** Add auto-correction for the clearest, lowest-risk discrepancy category. Keep the rest in the review queue.
+6. **Days thirteen and fourteen.** Add alerting. Ship the reconciliation report to a shared channel the team reads daily.
+
+For the broader reliability context, [webhooks the reliable pattern that most companies get wrong](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong) covers the real-time path that the reconciliation job backs up.

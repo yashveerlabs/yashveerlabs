@@ -1,0 +1,118 @@
+---
+slug: "code-smells-that-predict-tech-debt"
+title: "Code Smells That Predict Tech Debt"
+excerpt: "Not every code smell predicts pain. A few specific ones reliably do. The teams that catch them early pay less debt later. Here are the smells worth treating as warnings, not preferences."
+date: "2026-05-20"
+category: "Tech Debt and Refactoring"
+tags: ["tech-debt","code-smells","refactor","quality"]
+readingMinutes: 12
+ogImage: "/api/og/blog/code-smells-that-predict-tech-debt"
+status: "published"
+definition: "Code smells are patterns in code that suggest deeper problems. Not all smells matter. The ones that reliably predict tech debt are specific. Functions that grow without breaking up. Files that everyone has touched. Tests that are skipped. Try catch blocks that swallow errors. Configuration that lives in code. The teams that treat these specific smells as warnings and address them early avoid the larger debt that they predict."
+faq: [
+  {"q":"What is the most reliable code smell?","a":"A file that every engineer on the team has touched in the last quarter. The shared touch usually means the file has become a junction box for multiple concerns. The next change to it is likely to cause a regression in an unrelated area. The fix is decomposition along the actual concerns."},
+  {"q":"What about long functions?","a":"Long functions are a smell only when they grow over time without decomposition. A long pure function with clear inputs and outputs can be fine. A long function that has accumulated branches and side effects over twenty commits is a refactoring target."},
+  {"q":"What is the swallowed exception smell?","a":"A try catch block that catches an error and either ignores it or logs it without rethrowing. The error becomes invisible. The bug it would have surfaced becomes hard to debug. The fix is to let errors propagate to a place where the application can handle them deliberately."},
+  {"q":"What about magic numbers and strings?","a":"Names matter. A function that returns 1 for success and 2 for failure is a bug waiting to happen. The right pattern is a named constant or enum. The cost is hours. The bug prevented is a multi day investigation."},
+  {"q":"What is configuration in code?","a":"Values that should be configurable hard coded into the application. The fix is to externalize them into environment variables, configuration files, or a feature flag system. Configuration in code becomes debt the moment the team needs to vary the value."},
+  {"q":"How do I detect these smells systematically?","a":"Linter rules cover some. Code review catches others. Periodic audits catch the rest. A team that runs a quarterly tech debt review identifies the smells before they become acute."},
+  {"q":"What is the cost of ignoring smells?","a":"The cost compounds. A small smell that takes an hour to fix today takes a sprint to fix in six months. By the time the team has noticed the debt, the cost is large. The early treatment is the cheapest treatment."}
+]
+---
+
+## What you actually need to know
+
+- A handful of specific smells reliably predict tech debt.
+- Files that everyone has touched are the strongest predictor.
+- Long functions that grow over time. Swallowed exceptions. Magic numbers. Configuration in code. Skipped tests.
+- Treat smells as warnings, not preferences.
+- The cost of treatment compounds. Early is cheap. Late is expensive.
+
+| Smell | What it predicts |
+|---|---|
+| File touched by everyone | Junction box failures |
+| Function that grows over time | Refactoring debt |
+| Swallowed exceptions | Hidden bugs |
+| Magic numbers and strings | Bugs from name confusion |
+| Configuration in code | Inflexibility at scale |
+| Skipped tests | Regression risk |
+| Comments explaining workarounds | Brittle dependencies |
+| Duplicated logic with slight differences | Future divergence |
+
+## The core argument
+
+Code smells are noisy as a category. Some smells are real warnings. Many are matters of style. The teams that treat every smell as urgent burn out on cleanup work. The teams that treat no smells seriously accumulate debt that eventually requires a major refactor or rewrite.
+
+The discipline is to learn which smells reliably predict actual pain. The list is shorter than the textbook list. Files that everyone has touched. Functions that have grown without decomposition. Try catch blocks that swallow errors. Magic numbers without names. Configuration that lives in code. Skipped or commented out tests.
+
+Each of these has a high signal to noise ratio for predicting future pain. The file that the whole team has touched is the next regression site. The function that has grown is the next bug source. The swallowed exception is the next hours long debugging session. The magic number is the next time a behavior changes mysteriously and nobody can find where.
+
+The cost of treating these smells when they appear is small. A few hours per occurrence. The cost of treating them after they have compounded is large. Days to weeks of refactoring. The math favors the early treatment.
+
+## The smells and their fixes
+
+| Smell | Fix |
+|---|---|
+| File touched by everyone | Decompose along the actual concerns |
+| Function that grew over time | Extract methods. Apply single responsibility |
+| Swallowed exception | Let it propagate. Handle it deliberately at the right level |
+| Magic number | Named constant or enum |
+| Configuration in code | Externalize to env var or config file |
+| Skipped test | Fix the underlying issue or delete the test |
+| Comment explaining workaround | Address the workaround if possible |
+| Duplicated logic | Extract the shared part or commit to divergence |
+
+## How much does this cost
+
+The cost per smell treated is small. A few hours to refactor a function. An hour to externalize configuration. A few minutes to name a constant. The ongoing cost is the discipline to treat them as they appear rather than as they accumulate.
+
+The savings show up later. The bug that did not happen. The refactor that was small instead of large. The investigation that took minutes instead of days.
+
+## Features the smell discipline must have
+
+- Linter rules for the smells that can be detected.
+- Code review checklists that include the priority smells.
+- Quarterly tech debt audits.
+- A budget for tech debt work in every sprint.
+- A clear distinction between style and signal smells.
+- A list of approved exceptions where the smell is acceptable.
+
+## Expert opinion
+
+> The teams that ship the cleanest code do not treat every smell as urgent. They learn which smells reliably predict pain and treat those as warnings. The discipline is selective and ruthless. The result is a codebase that ages well because the genuine problems were caught early and the noise was ignored. The teams that treat every smell as urgent burn out and stop treating any of them.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client codebase had accumulated technical debt that was slowing the team. The founder wanted a cleanup pass. We started with the smells that reliably predict debt rather than the textbook list of all smells.
+
+The audit found four hot files that the whole team had touched in the previous quarter. Each was a junction box for multiple concerns. We decomposed them into focused modules. The regression rate in those files dropped dramatically over the next quarter.
+
+We found seventeen try catch blocks that swallowed exceptions. Most of them were silent for years. We let the exceptions propagate to a central error handler. Three new bugs surfaced in the first week because the team could finally see them. All three were fixed quickly.
+
+We found roughly forty magic numbers in critical paths. Each got a named constant. The codebase became readable in a way it had not been before.
+
+The total cleanup took six engineer weeks across three engineers. The velocity improvement over the next quarter recovered the investment within months. The team adopted the smell discipline as ongoing practice.
+
+For more on the related work, see [the cost of tech debt a founders worst bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill) and [when to refactor an MVP and when to throw it away](/blog/when-to-refactor-an-mvp-and-when-to-throw-it-away).
+
+## Common mistakes teams make
+
+1. Treating every smell as urgent.
+2. Ignoring the smells that reliably predict pain.
+3. No quarterly tech debt audit. Debt accumulates.
+4. No budget for cleanup work. Sprints are pure features.
+5. Treating style preferences as smells.
+6. Letting the file that everyone touched become the architecture.
+7. No linter for the smells that can be automated.
+8. No documented list of acceptable exceptions.
+
+## A 30 day plan to put smell discipline in place
+
+1. **Week one.** Audit the codebase for the priority smells. Score the hot files.
+2. **Week two.** Set up linter rules for the smells that can be automated.
+3. **Week three.** Refactor the three worst hot files.
+4. **Week four.** Establish the quarterly audit cadence and the per sprint budget.
+
+For more on the related work, read [the cost of tech debt a founders worst bill](/blog/the-cost-of-tech-debt-a-founders-worst-bill) and [adding tests to a legacy codebase without going mad](/blog/adding-tests-to-a-legacy-codebase-without-going-mad). On the broader refactor side, [big bang vs gradual migration a decision map](/blog/big-bang-vs-gradual-migration-a-decision-map) is the natural next read.

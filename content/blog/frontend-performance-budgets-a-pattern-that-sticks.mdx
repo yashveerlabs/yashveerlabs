@@ -1,0 +1,114 @@
+---
+slug: "frontend-performance-budgets-a-pattern-that-sticks"
+title: "Frontend Performance Budgets: A Pattern That Sticks"
+excerpt: "A performance budget that the team enforces in CI prevents the slow drift that destroys frontend performance over years. The setup is small. The discipline holds the line."
+date: "2026-05-22"
+category: "Performance Optimization"
+tags: ["performance","frontend","budgets","ci"]
+readingMinutes: 11
+ogImage: "/api/og/blog/frontend-performance-budgets-a-pattern-that-sticks"
+status: "published"
+definition: "A frontend performance budget is a documented threshold for specific metrics that the team commits not to exceed. Bundle size. LCP. CLS. INP. The budget is enforced in CI so regressions block the build. Without enforcement the budget is a wish. With enforcement the team holds performance over years rather than letting it drift down release by release."
+faq: [
+  {"q":"What metrics should I budget for?","a":"Bundle size compressed. Largest Contentful Paint. Cumulative Layout Shift. Interaction to Next Paint. Total page weight. Each is a Core Web Vital or a strong proxy. The team commits to a threshold per metric. The budget is the threshold."},
+  {"q":"What are reasonable thresholds?","a":"Bundle size under 200 KB compressed per route. LCP under 2.5 seconds. CLS under 0.1. INP under 200 ms. These are the Core Web Vitals targets plus a bundle target. Tune to your context. The targets should be achievable for your stack."},
+  {"q":"How do I enforce in CI?","a":"Lighthouse CI for Core Web Vitals. Size limit or a custom check for bundle size. Both fail the build on regression. The PR cannot merge if the budget is exceeded. The enforcement is the discipline."},
+  {"q":"What about field versus lab metrics?","a":"Both matter. The lab metrics from Lighthouse are reproducible. The field metrics from Real User Monitoring reflect what customers experience. Track both. The lab metric is the gate. The field metric is the truth."},
+  {"q":"How do I handle exceptions?","a":"With a documented process. A reviewer can approve a budget exception with a written justification. The exception is logged. The team revisits the budget if exceptions become frequent. The discipline is to make exceptions visible rather than silent."},
+  {"q":"What about new features that need more bundle?","a":"Dynamic import the heavy parts. The budget is for the initial load. The lazy loaded code does not count against the initial budget. The discipline is to split the bundle so the budget can hold."},
+  {"q":"What is the worst budget mistake?","a":"Budget without enforcement. The team commits to numbers. The CI does not check. The bundle drifts up. The metrics drift down. The team learns about the regression months later. The fix is to enforce in CI from day one."}
+]
+---
+
+## What you actually need to know
+
+- Budget for bundle size, LCP, CLS, INP, and total page weight.
+- Enforce in CI. PRs fail when budget is exceeded.
+- Track both lab and field metrics.
+- Document the exception process.
+- Dynamic import heavy code to keep the initial bundle within budget.
+
+| Metric | Recommended threshold |
+|---|---|
+| Initial JS bundle compressed | Under 200 KB |
+| LCP | Under 2.5 seconds |
+| CLS | Under 0.1 |
+| INP | Under 200 ms |
+| FID | Under 100 ms |
+| Total page weight | Under 1 MB |
+| Time to Interactive | Under 4 seconds |
+| Number of requests | Under 50 per page |
+
+## The core argument
+
+Frontend performance budgets are one of those engineering disciplines that prevent slow drift over years. Without the budget the bundle grows. Each PR adds a few kilobytes. None of the additions are individually large. The cumulative effect is a bundle that has doubled in size over a year. The site is slower. The team did not notice because each step was small.
+
+The fix is documented thresholds enforced in CI. The bundle size cannot grow past the threshold. The Core Web Vitals cannot regress past the threshold. The CI fails the build when a regression crosses the line. The team has to address the issue before merging. The slow drift cannot happen.
+
+The setup is small. Lighthouse CI for Core Web Vitals. A bundle size check for the bundle. Both run on every PR. The configuration is roughly a sprint for a team without it. The ongoing maintenance is small. The benefit is performance that does not drift.
+
+The discipline is in handling exceptions. Some changes genuinely require more bundle. The exception process makes the cost visible. The reviewer approves with justification. The exception is logged. The team revisits the budget if exceptions become frequent. The discipline is to make exceptions deliberate rather than silent.
+
+The teams that adopt this stop having quarterly performance crises. The performance is healthy because the budget caught the regressions when they were introduced. The teams that skip this find themselves in a performance project every six months because the cumulative drift has produced an unusable site.
+
+## The patterns that work
+
+| Pattern | Detail |
+|---|---|
+| Lighthouse CI on every PR | Core Web Vitals enforced |
+| Size limit check | Bundle size enforced |
+| Per route budgets | Different routes have different thresholds |
+| Field metric tracking | RUM data informs reality |
+| Exception process | Documented and visible |
+| Quarterly review | Adjust budgets as needed |
+| Dynamic imports | Heavy code not on initial load |
+| Performance regression alerts | Catch issues fast |
+
+## How much does this cost
+
+The cost of the setup is roughly a sprint of work. The ongoing cost is the handful of PRs that need exception conversations or rework to fit the budget. The savings is the performance crises that do not happen.
+
+## Features the budget system must have
+
+- Documented budgets per metric per route.
+- CI enforcement that fails the build.
+- Field metric tracking via RUM.
+- An exception process that is visible.
+- A quarterly budget review.
+- Dynamic import discipline.
+- Performance regression alerts.
+- A retrospective on misses.
+
+## Expert opinion
+
+> Performance budgets enforced in CI are the cheapest way to hold frontend performance over years. The setup is small. The enforcement removes the politics from individual PR conversations. The reviewer is not arguing with the engineer about bundle size. The CI is. The team has to address the issue or get an exception. The discipline is mechanical and effective.
+>
+> Yashveer Singh Rajpoot, founder of Yashveer Labs
+
+## How this played out on a real project
+
+A client SaaS had let frontend performance drift over two years. The LCP had grown from 1.8 seconds to 4.1 seconds. The bundle had grown from 200 KB to 540 KB. The team was facing a quarterly performance project to recover.
+
+We set up performance budgets in CI. Lighthouse CI for the Core Web Vitals. Size limit for the bundle. We brought the metrics back to budget with a focused project. The budget then held the metrics across the next year of feature work.
+
+The team did not have to spend another quarter on performance recovery. The PRs that would have caused regressions were rejected by CI. The engineers either fit the new code into the budget or got an exception. The slow drift stopped.
+
+For more on the related work, see [the real numbers behind a fast web app in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026) and [bundle size the quiet killer of mobile web performance](/blog/bundle-size-the-quiet-killer-of-mobile-web-performance).
+
+## Common mistakes teams make
+
+1. No budget. Performance drifts.
+2. Budget without CI enforcement.
+3. No field metric tracking. Lab only.
+4. No exception process. Either too rigid or invisibly bypassed.
+5. Bundle on first load includes everything.
+6. No per route budgets.
+7. No quarterly review. Budgets get stale.
+8. Treating performance as a quarterly project rather than a continuous discipline.
+
+## A two week setup plan
+
+1. **Week one.** Pick the metrics and thresholds. Document the budget.
+2. **Week two.** Set up Lighthouse CI and size limit. Wire to PR gating. Train the team.
+
+For more on the related work, read [the real numbers behind a fast web app in 2026](/blog/the-real-numbers-behind-a-fast-web-app-in-2026) and [bundle size the quiet killer of mobile web performance](/blog/bundle-size-the-quiet-killer-of-mobile-web-performance). On the broader performance side, [the performance regression that hides in CI](/blog/the-performance-regression-that-hides-in-ci) is the natural next read.

@@ -1,0 +1,87 @@
+---
+slug: "the-decision-to-switch-tech-stack"
+title: "The Decision to Switch Tech Stack"
+excerpt: "When rewriting in a new tech stack actually solves a real problem and when it is a way to avoid fixing the harder issues in the existing one."
+date: "2025-10-14"
+category: "Founder Decision Frameworks"
+tags: ["founders","tech-stack","refactoring","engineering","decision-frameworks"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-decision-to-switch-tech-stack"
+status: "published"
+definition: "Switching tech stacks means rewriting significant portions of the application in a different programming language, framework, or architectural pattern. It is one of the most expensive engineering decisions a company can make and one of the most frequently rationalized. The cases where it is genuinely necessary are fewer than most engineers believe. The cases where it is used to avoid fixing structural problems in the existing codebase are more common."
+faq: [
+  {"q":"When is switching tech stacks actually justified?","a":"When the current stack creates a hard hiring constraint that prevents the team from reaching required size, when a technical limitation of the current stack prevents building a product requirement that cannot be worked around, or when the maintenance cost of the current stack is measurably consuming more engineering time than a migration would cost."},
+  {"q":"What is the most common bad reason to switch stacks?","a":"The team is frustrated with the current stack. Frustration is real and legitimate, but it is not a business reason. A frustrated team on a working stack is a team problem, not a technology problem. Switching stacks to improve team morale almost always produces a new set of frustrations within a year."},
+  {"q":"How long does a full stack migration take?","a":"For a typical SaaS product, rewriting the backend in a new language takes 6 to 18 months while maintaining the existing product. The existing product continues to generate support requests, bug fixes, and feature demand during the rewrite. The rewrite almost always takes longer than the initial estimate."},
+  {"q":"What is the strangler fig pattern?","a":"A migration approach where new features are written in the new stack and old features are gradually replaced rather than rewritten all at once. The old application is 'strangled' by the new one over time. This approach reduces the risk of a big-bang rewrite and allows the team to validate the new stack in production before committing fully."},
+  {"q":"Can I migrate databases during a stack switch?","a":"Yes, but this significantly increases the migration risk. Separating the stack switch from the database migration is safer. Migrate the application to the new framework first, then address the database separately if needed. Doing both simultaneously creates a risk surface that is difficult to manage."}
+]
+---
+
+## What you actually need to know
+
+- The rewrite will take twice as long as estimated and cost twice as much in engineering capacity. Plan for this.
+- Most stack-related problems are solvable within the existing stack with refactoring. Exhaust this path before committing to a rewrite.
+- The strangler fig pattern is almost always better than a big-bang rewrite. Migrate incrementally.
+- Hiring constraints are the most legitimate driver for a stack switch. If you cannot hire engineers for the current stack, you cannot maintain it.
+- The new stack will have its own problems. The grass is not greener.
+
+| Migration Approach | Risk | Timeline | Recommended For |
+|---|---|---|---|
+| Big-bang rewrite | Very high | 12 to 24 months | Almost never |
+| Strangler fig | Medium | 12 to 36 months | When incremental migration is possible |
+| Parallel development | High | 12 to 18 months | When old stack is truly unmaintainable |
+| Incremental refactor | Low | Ongoing | Most situations that seem to need a rewrite |
+
+## The core argument
+
+Joel Spolsky wrote about this twenty years ago in his essay on the second-system effect. The old code is not necessarily bad. It is the accumulated decisions of engineers who were solving real problems with incomplete information. Some of those decisions look wrong in hindsight. Most of them were reasonable given what was known at the time. The new team that looks at the old code and says "let's rewrite this properly" is overestimating their own foresight and underestimating the implicit knowledge embedded in the code they are proposing to throw away.
+
+That said, stack switches sometimes are the right call. When the hiring pool for a language is genuinely constrained, when a technical limitation is genuinely preventing a product requirement, or when the maintenance burden is measurably unsustainable, the migration can be justified.
+
+The question to ask before committing to any rewrite is: what specific, measurable problem will the new stack solve that cannot be solved within the current one? If the answer requires specific metrics (we cannot hire engineers for this language in this market, we cannot build this specific performance requirement in this framework), the decision is on solid ground. If the answer is qualitative (the code is messy, the framework is outdated, the team wants to use modern tools), the decision is on weak ground.
+
+I have worked in enough codebases to know that the perceived problems with a tech stack are often really problems with the architecture decisions made in that stack, not with the stack itself. A poorly structured Node.js application does not become a well-structured Go application if the same architectural decisions are replicated in the new language. The discipline that makes the new stack better is the same discipline that could have improved the old one.
+
+## The legitimate drivers for a stack switch
+
+**Hiring constraint.** When the current language or framework has a small and shrinking pool of practitioners, and the company's hiring needs exceed what that pool can supply. PHP, classic ASP, and older Ruby on Rails versions have created real hiring challenges for teams in specific markets. If the next five engineering hires the company needs do not exist in the local market for the current stack, the migration becomes a business necessity.
+
+**Performance limit.** When the current stack genuinely cannot deliver the performance requirements of the product and the limitation is in the language runtime or framework architecture, not in the application code. This is rare. Most performance problems are in the application code (unoptimized queries, unnecessary network calls, missing caching) and can be fixed without a stack switch.
+
+**Technical debt beyond the point of return.** When the current codebase has accumulated so much technical debt that incremental improvements are slower than a rewrite. This threshold is higher than most teams believe. A codebase with significant technical debt can usually be improved incrementally in less time than a full rewrite.
+
+## The strangler fig approach
+
+The safest way to migrate a tech stack is incrementally, using the strangler fig pattern. New features are built in the new stack. Old features are replaced in the new stack as they need to be changed anyway. The old application shrinks over time as the new one grows.
+
+This approach has three advantages: it validates the new stack in production before full commitment, it keeps the existing application running while the migration proceeds, and it allows the team to learn the new stack's patterns on non-critical features before applying them to the critical ones.
+
+The disadvantage is that running two stacks simultaneously creates complexity: two deployment pipelines, two sets of dependencies, two monitoring configurations. This complexity is manageable for most teams and is substantially lower risk than a big-bang rewrite.
+
+## Common mistakes teams make with stack switches
+
+1. Starting the rewrite without completing the feature parity checklist. The old application has features the team has forgotten about. Starting the rewrite reveals this, but discovering undocumented features during a rewrite is expensive.
+2. Maintaining both stacks simultaneously for too long. The strangler fig approach requires a commitment to actually strangle the old code. Teams that run parallel stacks indefinitely double their maintenance burden without ever completing the migration.
+3. Not involving the team in the decision. The engineers who will do the migration need to agree that it is worth doing. A team that does not believe in the migration will not execute it well.
+4. Changing the database schema during the stack migration. Separating schema changes from the language migration reduces the risk surface significantly.
+5. Treating the rewrite as a clean slate for everything. A rewrite is a migration, not a redesign. The product requirements, data model, and business logic all carry over. Treating it as a redesign produces a second-system effect: the new system is more complex and less reliable than the old one.
+
+## Where to start: a 3-step stack switch decision
+
+**Step 1: Quantify the specific problem the switch would solve.** Time spent on stack-specific maintenance per week. Number of positions that cannot be filled because of the current stack. Specific product requirements that cannot be built in the current framework. If the quantification is hard, the problem may not be as severe as it appears.
+
+**Step 2: Evaluate the incremental refactor alternative.** For the specific problems identified, what is the cost of addressing them within the current stack? A three-month refactoring initiative that eliminates the most painful parts of the existing code is often more efficient than an 18-month rewrite.
+
+**Step 3: If proceeding, choose the strangler fig approach and define the first service to migrate.** Start with a non-critical service that receives production traffic. Run it in the new stack for 60 days. Validate that the operational experience (deployment, monitoring, debugging) works as expected before committing to the full migration.
+
+## The Context in Which I Make This Judgment
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The stack decisions I make for my own projects and for clients are deliberate. I use TypeScript on Next.js for frontend and API work, PostgreSQL for relational data, and reach for specialized tools only when the primary stack cannot solve the problem. I have inherited codebases that needed refactoring, not rewriting, and I have done the refactoring. If you are evaluating a stack switch and want a technical perspective on whether the current stack's problems can be addressed without migration, that is a specific evaluation I can do.
+
+## Related reading
+
+- [The Decision to Switch Cloud Providers](/blog/the-decision-to-switch-cloud-providers)
+- [The Decision to Build Your Own Platform vs Use Someone Else's](/blog/the-decision-to-build-your-own-platform-vs-use-someone-elses)
+- Tech Debt: When to Pay and When to Wait
+- Refactoring Without Breaking the Product

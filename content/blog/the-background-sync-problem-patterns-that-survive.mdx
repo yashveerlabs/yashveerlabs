@@ -1,0 +1,80 @@
+---
+slug: "the-background-sync-problem-patterns-that-survive"
+title: "The Background Sync Problem: Patterns That Survive"
+excerpt: "The background sync patterns that keep SaaS data consistent without blocking the user or corrupting the state. What works, what breaks, and when each applies."
+date: "2024-12-01"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","architecture","background-jobs","sync"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-background-sync-problem-patterns-that-survive"
+status: "published"
+definition: "Background sync is the challenge of keeping data consistent between services, between the client and server, or between a primary store and derived views, without requiring the user to wait for every sync operation to complete. The naive approaches either block the UI or produce corrupted state. The patterns that survive production are the ones that treat sync failures as expected events, not edge cases."
+faq: [
+  {"q":"What is the simplest background sync pattern for a small SaaS?","a":"Polling with a debounce. The client polls an endpoint every 30 to 60 seconds to check for updates. Simple to implement, easy to reason about, handles failures gracefully. Works well for data that does not need real-time freshness. Fails when the update needs to appear immediately."},
+  {"q":"When should I use webhooks instead of polling?","a":"When the data update is event-driven and happens infrequently but must be reflected quickly. A payment status change, a third-party integration event, or a user action in another part of the system. Webhooks are push-based, which means lower latency and lower load than polling."},
+  {"q":"How do I handle a background sync that fails midway?","a":"Idempotent operations and a retry queue. If the sync operation can be run twice without producing a different result the second time, failures are cheap to recover from. Write idempotent sync operations from the start. Use a job queue with retry logic for anything that cannot be re-run synchronously."},
+  {"q":"What is the biggest mistake teams make with background sync?","a":"Running sync operations in the request path. If a user saves a record and the API response does not return until the sync is complete, the user is waiting for an operation they do not see and cannot cancel. Push sync operations to the background. Return the response immediately. Update the UI when the sync completes."},
+  {"q":"How do I show the user that a sync is in progress?","a":"Optimistic UI with a pending state indicator. Show the user the expected result immediately. Show a subtle spinner or badge that indicates the sync is completing. When the sync completes or fails, update the UI accordingly. Hiding the sync state entirely leads to user confusion about whether their action succeeded."}
+]
+---
+
+## What you actually need to know
+
+- Background sync operations must be idempotent. Failures will happen. Retries will happen. The system must handle both safely.
+- Never run sync operations in the request path unless the user must see the result immediately. Push them to the background.
+- Optimistic UI is the pattern that makes background sync invisible to users. Show the expected result, then confirm or revert.
+- The failure case is not the exception. Design the sync system around failure recovery from the start.
+- Event-driven sync (webhooks, queue-based) is more reliable at scale than polling-based sync.
+
+| Sync Pattern | Latency | Reliability | Complexity | Best For |
+|---|---|---|---|---|
+| Synchronous (in request) | Low | High | Low | Simple, low-load operations |
+| Polling | Medium | Medium | Low | Infrequent updates, simple clients |
+| Webhook / event push | Low | Medium | Medium | External integrations, event-driven |
+| Queue-based background job | Low perceived | High | Medium | High-volume, retry-tolerant |
+
+## The core argument
+
+The background sync problem shows up the moment a SaaS connects two systems that need to stay in agreement. The customer's subscription status in the billing system needs to match the feature access in the product. The analytics warehouse needs to reflect the production database. The search index needs to reflect the content store. These are all sync problems.
+
+Teams that build sync naively run it synchronously, in the request path, assuming it will always succeed. The first time it fails, the user sees a 500 error. The first time it runs slowly under load, the API response time triples. The first time the sync target is unavailable, writes to the primary store start failing because they are coupled to the sync operation.
+
+The patterns that survive production treat sync as a separate concern from the primary write. The user writes to the primary store. The response returns immediately. The sync operation happens asynchronously, with retry logic, idempotency guarantees, and a clear failure state that can be inspected and replayed.
+
+## The queue-based pattern
+
+This is the most robust pattern for most SaaS sync needs. When a record changes in the primary store, an event is emitted to a job queue. A background worker picks up the event, performs the sync operation, and marks it complete. If the sync fails, the job is retried according to the queue's retry policy. If the sync target is unavailable, the jobs accumulate in the queue until the target recovers.
+
+The key constraint is idempotency. Every sync job must be safe to run multiple times. If a job is retried three times due to a transient failure, the final state of the sync target should be the same as if the job had run once. This constraint rules out approaches like "append this event to the log" without deduplication, because duplicate events produce incorrect results.
+
+In my work on Nexli and Velmora, queue-based sync is the default. The job queue is implemented with a database table rather than a dedicated queue service for projects at early scale. A table with columns for job type, payload, status, created_at, next_attempt_at, and attempt_count is a perfectly functional job queue for most SaaS at under 10,000 events per day. When the volume crosses that threshold, moving to a dedicated queue like BullMQ or Inngest is straightforward.
+
+## The optimistic UI pattern
+
+On the client side, the experience of background sync should be invisible when things go well and clear when they fail. Optimistic UI achieves this by updating the local state immediately when the user takes an action, before the sync operation confirms success.
+
+The user clicks "save." The UI shows the saved state instantly. In the background, the save operation and the sync are both running. If both succeed, the UI state is confirmed and the spinner disappears. If the sync fails, the UI reverts to the pre-save state and shows an error. If only the save fails, the UI also reverts.
+
+The critical element is the revert path. Teams that implement optimistic UI without the revert path leave users in an inconsistent state when things fail. The revert path is the part that makes the pattern correct, not just fast.
+
+## Common mistakes teams make
+
+1. Running sync in the request path and treating failures as unexpected. At production scale, sync failures are expected. Design for them.
+2. Not making sync operations idempotent. Retries are required. Non-idempotent retries produce corrupted state.
+3. Not monitoring the sync job queue. A queue that is growing faster than it is draining is a system that is about to fall behind. Track queue depth.
+4. Implementing optimistic UI without a revert path. The optimism needs to have a floor.
+5. Not distinguishing between sync failures that are transient (retry) and failures that are permanent (alert and investigate). Both categories need different handling.
+
+## Where to start: a 3-step background sync implementation
+
+**Step 1: Identify all sync dependencies in your system.** What data lives in multiple places? What external systems need to stay in sync with your primary store? List every sync relationship. This list is the scope of the problem.
+
+**Step 2: Implement a job queue.** Start with a database table. Define the schema: job type, payload, status, attempt count, next attempt at. Write a worker that polls for ready jobs, executes them, and marks them complete or failed. Build the retry logic with exponential backoff.
+
+**Step 3: Make every sync operation idempotent.** For each sync job type, write a test that runs the job twice with the same input and asserts that the output state is identical both times. This test is the idempotency contract. If it fails, the sync operation will produce incorrect results on retries.
+## Related reading
+
+- [Job Failure Recovery: How Good SaaS Companies Sleep at Night](/blog/job-failure-recovery-how-good-saas-companies-sleep-at-night)
+- [Webhooks: The Reliable Pattern That Most Companies Get Wrong](/blog/webhooks-the-reliable-pattern-that-most-companies-get-wrong)
+- [Why Your SaaS Should Have a Job Queue From Day One](/blog/why-your-saas-should-have-a-job-queue-from-day-one)
+- [The Outbox Pattern: A SaaS Reliability Cheat Code](/blog/the-outbox-pattern-a-saas-reliability-cheat-code)

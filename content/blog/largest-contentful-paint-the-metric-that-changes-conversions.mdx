@@ -1,0 +1,62 @@
+---
+slug: "largest-contentful-paint-the-metric-that-changes-conversions"
+title: "Largest Contentful Paint: The Metric That Changes Conversions"
+excerpt: "LCP is the Core Web Vital that measures how fast the main content loads. It is also the metric most directly correlated with conversion rate. Here is what causes poor LCP and how to fix it systematically."
+date: "2026-05-23"
+category: "Performance Optimization"
+tags: ["performance","core-web-vitals","optimization"]
+readingMinutes: 6
+ogImage: "/api/og/blog/largest-contentful-paint-the-metric-that-changes-conversions"
+status: "published"
+definition: "Largest Contentful Paint (LCP) measures the time from when the page starts loading to when the largest image or text block visible in the viewport is rendered. It is a Core Web Vital and a Google ranking signal. Good LCP is under 2.5 seconds. Poor LCP is above 4 seconds. LCP is the performance metric most closely correlated with user engagement and conversion rate because it captures how quickly the page feels usable."
+faq: [
+  {"q":"What element is typically the LCP candidate on a web page?","a":"The LCP element is the largest image, text block, or video visible in the viewport at load time. On most landing pages, it is either the hero image or the main headline text block. On product pages, it is usually the product image. You can identify your LCP element by running a Lighthouse audit or using Chrome DevTools Performance panel and looking for the LCP marker."},
+  {"q":"What causes slow LCP?","a":"The four main causes are slow server response time, render-blocking resources that delay the browser from building the page, slow resource load times for the LCP element itself, and client-side rendering that delays when the LCP element appears in the DOM. Each has a different fix, and identifying which one dominates your LCP time is the starting point for optimization."},
+  {"q":"How does lazy loading affect LCP?","a":"Lazy loading the LCP element directly delays it. A hero image with loading=lazy will not start loading until it enters the viewport, which is the opposite of what you want for the element that determines your LCP score. The LCP element should have fetchpriority=high and no lazy loading attribute. All other below-fold images should have loading=lazy to defer them and free bandwidth for the LCP element."},
+  {"q":"What is fetchpriority and how does it help LCP?","a":"The fetchpriority attribute tells the browser to treat a resource as high priority when deciding the order to load resources. Adding fetchpriority=high to the LCP image tells the browser to start loading it immediately at the highest priority, ahead of other images and some scripts. This is particularly impactful when the LCP image is discovered late in the page load or when the browser has many competing resources."},
+  {"q":"How much does LCP improvement actually affect conversions?","a":"The relationship varies by product and audience, but there is consistent evidence from Google and independent studies that faster LCP correlates with higher conversion rates. In my experience, reducing LCP from above 4 seconds to under 2.5 seconds on a product page produces a measurable lift in engagement metrics within two to four weeks of deployment. The effect is more pronounced on mobile where connections are slower and the performance gap between fast and slow sites is larger."}
+]
+---
+
+## What you need to know
+
+- LCP is the Core Web Vital with the strongest correlation to conversion rate. Improving it has business value beyond SEO rankings.
+- The LCP element on most marketing and product pages is the hero image or main headline. Identify yours with Lighthouse before optimizing.
+- Never lazy load the LCP element. Add `fetchpriority="high"` to the LCP image to tell the browser to prioritize it.
+- Server response time is the LCP bottleneck that developers underestimate. A slow Time to First Byte delays everything that follows, including the LCP element.
+- LCP from field data (real users) and lab data (Lighthouse) often differ significantly. Mobile users on slower connections frequently have LCP scores 2 to 3 times worse than desktop lab data suggests.
+
+## The core argument
+
+LCP fails for four distinct reasons, and each requires a different fix. The first is server response time: if the Time to First Byte (TTFB) is above 800 milliseconds, LCP cannot be good regardless of how optimized the rest of the page is. The page cannot finish painting a large element before the HTML has even arrived. Fixing slow TTFB requires either improving the server-side rendering speed, adding caching at the CDN or application layer, or moving to a static generation approach for content that does not change per request.
+
+The second cause is render-blocking resources. A `<link rel="stylesheet">` in the `<head>` blocks the browser from rendering any HTML until the CSS file is downloaded and parsed. A synchronous `<script>` does the same. When these resources are on a slow origin or are large, they delay the LCP element by hundreds of milliseconds. The fix is to defer non-critical CSS with preloading patterns, add `async` or `defer` to scripts that do not need to run before the page renders, and inline the critical CSS that is needed for above-the-fold rendering.
+
+The third cause is the LCP resource itself: the hero image is large, unoptimized, or served from a slow origin without CDN caching. A 1MB JPEG hero image on a mid-range mobile connection takes three to four seconds to download by itself. Compressing it to AVIF or WebP, serving it from a CDN edge, and sizing it correctly for the viewport eliminates this bottleneck. The fourth cause is client-side rendering: the LCP element is rendered by JavaScript rather than being in the initial HTML. This means the browser must download, parse, and execute JavaScript before the LCP element appears in the DOM. Server-side rendering or static generation of the above-fold content is the structural fix. For pages I have worked on through Expert Tutorials and other client projects, moving the hero section from client-rendered to server-rendered typically reduces LCP by 1.5 to 2.5 seconds on first load.
+
+## Common mistakes
+
+1. **Lazy loading the hero image.** This is the most common LCP mistake. Add `loading="lazy"` only to images that are below the fold. The LCP image should have `fetchpriority="high"` and no lazy loading attribute.
+
+2. **Not preloading the LCP image when it is in CSS.** Background images set via CSS are not visible to the browser's preload scanner. Use `<link rel="preload">` with the `as="image"` attribute to tell the browser about the LCP resource early.
+
+3. **Serving the LCP image in JPEG without a modern format.** A JPEG hero image that could be 60 to 70 percent smaller as AVIF is a wasted optimization opportunity. Use a CDN or Next.js Image to serve AVIF with JPEG fallback automatically.
+
+4. **Not measuring LCP on mobile with a slow connection.** Desktop Lighthouse scores often do not reflect the mobile user experience. Run Lighthouse with mobile settings and CPU throttling to see a more realistic picture of what slow-connection users experience.
+
+5. **Optimizing LCP on the homepage but not on landing pages.** LCP matters on every high-traffic page, not just the homepage. The pages where visitors first arrive, including ad landing pages and blog posts, should all be audited.
+
+## Where to start
+
+1. **Identify your LCP element on your highest-traffic page.** Run Lighthouse and look at the LCP metric and the highlighted element. Note the type (image or text), the size, and the load time.
+
+2. **Remove lazy loading from the LCP element and add fetchpriority="high".** This single change is often the highest-ROI LCP fix for pages where the LCP element is an image. Check the before and after Lighthouse score.
+
+3. **Measure your Time to First Byte.** Use WebPageTest or PageSpeed Insights field data to see the TTFB for your main pages. If it is above 600 milliseconds consistently, address server or CDN caching before optimizing individual resources.
+
+## Related reading
+
+- [INP: The New Core Web Vital Most Teams Are Failing](/blog/inp-the-new-core-web-vital-most-teams-are-failing)
+- [Image Optimization at Scale: AVIF, WebP, Responsive Images](/blog/image-optimization-at-scale-avif-webp-responsive-images)
+- [Frontend Performance Budgets: A Pattern That Sticks](/blog/frontend-performance-budgets-a-pattern-that-sticks)
+- [CDN Strategy for a Global SaaS in 2026](/blog/cdn-strategy-for-a-global-saas-in-2026)

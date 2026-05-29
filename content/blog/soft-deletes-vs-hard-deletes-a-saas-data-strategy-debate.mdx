@@ -1,0 +1,67 @@
+---
+slug: "soft-deletes-vs-hard-deletes-a-saas-data-strategy-debate"
+title: "Soft Deletes vs Hard Deletes: A SaaS Data Strategy Debate"
+excerpt: "Soft deletes seem safe but create long-term complexity. Here is how to decide and what you are trading away."
+date: "2026-05-23"
+category: "SaaS Architecture and Scaling"
+tags: ["saas","database","architecture","data-strategy"]
+readingMinutes: 7
+ogImage: "/api/og/blog/soft-deletes-vs-hard-deletes-a-saas-data-strategy-debate"
+status: "published"
+faq: [
+  {"q":"Are soft deletes ever the right choice?","a":"Yes, for specific cases: short-term undo functionality, business records where the law requires retention, or records where \"deleted\" has a specific business meaning distinct from permanent removal. The mistake is using soft deletes as the default without thinking through the query implications."},
+  {"q":"How do ORMs handle soft deletes?","a":"Most popular ORMs (Prisma, Sequelize, Active Record, Hibernate) have soft delete plugins or built-in support. These typically apply a default scope to all queries. The risk is raw queries and analytics queries that bypass the scope."},
+  {"q":"What is the right retention window for archived deleted records?","a":"It depends on your business context and legal requirements. In my experience, 30 to 90 days covers the vast majority of legitimate recovery requests. After that, records should be genuinely removed unless there is a legal reason to retain them."},
+  {"q":"Does using soft deletes affect performance?","a":"Yes. Adding deleted_at IS NULL to every query affects query planning. Accumulated soft-deleted rows increase table size, bloat indexes, and slow down scans. The effect is small at small scale and meaningful at large scale."},
+  {"q":"How do you handle soft deletes with full text search indexes?","a":"This is one of the most common soft delete complications. If your search index includes soft-deleted records, search results will include deleted content. You either need to remove records from the search index on soft delete or filter search results in the application layer."}
+]
+---
+
+# Soft Deletes vs Hard Deletes: A SaaS Data Strategy Debate
+
+**A soft delete marks a record as deleted without removing it from the database, typically by setting a deleted_at timestamp or an is_deleted flag. A hard delete removes the record permanently. Most SaaS teams default to soft deletes thinking they are the safe, recoverable choice. They are not always safe: soft deletes require every query in the application to filter out deleted records, create unexpected behavior when deleted records are referenced, and accumulate database bloat over time.**
+
+## What you need to know
+
+- Soft deletes require adding WHERE deleted_at IS NULL or equivalent to every query that should not return deleted records; missing one query is a data leak
+- Hard deletes with proper archiving (moving data to a separate archive table or data warehouse) give you the recoverable option without the query complexity
+- GDPR's right to erasure requires genuine data removal; soft deletes that keep PII "deleted" in the database complicate erasure compliance
+- Foreign key relationships with deleted records are the most common source of soft delete bugs; a deleted user referenced by an audit log creates ambiguity
+- The "we can undo it" benefit of soft deletes is usually overstated; most applications need a recovery path for days, not indefinitely
+
+## The core argument
+
+The case for soft deletes comes from a reasonable place: mistakes happen, and having the data available for recovery is better than permanent loss. The problem is that the recovery benefit is real but narrow. You want to recover data within a short window after an accidental deletion. You do not need to keep deleted records in your primary tables indefinitely, filtered out of every query, accumulating storage, and creating confusion in your data model.
+
+The query complexity tax is what kills teams in the long run. Every ORM soft delete plugin adds a default scope that filters deleted records. This works until someone writes a raw query, bypasses the ORM, runs an analytics query on the raw table, or adds a new query path that does not inherit the default scope. The soft-deleted records start leaking into results. A user who "deleted" their account starts appearing in admin reports. A deleted product variant shows up in inventory counts. These bugs are subtle and take time to trace.
+
+The pattern I prefer: hard deletes for most data with a short-term archive window. When a record is deleted, write the full record to an archived_records table (or a data warehouse) before removing it from the primary table. This gives you the recovery path you actually need (looking up what was deleted, restoring it if needed within a reasonable window) without polluting every query in the application with soft delete filters.
+
+For Nexli's student records, we use a specific approach: soft deletion is not an option at the data layer. Students are deactivated (a status flag), not deleted. Their records persist because educational institutions have legal retention requirements. That is a domain-specific constraint, not a general-purpose soft delete pattern. The deactivation status is explicit in the data model, not a hidden deleted_at filter that has to be applied everywhere.
+
+## Common mistakes
+
+1. **Adding a deleted_at column without auditing every query in the application.** Every query that touches the soft-deleted table must filter correctly. If you cannot audit every query, you cannot safely add soft deletes.
+
+2. **Soft-deleting records that are referenced by foreign keys without handling the references.** A deleted user record referenced by an order, audit log, or comment creates either a broken reference (if you add a cascade) or a zombie reference (if you do not). Plan the foreign key story before implementing soft deletes.
+
+3. **Using soft deletes to satisfy GDPR right to erasure.** Soft-deleted records still contain PII. GDPR erasure requires that PII be genuinely removed or anonymized. A soft delete that keeps the email address in the row does not satisfy erasure.
+
+4. **Accumulating soft-deleted records without any cleanup.** Over years, soft-deleted records accumulate database storage without providing value. Implement a cleanup job that hard-deletes records past a retention window.
+
+5. **Applying soft deletes uniformly without considering the data type.** User accounts might warrant soft deletes with a short recovery window. Log entries, events, and audit records should never be soft-deleted; they are append-only by design.
+
+## Where to start
+
+1. **Audit which tables genuinely need recoverable deletion.** Most tables do not. User accounts and certain business records warrant recovery paths. Event logs, audit trails, and analytics data do not need soft deletes.
+
+2. **Design the archive pattern explicitly.** For tables where you want recovery capability, design an archived_ version of the table (or a generic archive table with JSON payloads) and write the delete-and-archive logic before implementing any soft delete column.
+
+3. **If you already have soft deletes and they are causing problems, plan a migration.** Move deleted records to an archive table, remove the deleted_at column from the primary table, and remove the soft-delete filters from queries. This is recoverable work done in stages.
+
+## Related reading
+
+- [The Soft Delete Trap: A Pattern That Catches Up With Teams](/blog/the-soft-delete-trap-a-pattern-that-catches-up-with-teams)
+- [Why Logical Deletes Are Almost Always a Mistake](/blog/why-logical-deletes-are-almost-always-a-mistake)
+- [Right to Be Forgotten: How to Implement It Without Pain](/blog/right-to-be-forgotten-how-to-implement-it-without-pain)
+- [Schema Design Decisions That Haunt You at Million User Scale](/blog/schema-design-decisions-that-haunt-you-at-million-user-scale)

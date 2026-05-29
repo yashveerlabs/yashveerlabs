@@ -1,0 +1,175 @@
+---
+slug: "the-mobile-app-lifecycle-hooks-founders-should-know"
+title: "The Mobile App Lifecycle Hooks Founders Should Know"
+excerpt: "App foreground, background, and kill states drive user experience decisions that founders often miss. Here is what each state means for your product."
+date: "2025-02-21"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","founders","ux"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-app-lifecycle-hooks-founders-should-know"
+status: "published"
+definition: "Mobile app lifecycle states -- foreground, background, and killed -- determine what the app can do, when it can communicate with the user, and how user sessions are defined. Founders who understand lifecycle states make better product decisions about notification timing, session management, data synchronization, and the user experience of returning to the app after a gap. Founders who do not understand lifecycle states are surprised when behaviors they expected (background sync, persistent state, reliable push delivery) do not work the way they assumed."
+faq: [
+  {"q":"What are the main lifecycle states of a mobile app?","a":"Three primary states: foreground (the app is on screen and has user focus), background (the app is running but not on screen -- the user has pressed home or switched apps), and killed/not running (the app process has been terminated). iOS is strict about background execution and terminates most background tasks within a few seconds. Android is more permissive but varies significantly by device manufacturer and battery optimization settings. The lifecycle state determines what operations the app can perform and when the operating system will terminate the process."},
+  {"q":"What can an app do in the background?","a":"Limited operations, and the specifics vary by platform. iOS allows specific background modes (audio, location, fetch, remote notifications, VoIP, background processing) that must be declared in the app's Info.plist and approved by App Store review. Arbitrary background code execution is not allowed. Android allows more background work but battery optimization settings on many devices (Xiaomi, Samsung, Huawei) aggressively terminate background processes. For most apps, the safe assumption is: background execution is unreliable, and any operation that must complete should happen in the foreground or via a push notification trigger."},
+  {"q":"How should sessions be defined for a mobile app?","a":"A session in a mobile app is typically defined as: a period of continuous foreground usage, with a new session starting when the app is foregrounded after being in the background for more than a configurable gap (30 minutes is common). This is different from a web session (which is time-based and tied to the browser tab). Mobile session definitions affect retention metrics, engagement reporting, and the user experience of returning to the app. The session definition should be consistent between the analytics tool, the backend, and any caching or state management logic."},
+  {"q":"How do push notifications work with app lifecycle states?","a":"Push notifications are delivered by the OS when the app is killed or in the background. When the user taps the notification, the OS launches or foregrounds the app and passes the notification data to the app. The app needs to handle two cases: the notification was tapped when the app was killed (cold launch from notification) and the notification was tapped when the app was in the background (foreground from notification). Both cases require the app to navigate to the relevant content based on the notification payload. The common mistake: handling only the background-to-foreground case and discovering during testing that the cold-launch case does not navigate correctly."},
+  {"q":"What is the right data refresh strategy when an app comes to the foreground?","a":"Two approaches: time-based staleness (refresh data if it is older than X minutes when the app comes to the foreground) and event-driven refresh (use push notifications or WebSocket events to trigger targeted data refreshes). The time-based approach is simpler to implement; the event-driven approach produces fresher data without unnecessary network requests. For most apps, a hybrid approach works: refresh session-critical data (authentication state, subscription status) on every foreground, and refresh content data if it is older than a staleness threshold (5-15 minutes for most use cases)."}
+]
+---
+
+## What you actually need to know
+
+- Background execution is unreliable on mobile, especially on Android devices with aggressive battery optimization. Do not design product features that depend on reliable background code execution.
+- Push notifications are the primary mechanism for communicating with users when the app is not in the foreground. They are delivered by the OS, not by the app.
+- Cold launch from a notification (app was killed when the user tapped) is a different code path from foreground from background. Both must be handled.
+- Session definition affects retention and engagement metrics. Define it explicitly before integrating analytics tools.
+- Authentication state, subscription status, and cached data should be refreshed when the app comes to the foreground -- the state may have changed while the app was not running.
+
+| App State | User Experience | What the App Can Do | OS Behavior |
+|---|---|---|---|
+| Foreground | App is visible | Full capabilities | Normal execution |
+| Background | App not visible, running | Limited (declared modes only) | Aggressive termination on iOS |
+| Killed | App not running | Nothing | Process terminated |
+| Cold launch | App was killed, now opening | Starting fresh | Creates new process |
+| Warm launch | App was backgrounded, now foregrounding | Resuming state | Restores to last visible state |
+
+## The core argument
+
+Mobile app lifecycle is the part of mobile development that surprises founders most often. The product assumption that users will always experience the app from a fresh foreground state -- like a web page loaded in a browser -- is wrong. Mobile users switch between apps constantly. They receive a notification and open the app from a killed state. They open the app after three days of not using it. They open the app and the operating system has terminated the background process while they were doing something else.
+
+Each of these entry points is a different lifecycle scenario with different engineering requirements. The app that handles only the happy path (user opens app from scratch, uses it, closes it) and does not handle warm launches, cold launches from notifications, or stale background data produces confusing user experiences at the moments that matter most: re-engagement after absence.
+
+Founders who understand lifecycle states can make better product decisions. When the team says "we cannot send a notification when the user has not opened the app in 3 days," a founder who understands that the app is killed and background execution is unavailable understands that push notifications (OS-delivered) are the correct mechanism -- not in-app-triggered code. When the team says "the data is stale when the user comes back," a founder who understands foreground events understands that this is a data refresh timing decision, not an architectural problem.
+
+## Foreground and background in practice
+
+**Foreground.** The app has full access to device capabilities and can execute any code. Network requests, database writes, animations, and user interaction all work normally. This is the state that most feature development targets.
+
+**Background.** The app continues to run briefly after the user switches to another app or presses the home button. On iOS, the app has a few seconds to complete any in-flight operations before the OS suspends the process. On Android, the behavior is less consistent -- the app may continue running for minutes or may be terminated quickly depending on device battery optimization settings.
+
+Background execution modes that the OS allows (and that must be explicitly declared): audio playback (music, podcast apps), location tracking (navigation, fitness tracking), VoIP (calling apps), background fetch (periodic data refresh, available but unreliable), and background processing (scheduled long-running tasks, iOS 13+). Any code that must run in the background but does not fall into these declared modes should be treated as unreliable.
+
+**Killed.** The process is not running. The OS has either explicitly terminated it (due to memory pressure or the user force-quitting) or the device was restarted. When the user opens the app from a killed state, it is a cold launch: the app starts from scratch, must re-initialize all state, and must re-establish any connections.
+
+## Lifecycle events in React Native
+
+React Native exposes lifecycle events through the AppState API:
+
+```typescript
+import { AppState, AppStateStatus } from 'react-native';
+import { useEffect, useRef } from 'react';
+
+export function useAppLifecycle() {
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // App has come to the foreground
+        handleForeground();
+      }
+
+      if (nextAppState === 'background') {
+        // App is going to the background
+        handleBackground();
+      }
+
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, []);
+}
+
+function handleForeground() {
+  // Refresh stale data, re-check authentication, sync pending changes
+}
+
+function handleBackground() {
+  // Cancel unnecessary network requests, save unsaved state
+}
+```
+
+The `handleForeground` function is where data refresh logic lives. For most apps, this means: check if the auth token has expired (re-authenticate if so), check if the user's subscription status may have changed (refresh from the server if more than N minutes have elapsed), and refresh any content that may have changed since the app was last in the foreground.
+
+## Push notification lifecycle handling
+
+Push notifications require handling two lifecycle scenarios: the notification was tapped when the app was killed (cold launch), and the notification was tapped when the app was in the background (warm launch).
+
+In React Native with `@react-native-firebase/messaging`:
+
+```typescript
+// Handle notification that launched the app (cold launch)
+useEffect(() => {
+  messaging().getInitialNotification().then(notification => {
+    if (notification) {
+      navigateToNotificationDestination(notification.data);
+    }
+  });
+
+  // Handle notification tapped while app was in background
+  const unsubscribe = messaging().onNotificationOpenedApp(notification => {
+    navigateToNotificationDestination(notification.data);
+  });
+
+  return unsubscribe;
+}, []);
+
+function navigateToNotificationDestination(data: NotificationData) {
+  switch (data.type) {
+    case 'new_message':
+      navigation.navigate('Chat', { conversationId: data.conversationId });
+      break;
+    case 'payment_failed':
+      navigation.navigate('Billing');
+      break;
+    default:
+      navigation.navigate('Home');
+  }
+}
+```
+
+Both cases use the same `navigateToNotificationDestination` function, which reads the notification payload and navigates to the correct screen. The cold launch case uses `getInitialNotification()` (checked once at app startup). The background case uses the `onNotificationOpenedApp` listener.
+
+## Data freshness management on foreground
+
+The data that is cached in the app when the user backgrounds it may be stale when they return. How stale depends on how long the app was backgrounded. For short gaps (seconds to minutes), cached data is typically fresh enough. For longer gaps (hours to days), the data may have changed significantly.
+
+The foreground refresh strategy:
+
+**Always refresh:** authentication state, subscription/access status, user account settings. These are security-critical; stale state could allow access that should no longer be permitted.
+
+**Refresh if stale:** content feeds, notification badges, user-specific data that changes with some frequency. Define the staleness threshold (5 minutes, 30 minutes, 2 hours) based on how frequently the data changes and how bad the user experience of stale data is.
+
+**Do not refresh:** static content, reference data that rarely changes. These can be refreshed on a longer schedule or on explicit user action.
+
+## Common mistakes founders make with mobile lifecycle
+
+1. Expecting background data sync to work reliably. Features that require the app to fetch and process data in the background (sync contacts, pre-load content, update cache) are unreliable on iOS and inconsistent on Android. Design these features to work when the app is foregrounded instead, with graceful degradation when they cannot complete in the background.
+2. Not handling the cold launch from notification case. The notification that launches the app from a killed state is a different code path from the notification that brings a backgrounded app to the foreground. Both must be tested explicitly.
+3. Not refreshing authentication state on foreground. An auth token that expired while the app was backgrounded produces a confusing experience: the user opens the app and gets a 401 error on the first API call. Check auth state on every foreground event.
+4. Defining sessions for mobile the same way as for web. A web session is time-based and tied to the browser. A mobile session is gap-based and tied to foreground periods. Using web session logic for mobile analytics produces metrics that do not reflect actual mobile usage patterns.
+5. Not testing background-to-foreground transitions with stale data. The test that runs the app continuously without backgrounding does not catch the foreground refresh failure that only occurs when the app has been in the background for more than the staleness threshold.
+
+## Where to start: a 3-step lifecycle implementation
+
+**Step 1: Implement the foreground event handler and add auth state refresh.** Every foreground event should trigger a check of the authentication state. If the token has expired, re-authenticate silently (using refresh tokens) or redirect to the login screen. This is the minimum viable lifecycle handling for any app with authentication.
+
+**Step 2: Implement both push notification cases (cold launch and background-to-foreground) with navigation.** Define the notification payload format, implement the navigation logic, and test both cases explicitly: send a push notification with the app killed (cold launch path) and with the app backgrounded (background-to-foreground path).
+
+**Step 3: Define the session boundary and configure it consistently across analytics and backend.** The session gap (how long in the background before a new session starts) should be the same in the analytics tool configuration, the backend session tracking logic, and any local state management that uses sessions.
+
+## The Lifecycle That Shapes the User Experience
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app had a lifecycle bug in its first TestFlight: the push notification for a match schedule update navigated correctly when the app was in the background, but opened to the home screen when the app was killed. The cold launch case was not handled. It was found in the first week of testing and fixed before public launch -- but the scenario was only discovered because the testing protocol explicitly included cold launch testing. Most mobile bugs live in the transition cases: cold launch, background-to-foreground, stale auth, interrupted network requests. The happy path is easy to test. The lifecycle edge cases are the ones that reach users if the testing protocol does not explicitly include them.
+
+## Related reading
+
+- [The Mobile App Analytics Stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026)
+- [The Mobile API: How to Design One That Survives App Versions](/blog/the-mobile-api-how-to-design-one-that-survives-app-versions)
+- [The Hybrid Mobile Architecture: WebView Heavy Apps in 2026](/blog/the-hybrid-mobile-architecture-webview-heavy-apps-in-2026)
+- The App Store Submission Checklist That Actually Works

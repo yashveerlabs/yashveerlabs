@@ -1,0 +1,216 @@
+---
+slug: "the-mobile-build-pipeline-fastlane-eas-and-the-path-of-least-pain"
+title: "The Mobile Build Pipeline: Fastlane, EAS, and the Path of Least Pain"
+excerpt: "How to automate iOS and Android builds so the team never manually submits to the App Store again -- and which tool to use for React Native vs. Flutter."
+date: "2025-02-23"
+category: "Cross Platform and Mobile Development"
+tags: ["mobile","react-native","flutter","devops","ci-cd","fastlane","eas"]
+readingMinutes: 12
+ogImage: "/api/og/blog/the-mobile-build-pipeline-fastlane-eas-and-the-path-of-least-pain"
+status: "published"
+definition: "The mobile build pipeline is the automated system that takes source code, builds iOS and Android binaries, manages code signing, and distributes the app to TestFlight, Play Store internal tracks, or production. Without a build pipeline, every release requires a developer with the correct certificates, the correct Mac setup, and manual steps through App Store Connect. The build pipeline replaces this with a single command or a CI trigger that handles all of it reliably."
+faq: [
+  {"q":"What is the difference between Fastlane and EAS Build?","a":"Fastlane is an open-source tool that automates iOS and Android build and release tasks on your own hardware or CI machines. It handles code signing (via match), building, and uploading to App Store Connect and Google Play. EAS Build is Expo's managed build service that runs builds on Expo's cloud infrastructure -- no Mac required for iOS builds. For Expo and React Native projects, EAS Build is typically lower friction than Fastlane because it handles the iOS build infrastructure without requiring a macOS CI machine. For Flutter and native iOS projects, Fastlane is the more established choice."},
+  {"q":"How does code signing work for iOS and why is it the most painful part?","a":"iOS apps must be signed with a developer certificate that proves Apple has authorized the developer's account, and a provisioning profile that authorizes the app (identified by its bundle ID) to run on specific devices or be distributed on the App Store. Managing these manually means rotating certificates every year, updating provisioning profiles when new test devices are added, and distributing them to every developer who builds the app. Fastlane's `match` tool manages all of this by storing certificates and provisioning profiles in an encrypted Git repository, where they are automatically downloaded and applied to any machine that runs a Fastlane lane."},
+  {"q":"What triggers should kick off an automated mobile build?","a":"Three triggers: a push to the main branch (produces a build distributed to the internal test team via TestFlight/Play Store internal track), a push to a release branch or a version tag (produces a production build submitted for App Store review), and a pull request (runs lint, type check, and unit tests without producing a distributable build). The PR trigger provides fast feedback on code quality without the 10-15 minute build time. The main branch trigger provides the team with a nightly build. The release trigger is the automated equivalent of the manual App Store submission."},
+  {"q":"How long should a mobile CI/CD pipeline take?","a":"Target: under 20 minutes for the full build pipeline (lint + test + build + distribute), with lint and tests running in under 5 minutes. If the full pipeline takes more than 30 minutes, pull request feedback is too slow to be useful. The bottleneck in mobile build pipelines is almost always the Xcode build time, not the JavaScript compilation. Caching Xcode DerivedData and CocoaPods caches across CI runs significantly reduces build time. EAS Build uses its own cache system for this purpose."},
+  {"q":"What is the right certificate management strategy for a growing mobile team?","a":"Fastlane match for all teams using Fastlane; EAS Build's managed credentials for Expo projects. Both approaches store the single source of truth for certificates and provisioning profiles in a shared location (encrypted Git repository for Fastlane, Expo's secure credential storage for EAS). Every developer on the team runs the same command to authenticate and gets the current certificates. When a certificate expires, it is renewed in one place and all developers get the update. The manual alternative -- each developer managing their own certificates -- produces build failures every time a certificate expires or a new device needs to be added."}
+]
+---
+
+## What you actually need to know
+
+- Manual iOS builds require a Mac, valid certificates, and multiple steps through App Store Connect. Automating this eliminates the most common cause of release delays in mobile teams.
+- EAS Build is the lowest-friction path for React Native/Expo projects. It runs iOS builds in the cloud without requiring a Mac CI machine.
+- Fastlane is the right choice for Flutter, native iOS, and non-Expo React Native projects with more complex build requirements.
+- Fastlane `match` manages iOS certificates in a shared Git repository. It is the solution to the "my certificates expired and only one person knows how to renew them" problem.
+- The mobile build pipeline should produce TestFlight/internal track builds automatically on every merge to main, without anyone manually triggering a build.
+
+| Approach | Best For | iOS Build Machine | Certificate Management | Setup Time |
+|---|---|---|---|---|
+| EAS Build | Expo / React Native | Expo cloud (no Mac needed) | EAS managed | 4-8 hours |
+| Fastlane + GitHub Actions | Flutter / native iOS | macOS GitHub Actions runner | match (Git repo) | 1-2 days |
+| Fastlane + Bitrise | Large teams | Bitrise cloud | match | 1-2 days |
+| Manual | Small teams, infrequent releases | Developer's Mac | Individual | None upfront |
+
+## The core argument
+
+Manual mobile release processes are the single most reliable source of "we were ready to ship but the build failed" problems. The developer who manages the iOS certificates has left the company. The provisioning profile does not include the new test device. The App Store Connect credentials are not shared. The Xcode version on the build machine does not match the project configuration. Every one of these failure modes is predictable and every one of them is eliminated by an automated build pipeline.
+
+The investment in a mobile build pipeline is front-loaded: 4-8 hours for EAS Build, 1-2 days for Fastlane. The return is every manual build session that never needs to happen, every certificate management failure that never occurs, and every "who can do the release?" question that the pipeline answers automatically.
+
+The teams that resist this investment typically cite the upfront complexity as the reason. The teams that have shipped multiple mobile products use the automation because they have experienced what manual releases cost in time, in failed builds, and in the release process becoming a bottleneck that only certain engineers can unblock.
+
+## EAS Build for React Native
+
+EAS Build is the current lowest-friction path for React Native and Expo projects. The setup:
+
+**Install and configure EAS CLI:**
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+```
+
+The `eas build:configure` command generates an `eas.json` file with build profiles:
+
+```json
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+```
+
+**Build for internal distribution (TestFlight):**
+```bash
+eas build --platform ios --profile preview
+```
+
+EAS handles: downloading the correct Xcode version, managing provisioning profiles and certificates, building the app, and uploading the artifact. The result is a TestFlight build link that can be distributed to testers without anyone having run Xcode locally.
+
+**Submit to the App Store:**
+```bash
+eas submit --platform ios --latest
+```
+
+EAS Submit uploads the latest build to App Store Connect and starts the review process.
+
+**GitHub Actions integration:**
+```yaml
+name: EAS Build
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas build --platform all --profile preview --non-interactive
+```
+
+## Fastlane for Flutter and native iOS
+
+For Flutter and non-Expo React Native, Fastlane provides equivalent automation with more configuration. The core setup:
+
+**Fastfile for iOS:**
+```ruby
+platform :ios do
+  desc "Build and distribute to TestFlight"
+  lane :beta do
+    # Download certificates and provisioning profiles
+    match(type: "appstore", readonly: true)
+    
+    # Increment build number
+    increment_build_number(
+      build_number: number_of_commits
+    )
+    
+    # Build the app
+    build_app(
+      workspace: "ios/YourApp.xcworkspace",
+      scheme: "YourApp",
+      configuration: "Release",
+      export_method: "app-store"
+    )
+    
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
+  end
+end
+```
+
+**Fastlane match configuration:**
+```ruby
+# Matchfile
+git_url("https://github.com/yourorg/certs")
+type("appstore")
+app_identifier("com.yourapp.bundle")
+username("developer@example.com")
+```
+
+Fastlane match stores the certificates and provisioning profiles in an encrypted Git repository. When a new developer runs `fastlane match appstore`, they receive the current certificates and can build immediately without manual certificate setup.
+
+## The CI/CD pipeline structure
+
+A complete mobile CI/CD pipeline has three stages:
+
+**Pull request validation (5-10 minutes):**
+- ESLint / Dart analyze
+- TypeScript type check
+- Unit test suite
+- No build artifact produced
+
+**Main branch build (15-20 minutes):**
+- All PR validation steps
+- iOS and Android build (EAS or Fastlane)
+- Distribute to TestFlight (iOS) and Play Store internal track (Android)
+- Post build link to Slack
+
+**Release build (20-30 minutes):**
+- Triggered by a version tag or manual workflow dispatch
+- Increment version number
+- iOS and Android build with production configuration
+- Submit to App Store review and Play Store review
+
+This structure means the team always has a recent build available for testing (from main branch builds), and production releases are automated without manual App Store Connect steps.
+
+## Common mistakes teams make with mobile build pipelines
+
+1. Setting up the build pipeline after the first release instead of before. The pipeline that is set up before the first beta prevents the "who can build this?" problem from ever occurring. Setting it up after the first release means the first few releases are manual and teach bad habits.
+2. Not caching build artifacts. Xcode build times on clean CI machines are 15-25 minutes. Caching DerivedData and CocoaPods across CI runs reduces this to 5-8 minutes. EAS Build handles this automatically; Fastlane on GitHub Actions requires explicit cache configuration.
+3. Using individual developer Apple IDs for CI certificate access. The CI pipeline should use a dedicated Apple ID for the development team, not a personal developer account. When the personal account's authentication session expires, the CI pipeline fails and requires manual intervention.
+4. Not testing the pipeline on both platforms. iOS build failures and Android build failures are independent. A pipeline that only builds iOS regularly may not catch Android build regressions until they block a release.
+5. Not automating the version bump. Manual version and build number management is a source of "the build number we submitted is already taken" errors in App Store Connect. Automating the build number (using the commit count or a timestamp) eliminates this class of error.
+
+## Where to start: a 3-step build pipeline setup
+
+**Step 1: Set up EAS Build (for Expo/React Native) or Fastlane (for Flutter/native iOS) and produce the first automated TestFlight build.** This is the validation that the pipeline works. A successful automated TestFlight build means the pipeline can replace all manual builds.
+
+**Step 2: Add the build trigger to GitHub Actions and verify it runs on push to main.** The pipeline should produce a TestFlight build without anyone manually triggering it. Verify this by pushing a test commit and observing the CI run.
+
+**Step 3: Configure Fastlane match or EAS credentials management and remove individual developer certificate access from the CI pipeline.** The build pipeline should not depend on any individual developer's credentials. Shared, managed credentials ensure the pipeline continues to work as team members change.
+
+## The Pipeline That Nobody Has to Think About
+
+Yashveer Singh Rajpoot. Founder of Yashveer Labs. The Prominence Football Academy app uses EAS Build with a GitHub Actions trigger on every push to main. In the first three months after launch, we shipped 14 updates -- bug fixes, performance improvements, and new features. Every single one of those updates was built and distributed to TestFlight by the CI pipeline without a single manual App Store Connect step. The two developers on the project both contributed to the mobile codebase; neither needed to own the release process. When a certificate update was required (quarterly EAS credential refresh), it was handled in a single `eas credentials` command and did not interrupt any builds. That is what the pipeline investment produces: the release process becomes invisible, and the team's attention goes entirely to the product.
+
+## Related reading
+
+- [The Mobile App Tech Stack Founders Underrate](/blog/the-mobile-app-tech-stack-founders-underrate)
+- [The Mobile App Analytics Stack for 2026](/blog/the-mobile-app-analytics-stack-for-2026)
+- The App Store Submission Checklist That Actually Works
+- The CI/CD Pipeline for a Solo Developer
